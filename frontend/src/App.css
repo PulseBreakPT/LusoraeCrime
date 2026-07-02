@@ -1,34 +1,145 @@
-.App-logo {
-    height: 40vmin;
+.App {
+    min-height: 100vh;
+}
+
+/* ---------- Animations ---------- */
+@keyframes slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse-ring {
+    0% {
+        transform: scale(0.7);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(2.1);
+        opacity: 0;
+    }
+}
+
+.animate-slide-up {
+    animation: slide-up 0.35s ease-out both;
+}
+
+.animate-slide-down {
+    animation: slide-down 0.35s ease-out both;
+}
+
+/* ---------- Leaflet overrides ---------- */
+.leaflet-container {
+    background: #0a0a0a;
+    font-family: "Inter", sans-serif;
+}
+
+.leaflet-control-attribution {
+    background: rgba(5, 5, 5, 0.7) !important;
+    color: #52525b !important;
+    font-size: 9px !important;
+    backdrop-filter: blur(6px);
+}
+
+.leaflet-control-attribution a {
+    color: #8e8e93 !important;
+}
+
+.lus-marker {
+    background: transparent;
+    border: none;
+}
+
+/* ---------- Opportunity pin ---------- */
+.opp-pin {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9999px;
+    background: rgba(5, 5, 5, 0.88);
+    border: 1.5px solid var(--mk, #fff);
+    color: var(--mk, #fff);
+    box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.opp-pin:hover {
+    transform: scale(1.15);
+}
+
+.opp-pin-selected {
+    transform: scale(1.2);
+    box-shadow: 0 0 18px var(--mk, #fff);
+}
+
+.opp-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1.5px solid var(--mk, #fff);
+    animation: pulse-ring 2s ease-out infinite;
     pointer-events: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
-}
-
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
+/* ---------- HQ pin ---------- */
+.hq-pin {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #fff;
+    color: #050505;
+    border: 2px solid #050505;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
 }
 
-.App-link {
-    color: #61dafb;
+/* ---------- Unit pin (moving teams) ---------- */
+.unit-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 9999px;
+    background: var(--mk, #22d3ee);
+    color: #050505;
+    border: 2px solid rgba(5, 5, 5, 0.9);
+    box-shadow: 0 0 12px var(--mk, #22d3ee);
 }
 
-@keyframes App-logo-spin {
+.unit-operating {
+    animation: unit-blink 1s ease-in-out infinite alternate;
+}
+
+@keyframes unit-blink {
     from {
-        transform: rotate(0deg);
+        box-shadow: 0 0 8px var(--mk, #ef4444);
     }
     to {
-        transform: rotate(360deg);
+        box-shadow: 0 0 20px var(--mk, #ef4444);
     }
 }

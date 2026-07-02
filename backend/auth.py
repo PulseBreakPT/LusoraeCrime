@@ -1,0 +1,197 @@
+import os
+import bcrypt
+import jwt
+from datetime import datetime, timezone, timedelta
+from bson import ObjectId
+from fastapi import APIRouter, Request, Response, HTTPException, Depends
+from pydantic import BaseModel, EmailStr, Field
+
+from db import db
+from game_data import HQ_LOCATION, TEAM_TYPES, VEHICLE_TYPES
+from engine import now_utc, add_event
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+JWT_ALGORITHM = "HS256"
+MAX_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+
+
+def get_jwt_secret() -> str:
+    return os.environ["JWT_SECRET"]
+
+
+def create_access_token(user_id: str, email: str) -> str:
+    payload = {"sub": user_id, "email": email, "type": "access",
+               "exp": datetime.now(timezone.utc) + timedelta(minutes=60)}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+def create_refresh_token(user_id: str) -> str:
+    payload = {"sub": user_id, "type": "refresh",
+               "exp": datetime.now(timezone.utc) + timedelta(days=7)}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+def set_auth_cookies(response: Response, access: str, refresh: str):
+    response.set_cookie("access_token", access, httponly=True, secure=True, samesite="lax", max_age=3600, path="/")
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="lax", max_age=604800, path="/")
+
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Tipo de token inválido")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="Utilizador não encontrado")
+        user["_id"] = str(user["_id"])
+        user.pop("password_hash", None)
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Sessão expirada")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
+class RegisterInput(BaseModel):
+    org_name: str = Field(min_length=3, max_length=40)
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
+
+
+class LoginInput(BaseModel):
+    email: EmailStr
+    password: str
+
+
+def user_public(user: dict) -> dict:
+    return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", "")}
+
+
+async def create_player_for_user(user_id: str, org_name: str):
+    now = now_utc().isoformat()
+    result = await db.players.insert_one({
+        "user_id": user_id, "org_name": org_name,
+        "clean_money": 50000, "dirty_money": 0,
+        "respect": 0, "level": 1, "heat": 0.0,
+        "hq": HQ_LOCATION, "last_tick": now, "created_at": now,
+    })
+    pid = str(result.inserted_id)
+    tt = TEAM_TYPES["assalto"]
+    await db.teams.insert_one({
+        "player_id": pid, "name": "Crew Alfa", "type_key": "assalto",
+        "spec": tt["spec"], "skill": float(tt["skill"]), "status": "idle",
+        "vehicle": {"key": "usado", **VEHICLE_TYPES["usado"]},
+        "missions_done": 0, "created_at": now,
+    })
+    await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa. O Armazém do Cais é agora a tua base.")
+    await add_event(db, pid, "team", "Crew Alfa está pronta para a primeira operação.")
+    return pid
+
+
+@router.post("/register")
+async def register(body: RegisterInput, response: Response):
+    email = body.email.lower().strip()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Este email já está registado")
+    now = now_utc().isoformat()
+    result = await db.users.insert_one({
+        "email": email, "password_hash": hash_password(body.password),
+        "name": body.org_name, "role": "player", "created_at": now,
+    })
+    user_id = str(result.inserted_id)
+    await create_player_for_user(user_id, body.org_name)
+    set_auth_cookies(response, create_access_token(user_id, email), create_refresh_token(user_id))
+    return {"id": user_id, "email": email, "name": body.org_name}
+
+
+@router.post("/login")
+async def login(body: LoginInput, request: Request, response: Response):
+    email = body.email.lower().strip()
+    ip = request.client.host if request.client else "unknown"
+    identifier = f"{ip}:{email}"
+    attempt = await db.login_attempts.find_one({"identifier": identifier})
+    if attempt and attempt.get("count", 0) >= MAX_ATTEMPTS:
+        locked_until = datetime.fromisoformat(attempt["locked_until"])
+        if datetime.now(timezone.utc) < locked_until:
+            raise HTTPException(status_code=429, detail="Demasiadas tentativas. Tenta novamente em alguns minutos.")
+        await db.login_attempts.delete_one({"identifier": identifier})
+
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(body.password, user["password_hash"]):
+        await db.login_attempts.update_one(
+            {"identifier": identifier},
+            {"$inc": {"count": 1},
+             "$set": {"locked_until": (datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()}},
+            upsert=True,
+        )
+        raise HTTPException(status_code=401, detail="Email ou password incorretos")
+
+    await db.login_attempts.delete_one({"identifier": identifier})
+    user_id = str(user["_id"])
+    set_auth_cookies(response, create_access_token(user_id, email), create_refresh_token(user_id))
+    return user_public(user)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"ok": True}
+
+
+@router.get("/me")
+async def me(user: dict = Depends(get_current_user)):
+    return user_public({**user, "_id": user["_id"]})
+
+
+@router.post("/refresh")
+async def refresh(request: Request, response: Response):
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Sem refresh token")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Tipo de token inválido")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="Utilizador não encontrado")
+        access = create_access_token(str(user["_id"]), user["email"])
+        response.set_cookie("access_token", access, httponly=True, secure=True, samesite="lax", max_age=3600, path="/")
+        return {"ok": True}
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
+async def seed_admin():
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@lusorae.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    existing = await db.users.find_one({"email": admin_email})
+    if existing is None:
+        result = await db.users.insert_one({
+            "email": admin_email, "password_hash": hash_password(admin_password),
+            "name": "Sindicato Lusorae", "role": "admin",
+            "created_at": now_utc().isoformat(),
+        })
+        await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae")
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
