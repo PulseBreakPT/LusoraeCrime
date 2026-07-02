@@ -51,6 +51,26 @@ export const EMP_STATUS_COLORS = {
 
 export const FUEL_LABELS = { gasolina: "Gasolina", gasoleo: "Gasóleo" };
 
+export const ATTR_LABELS = { forca: "FOR", destreza: "DES", qi: "QI", carisma: "CAR" };
+
+export const SPEC_ATTR = { assalto: "forca", logistica: "destreza", tecnica: "qi", influencia: "carisma" };
+
+export function effectiveSpeed(v) {
+  if (v.condition >= 50) return v.speed;
+  return v.speed * (0.6 + (0.4 * v.condition) / 50);
+}
+
+export function chanceColor(c) {
+  if (c >= 0.75) return "#34D399";
+  if (c >= 0.5) return "#F59E0B";
+  return "#EF4444";
+}
+
+export function pctSigned(v) {
+  const p = Math.round(v * 100);
+  return `${p > 0 ? "+" : ""}${p}%`;
+}
+
 export function fatigueColor(f) {
   if (f >= 70) return "#EF4444";
   if (f >= 40) return "#F59E0B";

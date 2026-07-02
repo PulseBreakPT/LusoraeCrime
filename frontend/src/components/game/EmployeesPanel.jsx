@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, ROLE_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, fatigueColor, SPEC_LABELS } from "../../lib/game";
+import { fmtMoney, fmtDuration, ROLE_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, fatigueColor, SPEC_LABELS, ATTR_LABELS, SPEC_ATTR } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { IdCard, GraduationCap, ChevronDown } from "lucide-react";
@@ -53,6 +53,18 @@ export const EmployeesPanel = ({ open, onOpenChange }) => {
                   >
                     {e.status === "training" && trainingLeft > 0 ? `Formação ${fmtDuration(trainingLeft)}` : EMP_STATUS_LABELS[e.status]}
                   </span>
+                </div>
+
+                <div className="mt-2 grid grid-cols-4 gap-1" data-testid={`employee-attrs-${e.id}`}>
+                  {Object.entries(ATTR_LABELS).map(([k, label]) => {
+                    const main = SPEC_ATTR[e.spec] === k;
+                    return (
+                      <div key={k} className={`rounded px-1 py-0.5 text-center ${main ? "bg-red-600/15" : "bg-black/40"}`}>
+                        <p className={`text-[8px] uppercase tracking-wider ${main ? "text-red-400" : "text-zinc-600"}`}>{label}</p>
+                        <p className="font-mono text-[11px] font-bold text-white">{e.attrs?.[k] ?? 2}</p>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-2">

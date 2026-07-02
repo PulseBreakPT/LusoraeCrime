@@ -36,21 +36,23 @@ TEAM_SPECS = {
     "influencia": {"name": "Unidade de Influência", "desc": "Cobranças, lavagem de dinheiro e operações VIP."},
 }
 
+CATEGORY_ATTRS = {"assalto": "forca", "logistica": "destreza", "tecnica": "qi", "influencia": "carisma"}
+
 EMPLOYEE_ROLES = {
-    "musculo": {"name": "Músculo", "spec": "assalto", "cost": 4000, "desc": "Força bruta para assaltos e ataques."},
-    "condutor": {"name": "Condutor", "spec": "logistica", "cost": 3500, "desc": "Mestre da estrada e das rotas de fuga."},
-    "hacker": {"name": "Hacker", "spec": "tecnica", "cost": 5000, "desc": "Especialista em sistemas e infiltração digital."},
-    "negociador": {"name": "Negociador", "spec": "influencia", "cost": 4500, "desc": "Persuasão, cobranças e contactos VIP."},
+    "musculo": {"name": "Músculo", "spec": "assalto", "attr": "forca", "cost": 4000, "desc": "Força bruta para assaltos e ataques."},
+    "condutor": {"name": "Condutor", "spec": "logistica", "attr": "destreza", "cost": 3500, "desc": "Mestre da estrada e das rotas de fuga."},
+    "hacker": {"name": "Hacker", "spec": "tecnica", "attr": "qi", "cost": 5000, "desc": "Especialista em sistemas e infiltração digital."},
+    "negociador": {"name": "Negociador", "spec": "influencia", "attr": "carisma", "cost": 4500, "desc": "Persuasão, cobranças e contactos VIP."},
 }
 
 EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
 
 TRAINING_COURSES = {
-    "combate": {"name": "Treino de Combate", "spec": "assalto", "cost": 3000, "duration_s": 120, "xp": 60},
-    "conducao": {"name": "Condução Evasiva", "spec": "logistica", "cost": 2500, "duration_s": 100, "xp": 50},
-    "ciberseguranca": {"name": "Cibersegurança", "spec": "tecnica", "cost": 3500, "duration_s": 140, "xp": 70},
-    "persuasao": {"name": "Retórica e Persuasão", "spec": "influencia", "cost": 3000, "duration_s": 120, "xp": 60},
-    "fisico": {"name": "Preparação Física", "spec": None, "cost": 2000, "duration_s": 90, "xp": 40, "fatigue_relief": 25},
+    "combate": {"name": "Treino de Combate", "spec": "assalto", "attr": "forca", "cost": 3000, "duration_s": 120, "xp": 60},
+    "conducao": {"name": "Condução Evasiva", "spec": "logistica", "attr": "destreza", "cost": 2500, "duration_s": 100, "xp": 50},
+    "ciberseguranca": {"name": "Cibersegurança", "spec": "tecnica", "attr": "qi", "cost": 3500, "duration_s": 140, "xp": 70},
+    "persuasao": {"name": "Retórica e Persuasão", "spec": "influencia", "attr": "carisma", "cost": 3000, "duration_s": 120, "xp": 60},
+    "fisico": {"name": "Preparação Física", "spec": None, "attr": None, "cost": 2000, "duration_s": 90, "xp": 40, "fatigue_relief": 25},
 }
 
 _FIRST_NAMES = ["Rui", "Tiago", "Miguel", "André", "Bruno", "Carlos", "Diogo", "Vasco", "Nuno", "Pedro",

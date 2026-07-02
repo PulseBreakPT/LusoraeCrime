@@ -8,8 +8,9 @@ import { EmpirePanel } from "../components/game/EmpirePanel";
 import { EmployeesPanel } from "../components/game/EmployeesPanel";
 import { FleetPanel } from "../components/game/FleetPanel";
 import { PropertiesPanel } from "../components/game/PropertiesPanel";
+import { IntelPanel } from "../components/game/IntelPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
-import { Building2, Users, IdCard, Car, Warehouse, Loader2 } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Loader2 } from "lucide-react";
 
 export default function GamePage() {
   const { state, serverNow } = useGame();
@@ -46,6 +47,14 @@ export default function GamePage() {
       />
 
       <ResourceBar />
+      <button
+        data-testid="open-intel-button"
+        onClick={() => setOpenPanel("intel")}
+        className="pointer-events-auto absolute right-2 top-16 z-20 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black md:px-3"
+      >
+        <BrainCircuit size={16} className="text-red-500" />
+        <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
+      </button>
       <ActivityFeed />
       <ActivityFeedMobile />
       {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} />}
@@ -66,6 +75,7 @@ export default function GamePage() {
       <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} />
       <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} />
       <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} />
+      <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} />
     </div>
   );
 }

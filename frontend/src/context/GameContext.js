@@ -55,6 +55,18 @@ export function GameProvider({ children }) {
 
   const dispatchTeam = (opportunityId, teamId) =>
     action("dispatch", { opportunity_id: opportunityId, team_id: teamId }, "Equipa destacada");
+  const previewDispatch = useCallback(async (opportunityId, teamId) => {
+    try {
+      const { data } = await axios.post(
+        `${API}/game/dispatch/preview`,
+        { opportunity_id: opportunityId, team_id: teamId },
+        { withCredentials: true }
+      );
+      return { ok: true, data };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  }, []);
   const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
   const hireEmployee = (roleKey) => action("employees/hire", { role_key: roleKey }, "Funcionário contratado");
   const assignEmployee = (employeeId, teamId) =>
@@ -76,7 +88,7 @@ export function GameProvider({ children }) {
   return (
     <GameContext.Provider
       value={{
-        state, catalog, refresh, serverNow, dispatchTeam, createTeam,
+        state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
         hireEmployee, assignEmployee, trainEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
         buyProperty, sellProperty, upgradeProperty, bribePolice, launder,

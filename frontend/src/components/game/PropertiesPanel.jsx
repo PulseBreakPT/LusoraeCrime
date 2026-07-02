@@ -2,7 +2,7 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, propertyBenefit } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Warehouse, ArrowUpCircle, Trash2, Lock } from "lucide-react";
+import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren } from "lucide-react";
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
   const { state, catalog, buyProperty, sellProperty, upgradeProperty } = useGame();
@@ -20,6 +20,11 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <div className="mt-4 space-y-2" data-testid="properties-list">
+          {state.player.heat >= 70 && state.properties.some((p) => p.type_key === "laboratorio") && (
+            <p data-testid="raid-warning" className="flex items-center gap-1.5 rounded-md border border-red-600/40 bg-red-600/10 px-2.5 py-2 font-mono text-[10px] text-red-400">
+              <Siren size={12} /> Calor alto: risco de rusga policial aos laboratórios!
+            </p>
+          )}
           {state.properties.length === 0 && (
             <p className="rounded-lg border border-dashed border-white/10 p-4 text-center font-mono text-[11px] text-zinc-600">
               Ainda não tens propriedades. Expande o teu império abaixo.
@@ -42,6 +47,13 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                   </div>
                 </div>
                 <p className="mt-1.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>
+                {(p.total_dirty_generated > 0 || p.total_laundered > 0) && (
+                  <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
+                    {p.total_dirty_generated > 0 && <>Gerado: <span className="text-amber-400">{fmtMoney(p.total_dirty_generated)}</span></>}
+                    {p.total_dirty_generated > 0 && p.total_laundered > 0 && " · "}
+                    {p.total_laundered > 0 && <>Lavado: <span className="text-emerald-400">{fmtMoney(p.total_laundered)}</span></>}
+                  </p>
+                )}
                 <div className="mt-2 flex gap-1.5">
                   <button
                     data-testid={`upgrade-property-${p.id}`}

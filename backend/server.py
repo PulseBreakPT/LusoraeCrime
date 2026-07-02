@@ -12,7 +12,8 @@ from starlette.middleware.cors import CORSMiddleware
 from db import client, db
 from auth import router as auth_router, seed_admin
 from routes_game import router as game_router
-from engine import vehicle_doc, employee_doc, now_utc
+from engine import vehicle_doc, employee_doc, now_utc, default_stats
+from game_data import EMPLOYEE_ROLES
 
 app = FastAPI(title="Lusorae API")
 
@@ -62,6 +63,16 @@ async def migrate_v2():
         }})
 
 
+async def migrate_v3():
+    import random as _r
+    async for emp in db.employees.find({"attrs": {"$exists": False}}):
+        attrs = {k: _r.randint(1, 3) for k in ("forca", "destreza", "qi", "carisma")}
+        role_attr = EMPLOYEE_ROLES.get(emp.get("role_key", "musculo"), EMPLOYEE_ROLES["musculo"])["attr"]
+        attrs[role_attr] = min(10, attrs[role_attr] + 2 + max(0, emp.get("level", 1) - 1))
+        await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"attrs": attrs}})
+    await db.players.update_many({"stats": {"$exists": False}}, {"$set": {"stats": default_stats()}})
+
+
 @app.on_event("startup")
 async def startup():
     await db.users.create_index("email", unique=True)
@@ -76,6 +87,7 @@ async def startup():
     await db.events.create_index([("player_id", 1), ("ts", -1)])
     await seed_admin()
     await migrate_v2()
+    await migrate_v3()
 
 
 @app.on_event("shutdown")

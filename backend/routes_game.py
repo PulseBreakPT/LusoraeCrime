@@ -9,7 +9,8 @@ from datetime import timedelta
 from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
-                    get_caps, vehicle_doc, employee_doc)
+                    get_caps, vehicle_doc, employee_doc, effective_speed, chance_breakdown,
+                    team_effectiveness)
 from models import Player, Team, Employee, Vehicle, Property, Opportunity, Mission, Event
 from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, EMPLOYEE_ROLES, TRAINING_COURSES,
                        EMP_LEVEL_XP, VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
@@ -112,6 +113,7 @@ async def get_state(user: dict = Depends(get_current_user)):
         {"player_id": pid, "status": "active", "expires_at": {"$gt": now_iso}}
     ).to_list(50)
     missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(100)
+    history = await db.missions.find({"player_id": pid, "phase": "done"}).sort("return_at", -1).to_list(20)
     events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(30)
 
     caps, _ = await get_caps(db, pid)
@@ -126,6 +128,7 @@ async def get_state(user: dict = Depends(get_current_user)):
         "properties": [Property.from_mongo(pr).model_dump() for pr in properties],
         "opportunities": [Opportunity.from_mongo(o).model_dump() for o in opportunities],
         "missions": [Mission.from_mongo(m).model_dump() for m in missions],
+        "history": [Mission.from_mongo(h).model_dump() for h in history],
         "events": [Event.from_mongo(e).model_dump() for e in events],
         "caps": {
             "employees": {"used": len(employees), "max": caps["employees"]},
@@ -135,33 +138,15 @@ async def get_state(user: dict = Depends(get_current_user)):
     }
 
 
-@router.post("/dispatch")
-async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
-    player = await get_player(user)
+async def _prepare_dispatch(player, opp, team):
     pid = str(player["_id"])
-    now = now_utc()
-
-    if player["heat"] >= 90:
-        raise HTTPException(status_code=400, detail="A polícia está em alerta máximo. Reduz o calor antes de operar.")
-
-    opp = await db.opportunities.find_one({"_id": _oid(body.opportunity_id, "Oportunidade inválida"), "player_id": pid})
-    if not opp or opp["status"] != "active" or parse_dt(opp["expires_at"]) <= now:
-        raise HTTPException(status_code=400, detail="Oportunidade já não está disponível")
-    if player["level"] < opp["min_level"]:
-        raise HTTPException(status_code=400, detail=f"Requer nível {opp['min_level']}")
-
-    team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
-    if not team:
-        raise HTTPException(status_code=404, detail="Equipa não encontrada")
     if team["status"] != "idle":
         raise HTTPException(status_code=400, detail="Equipa está ocupada")
-
     members = await db.employees.find({
         "player_id": pid, "team_id": str(team["_id"]), "status": "idle", "fatigue": {"$lt": 90},
     }).to_list(50)
     if not members:
         raise HTTPException(status_code=400, detail="A equipa não tem membros disponíveis (sem funcionários ou demasiado fatigados)")
-
     if not team.get("vehicle_id"):
         raise HTTPException(status_code=400, detail="A equipa não tem veículo atribuído")
     vehicle = await db.vehicles.find_one({"_id": ObjectId(team["vehicle_id"]), "player_id": pid})
@@ -177,38 +162,89 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     if vehicle["fuel_l"] < fuel_needed:
         raise HTTPException(status_code=400, detail="Combustível insuficiente para a viagem")
 
-    travel_s = max(20, dist / vehicle["speed"])
-    depart = now
-    arrive = depart + timedelta(seconds=travel_s)
-    finish = arrive + timedelta(seconds=opp["duration_s"])
-    ret = finish + timedelta(seconds=travel_s)
+    speed = effective_speed(vehicle)
+    travel_s = max(20, dist / speed)
 
-    caps_props = await db.properties.find({"player_id": pid}).to_list(200)
+    props = await db.properties.find({"player_id": pid}).to_list(200)
     mult = 1.0
-    for pr in caps_props:
+    for pr in props:
         pt = PROPERTY_TYPES[pr["type_key"]]
         if pt.get("bonus_pct") and (pt.get("bonus_category") == "all" or pt.get("bonus_category") == opp["category"]):
             mult += pt["bonus_pct"] * pr["level"]
     reward = int(opp["reward"] * mult)
 
-    def eff(e):
-        match = e["spec"] == opp["category"] or opp["category"] == "especial"
-        return e["level"] * (1.25 if match else 1.0) * (1 - e["fatigue"] / 250)
-
-    team_skill = sum(eff(e) for e in members) / len(members) + 0.3 * (len(members) - 1)
+    team_skill = team_effectiveness(members, opp["category"])
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
+    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match)
+    return {
+        "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
+        "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
+        "reward": reward, "reward_mult": mult, "team_skill": team_skill,
+        "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
+    }
+
+
+async def _validate_dispatch_inputs(body: DispatchInput, user: dict):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    now = now_utc()
+    if player["heat"] >= 90:
+        raise HTTPException(status_code=400, detail="A polícia está em alerta máximo. Reduz o calor antes de operar.")
+    opp = await db.opportunities.find_one({"_id": _oid(body.opportunity_id, "Oportunidade inválida"), "player_id": pid})
+    if not opp or opp["status"] != "active" or parse_dt(opp["expires_at"]) <= now:
+        raise HTTPException(status_code=400, detail="Oportunidade já não está disponível")
+    if player["level"] < opp["min_level"]:
+        raise HTTPException(status_code=400, detail=f"Requer nível {opp['min_level']}")
+    team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
+    if not team:
+        raise HTTPException(status_code=404, detail="Equipa não encontrada")
+    return player, opp, team
+
+
+@router.post("/dispatch/preview")
+async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current_user)):
+    player, opp, team = await _validate_dispatch_inputs(body, user)
+    prep = await _prepare_dispatch(player, opp, team)
+    return {
+        "chance": round(prep["chance"], 3),
+        "breakdown": prep["breakdown"],
+        "eta_s": round(prep["travel_s"]),
+        "duration_s": opp["duration_s"],
+        "fuel_needed": round(prep["fuel_needed"], 1),
+        "reward": prep["reward"],
+        "reward_bonus_pct": round((prep["reward_mult"] - 1) * 100, 1),
+        "members": len(prep["members"]),
+        "effective_speed": round(prep["speed"], 1),
+        "spec_match": prep["spec_match"],
+    }
+
+
+@router.post("/dispatch")
+async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
+    player, opp, team = await _validate_dispatch_inputs(body, user)
+    pid = str(player["_id"])
+    now = now_utc()
+    prep = await _prepare_dispatch(player, opp, team)
+    vehicle = prep["vehicle"]
+    members = prep["members"]
+
+    depart = now
+    arrive = depart + timedelta(seconds=prep["travel_s"])
+    finish = arrive + timedelta(seconds=opp["duration_s"])
+    ret = finish + timedelta(seconds=prep["travel_s"])
     member_ids = [str(e["_id"]) for e in members]
 
     mission = {
         "player_id": pid, "team_id": str(team["_id"]), "team_name": team["name"],
-        "team_skill": round(team_skill, 2), "spec_match": spec_match,
+        "team_skill": round(prep["team_skill"], 2), "spec_match": prep["spec_match"],
+        "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
-            "district": opp["district"], "reward": reward, "respect": opp["respect"],
+            "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
             "risk": opp["risk"], "heat": opp["heat"], "pays": opp["pays"],
         },
-        "origin": {"lat": hq["lat"], "lng": hq["lng"]},
+        "origin": {"lat": player["hq"]["lat"], "lng": player["hq"]["lng"]},
         "target": {"lat": opp["lat"], "lng": opp["lng"]},
         "phase": "en_route", "outcome": None,
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
@@ -218,8 +254,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
     await db.teams.update_one({"_id": team["_id"]}, {"$set": {"status": "en_route"}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
-        "fuel_l": round(vehicle["fuel_l"] - fuel_needed, 2),
-        "km_total": round(vehicle["km_total"] + round_km, 2),
+        "fuel_l": round(vehicle["fuel_l"] - prep["fuel_needed"], 2),
+        "km_total": round(vehicle["km_total"] + prep["round_km"], 2),
     }})
     await db.employees.update_many(
         {"_id": {"$in": [ObjectId(i) for i in member_ids]}},
@@ -372,7 +408,7 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"fuel_l": vehicle["tank_l"]}})
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"fuel_l": vehicle["tank_l"]}, "$inc": {"fuel_spent_total": cost}})
     await add_event(db, pid, "vehicle", f"{vehicle['name']} abastecido ({vehicle['fuel_type']}) por {cost:,} €.")
     return {"cost": cost}
 
@@ -395,7 +431,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"condition": 100.0}})
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"condition": 100.0}, "$inc": {"repair_spent_total": cost}})
     await add_event(db, pid, "vehicle", f"{vehicle['name']} reparado por {cost:,} €.")
     return {"cost": cost}
 
@@ -515,6 +551,8 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
     if player["dirty_money"] < body.amount:
         raise HTTPException(status_code=400, detail="Dinheiro sujo insuficiente")
     clean_gain = int(body.amount * 0.75)
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"dirty_money": -body.amount, "clean_money": clean_gain}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {
+        "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,
+    }})
     await add_event(db, pid, "launder", f"Lavagem de {body.amount:,} € — recebeste {clean_gain:,} € limpos (taxa 25%).")
     return {"clean_gain": clean_gain}

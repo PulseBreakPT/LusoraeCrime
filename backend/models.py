@@ -33,6 +33,7 @@ class Player(BaseDocument):
     level: int
     heat: float
     next_level_respect: Optional[int] = None
+    stats: dict = {}
     hq: dict
     last_tick: str
     created_at: str
@@ -56,6 +57,7 @@ class Employee(BaseDocument):
     level: int
     xp: int
     fatigue: float
+    attrs: dict = {}
     status: str
     team_id: Optional[str] = None
     training: Optional[dict] = None
@@ -76,6 +78,10 @@ class Vehicle(BaseDocument):
     min_level: int
     team_id: Optional[str] = None
     km_total: float = 0.0
+    fuel_spent_total: float = 0.0
+    repair_spent_total: float = 0.0
+    missions_done: int = 0
+    missions_success: int = 0
     bought_at: str
 
 
@@ -87,6 +93,8 @@ class Property(BaseDocument):
     lat: float
     lng: float
     level: int
+    total_dirty_generated: float = 0.0
+    total_laundered: float = 0.0
     bought_at: str
 
 
@@ -123,6 +131,7 @@ class Mission(BaseDocument):
     target: dict
     phase: str
     outcome: Optional[str] = None
+    success_chance: Optional[float] = None
     depart_at: str
     arrive_at: str
     finish_at: str

@@ -1,11 +1,20 @@
+import { useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, FUEL_LABELS } from "../../lib/game";
+import { fmtMoney, FUEL_LABELS, effectiveSpeed } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Car, Fuel, Wrench, Trash2, Lock } from "lucide-react";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown } from "lucide-react";
+
+const VStat = ({ label, value }) => (
+  <div className="rounded bg-black/40 px-1.5 py-1 text-center">
+    <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="font-mono text-[10px] font-bold text-white">{value}</p>
+  </div>
+);
 
 export const FleetPanel = ({ open, onOpenChange }) => {
   const { state, catalog, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle } = useGame();
+  const [statsOpen, setStatsOpen] = useState(null);
   if (!state) return null;
   const caps = state.caps.vehicles;
 
@@ -33,6 +42,8 @@ export const FleetPanel = ({ open, onOpenChange }) => {
             const refuelCost = Math.ceil((v.tank_l - v.fuel_l) * state.fuel_prices[v.fuel_type]);
             const repairCost = Math.max(50, Math.round((100 - v.condition) * v.price * 0.002));
             const sellValue = Math.round(v.price * 0.4 * (v.condition / 100));
+            const effSpeed = effectiveSpeed(v);
+            const speedReduced = effSpeed < v.speed - 0.05;
             return (
               <div key={v.id} data-testid={`vehicle-card-${v.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
@@ -44,6 +55,11 @@ export const FleetPanel = ({ open, onOpenChange }) => {
                   </div>
                   {busy && <span className="rounded-full bg-red-600/20 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-red-400">Em missão</span>}
                 </div>
+                {speedReduced && (
+                  <p className="mt-1 font-mono text-[10px] text-amber-400">
+                    Velocidade reduzida para {effSpeed.toFixed(1)} m/s — repara o veículo
+                  </p>
+                )}
 
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <div>
@@ -108,6 +124,25 @@ export const FleetPanel = ({ open, onOpenChange }) => {
                     <Trash2 size={11} /> {fmtMoney(sellValue)}
                   </button>
                 </div>
+
+                <button
+                  data-testid={`vehicle-stats-toggle-${v.id}`}
+                  onClick={() => setStatsOpen(statsOpen === v.id ? null : v.id)}
+                  className="mt-2 flex w-full items-center justify-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
+                >
+                  <BarChart3 size={11} /> Estatísticas
+                  <ChevronDown size={11} className={`transition-transform ${statsOpen === v.id ? "rotate-180" : ""}`} />
+                </button>
+                {statsOpen === v.id && (
+                  <div data-testid={`vehicle-stats-${v.id}`} className="mt-1.5 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-2">
+                    <VStat label="Missões" value={`${v.missions_success || 0}✓/${v.missions_done || 0}`} />
+                    <VStat label="Sucesso" value={v.missions_done ? `${Math.round(((v.missions_success || 0) / v.missions_done) * 100)}%` : "—"} />
+                    <VStat label="Km" value={Math.round(v.km_total)} />
+                    <VStat label="Comb. gasto" value={fmtMoney(v.fuel_spent_total || 0)} />
+                    <VStat label="Reparações" value={fmtMoney(v.repair_spent_total || 0)} />
+                    <VStat label="Vel. efetiva" value={`${effSpeed.toFixed(1)} m/s`} />
+                  </div>
+                )}
               </div>
             );
           })}

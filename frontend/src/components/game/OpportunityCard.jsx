@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS } from "../../lib/game";
+import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Button } from "../ui/button";
 import { X, Clock, TrendingUp, AlertTriangle, Siren } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose }) => {
-  const { state, dispatchTeam, serverNow } = useGame();
+  const { state, dispatchTeam, previewDispatch, serverNow } = useGame();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -16,6 +17,16 @@ export const OpportunityCard = ({ opp, onClose }) => {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [opp, serverNow]);
+
+  useEffect(() => {
+    setPreview(null);
+    if (!selectedTeamId) return;
+    let cancelled = false;
+    previewDispatch(opp.id, selectedTeamId).then((r) => {
+      if (!cancelled && r.ok) setPreview(r.data);
+    });
+    return () => { cancelled = true; };
+  }, [selectedTeamId, opp.id, previewDispatch]);
 
   if (!state) return null;
   const hq = state.player.hq;
@@ -36,7 +47,7 @@ export const OpportunityCard = ({ opp, onClose }) => {
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
     const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
     if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
-    return { ok: true, members: ready.length, eta: Math.max(20, distM / vehicle.speed), vehicle };
+    return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle };
   };
 
   const handleDispatch = async () => {
@@ -124,6 +135,27 @@ export const OpportunityCard = ({ opp, onClose }) => {
               Nenhuma equipa operacional — verifica membros, combustível e condição
             </p>
           )}
+          {preview && (
+            <div data-testid="dispatch-preview" className="mt-2 animate-slide-up rounded-md border border-white/10 bg-white/[0.03] p-2.5">
+              <div className="flex items-baseline justify-between">
+                <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
+                <p className="font-mono text-lg font-bold" style={{ color: chanceColor(preview.chance) }}>
+                  {Math.round(preview.chance * 100)}%
+                </p>
+              </div>
+              <div className="mt-1 grid grid-cols-4 gap-1">
+                <PreviewFactor label="Risco" value={preview.breakdown.risco} />
+                <PreviewFactor label="Equipa" value={preview.breakdown.equipa} />
+                <PreviewFactor label="Match" value={preview.breakdown.match} />
+                <PreviewFactor label="Calor" value={preview.breakdown.calor} />
+              </div>
+              <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
+                <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
+                {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
+                {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
+              </p>
+            </div>
+          )}
           <Button
             data-testid="dispatch-team-button"
             onClick={handleDispatch}
@@ -137,6 +169,15 @@ export const OpportunityCard = ({ opp, onClose }) => {
     </div>
   );
 };
+
+const PreviewFactor = ({ label, value }) => (
+  <div className="rounded bg-black/40 px-1 py-0.5 text-center">
+    <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="font-mono text-[10px] font-bold" style={{ color: value >= 0 ? "#34D399" : "#EF4444" }}>
+      {pctSigned(value)}
+    </p>
+  </div>
+);
 
 const Metric = ({ icon: Icon, label, value, color }) => (
   <div className="rounded-md border border-white/10 bg-white/[0.03] p-2">
