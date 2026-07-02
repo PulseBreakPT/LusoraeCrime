@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Users, Car, ChevronDown, Plus } from "lucide-react";
 
@@ -17,6 +17,7 @@ export const TeamsPanel = ({ open, onOpenChange }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <Users size={18} className="text-red-500" /> Equipas
           </SheetTitle>
+          <SheetDescription className="text-zinc-500">Gere as tuas crews, veículos e recrutamento.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 space-y-2" data-testid="teams-list">

@@ -48,7 +48,7 @@ export default function GamePage() {
       <ActivityFeedMobile />
       {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} />}
 
-      <div className="pointer-events-auto absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 gap-2">
+      <div className="pointer-events-auto absolute bottom-3 left-2 z-30 flex gap-2 md:left-1/2 md:-translate-x-1/2">
         <button
           data-testid="open-empire-button"
           onClick={() => setShowEmpire(true)}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { useAuth } from "../../context/AuthContext";
 import { fmtMoney } from "../../lib/game";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Building2, Banknote, LogOut, MapPin } from "lucide-react";
@@ -28,6 +28,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <Building2 size={18} className="text-red-500" /> {p.org_name}
           </SheetTitle>
+          <SheetDescription className="text-zinc-500">Visão geral do império e economia.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
