@@ -207,9 +207,7 @@ const EmployeeCard = ({ e }) => {
             >
               <option value="">Escolher formação...</option>
               {Object.entries(catalog.training_courses).map(([k, c]) => (
-                <option key={k} value={k}>
-                  {c.name} · {fmtMoney(c.cost)}{c.spec && c.spec === e.spec ? " ★" : ""}
-                </option>
+                <option key={k} value={k}>{`${c.name} · ${fmtMoney(c.cost)}${c.spec && c.spec === e.spec ? " ★" : ""}`}</option>
               ))}
             </select>
             <ActionBtn

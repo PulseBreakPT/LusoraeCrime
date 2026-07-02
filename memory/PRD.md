@@ -9,35 +9,47 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Mapa: Lisboa
 - Multiplayer: fase posterior (MVP single-player persistente)
 - IA: apenas lógica de jogo (sem LLM)
+- Funcionários são o CORAÇÃO da organização (pedido explícito): especializações, atributos, raridades, talentos, lealdade, moral, fadiga, estados, progressão
 
 ## Personas
 - Jogador estratégico casual/mobile: sessões curtas, despacha equipas, acompanha progressão
-- Jogador de gestão hardcore: otimiza economia, especializações, frotas
+- Jogador de gestão hardcore: otimiza economia, especializações, frotas, RH
 
 ## Arquitetura (modular)
 - FastAPI + MongoDB (motor) + React 19 + Leaflet (CartoDB Dark Matter)
-- Backend: `server.py` (app+startup), `auth.py` (JWT/cookies + seed admin), `routes_game.py` (endpoints), `engine.py` (tick lazy: spawn/resolução/heat decay), `game_data.py` (catálogos data-driven — novos tipos de oportunidades/equipas/veículos adicionam-se aqui sem tocar na arquitetura), `models.py` (PyObjectId/BaseDocument)
-- Frontend: contexts (Auth, Game c/ polling 4s + clock offset), páginas (AuthPage, GamePage), componentes HUD (LiveMap, ResourceBar, OpportunityCard, TeamsPanel, EmpirePanel, ActivityFeed), `lib/game.js` (interpolação de posições, catálogos visuais)
-- Tick lazy no GET /state: expira oportunidades, faz spawn (target por nível), progride missões (en_route→operating→returning→done), heat decay, level-up
-- Movimento no mapa: timestamps server-side + interpolação client-side (350ms)
+- Backend: `server.py` (app+startup+migrações v2/v4), `auth.py` (JWT/cookies + seed admin), `routes_game.py` (endpoints), `engine.py` (tick lazy: spawn/resolução/heat decay/RH), `game_data.py` (catálogos data-driven), `models.py` (PyObjectId/BaseDocument)
+- Frontend: contexts (Auth, Game c/ polling 4s + clock offset), páginas (AuthPage, GamePage), componentes HUD (LiveMap, ResourceBar, OpportunityCard, TeamsPanel, EmployeesPanel, FleetPanel, PropertiesPanel, EmpirePanel, IntelPanel, ActivityFeed), `lib/game.js`
+- Tick lazy no GET /state: expira oportunidades, spawn, progride missões, heat decay, level-up, formações, estados RH, folha salarial, traições, pool de recrutamento, rendimento passivo, rusgas
 
-## Implementado (Jul 2026 — MVP Temporada 0)
-- Auth JWT (cookies httpOnly + Bearer fallback), registo cria org + equipa inicial, brute-force lockout, admin seeded
-- 11 tipos de oportunidades (assalto, roubo, contrabando, transporte, lavagem, cobrança, ataque a território, infiltração, hack, operação VIP, missão especial) com gate por nível
-- 4 especializações de equipas (assalto, logística, técnica, influência) com bónus de match; skill cresce com missões
-- 5 veículos (velocidade afeta ETA); garagem por equipa
-- Economia: € limpo / € sujo, lavagem (taxa 25%), respeito/níveis (10 thresholds), calor/polícia (multas, decay)
-- Mapa vivo de Lisboa: 16 zonas, HQ Cais do Sodré, marcadores pulsantes por categoria, unidades a mover-se em tempo real
-- HUD premium dark: resource bar, cartão de oportunidade c/ ETA, painéis Equipas/Império (sheets), feed de atividade terminal
-- Testes: 17/17 backend + todos os fluxos frontend (iteration_1)
+## Implementado (Jul 2026)
+### MVP Temporada 0
+- Auth JWT (cookies httpOnly + Bearer fallback), registo cria org + Crew Alfa + 2 fundadores + Sedan Usado, brute-force lockout, admin seeded
+- 11 tipos de oportunidades com gate por nível; 4 especializações de equipas com bónus de match
+- Mapa vivo de Lisboa: 16 zonas, HQ Cais do Sodré, marcadores pulsantes, unidades a mover-se em tempo real
+- Economia: € limpo / € sujo, lavagem, respeito/níveis (10 thresholds), calor/polícia
+### Frota & Propriedades
+- 6 veículos (combustível gasolina/gasóleo, desgaste, reparações, atribuição a equipas, venda, estatísticas)
+- 7 propriedades (esconderijo=cap funcionários, garagem=cap veículos, empresa de fachada=lavagem passiva, armazém/porto=bónus recompensas, laboratório=produção suja+calor, oficina=desconto reparações); upgrade até nível 3; rusgas policiais com heat≥70
+### Sistema de Funcionários COMPLETO (02/07/2026)
+- 14 especializações (assaltante, motorista, hacker, mecânico, informador, médico, lavador, advogado, negociador, segurança, contrabandista, falsificador, espião, gestor) — 6 com passivos de organização
+- 9 atributos (força, inteligência, discrição, condução, tiro, hack, negociação, sangue-frio, resistência)
+- 4 raridades (comum/raro/elite/lendário) com multiplicadores, max level e slots de talento; gate por respeito
+- 8 talentos (ex: Motorista Fantasma -10% viagem, Pontaria Letal +5% assaltos, Fantasma Digital -50% calor técnico) — aplicados em missões
+- 7 ranks (recruta→braço-direito) com promoções pagas (requisito de nível, +10% salário)
+- Lealdade/Moral/Fadiga: folha salarial a cada 30 min (falta de pagamento → quebra moral/lealdade/abandonos), traições (roubo, fuga de info, sabotagem, abandono) com risco exposto na UI, bónus pagos para subir moral
+- Estados: idle, on_mission, training, resting (90s, -50 fadiga), injured (clínica paga cura), arrested (advogado/suborno liberta)
+- Recrutamento por 6 fontes (rua, bares, empresas, prisões, mercado negro, contactos) desbloqueadas por nível; pool renova 5 min ou refresh pago 500€
+- 9 formações (+1 atributo, XP, bónus se combinar com especialização)
+- XP/level individual, subida de atributos + desbloqueio de talentos no level-up, histórico por funcionário
+- EmployeesPanel reformulado: tabs Plantel/Recrutar, cartões com barras moral/lealdade/fadiga, atributos, talentos, ações (treinar, descansar, promover, bónus, despedir, curar, libertar), countdowns
+- Migração v4 automática de funcionários do schema antigo
+- Testes: backend 29/29 pytest + frontend Playwright 100% (iteration_2)
 
 ## Backlog priorizado
 ### P0 (próxima fase)
-- Edifícios: comprar/melhorar esconderijos, garagens, laboratórios, armazéns, portos, oficinas, empresas legais (geração passiva + capacidade)
 - Territórios/influência: conquistar bairros de Lisboa, controlo gera rendimento, ataques a territórios ligados ao mapa
 ### P1
-- Membros individuais dentro das equipas (recrutar, treinar, especializar)
-- Polícia mais profunda: raids em heat alto, subornos, inteligência
+- Polícia mais profunda: investigações prolongadas, inteligência, informadores da polícia
 - Mercado dinâmico (preços de mercadorias flutuantes) + logística de armazéns
 - Tecnologia/árvore de investigação
 ### P2
@@ -45,10 +57,14 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Temporadas/eventos, leaderboards
 - PWA/Capacitor para Android/iOS
 
+### Refactoring
+- `routes_game.py` (~760 linhas) — dividir em módulos (routes_employees, routes_fleet, routes_properties) quando crescer mais
+- `engine.py` (~700 linhas) — dividir por domínio se ultrapassar 900
+
 ## Próximas tarefas
-1. Sistema de edifícios (P0)
-2. Territórios + influência (P0)
-3. Rendimento passivo ligado a edifícios/territórios
+1. Territórios + influência (P0)
+2. Rendimento passivo ligado a territórios
+3. Refactoring de rotas por módulo
 
 ## Credenciais
 Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
