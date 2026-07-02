@@ -1,0 +1,102 @@
+{
+  "project_name": "Lusorae",
+  "theme_archetype": {
+    "primary": "Archetype 2 (The Performance Pro)",
+    "description": "Dark-first, tactical command-center HUD. Designed for high-stakes criminal strategy. Minimalist chrome, high data density, vivid kinetic triggers over an OLED black/dark grey base."
+  },
+  "colors": {
+    "background": {
+      "base": "#050505",
+      "panel_matte": "#121212",
+      "panel_glass": "rgba(18, 18, 18, 0.75)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#8E8E93",
+      "muted": "#52525B"
+    },
+    "accents": {
+      "primary_action": "#FFFFFF",
+      "clean_money": "#10B981",
+      "dirty_money": "#F59E0B",
+      "heat_respect": "#DC2626",
+      "system_cyan": "#0A84FF",
+      "warning": "#FF9F0A"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.1)",
+      "active": "rgba(255, 255, 255, 0.3)",
+      "tactical_glow": "rgba(220, 38, 38, 0.5)"
+    }
+  },
+  "typography": {
+    "headings": {
+      "family": "IBM Plex Sans, sans-serif",
+      "weights": ["600", "700"],
+      "tracking": "tracking-tight"
+    },
+    "data_metrics": {
+      "family": "JetBrains Mono, monospace",
+      "weights": ["400", "700"],
+      "usage": "Use for all resource counts, timers, distances, and levels to give a hacker/software feel"
+    },
+    "body": {
+      "family": "Inter, sans-serif",
+      "weights": ["400", "500"]
+    }
+  },
+  "layout_and_spacing": {
+    "strategy": "Map is Hero. All UI elements float above the map.",
+    "map_container": "absolute inset-0 z-0 w-full h-full",
+    "hud_panels": "absolute z-10 floating-panel",
+    "spacing_scale": "Dense and tactical. Use p-2, p-4. Avoid excessive empty space in data cards.",
+    "mobile_first": "Use bottom drawers (Sheet component from Shadcn) for main menus and team lists on mobile. Floating compact cards on desktop."
+  },
+  "surface_strategies": {
+    "panels": {
+      "type": "Glassmorphism (Tactical)",
+      "classes": "bg-black/75 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl"
+    },
+    "buttons": {
+      "primary": "bg-white text-black hover:bg-gray-200 font-bold uppercase tracking-wider text-sm",
+      "danger_dispatch": "bg-red-600 text-white hover:bg-red-700 shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all duration-300"
+    }
+  },
+  "components": {
+    "auth_screen": "Fullscreen cinematic background image with a centered dark glass panel. Dramatic lighting.",
+    "resource_bar": "Top floating pill or bar. JetBrains Mono for numbers. Distinct colors for clean/dirty money.",
+    "opportunity_card": "Compact bento-style card. Clear risk/reward metrics. Urgent dispatch button.",
+    "teams_panel": "Side or bottom drawer. Status indicators (Idle=Gray, En-Route=Cyan, Operating=Red).",
+    "activity_feed": "Scrolling terminal-like log. Small text, high density."
+  },
+  "motion_and_interactions": {
+    "panel_entrance": "Framer motion slide-in from edges (y: 20, opacity: 0).",
+    "map_markers": "Smooth CSS transitions for vehicle movement.",
+    "hover_states": "Hover states must lift cards slightly (-translate-y-1) and increase border opacity to white/30."
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "style": "weight='bold' or weight='duotone' for tactical feel",
+    "installation": "yarn add @phosphor-icons/react"
+  },
+  "media": {
+    "auth_background": {
+      "url": "https://images.unsplash.com/photo-1731234361187-4702894e725a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwzfHxsaXNib24lMjBuaWdodCUyMGFlcmlhbHxlbnwwfHx8fDE3ODMwMjgyODd8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Aerial view of Lisbon at night, used for Login/Register background"
+    },
+    "texture_overlay": {
+      "url": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwxfHx1bmRlcmdyb3VuZCUyMGRhcmslMjBjcmltZSUyMHRleHR1cmV8ZW58MHx8fGJsYWNrfDE3ODMwMjgyODd8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Dark grime texture, use with low opacity (mix-blend-overlay) over flat dark panels if needed"
+    }
+  },
+  "accessibility_and_testing": {
+    "data_testid_requirement": "ALL interactive elements MUST have data-testid attributes (e.g., data-testid='dispatch-team-button', data-testid='login-submit')",
+    "contrast": "Ensure pure white text over the dark map or glass panels passes WCAG AA."
+  },
+  "map_configuration": {
+    "library": "react-leaflet",
+    "tile_layer": "CartoDB Dark Matter (https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png)",
+    "center": "[38.7223, -9.1393]",
+    "zoom": "13"
+  }
+}
