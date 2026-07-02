@@ -30,30 +30,50 @@ export const SPEC_LABELS = {
   especial: "Especial",
 };
 
-export const ROLE_LABELS = {
-  musculo: "Músculo",
-  condutor: "Condutor",
-  hacker: "Hacker",
-  negociador: "Negociador",
-};
-
 export const EMP_STATUS_LABELS = {
   idle: "Disponível",
   on_mission: "Em missão",
   training: "Em formação",
+  resting: "A descansar",
+  injured: "Ferido",
+  arrested: "Preso",
 };
 
 export const EMP_STATUS_COLORS = {
   idle: "#34D399",
-  on_mission: "#EF4444",
-  training: "#22D3EE",
+  on_mission: "#22D3EE",
+  training: "#60A5FA",
+  resting: "#A78BFA",
+  injured: "#F97316",
+  arrested: "#EF4444",
+};
+
+export const RARITY_LABELS = { comum: "Comum", raro: "Raro", elite: "Elite", lendario: "Lendário" };
+
+export const RARITY_COLORS = { comum: "#A1A1AA", raro: "#22D3EE", elite: "#C084FC", lendario: "#F59E0B" };
+
+export const RANK_LABELS = {
+  recruta: "Recruta",
+  membro: "Membro",
+  especialista: "Especialista",
+  veterano: "Veterano",
+  tenente: "Tenente",
+  chefe_equipa: "Chefe de Equipa",
+  braco_direito: "Braço-Direito",
 };
 
 export const FUEL_LABELS = { gasolina: "Gasolina", gasoleo: "Gasóleo" };
 
-export const ATTR_LABELS = { forca: "FOR", destreza: "DES", qi: "QI", carisma: "CAR" };
+export const ATTR_LABELS = {
+  forca: "FOR", inteligencia: "INT", discricao: "DIS", conducao: "CND", tiro: "TIR",
+  hack: "HCK", negociacao: "NEG", sangue_frio: "SFR", resistencia: "RES",
+};
 
-export const SPEC_ATTR = { assalto: "forca", logistica: "destreza", tecnica: "qi", influencia: "carisma" };
+export function goodBarColor(v) {
+  if (v >= 60) return "#34D399";
+  if (v >= 30) return "#F59E0B";
+  return "#EF4444";
+}
 
 export function effectiveSpeed(v) {
   if (v.condition >= 50) return v.speed;

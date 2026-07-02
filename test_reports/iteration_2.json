@@ -1,0 +1,35 @@
+{
+  "summary": "Full E2E regression on Lusorae HR (Funcionários) overhaul + fleet/properties/police/launder. Backend pytest 29/29 PASS (28 fast + 1 slow training-completion). Frontend Playwright: register → HUD map → RH panel (roster, salary-total, payroll-countdown, employee cards with rarity/rank/attrs, expand Gerir, Bonus toast, Train UI, Recruit tab with candidates, hire flow, refresh-pool visible). All HUD panels (Frota/Imóveis/Equipas/Intel/Império) open without errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "EmployeesPanel — Training Select (Radix)", "issues": ["Console hydration warning: '<span> cannot be a child of <option>' — Radix Select renders a native <select> fallback that receives <span> children somewhere. Non-blocking but should be cleaned up (probably in emp-train-select rendering)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Fix Radix Select hydration warning in EmployeesPanel training dropdown: '<span> cannot be a child of <option>' — check emp-train-select-{id} option rendering.",
+    "(Optional a11y) SheetDescription still missing on some panels per prev iteration."
+  ],
+  "critical_code_review_comments": [
+    "routes_game.py is 764 lines — approaching split threshold; consider splitting employees/vehicles/properties into separate route modules.",
+    "employees/recruit + hire endpoints properly guard capacity, respect requirement per rarity, and cost — good.",
+    "employees/fire severance uses 3x salary and blanket -3 morale on remaining team via update_many — clamped to 0 with a follow-up update_many; two-step could yield transient negative morale but final state OK.",
+    "employees/bonus.cost = max(100, salary) — matches test expectation.",
+    "properties/sell guard correctly prevents leaving employees/vehicles above cap after selling esconderijo/garagem.",
+    "catalog endpoint correctly exposes new HR schema (specializations, rarities, ranks, talents, recruit_sources, hr_costs) and legacy 'employee_roles' key is gone.",
+    "State endpoint enriches employees with betrayal_risk and returns salary_total + bonuses + next_payroll_at + pool_refresh_at — all needed by UI."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (29/29)", "frontend": "100% (all critical HR flows + panel navigation)"},
+  "test_credentials": "admin@lusorae.com / LusoraeAdmin2026! (works). Fresh users registered dynamically per test.",
+  "seed_data_creation": "Register endpoint creates 2 starter employees (assaltante+motorista, new schema) assigned to Crew Alfa + 1 Sedan Usado. Recruitment pool auto-populated for sources ≤ player level.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests parallelized via pytest.ini (-n 2 --dist loadscope). Run: `REACT_APP_BACKEND_URL=... python -m pytest tests/backend_test.py -m 'not slow'` for fast suite; drop the -m for the training-completion test (~106s). Frontend Playwright: use auth-tab-register/register-org-name-input/auth-email-input/auth-password-input/auth-submit-button. HR panel testids: open-employees-button, tab-roster, tab-recruit, employee-card-{id}, emp-manage-toggle-{id}, emp-train-select/btn-{id}, emp-bonus-{id}, emp-team-select-{id}, emp-fire-{id}, hire-candidate-{id}, refresh-pool-btn, salary-total, payroll-countdown, employee-caps. Radix Select inside modal — options in portal; use force=True and query [role='option'] after opening."
+}

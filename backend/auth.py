@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from db import db
 from game_data import HQ_LOCATION
-from engine import now_utc, add_event, vehicle_doc, employee_doc
+from engine import now_utc, add_event, vehicle_doc, starting_employee
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -102,10 +102,10 @@ async def create_player_for_user(user_id: str, org_name: str):
     tid = str(team_res.inserted_id)
     veh_res = await db.vehicles.insert_one(vehicle_doc(pid, "usado", now, team_id=tid))
     await db.teams.update_one({"_id": team_res.inserted_id}, {"$set": {"vehicle_id": str(veh_res.inserted_id)}})
-    for _ in range(2):
-        await db.employees.insert_one(employee_doc(pid, "musculo", now, team_id=tid))
+    for role in ("assaltante", "motorista"):
+        await db.employees.insert_one(starting_employee(pid, role, now, team_id=tid))
     await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa com 75.000 € limpos e 5.000 € sujos de capital inicial.")
-    await add_event(db, pid, "team", "Crew Alfa está pronta: 2 músculos e um Sedan Usado na garagem.")
+    await add_event(db, pid, "team", "Crew Alfa está pronta: um assaltante, um motorista e um Sedan Usado na garagem.")
     return pid
 
 

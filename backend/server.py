@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 import os
+import random
 import logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
@@ -12,8 +13,8 @@ from starlette.middleware.cors import CORSMiddleware
 from db import client, db
 from auth import router as auth_router, seed_admin
 from routes_game import router as game_router
-from engine import vehicle_doc, employee_doc, now_utc, default_stats
-from game_data import EMPLOYEE_ROLES
+from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
+from game_data import SPECIALIZATIONS
 
 app = FastAPI(title="Lusorae API")
 
@@ -56,21 +57,31 @@ async def migrate_v2():
         emp_count = await db.employees.count_documents({"player_id": pid})
         if emp_count == 0 and teams:
             tid = str(teams[0]["_id"])
-            for _ in range(2):
-                await db.employees.insert_one(employee_doc(pid, "musculo", now, team_id=tid))
+            for role in ("assaltante", "motorista"):
+                await db.employees.insert_one(starting_employee(pid, role, now, team_id=tid))
         await db.players.update_one({"_id": player["_id"]}, {"$set": {
             "v2": True, "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0,
         }})
-
-
-async def migrate_v3():
-    import random as _r
-    async for emp in db.employees.find({"attrs": {"$exists": False}}):
-        attrs = {k: _r.randint(1, 3) for k in ("forca", "destreza", "qi", "carisma")}
-        role_attr = EMPLOYEE_ROLES.get(emp.get("role_key", "musculo"), EMPLOYEE_ROLES["musculo"])["attr"]
-        attrs[role_attr] = min(10, attrs[role_attr] + 2 + max(0, emp.get("level", 1) - 1))
-        await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"attrs": attrs}})
     await db.players.update_many({"stats": {"$exists": False}}, {"$set": {"stats": default_stats()}})
+
+
+ROLE_MAP_V4 = {"musculo": "assaltante", "condutor": "motorista", "hacker": "hacker", "negociador": "negociador"}
+
+
+async def migrate_v4():
+    async for emp in db.employees.find({"rarity": {"$exists": False}}):
+        role_key = ROLE_MAP_V4.get(emp.get("role_key"), "assaltante")
+        sp = SPECIALIZATIONS[role_key]
+        level = emp.get("level", 1)
+        attrs = gen_attrs(role_key, "comum")
+        for a in sp["attrs"]:
+            attrs[a] = min(10, attrs[a] + max(0, level - 1))
+        await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
+            "role_key": role_key, "spec": sp["spec"], "rarity": "comum", "rank": "recruta",
+            "age": random.randint(22, 45), "salary": sp["salary"], "loyalty": 70.0, "morale": 70.0,
+            "attrs": attrs, "talents": [], "status_until": None,
+            "history": [{"ts": now_utc().isoformat(), "text": "Registo migrado para o novo sistema de RH."}],
+        }})
 
 
 @app.on_event("startup")
@@ -80,6 +91,7 @@ async def startup():
     await db.players.create_index("user_id")
     await db.teams.create_index("player_id")
     await db.employees.create_index("player_id")
+    await db.candidates.create_index("player_id")
     await db.vehicles.create_index("player_id")
     await db.properties.create_index("player_id")
     await db.opportunities.create_index([("player_id", 1), ("status", 1)])
@@ -87,7 +99,7 @@ async def startup():
     await db.events.create_index([("player_id", 1), ("ts", -1)])
     await seed_admin()
     await migrate_v2()
-    await migrate_v3()
+    await migrate_v4()
 
 
 @app.on_event("shutdown")

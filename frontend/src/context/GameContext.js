@@ -68,11 +68,18 @@ export function GameProvider({ children }) {
     }
   }, []);
   const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
-  const hireEmployee = (roleKey) => action("employees/hire", { role_key: roleKey }, "Funcionário contratado");
+  const recruitEmployee = (candidateId) => action("employees/recruit", { candidate_id: candidateId }, "Recruta contratado");
+  const refreshPool = () => action("recruitment/refresh", {}, "Contactos atualizados");
   const assignEmployee = (employeeId, teamId) =>
     action("employees/assign", { employee_id: employeeId, team_id: teamId }, teamId ? "Atribuído à equipa" : "Removido da equipa");
   const trainEmployee = (employeeId, courseKey) =>
     action("employees/train", { employee_id: employeeId, course_key: courseKey }, "Formação iniciada");
+  const restEmployee = (employeeId) => action("employees/rest", { employee_id: employeeId }, "Foi descansar");
+  const promoteEmployee = (employeeId) => action("employees/promote", { employee_id: employeeId }, "Promovido");
+  const bonusEmployee = (employeeId) => action("employees/bonus", { employee_id: employeeId }, "Bónus pago");
+  const healEmployee = (employeeId) => action("employees/heal", { employee_id: employeeId }, "Tratamento pago");
+  const releaseEmployee = (employeeId) => action("employees/release", { employee_id: employeeId }, "Libertado");
+  const fireEmployee = (employeeId) => action("employees/fire", { employee_id: employeeId }, "Despedido");
   const buyVehicle = (modelKey) => action("vehicles/buy", { model_key: modelKey }, "Veículo adquirido");
   const sellVehicle = (vehicleId) => action("vehicles/sell", { vehicle_id: vehicleId }, "Veículo abatido");
   const refuelVehicle = (vehicleId) => action("vehicles/refuel", { vehicle_id: vehicleId }, "Depósito cheio");
@@ -89,7 +96,8 @@ export function GameProvider({ children }) {
     <GameContext.Provider
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
-        hireEmployee, assignEmployee, trainEmployee,
+        recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
+        promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
         buyProperty, sellProperty, upgradeProperty, bribePolice, launder,
       }}

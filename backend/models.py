@@ -33,6 +33,8 @@ class Player(BaseDocument):
     level: int
     heat: float
     next_level_respect: Optional[int] = None
+    next_payroll_at: Optional[str] = None
+    pool_refresh_at: Optional[str] = None
     stats: dict = {}
     hq: dict
     last_tick: str
@@ -52,16 +54,41 @@ class Team(BaseDocument):
 class Employee(BaseDocument):
     player_id: str
     name: str
+    age: int = 30
     role_key: str
     spec: str
+    rarity: str = "comum"
+    rank: str = "recruta"
     level: int
     xp: int
+    salary: int = 0
+    loyalty: float = 70.0
+    morale: float = 70.0
     fatigue: float
     attrs: dict = {}
+    talents: List[str] = []
     status: str
+    status_until: Optional[str] = None
     team_id: Optional[str] = None
     training: Optional[dict] = None
+    history: List[dict] = []
     hired_at: str
+
+
+class Candidate(BaseDocument):
+    player_id: str
+    source: str
+    name: str
+    age: int
+    role_key: str
+    spec: str
+    rarity: str
+    attrs: dict = {}
+    talents: List[str] = []
+    salary: int
+    cost: int
+    min_respect: int
+    created_at: str
 
 
 class Vehicle(BaseDocument):

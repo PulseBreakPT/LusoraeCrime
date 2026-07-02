@@ -36,34 +36,116 @@ TEAM_SPECS = {
     "influencia": {"name": "Unidade de Influência", "desc": "Cobranças, lavagem de dinheiro e operações VIP."},
 }
 
-CATEGORY_ATTRS = {"assalto": "forca", "logistica": "destreza", "tecnica": "qi", "influencia": "carisma"}
+# ---------------- Funcionários ----------------
 
-EMPLOYEE_ROLES = {
-    "musculo": {"name": "Músculo", "spec": "assalto", "attr": "forca", "cost": 4000, "desc": "Força bruta para assaltos e ataques."},
-    "condutor": {"name": "Condutor", "spec": "logistica", "attr": "destreza", "cost": 3500, "desc": "Mestre da estrada e das rotas de fuga."},
-    "hacker": {"name": "Hacker", "spec": "tecnica", "attr": "qi", "cost": 5000, "desc": "Especialista em sistemas e infiltração digital."},
-    "negociador": {"name": "Negociador", "spec": "influencia", "attr": "carisma", "cost": 4500, "desc": "Persuasão, cobranças e contactos VIP."},
+ATTR_KEYS = ["forca", "inteligencia", "discricao", "conducao", "tiro", "hack", "negociacao", "sangue_frio", "resistencia"]
+
+CATEGORY_ATTRS = {
+    "assalto": ["tiro", "forca"],
+    "logistica": ["conducao", "discricao"],
+    "tecnica": ["hack", "inteligencia"],
+    "influencia": ["negociacao", "sangue_frio"],
 }
+
+SPECIALIZATIONS = {
+    "assaltante": {"name": "Assaltante", "spec": "assalto", "attrs": ["tiro", "forca"], "salary": 260,
+                   "desc": "Linha da frente em assaltos e ataques."},
+    "motorista": {"name": "Motorista", "spec": "logistica", "attrs": ["conducao", "sangue_frio"], "salary": 220,
+                  "desc": "Rotas de fuga e transportes rápidos."},
+    "hacker": {"name": "Hacker", "spec": "tecnica", "attrs": ["hack", "inteligencia"], "salary": 320,
+               "desc": "Sistemas, dados e infiltração digital."},
+    "mecanico": {"name": "Mecânico", "spec": "suporte", "attrs": ["inteligencia", "resistencia"], "salary": 200,
+                 "desc": "Passivo: -15% custo de reparações.", "passive": {"repair_discount": 0.15}},
+    "informador": {"name": "Informador", "spec": "suporte", "attrs": ["discricao", "negociacao"], "salary": 180,
+                   "desc": "Passivo: +8% oportunidades raras.", "passive": {"rare_opp": 0.08}},
+    "medico": {"name": "Médico Clandestino", "spec": "suporte", "attrs": ["inteligencia", "sangue_frio"], "salary": 340,
+               "desc": "Passivo: feridos recuperam 40% mais rápido e barato.", "passive": {"heal": 0.4}},
+    "lavador": {"name": "Lavador de Dinheiro", "spec": "influencia", "attrs": ["negociacao", "inteligencia"], "salary": 300,
+                "desc": "Passivo: +5% taxa de lavagem manual.", "passive": {"launder_rate": 0.05}},
+    "advogado": {"name": "Advogado", "spec": "suporte", "attrs": ["negociacao", "inteligencia"], "salary": 380,
+                 "desc": "Passivo: libertações 40% mais rápidas e baratas.", "passive": {"legal": 0.4}},
+    "negociador": {"name": "Negociador", "spec": "influencia", "attrs": ["negociacao", "sangue_frio"], "salary": 280,
+                   "desc": "Cobranças, acordos e operações VIP."},
+    "seguranca": {"name": "Segurança", "spec": "assalto", "attrs": ["forca", "resistencia"], "salary": 210,
+                  "desc": "Proteção de equipas e cargas."},
+    "contrabandista": {"name": "Contrabandista", "spec": "logistica", "attrs": ["discricao", "conducao"], "salary": 290,
+                       "desc": "Mercadoria ilegal através de fronteiras."},
+    "falsificador": {"name": "Falsificador", "spec": "tecnica", "attrs": ["discricao", "inteligencia"], "salary": 270,
+                     "desc": "Documentos, identidades e notas."},
+    "espiao": {"name": "Espião", "spec": "tecnica", "attrs": ["discricao", "sangue_frio"], "salary": 350,
+               "desc": "Infiltrações e vigilância de alto risco."},
+    "gestor": {"name": "Gestor de Empresa", "spec": "suporte", "attrs": ["inteligencia", "negociacao"], "salary": 310,
+               "desc": "Passivo: +25% lavagem passiva das empresas.", "passive": {"empresa_boost": 0.25}},
+}
+
+RARITIES = {
+    "comum": {"name": "Comum", "mult": 1.0, "max_level": 5, "talent_slots": 1, "talent_chance": 0.12},
+    "raro": {"name": "Raro", "mult": 1.5, "max_level": 7, "talent_slots": 1, "talent_chance": 0.6},
+    "elite": {"name": "Elite", "mult": 2.5, "max_level": 9, "talent_slots": 2, "talent_chance": 1.0},
+    "lendario": {"name": "Lendário", "mult": 4.0, "max_level": 10, "talent_slots": 3, "talent_chance": 1.0},
+}
+
+RARITY_MIN_RESPECT = {"comum": 0, "raro": 300, "elite": 1200, "lendario": 3500}
+
+RANKS = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"]
+RANK_REQ_LEVEL = [1, 2, 3, 4, 6, 8, 10]
+
+TALENTS = {
+    "motorista_fantasma": {"name": "Motorista Fantasma", "desc": "-10% tempo de viagem", "roles": ["motorista", "contrabandista"]},
+    "contabilista_sujo": {"name": "Contabilista Sujo", "desc": "+15% lavagem de dinheiro", "roles": ["lavador", "gestor"]},
+    "olhos_na_rua": {"name": "Olhos na Rua", "desc": "+10% oportunidades raras", "roles": ["informador", "espiao"]},
+    "mecanico_elite": {"name": "Mecânico de Elite", "desc": "-20% custo de reparação", "roles": ["mecanico"]},
+    "pontaria_letal": {"name": "Pontaria Letal", "desc": "+5% sucesso em assaltos", "roles": ["assaltante", "seguranca"]},
+    "rei_da_noite": {"name": "Rei da Noite", "desc": "-20% fadiga em missões", "roles": []},
+    "lingua_de_prata": {"name": "Língua de Prata", "desc": "-15% custo de subornos", "roles": ["negociador", "advogado"]},
+    "fantasma_digital": {"name": "Fantasma Digital", "desc": "-50% calor em operações técnicas", "roles": ["hacker", "falsificador", "espiao"]},
+}
+
+RECRUIT_SOURCES = {
+    "rua": {"name": "Rua", "min_level": 1, "roles": ["assaltante", "seguranca", "motorista"],
+            "rarity_w": {"comum": 80, "raro": 18, "elite": 2, "lendario": 0}},
+    "bares": {"name": "Bares", "min_level": 1, "roles": ["informador", "contrabandista", "negociador", "motorista"],
+              "rarity_w": {"comum": 70, "raro": 25, "elite": 5, "lendario": 0}},
+    "empresas": {"name": "Empresas", "min_level": 2, "roles": ["gestor", "advogado", "lavador"],
+                 "rarity_w": {"comum": 55, "raro": 35, "elite": 9, "lendario": 1}},
+    "prisoes": {"name": "Prisões", "min_level": 3, "roles": ["assaltante", "falsificador", "seguranca", "contrabandista"],
+                "rarity_w": {"comum": 50, "raro": 35, "elite": 13, "lendario": 2}},
+    "mercado_negro": {"name": "Mercado Negro", "min_level": 4, "roles": ["hacker", "falsificador", "espiao", "medico"],
+                      "rarity_w": {"comum": 35, "raro": 40, "elite": 20, "lendario": 5}},
+    "contactos": {"name": "Contactos", "min_level": 5, "roles": list(SPECIALIZATIONS.keys()),
+                  "rarity_w": {"comum": 20, "raro": 40, "elite": 30, "lendario": 10}},
+}
+
+POOL_REFRESH_MIN = 5
+PAYROLL_CYCLE_MIN = 30
 
 EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
 
 TRAINING_COURSES = {
-    "combate": {"name": "Treino de Combate", "spec": "assalto", "attr": "forca", "cost": 3000, "duration_s": 120, "xp": 60},
-    "conducao": {"name": "Condução Evasiva", "spec": "logistica", "attr": "destreza", "cost": 2500, "duration_s": 100, "xp": 50},
-    "ciberseguranca": {"name": "Cibersegurança", "spec": "tecnica", "attr": "qi", "cost": 3500, "duration_s": 140, "xp": 70},
-    "persuasao": {"name": "Retórica e Persuasão", "spec": "influencia", "attr": "carisma", "cost": 3000, "duration_s": 120, "xp": 60},
-    "fisico": {"name": "Preparação Física", "spec": None, "attr": None, "cost": 2000, "duration_s": 90, "xp": 40, "fatigue_relief": 25},
+    "combate": {"name": "Combate", "attr": "tiro", "spec": "assalto", "cost": 3000, "duration_s": 120, "xp": 60},
+    "conducao": {"name": "Condução Evasiva", "attr": "conducao", "spec": "logistica", "cost": 2500, "duration_s": 100, "xp": 50},
+    "hacking": {"name": "Hacking", "attr": "hack", "spec": "tecnica", "cost": 3500, "duration_s": 140, "xp": 70},
+    "discricao": {"name": "Discrição", "attr": "discricao", "spec": None, "cost": 2800, "duration_s": 110, "xp": 55},
+    "negociacao": {"name": "Negociação", "attr": "negociacao", "spec": "influencia", "cost": 3000, "duration_s": 120, "xp": 60},
+    "primeiros_socorros": {"name": "Primeiros Socorros", "attr": "inteligencia", "spec": None, "cost": 2600, "duration_s": 100, "xp": 45},
+    "logistica": {"name": "Logística", "attr": "resistencia", "spec": "logistica", "cost": 2400, "duration_s": 90, "xp": 45},
+    "gestao": {"name": "Gestão", "attr": "inteligencia", "spec": None, "cost": 3200, "duration_s": 130, "xp": 60},
+    "lideranca": {"name": "Liderança", "attr": "sangue_frio", "spec": None, "cost": 4000, "duration_s": 150, "xp": 70, "morale": 10},
 }
 
 _FIRST_NAMES = ["Rui", "Tiago", "Miguel", "André", "Bruno", "Carlos", "Diogo", "Vasco", "Nuno", "Pedro",
-                "Marta", "Inês", "Sofia", "Carla", "Beatriz", "Joana", "Rita", "Ana", "Hugo", "Fábio"]
+                "Marta", "Inês", "Sofia", "Carla", "Beatriz", "Joana", "Rita", "Ana", "Hugo", "Fábio",
+                "Leonor", "Duarte", "Gonçalo", "Matilde", "Ricardo", "Telma", "Xavier", "Lara"]
 _LAST_NAMES = ["Silva", "Santos", "Ferreira", "Costa", "Oliveira", "Rodrigues", "Martins", "Sousa",
-               "Fonseca", "Ramos", "Lopes", "Vieira", "Cardoso", "Pinto", "Moreira", "Correia"]
+               "Fonseca", "Ramos", "Lopes", "Vieira", "Cardoso", "Pinto", "Moreira", "Correia",
+               "Teixeira", "Nunes", "Barbosa", "Machado"]
 
 
 def random_employee_name():
     return f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}"
 
+
+# ---------------- Veículos ----------------
 
 VEHICLE_MODELS = {
     "usado": {"name": "Sedan Usado", "min_level": 1, "price": 6000, "speed": 9,
@@ -81,6 +163,8 @@ VEHICLE_MODELS = {
 }
 
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
+
+# ---------------- Propriedades ----------------
 
 PROPERTY_TYPES = {
     "esconderijo": {"name": "Esconderijo", "min_level": 1, "price": 20000, "cap_employees": 4,
@@ -103,6 +187,8 @@ PROPERTY_TYPES = {
 BASE_EMPLOYEE_CAP = 4
 BASE_VEHICLE_CAP = 2
 PROPERTY_MAX_LEVEL = 3
+
+# ---------------- Oportunidades ----------------
 
 OPPORTUNITY_TYPES = {
     "assalto": {"name": "Assalto", "category": "assalto", "min_level": 1, "base_reward": 3500,

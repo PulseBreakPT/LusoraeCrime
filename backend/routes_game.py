@@ -9,14 +9,23 @@ from datetime import timedelta
 from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
-                    get_caps, vehicle_doc, employee_doc, effective_speed, chance_breakdown,
-                    team_effectiveness)
-from models import Player, Team, Employee, Vehicle, Property, Opportunity, Mission, Event
-from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, EMPLOYEE_ROLES, TRAINING_COURSES,
-                       EMP_LEVEL_XP, VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
+                    get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
+                    team_effectiveness, gen_candidate, employee_from_candidate, betrayal_risk_of,
+                    push_history)
+from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event
+from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS, RARITIES,
+                       RARITY_MIN_RESPECT, RANKS, RANK_REQ_LEVEL, TALENTS, RECRUIT_SOURCES,
+                       POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
+                       VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
+
+PROMOTE_BASE_COST = 2000
+POOL_REFRESH_COST = 500
+HEAL_BASE_COST = 2500
+RELEASE_BASE_COST = 2000
+REST_DURATION_S = 90
 
 
 async def get_player(user: dict) -> dict:
@@ -35,8 +44,12 @@ class TeamCreateInput(BaseModel):
     spec: str
 
 
-class HireInput(BaseModel):
-    role_key: str
+class RecruitInput(BaseModel):
+    candidate_id: str
+
+
+class EmployeeIdInput(BaseModel):
+    employee_id: str
 
 
 class AssignEmployeeInput(BaseModel):
@@ -86,7 +99,17 @@ async def catalog():
     return {
         "team_specs": TEAM_SPECS,
         "team_create_cost": TEAM_CREATE_COST,
-        "employee_roles": EMPLOYEE_ROLES,
+        "specializations": SPECIALIZATIONS,
+        "rarities": RARITIES,
+        "rarity_min_respect": RARITY_MIN_RESPECT,
+        "ranks": RANKS,
+        "rank_req_level": RANK_REQ_LEVEL,
+        "talents": TALENTS,
+        "recruit_sources": {k: {"name": v["name"], "min_level": v["min_level"]} for k, v in RECRUIT_SOURCES.items()},
+        "pool_refresh_min": POOL_REFRESH_MIN,
+        "payroll_cycle_min": PAYROLL_CYCLE_MIN,
+        "hr_costs": {"promote_base": PROMOTE_BASE_COST, "pool_refresh": POOL_REFRESH_COST,
+                     "heal_base": HEAL_BASE_COST, "release_base": RELEASE_BASE_COST},
         "training_courses": TRAINING_COURSES,
         "emp_level_xp": EMP_LEVEL_XP,
         "vehicle_models": VEHICLE_MODELS,
@@ -106,7 +129,8 @@ async def get_state(user: dict = Depends(get_current_user)):
     now_iso = now_utc().isoformat()
 
     teams = await db.teams.find({"player_id": pid}).to_list(100)
-    employees = await db.employees.find({"player_id": pid}).to_list(200)
+    employees = await db.employees.find({"player_id": pid}).to_list(300)
+    candidates = await db.candidates.find({"player_id": pid}).to_list(50)
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
     properties = await db.properties.find({"player_id": pid}).to_list(100)
     opportunities = await db.opportunities.find(
@@ -117,13 +141,22 @@ async def get_state(user: dict = Depends(get_current_user)):
     events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(30)
 
     caps, _ = await get_caps(db, pid)
+    bonuses = await get_org_bonuses(db, pid)
     p = Player.from_mongo(player).model_dump()
     p["next_level_respect"] = next_threshold(player["level"])
+
+    emp_dumps = []
+    for e in employees:
+        d = Employee.from_mongo(e).model_dump()
+        d["betrayal_risk"] = betrayal_risk_of(e)
+        emp_dumps.append(d)
+
     return {
         "server_time": now_iso,
         "player": p,
         "teams": [Team.from_mongo(t).model_dump() for t in teams],
-        "employees": [Employee.from_mongo(e).model_dump() for e in employees],
+        "employees": emp_dumps,
+        "candidates": [Candidate.from_mongo(c).model_dump() for c in candidates],
         "vehicles": [Vehicle.from_mongo(v).model_dump() for v in vehicles],
         "properties": [Property.from_mongo(pr).model_dump() for pr in properties],
         "opportunities": [Opportunity.from_mongo(o).model_dump() for o in opportunities],
@@ -134,6 +167,8 @@ async def get_state(user: dict = Depends(get_current_user)):
             "employees": {"used": len(employees), "max": caps["employees"]},
             "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
         },
+        "bonuses": bonuses,
+        "salary_total": sum(e.get("salary", 0) for e in employees),
         "fuel_prices": FUEL_PRICES,
     }
 
@@ -165,6 +200,11 @@ async def _prepare_dispatch(player, opp, team):
     speed = effective_speed(vehicle)
     travel_s = max(20, dist / speed)
 
+    member_talents = sorted({t for e in members for t in e.get("talents", [])})
+    if "motorista_fantasma" in member_talents:
+        travel_s *= 0.9
+    talent_bonus = 0.05 if ("pontaria_letal" in member_talents and opp["category"] == "assalto") else 0.0
+
     props = await db.properties.find({"player_id": pid}).to_list(200)
     mult = 1.0
     for pr in props:
@@ -175,12 +215,13 @@ async def _prepare_dispatch(player, opp, team):
 
     team_skill = team_effectiveness(members, opp["category"])
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
-    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match)
+    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match, talent_bonus)
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
         "reward": reward, "reward_mult": mult, "team_skill": team_skill,
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
+        "talents": member_talents,
     }
 
 
@@ -216,6 +257,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "members": len(prep["members"]),
         "effective_speed": round(prep["speed"], 1),
         "spec_match": prep["spec_match"],
+        "talents": prep["talents"],
     }
 
 
@@ -239,6 +281,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "team_skill": round(prep["team_skill"], 2), "spec_match": prep["spec_match"],
         "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
+        "talents": prep["talents"],
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
@@ -284,23 +327,59 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
     return {"ok": True}
 
 
-@router.post("/employees/hire")
-async def hire_employee(body: HireInput, user: dict = Depends(get_current_user)):
-    if body.role_key not in EMPLOYEE_ROLES:
-        raise HTTPException(status_code=400, detail="Função inválida")
+# ---------------- Funcionários ----------------
+
+async def _get_employee(pid, employee_id):
+    emp = await db.employees.find_one({"_id": _oid(employee_id, "Funcionário inválido"), "player_id": pid})
+    if not emp:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    return emp
+
+
+@router.post("/employees/recruit")
+async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
-    role = EMPLOYEE_ROLES[body.role_key]
-    if player["clean_money"] < role["cost"]:
+    cand = await db.candidates.find_one({"_id": _oid(body.candidate_id, "Candidato inválido"), "player_id": pid})
+    if not cand:
+        raise HTTPException(status_code=404, detail="Candidato já não está disponível")
+    if player["respect"] < cand["min_respect"]:
+        raise HTTPException(status_code=400, detail=f"Requer {cand['min_respect']:,} respeito para recrutar {RARITIES[cand['rarity']]['name']}")
+    if player["clean_money"] < cand["cost"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     caps, _ = await get_caps(db, pid)
     used = await db.employees.count_documents({"player_id": pid})
     if used >= caps["employees"]:
         raise HTTPException(status_code=400, detail="Sem capacidade. Compra ou melhora um esconderijo.")
-    doc = employee_doc(pid, body.role_key, now_utc().isoformat())
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -role["cost"]}})
+    doc = employee_from_candidate(cand, now_utc().isoformat())
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cand["cost"]}})
     await db.employees.insert_one(doc)
-    await add_event(db, pid, "team", f"{doc['name']} ({role['name']}) contratado por {role['cost']:,} €.")
+    await db.candidates.delete_one({"_id": cand["_id"]})
+    role_name = SPECIALIZATIONS[cand["role_key"]]["name"]
+    await add_event(db, pid, "team", f"{cand['name']} ({role_name}, {RARITIES[cand['rarity']]['name']}) recrutado por {cand['cost']:,} €.")
+    return {"ok": True}
+
+
+@router.post("/recruitment/refresh")
+async def refresh_recruitment(user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    if player["clean_money"] < POOL_REFRESH_COST:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    now = now_utc()
+    await db.candidates.delete_many({"player_id": pid})
+    docs = []
+    for key, src in RECRUIT_SOURCES.items():
+        if player["level"] >= src["min_level"]:
+            for _ in range(2):
+                docs.append(gen_candidate(pid, key, now.isoformat()))
+    if docs:
+        await db.candidates.insert_many(docs)
+    await db.players.update_one({"_id": player["_id"]}, {
+        "$inc": {"clean_money": -POOL_REFRESH_COST},
+        "$set": {"pool_refresh_at": (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()},
+    })
+    await add_event(db, pid, "team", f"Contactos de recrutamento atualizados por {POOL_REFRESH_COST:,} €.")
     return {"ok": True}
 
 
@@ -308,9 +387,7 @@ async def hire_employee(body: HireInput, user: dict = Depends(get_current_user))
 async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
-    emp = await db.employees.find_one({"_id": _oid(body.employee_id, "Funcionário inválido"), "player_id": pid})
-    if not emp:
-        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "idle":
         raise HTTPException(status_code=400, detail="Funcionário está ocupado")
     if body.team_id:
@@ -328,9 +405,7 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
     player = await get_player(user)
     pid = str(player["_id"])
     course = TRAINING_COURSES[body.course_key]
-    emp = await db.employees.find_one({"_id": _oid(body.employee_id, "Funcionário inválido"), "player_id": pid})
-    if not emp:
-        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "idle":
         raise HTTPException(status_code=400, detail="Funcionário está ocupado")
     if player["clean_money"] < course["cost"]:
@@ -344,6 +419,129 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
     await add_event(db, pid, "team", f"{emp['name']} iniciou a formação {course['name']}.")
     return {"ok": True}
 
+
+@router.post("/employees/rest")
+async def rest_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    if emp["status"] != "idle":
+        raise HTTPException(status_code=400, detail="Funcionário está ocupado")
+    if emp["fatigue"] < 15:
+        raise HTTPException(status_code=400, detail="Não está fatigado o suficiente para descansar")
+    until = (now_utc() + timedelta(seconds=REST_DURATION_S)).isoformat()
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "resting", "status_until": until}})
+    await add_event(db, pid, "team", f"{emp['name']} foi descansar.")
+    return {"ok": True}
+
+
+@router.post("/employees/promote")
+async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    if emp["status"] == "on_mission":
+        raise HTTPException(status_code=400, detail="Funcionário está em missão")
+    try:
+        idx = RANKS.index(emp.get("rank", "recruta"))
+    except ValueError:
+        idx = 0
+    if idx >= len(RANKS) - 1:
+        raise HTTPException(status_code=400, detail="Já está no topo da hierarquia")
+    new_idx = idx + 1
+    if emp["level"] < RANK_REQ_LEVEL[new_idx]:
+        raise HTTPException(status_code=400, detail=f"Requer nível {RANK_REQ_LEVEL[new_idx]} do funcionário")
+    cost = PROMOTE_BASE_COST * new_idx
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    new_rank = RANKS[new_idx]
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
+        "rank": new_rank, "salary": int(emp.get("salary", 0) * 1.1),
+        "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
+        "morale": min(100.0, emp.get("morale", 70) + 8),
+    }})
+    await push_history(db, emp["_id"], f"Promovido a {new_rank.replace('_', ' ')}.")
+    await add_event(db, pid, "team", f"{emp['name']} promovido a {new_rank.replace('_', ' ')} por {cost:,} €.")
+    return {"ok": True}
+
+
+@router.post("/employees/bonus")
+async def bonus_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    cost = max(100, emp.get("salary", 100))
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
+        "morale": min(100.0, emp.get("morale", 70) + 15),
+        "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
+    }})
+    await push_history(db, emp["_id"], f"Recebeu um bónus de {cost:,} €.")
+    await add_event(db, pid, "team", f"Bónus de {cost:,} € pago a {emp['name']}. Moral e lealdade subiram.")
+    return {"cost": cost}
+
+
+@router.post("/employees/heal")
+async def heal_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    if emp["status"] != "injured":
+        raise HTTPException(status_code=400, detail="Funcionário não está ferido")
+    bonuses = await get_org_bonuses(db, pid)
+    cost = max(200, int(HEAL_BASE_COST * (1 - bonuses["heal"])))
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "idle", "status_until": None}})
+    await push_history(db, emp["_id"], "Tratado na clínica clandestina.")
+    await add_event(db, pid, "team", f"{emp['name']} tratado na clínica clandestina por {cost:,} €.")
+    return {"cost": cost}
+
+
+@router.post("/employees/release")
+async def release_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    if emp["status"] != "arrested":
+        raise HTTPException(status_code=400, detail="Funcionário não está preso")
+    bonuses = await get_org_bonuses(db, pid)
+    cost = max(300, int((RELEASE_BASE_COST + player["heat"] * 30) * (1 - bonuses["legal"]) * (1 - bonuses["bribe_discount"])))
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
+        "status": "idle", "status_until": None,
+        "loyalty": min(100.0, emp.get("loyalty", 70) + 8),
+    }})
+    await push_history(db, emp["_id"], "Libertado com ajuda do advogado.")
+    await add_event(db, pid, "team", f"{emp['name']} libertado da prisão por {cost:,} € (advogados e subornos).")
+    return {"cost": cost}
+
+
+@router.post("/employees/fire")
+async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    if emp["status"] == "on_mission":
+        raise HTTPException(status_code=400, detail="Não podes despedir alguém em missão")
+    severance = emp.get("salary", 100) * 3
+    if player["clean_money"] < severance:
+        raise HTTPException(status_code=400, detail=f"Indemnização de {severance:,} € — dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -severance}})
+    await db.employees.delete_one({"_id": emp["_id"]})
+    await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": -3}})
+    await db.employees.update_many({"player_id": pid, "morale": {"$lt": 0}}, {"$set": {"morale": 0.0}})
+    await add_event(db, pid, "team", f"{emp['name']} despedido (indemnização de {severance:,} €). A moral da equipa ressentiu-se.")
+    return {"severance": severance}
+
+
+# ---------------- Veículos ----------------
 
 @router.post("/vehicles/buy")
 async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_user)):
@@ -426,7 +624,8 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if missing < 1:
         raise HTTPException(status_code=400, detail="Veículo em perfeitas condições")
     _, props = await get_caps(db, pid)
-    discount = min(0.45, sum(0.15 * p["level"] for p in props if p["type_key"] == "oficina"))
+    bonuses = await get_org_bonuses(db, pid)
+    discount = min(0.6, sum(0.15 * p["level"] for p in props if p["type_key"] == "oficina") + bonuses["repair_discount"])
     cost = max(50, int(missing * vehicle["price"] * 0.002 * (1 - discount)))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
@@ -459,6 +658,8 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"team_id": body.team_id}})
     return {"ok": True}
 
+
+# ---------------- Propriedades ----------------
 
 @router.post("/properties/buy")
 async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_user)):
@@ -527,13 +728,16 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
     return {"ok": True}
 
 
+# ---------------- Polícia / economia ----------------
+
 @router.post("/police/bribe")
 async def bribe_police(user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
     if player["heat"] < 10:
         raise HTTPException(status_code=400, detail="O calor está demasiado baixo para justificar um suborno")
-    cost = max(1000, int(player["heat"] * 150))
+    bonuses = await get_org_bonuses(db, pid)
+    cost = max(1000, int(player["heat"] * 150 * (1 - bonuses["bribe_discount"])))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     new_heat = max(0.0, player["heat"] - 40)
@@ -550,9 +754,11 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
     pid = str(player["_id"])
     if player["dirty_money"] < body.amount:
         raise HTTPException(status_code=400, detail="Dinheiro sujo insuficiente")
-    clean_gain = int(body.amount * 0.75)
+    bonuses = await get_org_bonuses(db, pid)
+    rate = min(0.95, 0.75 + bonuses["launder_rate"])
+    clean_gain = int(body.amount * rate)
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {
         "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,
     }})
-    await add_event(db, pid, "launder", f"Lavagem de {body.amount:,} € — recebeste {clean_gain:,} € limpos (taxa 25%).")
+    await add_event(db, pid, "launder", f"Lavagem de {body.amount:,} € — recebeste {clean_gain:,} € limpos (taxa {round((1 - rate) * 100)}%).")
     return {"clean_gain": clean_gain}
