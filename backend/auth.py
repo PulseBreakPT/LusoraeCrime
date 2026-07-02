@@ -7,8 +7,8 @@ from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
 from db import db
-from game_data import HQ_LOCATION, TEAM_TYPES, VEHICLE_TYPES
-from engine import now_utc, add_event
+from game_data import HQ_LOCATION
+from engine import now_utc, add_event, vehicle_doc, employee_doc
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -91,18 +91,21 @@ async def create_player_for_user(user_id: str, org_name: str):
         "user_id": user_id, "org_name": org_name,
         "clean_money": 50000, "dirty_money": 0,
         "respect": 0, "level": 1, "heat": 0.0,
+        "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0, "v2": True,
         "hq": HQ_LOCATION, "last_tick": now, "created_at": now,
     })
     pid = str(result.inserted_id)
-    tt = TEAM_TYPES["assalto"]
-    await db.teams.insert_one({
-        "player_id": pid, "name": "Crew Alfa", "type_key": "assalto",
-        "spec": tt["spec"], "skill": float(tt["skill"]), "status": "idle",
-        "vehicle": {"key": "usado", **VEHICLE_TYPES["usado"]},
-        "missions_done": 0, "created_at": now,
+    team_res = await db.teams.insert_one({
+        "player_id": pid, "name": "Crew Alfa", "spec": "assalto",
+        "status": "idle", "vehicle_id": None, "missions_done": 0, "created_at": now,
     })
+    tid = str(team_res.inserted_id)
+    veh_res = await db.vehicles.insert_one(vehicle_doc(pid, "usado", now, team_id=tid))
+    await db.teams.update_one({"_id": team_res.inserted_id}, {"$set": {"vehicle_id": str(veh_res.inserted_id)}})
+    for _ in range(2):
+        await db.employees.insert_one(employee_doc(pid, "musculo", now, team_id=tid))
     await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa. O Armazém do Cais é agora a tua base.")
-    await add_event(db, pid, "team", "Crew Alfa está pronta para a primeira operação.")
+    await add_event(db, pid, "team", "Crew Alfa está pronta: 2 músculos e um Sedan Usado na garagem.")
     return pid
 
 

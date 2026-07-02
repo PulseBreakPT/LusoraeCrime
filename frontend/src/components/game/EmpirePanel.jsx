@@ -5,10 +5,10 @@ import { fmtMoney } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Building2, Banknote, LogOut, MapPin } from "lucide-react";
+import { Building2, Banknote, LogOut, MapPin, Siren } from "lucide-react";
 
 export const EmpirePanel = ({ open, onOpenChange }) => {
-  const { state, launder } = useGame();
+  const { state, launder, bribePolice } = useGame();
   const { logout } = useAuth();
   const [amount, setAmount] = useState("");
   if (!state) return null;
@@ -104,6 +104,36 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
                 Recebes {fmtMoney(Math.floor(parseInt(amount, 10) * 0.75))} limpos
               </p>
             )}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <Siren size={12} /> Polícia
+          </h3>
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+              <span>Calor policial</span>
+              <span>{Math.round(p.heat)}%</span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${p.heat}%`, background: p.heat >= 70 ? "#DC2626" : p.heat >= 40 ? "#F59E0B" : "#34D399" }}
+              />
+            </div>
+            {p.heat >= 90 && (
+              <p className="mt-1.5 font-mono text-[10px] text-red-500">Alerta máximo: operações bloqueadas</p>
+            )}
+            <Button
+              data-testid="bribe-police-button"
+              onClick={bribePolice}
+              disabled={p.heat < 10 || p.clean_money < Math.max(1000, Math.round(p.heat * 150))}
+              size="sm"
+              className="mt-2 w-full bg-white text-[10px] font-bold uppercase tracking-wider text-black hover:bg-gray-200 disabled:opacity-40"
+            >
+              Subornar polícia · {fmtMoney(Math.max(1000, Math.round(p.heat * 150)))} (-40 calor)
+            </Button>
           </div>
         </div>
 

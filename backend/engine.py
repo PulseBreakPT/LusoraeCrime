@@ -3,7 +3,9 @@ import random
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 
-from game_data import OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS
+from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LEVEL_XP,
+                       TRAINING_COURSES, PROPERTY_TYPES, VEHICLE_MODELS, EMPLOYEE_ROLES,
+                       BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, random_employee_name)
 
 
 def now_utc():
@@ -31,8 +33,43 @@ def level_for(respect):
     return lvl
 
 
+def emp_level_for(xp):
+    lvl = 1
+    for i, t in enumerate(EMP_LEVEL_XP):
+        if xp >= t:
+            lvl = i + 1
+    return lvl
+
+
 def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
+
+
+def vehicle_doc(pid, model_key, now_iso, team_id=None):
+    m = VEHICLE_MODELS[model_key]
+    return {
+        "player_id": pid, "model_key": model_key, "name": m["name"],
+        "fuel_type": m["fuel_type"], "tank_l": float(m["tank_l"]), "fuel_l": float(m["tank_l"]),
+        "condition": 100.0, "speed": float(m["speed"]), "cons": float(m["cons"]),
+        "price": m["price"], "min_level": m["min_level"],
+        "team_id": team_id, "km_total": 0.0, "bought_at": now_iso,
+    }
+
+
+def employee_doc(pid, role_key, now_iso, team_id=None):
+    role = EMPLOYEE_ROLES[role_key]
+    return {
+        "player_id": pid, "name": random_employee_name(), "role_key": role_key,
+        "spec": role["spec"], "level": 1, "xp": 0, "fatigue": 0.0,
+        "status": "idle", "team_id": team_id, "training": None, "hired_at": now_iso,
+    }
+
+
+async def get_caps(db, pid):
+    props = await db.properties.find({"player_id": pid}).to_list(200)
+    emp_cap = BASE_EMPLOYEE_CAP + sum(PROPERTY_TYPES[p["type_key"]].get("cap_employees", 0) * p["level"] for p in props)
+    veh_cap = BASE_VEHICLE_CAP + sum(PROPERTY_TYPES[p["type_key"]].get("cap_vehicles", 0) * p["level"] for p in props)
+    return {"employees": emp_cap, "vehicles": veh_cap}, props
 
 
 async def add_event(db, player_id, kind, message):
@@ -116,6 +153,32 @@ def _outcome_message(m, outcome):
     return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €."
 
 
+async def _crew_returns(db, m, outcome):
+    t = m["opportunity"]
+    for emp_id in m.get("member_ids", []):
+        emp = await db.employees.find_one({"_id": ObjectId(emp_id)})
+        if not emp:
+            continue
+        match = emp["spec"] == t["category"] or t["category"] == "especial"
+        if outcome == "success":
+            xp_gain = int(t["respect"] * 0.5 * (1.5 if match else 1.0))
+        else:
+            xp_gain = max(1, int(t["respect"] * 0.2))
+        xp = emp["xp"] + xp_gain
+        new_level = emp_level_for(xp)
+        if new_level > emp["level"]:
+            await add_event(db, m["player_id"], "team", f"{emp['name']} subiu para o nível {new_level}.")
+        await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
+            "xp": xp, "level": new_level,
+            "fatigue": min(100.0, emp["fatigue"] + 12 + t["risk"] * 4),
+        }})
+    if m.get("vehicle_id"):
+        veh = await db.vehicles.find_one({"_id": ObjectId(m["vehicle_id"])})
+        if veh:
+            wear = 2 + t["risk"] * 1.5
+            await db.vehicles.update_one({"_id": veh["_id"]}, {"$set": {"condition": max(0.0, veh["condition"] - wear)}})
+
+
 async def _progress_mission(db, player, m, now):
     phase = m["phase"]
     updates = {}
@@ -127,6 +190,7 @@ async def _progress_mission(db, player, m, now):
     if phase == "operating" and now >= parse_dt(m["finish_at"]):
         outcome = _roll_outcome(player, m)
         _apply_outcome(player, m, outcome)
+        await _crew_returns(db, m, outcome)
         phase = "returning"
         updates.update({"phase": phase, "outcome": outcome})
         if "fine" in m:
@@ -138,9 +202,58 @@ async def _progress_mission(db, player, m, now):
         phase = "done"
         updates["phase"] = phase
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "idle"}})
+        if m.get("member_ids"):
+            await db.employees.update_many(
+                {"_id": {"$in": [ObjectId(i) for i in m["member_ids"]]}},
+                {"$set": {"status": "idle"}},
+            )
         await add_event(db, m["player_id"], "team", f"{m['team_name']} regressou à base.")
     if updates:
         await db.missions.update_one({"_id": m["_id"]}, {"$set": updates})
+
+
+async def _complete_trainings(db, pid, now):
+    trainees = await db.employees.find({"player_id": pid, "status": "training"}).to_list(200)
+    for e in trainees:
+        tr = e.get("training") or {}
+        if not tr or parse_dt(tr["ends_at"]) > now:
+            continue
+        course = TRAINING_COURSES[tr["course_key"]]
+        bonus = 1.5 if course["spec"] == e["spec"] else 1.0
+        xp = e["xp"] + int(course["xp"] * bonus)
+        new_level = emp_level_for(xp)
+        await db.employees.update_one({"_id": e["_id"]}, {"$set": {
+            "xp": xp, "level": new_level, "status": "idle", "training": None,
+            "fatigue": max(0.0, e["fatigue"] - course.get("fatigue_relief", 0)),
+        }})
+        msg = f"{e['name']} concluiu a formação {course['name']}."
+        if new_level > e["level"]:
+            msg += f" Subiu para o nível {new_level}!"
+        await add_event(db, pid, "team", msg)
+
+
+def _apply_passive_income(player, props, hours):
+    dirty_rate = sum(PROPERTY_TYPES[p["type_key"]].get("dirty_per_h", 0) * p["level"] for p in props)
+    heat_rate = sum(PROPERTY_TYPES[p["type_key"]].get("heat_per_h", 0) * p["level"] for p in props)
+    launder_rate = sum(PROPERTY_TYPES[p["type_key"]].get("launder_per_h", 0) * p["level"] for p in props)
+
+    if dirty_rate > 0:
+        fd = player.get("frac_dirty", 0.0) + dirty_rate * hours
+        gain = int(fd)
+        player["frac_dirty"] = fd - gain
+        player["dirty_money"] += gain
+    if heat_rate > 0:
+        player["heat"] = min(100.0, player["heat"] + heat_rate * hours)
+    if launder_rate > 0 and player["dirty_money"] > 0:
+        fl = player.get("frac_launder", 0.0) + launder_rate * hours
+        conv = min(player["dirty_money"], int(fl))
+        player["frac_launder"] = fl - int(fl) if player["dirty_money"] >= int(fl) else 0.0
+        if conv > 0:
+            player["dirty_money"] -= conv
+            fc = player.get("frac_clean", 0.0) + conv * 0.9
+            gain = int(fc)
+            player["frac_clean"] = fc - gain
+            player["clean_money"] += gain
 
 
 async def advance(db, player):
@@ -156,9 +269,26 @@ async def advance(db, player):
     for m in missions:
         await _progress_mission(db, player, m, now)
 
+    await _complete_trainings(db, pid, now)
+
     last = parse_dt(player["last_tick"])
     minutes = max(0.0, (now - last).total_seconds() / 60)
-    player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 2)
+
+    if minutes > 0:
+        rec = minutes * 0.6
+        await db.employees.update_many(
+            {"player_id": pid, "status": "idle", "fatigue": {"$gt": 0}},
+            {"$inc": {"fatigue": -rec}},
+        )
+        await db.employees.update_many(
+            {"player_id": pid, "fatigue": {"$lt": 0}},
+            {"$set": {"fatigue": 0.0}},
+        )
+
+    props = await db.properties.find({"player_id": pid}).to_list(200)
+    _apply_passive_income(player, props, minutes / 60)
+
+    player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 3)
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
 
@@ -166,6 +296,8 @@ async def advance(db, player):
         "heat": player["heat"], "level": player["level"], "last_tick": player["last_tick"],
         "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
         "respect": player["respect"],
+        "frac_dirty": player.get("frac_dirty", 0.0), "frac_clean": player.get("frac_clean", 0.0),
+        "frac_launder": player.get("frac_launder", 0.0),
     }})
     await spawn_opportunities(db, player)
     return player

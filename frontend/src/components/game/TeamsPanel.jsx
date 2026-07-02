@@ -1,14 +1,15 @@
-import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Users, Car, ChevronDown, Plus } from "lucide-react";
+import { Users, Car, UserRound } from "lucide-react";
 
 export const TeamsPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, recruitTeam, buyVehicle } = useGame();
-  const [garageOpen, setGarageOpen] = useState(null);
+  const { state, catalog, createTeam } = useGame();
   if (!state) return null;
+
+  const membersOf = (teamId) => state.employees.filter((e) => e.team_id === teamId);
+  const vehicleOf = (team) => state.vehicles.find((v) => v.id === team.vehicle_id);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -17,85 +18,79 @@ export const TeamsPanel = ({ open, onOpenChange }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <Users size={18} className="text-red-500" /> Equipas
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Gere as tuas crews, veículos e recrutamento.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Membros geridos no RH, veículos na Frota.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 space-y-2" data-testid="teams-list">
-          {state.teams.map((t) => (
-            <div key={t.id} data-testid={`team-card-${t.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-white">{t.name}</p>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                    {SPEC_LABELS[t.spec]} · Skill {t.skill.toFixed(0)} · {t.missions_done} ops
-                  </p>
+          {state.teams.map((t) => {
+            const members = membersOf(t.id);
+            const vehicle = vehicleOf(t);
+            return (
+              <div key={t.id} data-testid={`team-card-${t.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-white">{t.name}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                      {SPEC_LABELS[t.spec]} · {t.missions_done} ops
+                    </p>
+                  </div>
+                  <span
+                    className="rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
+                    style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
+                  >
+                    {STATUS_LABELS[t.status]}
+                  </span>
                 </div>
-                <span
-                  className="rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
-                  style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
-                >
-                  {STATUS_LABELS[t.status]}
-                </span>
-              </div>
 
-              <div className="mt-2 flex items-center justify-between">
-                <p className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-400">
-                  <Car size={12} className="text-cyan-400" /> {t.vehicle.name} · {t.vehicle.speed} m/s
+                <div className="mt-2 flex items-center gap-1.5">
+                  <UserRound size={12} className="shrink-0 text-zinc-500" />
+                  {members.length === 0 ? (
+                    <span className="font-mono text-[10px] text-red-400">Sem membros — atribui no RH</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {members.map((m) => (
+                        <span key={m.id} className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                          {m.name.split(" ")[0]} <span className="text-zinc-500">N{m.level}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-zinc-400">
+                  <Car size={12} className="shrink-0 text-cyan-400" />
+                  {vehicle ? (
+                    <>
+                      {vehicle.name} · <span className="text-amber-400">{Math.round((vehicle.fuel_l / vehicle.tank_l) * 100)}% comb.</span> ·{" "}
+                      <span className={vehicle.condition < 30 ? "text-red-400" : "text-emerald-400"}>{Math.round(vehicle.condition)}% cond.</span>
+                    </>
+                  ) : (
+                    <span className="text-red-400">Sem veículo — atribui na Frota</span>
+                  )}
                 </p>
-                <button
-                  data-testid={`garage-toggle-${t.id}`}
-                  onClick={() => setGarageOpen(garageOpen === t.id ? null : t.id)}
-                  className="flex items-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
-                >
-                  Garagem <ChevronDown size={12} className={`transition-transform ${garageOpen === t.id ? "rotate-180" : ""}`} />
-                </button>
               </div>
-
-              {garageOpen === t.id && catalog && (
-                <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
-                  {Object.entries(catalog.vehicle_types)
-                    .filter(([key, v]) => key !== t.vehicle.key && v.cost > 0)
-                    .map(([key, v]) => (
-                      <button
-                        key={key}
-                        data-testid={`buy-vehicle-${key}-${t.id}`}
-                        onClick={() => buyVehicle(t.id, key)}
-                        disabled={t.status !== "idle" || state.player.clean_money < v.cost}
-                        className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left transition-colors hover:bg-white/5 disabled:opacity-40"
-                      >
-                        <span className="text-xs text-white">{v.name} <span className="font-mono text-[10px] text-cyan-400">{v.speed} m/s</span></span>
-                        <span className="font-mono text-[10px] text-emerald-400">{fmtMoney(v.cost)}</span>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <Plus size={12} /> Recrutar
+          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
+            Formar nova equipa · {catalog && fmtMoney(catalog.team_create_cost)}
           </h3>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
             {catalog &&
-              Object.entries(catalog.team_types).map(([key, tt]) => (
-                <div key={key} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">{tt.name}</p>
-                    <span className="font-mono text-xs text-emerald-400">{fmtMoney(tt.cost)}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-zinc-500">{tt.desc}</p>
-                  <Button
-                    data-testid={`recruit-team-${key}`}
-                    onClick={() => recruitTeam(key)}
-                    disabled={state.player.clean_money < tt.cost}
-                    size="sm"
-                    className="mt-2 w-full bg-white text-xs font-bold uppercase tracking-wider text-black hover:bg-gray-200 disabled:opacity-40"
-                  >
-                    Recrutar
-                  </Button>
-                </div>
+              Object.entries(catalog.team_specs).map(([key, ts]) => (
+                <Button
+                  key={key}
+                  data-testid={`create-team-${key}`}
+                  onClick={() => createTeam(key)}
+                  disabled={state.player.clean_money < catalog.team_create_cost}
+                  variant="outline"
+                  className="h-auto flex-col items-start border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40"
+                >
+                  <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
+                  <span className="whitespace-normal text-[10px] leading-tight text-zinc-500">{ts.desc}</span>
+                </Button>
               ))}
           </div>
         </div>

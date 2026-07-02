@@ -117,6 +117,20 @@
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
 }
 
+/* ---------- Property pin ---------- */
+.prop-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: rgba(18, 18, 18, 0.92);
+    color: #a1a1aa;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
 /* ---------- Unit pin (moving teams) ---------- */
 .unit-pin {
     display: flex;

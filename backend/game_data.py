@@ -1,3 +1,5 @@
+import random
+
 LISBON_SPOTS = [
     {"name": "Baixa", "lat": 38.7118, "lng": -9.1366},
     {"name": "Alfama", "lat": 38.7126, "lng": -9.1290},
@@ -25,24 +27,80 @@ TEAM_NAMES = ["Crew Alfa", "Crew Bravo", "Crew Cobra", "Crew Delta", "Crew Eco",
               "Crew Fénix", "Crew Gama", "Crew Hidra", "Crew Íbis", "Crew Jaguar",
               "Crew Kilo", "Crew Lince", "Crew Mamba", "Crew Norte", "Crew Onix"]
 
-TEAM_TYPES = {
-    "assalto": {"name": "Crew de Assalto", "spec": "assalto", "cost": 15000, "skill": 2,
-                "desc": "Especialistas em assaltos, roubos e ataques a territórios."},
-    "logistica": {"name": "Rede Logística", "spec": "logistica", "cost": 12000, "skill": 2,
-                  "desc": "Transporte de mercadorias ilegais e contrabando."},
-    "tecnica": {"name": "Célula Técnica", "spec": "tecnica", "cost": 18000, "skill": 2,
-                "desc": "Hacks, infiltrações e vigilância digital."},
-    "influencia": {"name": "Unidade de Influência", "spec": "influencia", "cost": 20000, "skill": 2,
-                   "desc": "Cobranças, lavagem de dinheiro e operações VIP."},
+TEAM_CREATE_COST = 5000
+
+TEAM_SPECS = {
+    "assalto": {"name": "Crew de Assalto", "desc": "Especializada em assaltos, roubos e ataques a territórios."},
+    "logistica": {"name": "Rede Logística", "desc": "Transporte de mercadorias ilegais e contrabando."},
+    "tecnica": {"name": "Célula Técnica", "desc": "Hacks, infiltrações e vigilância digital."},
+    "influencia": {"name": "Unidade de Influência", "desc": "Cobranças, lavagem de dinheiro e operações VIP."},
 }
 
-VEHICLE_TYPES = {
-    "usado": {"name": "Sedan Usado", "speed": 9, "cost": 0},
-    "moto": {"name": "Moto Rápida", "speed": 15, "cost": 12000},
-    "van": {"name": "Van Reforçada", "speed": 12, "cost": 18000},
-    "desportivo": {"name": "Desportivo", "speed": 19, "cost": 30000},
-    "supercarro": {"name": "Supercarro", "speed": 26, "cost": 65000},
+EMPLOYEE_ROLES = {
+    "musculo": {"name": "Músculo", "spec": "assalto", "cost": 4000, "desc": "Força bruta para assaltos e ataques."},
+    "condutor": {"name": "Condutor", "spec": "logistica", "cost": 3500, "desc": "Mestre da estrada e das rotas de fuga."},
+    "hacker": {"name": "Hacker", "spec": "tecnica", "cost": 5000, "desc": "Especialista em sistemas e infiltração digital."},
+    "negociador": {"name": "Negociador", "spec": "influencia", "cost": 4500, "desc": "Persuasão, cobranças e contactos VIP."},
 }
+
+EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
+
+TRAINING_COURSES = {
+    "combate": {"name": "Treino de Combate", "spec": "assalto", "cost": 3000, "duration_s": 120, "xp": 60},
+    "conducao": {"name": "Condução Evasiva", "spec": "logistica", "cost": 2500, "duration_s": 100, "xp": 50},
+    "ciberseguranca": {"name": "Cibersegurança", "spec": "tecnica", "cost": 3500, "duration_s": 140, "xp": 70},
+    "persuasao": {"name": "Retórica e Persuasão", "spec": "influencia", "cost": 3000, "duration_s": 120, "xp": 60},
+    "fisico": {"name": "Preparação Física", "spec": None, "cost": 2000, "duration_s": 90, "xp": 40, "fatigue_relief": 25},
+}
+
+_FIRST_NAMES = ["Rui", "Tiago", "Miguel", "André", "Bruno", "Carlos", "Diogo", "Vasco", "Nuno", "Pedro",
+                "Marta", "Inês", "Sofia", "Carla", "Beatriz", "Joana", "Rita", "Ana", "Hugo", "Fábio"]
+_LAST_NAMES = ["Silva", "Santos", "Ferreira", "Costa", "Oliveira", "Rodrigues", "Martins", "Sousa",
+               "Fonseca", "Ramos", "Lopes", "Vieira", "Cardoso", "Pinto", "Moreira", "Correia"]
+
+
+def random_employee_name():
+    return f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}"
+
+
+VEHICLE_MODELS = {
+    "usado": {"name": "Sedan Usado", "min_level": 1, "price": 6000, "speed": 9,
+              "fuel_type": "gasolina", "tank_l": 45, "cons": 8.0},
+    "moto": {"name": "Moto Rápida", "min_level": 1, "price": 12000, "speed": 15,
+             "fuel_type": "gasolina", "tank_l": 15, "cons": 4.5},
+    "van": {"name": "Van Reforçada", "min_level": 2, "price": 18000, "speed": 12,
+            "fuel_type": "gasoleo", "tank_l": 70, "cons": 10.0},
+    "desportivo": {"name": "Desportivo", "min_level": 3, "price": 30000, "speed": 19,
+                   "fuel_type": "gasolina", "tank_l": 55, "cons": 12.0},
+    "suv_blindado": {"name": "SUV Blindado", "min_level": 4, "price": 45000, "speed": 14,
+                     "fuel_type": "gasoleo", "tank_l": 80, "cons": 13.0},
+    "supercarro": {"name": "Supercarro", "min_level": 5, "price": 65000, "speed": 26,
+                   "fuel_type": "gasolina", "tank_l": 60, "cons": 15.0},
+}
+
+FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
+
+PROPERTY_TYPES = {
+    "esconderijo": {"name": "Esconderijo", "min_level": 1, "price": 20000, "cap_employees": 4,
+                    "desc": "Alarga a capacidade de funcionários da organização."},
+    "garagem": {"name": "Garagem", "min_level": 1, "price": 15000, "cap_vehicles": 2,
+                "desc": "Espaço extra para a frota de veículos."},
+    "empresa_legal": {"name": "Empresa de Fachada", "min_level": 2, "price": 35000, "launder_per_h": 2000,
+                      "desc": "Lava dinheiro sujo automaticamente (90% de retorno)."},
+    "armazem": {"name": "Armazém", "min_level": 2, "price": 25000, "bonus_pct": 0.05, "bonus_category": "logistica",
+                "bonus_label": "recompensas de logística", "desc": "Aumenta recompensas de operações logísticas."},
+    "laboratorio": {"name": "Laboratório", "min_level": 3, "price": 40000, "dirty_per_h": 3000, "heat_per_h": 0.8,
+                    "desc": "Produz dinheiro sujo passivamente, mas atrai calor."},
+    "oficina": {"name": "Oficina", "min_level": 3, "price": 30000, "repair_discount_pct": 0.15,
+                "desc": "Reduz o custo de reparações da frota."},
+    "porto_clandestino": {"name": "Porto Clandestino", "min_level": 4, "price": 60000, "bonus_pct": 0.05,
+                          "bonus_category": "all", "bonus_label": "todas as recompensas",
+                          "desc": "Rede de contrabando que aumenta todas as recompensas."},
+}
+
+BASE_EMPLOYEE_CAP = 4
+BASE_VEHICLE_CAP = 2
+PROPERTY_MAX_LEVEL = 3
 
 OPPORTUNITY_TYPES = {
     "assalto": {"name": "Assalto", "category": "assalto", "min_level": 1, "base_reward": 3500,

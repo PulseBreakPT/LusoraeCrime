@@ -30,6 +30,46 @@ export const SPEC_LABELS = {
   especial: "Especial",
 };
 
+export const ROLE_LABELS = {
+  musculo: "Músculo",
+  condutor: "Condutor",
+  hacker: "Hacker",
+  negociador: "Negociador",
+};
+
+export const EMP_STATUS_LABELS = {
+  idle: "Disponível",
+  on_mission: "Em missão",
+  training: "Em formação",
+};
+
+export const EMP_STATUS_COLORS = {
+  idle: "#34D399",
+  on_mission: "#EF4444",
+  training: "#22D3EE",
+};
+
+export const FUEL_LABELS = { gasolina: "Gasolina", gasoleo: "Gasóleo" };
+
+export function fatigueColor(f) {
+  if (f >= 70) return "#EF4444";
+  if (f >= 40) return "#F59E0B";
+  return "#34D399";
+}
+
+export function propertyBenefit(pt, level = 1) {
+  const parts = [];
+  if (pt.cap_employees) parts.push(`+${pt.cap_employees * level} funcionários`);
+  if (pt.cap_vehicles) parts.push(`+${pt.cap_vehicles * level} veículos`);
+  if (pt.dirty_per_h) parts.push(`+${pt.dirty_per_h * level} €/h sujos`);
+  if (pt.launder_per_h) parts.push(`lava ${pt.launder_per_h * level} €/h`);
+  if (pt.heat_per_h) parts.push(`+${(pt.heat_per_h * level).toFixed(1)} calor/h`);
+  if (pt.bonus_pct) parts.push(`+${Math.round(pt.bonus_pct * level * 100)}% ${pt.bonus_label}`);
+  if (pt.repair_discount_pct) parts.push(`-${Math.round(pt.repair_discount_pct * level * 100)}% reparações`);
+  return parts.join(" · ");
+}
+
+
 export const STATUS_LABELS = {
   idle: "Na base",
   en_route: "A caminho",

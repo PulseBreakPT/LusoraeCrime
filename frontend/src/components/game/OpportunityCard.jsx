@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS } from "../../lib/game";
 import { Button } from "../ui/button";
-import { X, Clock, TrendingUp, AlertTriangle } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose }) => {
   const { state, dispatchTeam, serverNow } = useGame();
@@ -18,15 +18,25 @@ export const OpportunityCard = ({ opp, onClose }) => {
   }, [opp, serverNow]);
 
   if (!state) return null;
-  const idleTeams = state.teams.filter((t) => t.status === "idle");
   const hq = state.player.hq;
   const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
   const color = CATEGORY_COLORS[opp.category] || "#fff";
   const lockedByLevel = state.player.level < opp.min_level;
+  const policeAlert = state.player.heat >= 90;
+  const distM = haversineM(hq.lat, hq.lng, opp.lat, opp.lng);
 
-  const etaFor = (team) => {
-    const dist = haversineM(hq.lat, hq.lng, opp.lat, opp.lng);
-    return Math.max(20, dist / team.vehicle.speed);
+  const readiness = (t) => {
+    if (t.status !== "idle") return { ok: false, reason: "Em operação" };
+    const members = state.employees.filter((e) => e.team_id === t.id);
+    if (members.length === 0) return { ok: false, reason: "Sem membros" };
+    const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
+    if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
+    const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
+    if (!vehicle) return { ok: false, reason: "Sem veículo" };
+    if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
+    const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
+    if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
+    return { ok: true, members: ready.length, eta: Math.max(20, distM / vehicle.speed), vehicle };
   };
 
   const handleDispatch = async () => {
@@ -36,6 +46,8 @@ export const OpportunityCard = ({ opp, onClose }) => {
     setBusy(false);
     if (res.ok) onClose();
   };
+
+  const anyReady = state.teams.some((t) => readiness(t).ok);
 
   return (
     <div
@@ -65,23 +77,29 @@ export const OpportunityCard = ({ opp, onClose }) => {
         <Metric icon={Clock} label="Expira" value={fmtDuration(timeLeft)} color="#F59E0B" />
       </div>
 
-      {lockedByLevel ? (
+      {policeAlert ? (
+        <p className="mt-3 flex items-center justify-center gap-1.5 rounded-md border border-red-600/40 bg-red-600/10 py-2 text-center font-mono text-xs text-red-500">
+          <Siren size={13} /> Polícia em alerta máximo — reduz o calor
+        </p>
+      ) : lockedByLevel ? (
         <p className="mt-3 text-center font-mono text-xs text-red-500">Requer nível {opp.min_level}</p>
-      ) : idleTeams.length === 0 ? (
-        <p className="mt-3 text-center font-mono text-xs text-zinc-500">Nenhuma equipa disponível na base</p>
       ) : (
         <>
-          <div className="mt-3 max-h-28 space-y-1 overflow-y-auto">
-            {idleTeams.map((t) => {
+          <div className="mt-3 max-h-32 space-y-1 overflow-y-auto">
+            {state.teams.map((t) => {
+              const r = readiness(t);
               const match = t.spec === opp.category || opp.category === "especial";
               return (
                 <button
                   key={t.id}
                   data-testid={`select-team-${t.id}`}
-                  onClick={() => setSelectedTeamId(t.id)}
+                  onClick={() => r.ok && setSelectedTeamId(t.id)}
+                  disabled={!r.ok}
                   className={`flex w-full items-center justify-between rounded-md border px-2.5 py-1.5 text-left transition-colors ${
-                    selectedTeamId === t.id ? "border-white/40 bg-white/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
-                  }`}
+                    selectedTeamId === t.id
+                      ? "border-white/40 bg-white/10"
+                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+                  } ${!r.ok ? "opacity-45" : ""}`}
                 >
                   <div>
                     <p className="text-xs font-semibold text-white">
@@ -89,14 +107,23 @@ export const OpportunityCard = ({ opp, onClose }) => {
                       {match && <span className="ml-1.5 font-mono text-[9px] uppercase text-emerald-400">match</span>}
                     </p>
                     <p className="font-mono text-[10px] text-zinc-500">
-                      {SPEC_LABELS[t.spec]} · {t.vehicle.name}
+                      {r.ok ? `${r.members} membros · ${r.vehicle.name}` : SPEC_LABELS[t.spec]}
                     </p>
                   </div>
-                  <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(etaFor(t))}</span>
+                  {r.ok ? (
+                    <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
+                  ) : (
+                    <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
+                  )}
                 </button>
               );
             })}
           </div>
+          {!anyReady && (
+            <p className="mt-2 text-center font-mono text-[10px] text-zinc-500">
+              Nenhuma equipa operacional — verifica membros, combustível e condição
+            </p>
+          )}
           <Button
             data-testid="dispatch-team-button"
             onClick={handleDispatch}

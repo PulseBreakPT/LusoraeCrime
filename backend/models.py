@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List
 from pydantic import BaseModel, BeforeValidator, Field, ConfigDict
 from bson import ObjectId
 
@@ -41,13 +41,53 @@ class Player(BaseDocument):
 class Team(BaseDocument):
     player_id: str
     name: str
-    type_key: str
     spec: str
-    skill: float
     status: str
-    vehicle: dict
-    missions_done: int
+    vehicle_id: Optional[str] = None
+    missions_done: int = 0
     created_at: str
+
+
+class Employee(BaseDocument):
+    player_id: str
+    name: str
+    role_key: str
+    spec: str
+    level: int
+    xp: int
+    fatigue: float
+    status: str
+    team_id: Optional[str] = None
+    training: Optional[dict] = None
+    hired_at: str
+
+
+class Vehicle(BaseDocument):
+    player_id: str
+    model_key: str
+    name: str
+    fuel_type: str
+    tank_l: float
+    fuel_l: float
+    condition: float
+    speed: float
+    cons: float
+    price: int
+    min_level: int
+    team_id: Optional[str] = None
+    km_total: float = 0.0
+    bought_at: str
+
+
+class Property(BaseDocument):
+    player_id: str
+    type_key: str
+    name: str
+    district: str
+    lat: float
+    lng: float
+    level: int
+    bought_at: str
 
 
 class Opportunity(BaseDocument):
@@ -76,6 +116,8 @@ class Mission(BaseDocument):
     team_name: str
     team_skill: float
     spec_match: bool
+    member_ids: List[str] = []
+    vehicle_id: Optional[str] = None
     opportunity: dict
     origin: dict
     target: dict

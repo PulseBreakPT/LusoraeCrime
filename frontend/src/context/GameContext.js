@@ -55,12 +55,33 @@ export function GameProvider({ children }) {
 
   const dispatchTeam = (opportunityId, teamId) =>
     action("dispatch", { opportunity_id: opportunityId, team_id: teamId }, "Equipa destacada");
-  const recruitTeam = (typeKey) => action("recruit", { type_key: typeKey }, "Equipa recrutada");
-  const buyVehicle = (teamId, vehicleKey) => action("vehicle", { team_id: teamId, vehicle_key: vehicleKey }, "Veículo adquirido");
+  const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
+  const hireEmployee = (roleKey) => action("employees/hire", { role_key: roleKey }, "Funcionário contratado");
+  const assignEmployee = (employeeId, teamId) =>
+    action("employees/assign", { employee_id: employeeId, team_id: teamId }, teamId ? "Atribuído à equipa" : "Removido da equipa");
+  const trainEmployee = (employeeId, courseKey) =>
+    action("employees/train", { employee_id: employeeId, course_key: courseKey }, "Formação iniciada");
+  const buyVehicle = (modelKey) => action("vehicles/buy", { model_key: modelKey }, "Veículo adquirido");
+  const sellVehicle = (vehicleId) => action("vehicles/sell", { vehicle_id: vehicleId }, "Veículo abatido");
+  const refuelVehicle = (vehicleId) => action("vehicles/refuel", { vehicle_id: vehicleId }, "Depósito cheio");
+  const repairVehicle = (vehicleId) => action("vehicles/repair", { vehicle_id: vehicleId }, "Veículo reparado");
+  const assignVehicle = (vehicleId, teamId) =>
+    action("vehicles/assign", { vehicle_id: vehicleId, team_id: teamId }, teamId ? "Veículo atribuído" : "Veículo na garagem");
+  const buyProperty = (typeKey) => action("properties/buy", { type_key: typeKey }, "Propriedade comprada");
+  const sellProperty = (propertyId) => action("properties/sell", { property_id: propertyId }, "Propriedade vendida");
+  const upgradeProperty = (propertyId) => action("properties/upgrade", { property_id: propertyId }, "Propriedade melhorada");
+  const bribePolice = () => action("police/bribe", {}, "Suborno pago");
   const launder = (amount) => action("launder", { amount }, "Dinheiro lavado");
 
   return (
-    <GameContext.Provider value={{ state, catalog, refresh, serverNow, dispatchTeam, recruitTeam, buyVehicle, launder }}>
+    <GameContext.Provider
+      value={{
+        state, catalog, refresh, serverNow, dispatchTeam, createTeam,
+        hireEmployee, assignEmployee, trainEmployee,
+        buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
+        buyProperty, sellProperty, upgradeProperty, bribePolice, launder,
+      }}
+    >
       {children}
     </GameContext.Provider>
   );

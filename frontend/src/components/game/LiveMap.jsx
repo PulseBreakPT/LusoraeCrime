@@ -3,8 +3,18 @@ import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation } from "lucide-react";
+import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes } from "lucide-react";
 import { CATEGORY_COLORS, TYPE_ICONS, missionPosition } from "../../lib/game";
+
+const PROP_ICONS = {
+  esconderijo: Shield,
+  garagem: Warehouse,
+  armazem: Boxes,
+  laboratorio: FlaskConical,
+  empresa_legal: Landmark,
+  oficina: Wrench,
+  porto_clandestino: Anchor,
+};
 
 const makeDivIcon = (html, size, className = "") =>
   L.divIcon({ html, className: `lus-marker ${className}`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
@@ -35,6 +45,15 @@ const unitIcon = (phase) => {
       ${renderToStaticMarkup(<Navigation size={13} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, 26);
+};
+
+const propIcon = (typeKey) => {
+  const Icon = PROP_ICONS[typeKey] || Warehouse;
+  const html = `
+    <div class="prop-pin">
+      ${renderToStaticMarkup(<Icon size={13} strokeWidth={2.5} />)}
+    </div>`;
+  return makeDivIcon(html, 28);
 };
 
 const PanTo = ({ target }) => {
@@ -73,6 +92,9 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
       />
       <Marker position={[hq.lat, hq.lng]} icon={hqMarkerIcon} zIndexOffset={400} />
+      {state.properties.map((p) => (
+        <Marker key={p.id} position={[p.lat, p.lng]} icon={propIcon(p.type_key)} zIndexOffset={300} />
+      ))}
       {state.opportunities.map((opp) => (
         <Marker
           key={opp.id}
