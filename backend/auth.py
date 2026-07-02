@@ -89,7 +89,7 @@ async def create_player_for_user(user_id: str, org_name: str):
     now = now_utc().isoformat()
     result = await db.players.insert_one({
         "user_id": user_id, "org_name": org_name,
-        "clean_money": 50000, "dirty_money": 0,
+        "clean_money": 75000, "dirty_money": 5000,
         "respect": 0, "level": 1, "heat": 0.0,
         "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0, "v2": True,
         "hq": HQ_LOCATION, "last_tick": now, "created_at": now,
@@ -104,7 +104,7 @@ async def create_player_for_user(user_id: str, org_name: str):
     await db.teams.update_one({"_id": team_res.inserted_id}, {"$set": {"vehicle_id": str(veh_res.inserted_id)}})
     for _ in range(2):
         await db.employees.insert_one(employee_doc(pid, "musculo", now, team_id=tid))
-    await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa. O Armazém do Cais é agora a tua base.")
+    await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa com 75.000 € limpos e 5.000 € sujos de capital inicial.")
     await add_event(db, pid, "team", "Crew Alfa está pronta: 2 músculos e um Sedan Usado na garagem.")
     return pid
 

@@ -37,7 +37,7 @@ export default function GamePage() {
   const busyCount = state.teams.filter((t) => t.status !== "idle").length;
 
   return (
-    <div data-testid="game-page" className="relative h-screen w-full overflow-hidden bg-[#050505]">
+    <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-[#050505]">
       <LiveMap
         state={state}
         serverNow={serverNow}
@@ -50,7 +50,10 @@ export default function GamePage() {
       <ActivityFeedMobile />
       {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} />}
 
-      <div className="pointer-events-auto absolute bottom-3 left-2 z-30 flex gap-1.5 md:left-1/2 md:-translate-x-1/2">
+      <div
+        className="pointer-events-auto absolute left-2 z-30 flex gap-1 md:left-1/2 md:-translate-x-1/2 md:gap-1.5"
+        style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         <HudButton testId="open-empire-button" icon={Building2} label="Império" color="text-red-500" onClick={() => setOpenPanel("empire")} />
         <HudButton testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400" badge={busyCount} onClick={() => setOpenPanel("teams")} />
         <HudButton testId="open-employees-button" icon={IdCard} label="RH" color="text-emerald-400" onClick={() => setOpenPanel("employees")} />
@@ -71,7 +74,7 @@ const HudButton = ({ testId, icon: Icon, label, color, badge, onClick }) => (
   <button
     data-testid={testId}
     onClick={onClick}
-    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black"
+    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-2 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black md:px-3 md:py-2.5"
   >
     <Icon size={15} className={color} />
     <span className="hidden md:inline">{label}</span>
