@@ -11,13 +11,16 @@ from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
                     team_effectiveness, gen_candidate, employee_from_candidate, betrayal_risk_of,
-                    push_history)
-from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event
+                    push_history, gen_attrs, gen_talents)
+from quests import make_instance, enrich_quest, locked_principals
+from quests_data import QUEST_DEFS
+from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest
 from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS, RARITIES,
                        RARITY_MIN_RESPECT, RANKS, RANK_REQ_LEVEL, TALENTS, RECRUIT_SOURCES,
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
                        VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
-                       BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS)
+                       BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
+                       random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -87,6 +90,15 @@ class LaunderInput(BaseModel):
     amount: int
 
 
+class QuestClaimInput(BaseModel):
+    quest_id: str
+
+
+class QuestChooseInput(BaseModel):
+    quest_id: str
+    option: str
+
+
 def _oid(v, msg):
     try:
         return ObjectId(v)
@@ -139,6 +151,7 @@ async def get_state(user: dict = Depends(get_current_user)):
     missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(100)
     history = await db.missions.find({"player_id": pid, "phase": "done"}).sort("return_at", -1).to_list(20)
     events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(30)
+    quest_docs = await db.quests.find({"player_id": pid}).to_list(400)
 
     caps, _ = await get_caps(db, pid)
     bonuses = await get_org_bonuses(db, pid)
@@ -150,6 +163,9 @@ async def get_state(user: dict = Depends(get_current_user)):
         d = Employee.from_mongo(e).model_dump()
         d["betrayal_risk"] = betrayal_risk_of(e)
         emp_dumps.append(d)
+
+    quests_out = [enrich_quest(Quest.from_mongo(q).model_dump()) for q in quest_docs]
+    quests_out += locked_principals({q["quest_key"] for q in quest_docs}, player["level"])
 
     return {
         "server_time": now_iso,
@@ -163,6 +179,7 @@ async def get_state(user: dict = Depends(get_current_user)):
         "missions": [Mission.from_mongo(m).model_dump() for m in missions],
         "history": [Mission.from_mongo(h).model_dump() for h in history],
         "events": [Event.from_mongo(e).model_dump() for e in events],
+        "quests": quests_out,
         "caps": {
             "employees": {"used": len(employees), "max": caps["employees"]},
             "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
@@ -211,6 +228,9 @@ async def _prepare_dispatch(player, opp, team):
         pt = PROPERTY_TYPES[pr["type_key"]]
         if pt.get("bonus_pct") and (pt.get("bonus_category") == "all" or pt.get("bonus_category") == opp["category"]):
             mult += pt["bonus_pct"] * pr["level"]
+    tb = player.get("temp_bonus")
+    if tb and tb.get("kind") == "reward_boost" and parse_dt(tb["until"]) > now_utc():
+        mult += tb["pct"]
     reward = int(opp["reward"] * mult)
 
     team_skill = team_effectiveness(members, opp["category"])
@@ -304,6 +324,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         {"_id": {"$in": [ObjectId(i) for i in member_ids]}},
         {"$set": {"status": "on_mission"}},
     )
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"stats.ops_dispatched": 1}})
     await add_event(db, pid, "dispatch", f"{team['name']} ({len(members)} membros) destacada para {opp['name']} em {opp['district']}.")
     return {"mission_id": str(result.inserted_id)}
 
@@ -318,7 +339,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     count = await db.teams.count_documents({"player_id": pid})
     name = TEAM_NAMES[count % len(TEAM_NAMES)]
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST, "stats.teams_created": 1}})
     await db.teams.insert_one({
         "player_id": pid, "name": name, "spec": body.spec, "status": "idle",
         "vehicle_id": None, "missions_done": 0, "created_at": now_utc().isoformat(),
@@ -352,7 +373,10 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
     if used >= caps["employees"]:
         raise HTTPException(status_code=400, detail="Sem capacidade. Compra ou melhora um esconderijo.")
     doc = employee_from_candidate(cand, now_utc().isoformat())
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cand["cost"]}})
+    inc = {"clean_money": -cand["cost"], "stats.recruits_hired": 1}
+    if cand["role_key"] == "informador":
+        inc["stats.recruits_informador"] = 1
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": inc})
     await db.employees.insert_one(doc)
     await db.candidates.delete_one({"_id": cand["_id"]})
     role_name = SPECIALIZATIONS[cand["role_key"]]["name"]
@@ -431,6 +455,7 @@ async def rest_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail="Não está fatigado o suficiente para descansar")
     until = (now_utc() + timedelta(seconds=REST_DURATION_S)).isoformat()
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "resting", "status_until": until}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"stats.employees_rested": 1}})
     await add_event(db, pid, "team", f"{emp['name']} foi descansar.")
     return {"ok": True}
 
@@ -455,7 +480,7 @@ async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     new_rank = RANKS[new_idx]
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.employees_promoted": 1}})
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
         "rank": new_rank, "salary": int(emp.get("salary", 0) * 1.1),
         "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
@@ -474,7 +499,7 @@ async def bonus_employee(body: EmployeeIdInput, user: dict = Depends(get_current
     cost = max(100, emp.get("salary", 100))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.bonuses_paid": 1}})
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
         "morale": min(100.0, emp.get("morale", 70) + 15),
         "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
@@ -558,7 +583,7 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
     used = await db.vehicles.count_documents({"player_id": pid})
     if used >= caps["vehicles"]:
         raise HTTPException(status_code=400, detail="Garagem cheia. Compra ou melhora uma garagem.")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -model["price"]}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -model["price"], "stats.vehicles_bought": 1}})
     await db.vehicles.insert_one(vehicle_doc(pid, body.model_key, now_utc().isoformat()))
     await add_event(db, pid, "vehicle", f"{model['name']} adquirido por {model['price']:,} €.")
     return {"ok": True}
@@ -605,7 +630,7 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     cost = math.ceil(missing * FUEL_PRICES[vehicle["fuel_type"]])
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_refueled": 1}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"fuel_l": vehicle["tank_l"]}, "$inc": {"fuel_spent_total": cost}})
     await add_event(db, pid, "vehicle", f"{vehicle['name']} abastecido ({vehicle['fuel_type']}) por {cost:,} €.")
     return {"cost": cost}
@@ -629,7 +654,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     cost = max(50, int(missing * vehicle["price"] * 0.002 * (1 - discount)))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_repaired": 1}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"condition": 100.0}, "$inc": {"repair_spent_total": cost}})
     await add_event(db, pid, "vehicle", f"{vehicle['name']} reparado por {cost:,} €.")
     return {"cost": cost}
@@ -673,7 +698,7 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
     if player["clean_money"] < pt["price"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     spot = random.choice(LISBON_SPOTS)
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -pt["price"]}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -pt["price"], "stats.properties_bought": 1}})
     await db.properties.insert_one({
         "player_id": pid, "type_key": body.type_key,
         "name": f"{pt['name']} — {spot['name']}", "district": spot["name"],
@@ -722,7 +747,7 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
     cost = int(pt["price"] * 0.6 * (prop["level"] + 1))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.properties_upgraded": 1}})
     await db.properties.update_one({"_id": prop["_id"]}, {"$inc": {"level": 1}})
     await add_event(db, pid, "property", f"{prop['name']} melhorado para nível {prop['level'] + 1} por {cost:,} €.")
     return {"ok": True}
@@ -741,7 +766,7 @@ async def bribe_police(user: dict = Depends(get_current_user)):
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     new_heat = max(0.0, player["heat"] - 40)
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}, "$set": {"heat": new_heat}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.bribes_paid": 1}, "$set": {"heat": new_heat}})
     await add_event(db, pid, "police", f"Suborno de {cost:,} € pago. O calor baixou para {round(new_heat)}%.")
     return {"cost": cost}
 
@@ -762,3 +787,142 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
     }})
     await add_event(db, pid, "launder", f"Lavagem de {body.amount:,} € — recebeste {clean_gain:,} € limpos (taxa {round((1 - rate) * 100)}%).")
     return {"clean_gain": clean_gain}
+
+
+# ---------------- Missões ----------------
+
+async def _grant_rewards(player, rw):
+    pid = str(player["_id"])
+    now_iso = now_utc().isoformat()
+    parts, inc, sets = [], {}, {}
+    if rw.get("dirty"):
+        inc["dirty_money"] = rw["dirty"]
+        parts.append(f"+{rw['dirty']:,} € sujos")
+    if rw.get("clean"):
+        inc["clean_money"] = inc.get("clean_money", 0) + rw["clean"]
+        parts.append(f"+{rw['clean']:,} € limpos")
+    if rw.get("respect"):
+        inc["respect"] = rw["respect"]
+        parts.append(f"+{rw['respect']} respeito")
+    if rw.get("heat"):
+        sets["heat"] = max(0.0, min(100.0, player["heat"] + rw["heat"]))
+        parts.append(f"{rw['heat']} calor")
+    if rw.get("vehicle"):
+        m = VEHICLE_MODELS[rw["vehicle"]]
+        caps, _ = await get_caps(db, pid)
+        used = await db.vehicles.count_documents({"player_id": pid})
+        if used < caps["vehicles"]:
+            await db.vehicles.insert_one(vehicle_doc(pid, rw["vehicle"], now_iso))
+            parts.append(f"{m['name']} novo na garagem")
+        else:
+            inc["clean_money"] = inc.get("clean_money", 0) + m["price"]
+            parts.append(f"+{m['price']:,} € limpos (garagem cheia)")
+    if rw.get("employee"):
+        er = rw["employee"]
+        role, rarity = er["role"], er["rarity"]
+        caps, _ = await get_caps(db, pid)
+        used = await db.employees.count_documents({"player_id": pid})
+        if used < caps["employees"]:
+            sp = SPECIALIZATIONS[role]
+            await db.employees.insert_one({
+                "player_id": pid, "name": random_employee_name(), "age": random.randint(20, 50),
+                "role_key": role, "spec": sp["spec"], "rarity": rarity,
+                "rank": "recruta", "level": 1, "xp": 0,
+                "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
+                "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
+                "attrs": gen_attrs(role, rarity), "talents": gen_talents(role, rarity),
+                "status": "idle", "status_until": None, "team_id": None, "training": None,
+                "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
+                "hired_at": now_iso,
+            })
+            parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
+        else:
+            fb = er.get("fallback_clean", 10000)
+            inc["clean_money"] = inc.get("clean_money", 0) + fb
+            parts.append(f"+{fb:,} € limpos (sem espaço no esconderijo)")
+    if rw.get("temp_bonus"):
+        tb = rw["temp_bonus"]
+        sets["temp_bonus"] = {"kind": tb["kind"], "pct": tb["pct"],
+                              "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat()}
+        parts.append(f"+{int(tb['pct'] * 100)}% recompensas durante {tb['duration_s'] // 60} min")
+    update = {}
+    if inc:
+        update["$inc"] = inc
+    if sets:
+        update["$set"] = sets
+    if update:
+        await db.players.update_one({"_id": player["_id"]}, update)
+    return parts
+
+
+@router.post("/quests/claim")
+async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    q = await db.quests.find_one({"_id": _oid(body.quest_id, "Missão inválida"), "player_id": pid})
+    if not q:
+        raise HTTPException(status_code=404, detail="Missão não encontrada")
+    if q["status"] != "completed":
+        raise HTTPException(status_code=400, detail="A missão ainda não está concluída")
+    d = QUEST_DEFS.get(q["quest_key"])
+    if not d:
+        raise HTTPException(status_code=400, detail="Missão desconhecida")
+    parts = await _grant_rewards(player, d.get("rewards", {}))
+    await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}})
+    if q["quest_key"] == "c2_front":
+        await db.quests.insert_one(make_instance(pid, "dec_informador", now_utc(), player.get("stats", {}), expires_s=3600))
+        await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
+    msg = f"Recompensa reclamada — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada."
+    await add_event(db, pid, "success", msg)
+    return {"ok": True, "rewards": parts, "unlocks": d.get("unlocks_text")}
+
+
+@router.post("/quests/choose")
+async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    q = await db.quests.find_one({"_id": _oid(body.quest_id, "Missão inválida"), "player_id": pid})
+    if not q or q["status"] != "active":
+        raise HTTPException(status_code=400, detail="Decisão já não está disponível")
+    d = QUEST_DEFS.get(q["quest_key"])
+    if not d or d["type"] != "decisao":
+        raise HTTPException(status_code=400, detail="Esta missão não tem decisões")
+    opt = d["options"].get(body.option)
+    if not opt:
+        raise HTTPException(status_code=400, detail="Opção inválida")
+    if opt.get("cost_clean") and player["clean_money"] < opt["cost_clean"]:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    res = opt
+    if opt.get("random"):
+        r, acc = random.random(), 0.0
+        res = opt["random"][-1]
+        for cand in opt["random"]:
+            acc += cand["p"]
+            if r <= acc:
+                res = cand
+                break
+    inc, sets = {}, {}
+    if opt.get("cost_clean"):
+        inc["clean_money"] = -opt["cost_clean"]
+    eff = res.get("effects", {})
+    if eff.get("dirty"):
+        inc["dirty_money"] = eff["dirty"]
+    if eff.get("clean"):
+        inc["clean_money"] = inc.get("clean_money", 0) + eff["clean"]
+    if eff.get("respect"):
+        inc["respect"] = eff["respect"]
+    if eff.get("heat"):
+        sets["heat"] = max(0.0, min(100.0, player["heat"] + eff["heat"]))
+    update = {}
+    if inc:
+        update["$inc"] = inc
+    if sets:
+        update["$set"] = sets
+    if update:
+        await db.players.update_one({"_id": player["_id"]}, update)
+    await db.quests.update_one({"_id": q["_id"]}, {"$set": {
+        "status": "claimed", "choice": body.option, "outcome": res["outcome"],
+        "claimed_at": now_utc().isoformat(),
+    }})
+    await add_event(db, pid, "intel", f"{d['name']}: {res['outcome']}")
+    return {"ok": True, "outcome": res["outcome"]}

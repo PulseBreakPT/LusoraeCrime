@@ -91,6 +91,17 @@ export function GameProvider({ children }) {
   const upgradeProperty = (propertyId) => action("properties/upgrade", { property_id: propertyId }, "Propriedade melhorada");
   const bribePolice = () => action("police/bribe", {}, "Suborno pago");
   const launder = (amount) => action("launder", { amount }, "Dinheiro lavado");
+  const claimQuest = useCallback(async (questId) => {
+    const res = await action("quests/claim", { quest_id: questId });
+    if (res.ok && res.data?.rewards?.length) toast.success(res.data.rewards.join(" · "));
+    if (res.ok && res.data?.unlocks) toast.info(res.data.unlocks);
+    return res;
+  }, [action]);
+  const chooseQuest = useCallback(async (questId, option) => {
+    const res = await action("quests/choose", { quest_id: questId, option });
+    if (res.ok && res.data?.outcome) toast(res.data.outcome);
+    return res;
+  }, [action]);
 
   return (
     <GameContext.Provider
@@ -100,6 +111,7 @@ export function GameProvider({ children }) {
         promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
         buyProperty, sellProperty, upgradeProperty, bribePolice, launder,
+        claimQuest, chooseQuest,
       }}
     >
       {children}

@@ -75,6 +75,44 @@ export function goodBarColor(v) {
   return "#EF4444";
 }
 
+export const QUEST_TYPE_LABELS = {
+  principal: "História",
+  diaria: "Diária",
+  semanal: "Semanal",
+  dinamica: "Sugerida",
+  evento: "Evento",
+  decisao: "Decisão",
+};
+
+export const QUEST_STATUS_LABELS = {
+  locked: "Bloqueada",
+  active: "Ativa",
+  completed: "Concluída",
+  claimed: "Reclamada",
+  expired: "Expirada",
+  failed: "Falhada",
+};
+
+export const QUEST_STATUS_COLORS = {
+  locked: "#71717A",
+  active: "#22D3EE",
+  completed: "#34D399",
+  claimed: "#8E8E93",
+  expired: "#F59E0B",
+  failed: "#EF4444",
+};
+
+export const DIFFICULTY_LABELS = { facil: "Fácil", normal: "Normal", dificil: "Difícil", elite: "Elite", lendaria: "Lendária" };
+
+export const DIFFICULTY_COLORS = { facil: "#34D399", normal: "#22D3EE", dificil: "#F59E0B", elite: "#C084FC", lendaria: "#F43F5E" };
+
+export const CHAPTER_LABELS = {
+  1: "Capítulo 1 — Começo",
+  2: "Capítulo 2 — Expansão",
+  3: "Capítulo 3 — Organização",
+  4: "Capítulo 4 — Domínio",
+};
+
 export function effectiveSpeed(v) {
   if (v.condition >= 50) return v.speed;
   return v.speed * (0.6 + (0.4 * v.condition) / 50);

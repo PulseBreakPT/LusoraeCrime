@@ -35,6 +35,9 @@ class Player(BaseDocument):
     next_level_respect: Optional[int] = None
     next_payroll_at: Optional[str] = None
     pool_refresh_at: Optional[str] = None
+    quests_daily_at: Optional[str] = None
+    quests_weekly_at: Optional[str] = None
+    temp_bonus: Optional[dict] = None
     stats: dict = {}
     hq: dict
     last_tick: str
@@ -170,3 +173,18 @@ class Event(BaseDocument):
     kind: str
     message: str
     ts: str
+
+
+class Quest(BaseDocument):
+    player_id: str
+    quest_key: str
+    status: str
+    progress: float = 0.0
+    target: float = 1.0
+    baseline: dict = {}
+    choice: Optional[str] = None
+    outcome: Optional[str] = None
+    activated_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    claimed_at: Optional[str] = None

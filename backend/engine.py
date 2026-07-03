@@ -8,6 +8,7 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, CATEGORY_ATTRS, ATTR_KEYS,
                        RARITIES, RARITY_MIN_RESPECT, RANKS, TALENTS, RECRUIT_SOURCES,
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, random_employee_name)
+from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
 
@@ -52,7 +53,12 @@ def next_threshold(level):
 def default_stats():
     return {"missions_total": 0, "missions_success": 0, "missions_failure": 0, "missions_police": 0,
             "earned_dirty": 0, "earned_clean": 0, "fines_paid": 0, "laundered_total": 0,
-            "by_category": {}}
+            "by_category": {}, "success_by_category": {}, "high_value_ops": 0, "ops_dispatched": 0,
+            "recruits_hired": 0, "recruits_informador": 0, "trainings_completed": 0,
+            "employees_promoted": 0, "employees_rested": 0, "bonuses_paid": 0,
+            "vehicles_bought": 0, "vehicles_repaired": 0, "vehicles_refueled": 0,
+            "properties_bought": 0, "properties_upgraded": 0, "teams_created": 0,
+            "bribes_paid": 0, "raids_survived": 0}
 
 
 def betrayal_risk_of(e):
@@ -436,7 +442,8 @@ async def _progress_mission(db, player, m, now):
 
 # ---------------- Ciclos de vida dos funcionários ----------------
 
-async def _complete_trainings(db, pid, now):
+async def _complete_trainings(db, player, now):
+    pid = str(player["_id"])
     trainees = await db.employees.find({"player_id": pid, "status": "training"}).to_list(300)
     for e in trainees:
         tr = e.get("training") or {}
@@ -455,6 +462,7 @@ async def _complete_trainings(db, pid, now):
             "morale": min(100.0, e.get("morale", 70) + course.get("morale", 0)),
         }
         await db.employees.update_one({"_id": e["_id"]}, {"$set": sets})
+        player["stats"]["trainings_completed"] = player["stats"].get("trainings_completed", 0) + 1
         msg = f"{e['name']} concluiu a formação {course['name']}"
         if course.get("attr"):
             msg += f" (+1 {course['attr'].upper()})"
@@ -630,6 +638,7 @@ async def _maybe_raid(db, player, props, minutes, now):
     player["heat"] = max(0.0, player["heat"] - 15)
     player.setdefault("stats", default_stats())
     player["stats"]["fines_paid"] += seized
+    player["stats"]["raids_survived"] = player["stats"].get("raids_survived", 0) + 1
     player["raid_cooldown_until"] = (now + timedelta(minutes=10)).isoformat()
     await add_event(db, str(player["_id"]), "police",
                     f"RUSGA POLICIAL ao {lab['name']}! Apreenderam {seized:,} € sujos.")
@@ -651,7 +660,7 @@ async def advance(db, player):
     for m in missions:
         await _progress_mission(db, player, m, now)
 
-    await _complete_trainings(db, pid, now)
+    await _complete_trainings(db, player, now)
     await _process_statuses(db, pid, now)
 
     last = parse_dt(player["last_tick"])
@@ -679,6 +688,10 @@ async def advance(db, player):
     await _apply_passive_income(db, player, props, minutes / 60, bonuses)
     await _maybe_raid(db, player, props, minutes, now)
 
+    vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
+    await process_quests(db, player, {"employees": employees, "props": props,
+                                      "vehicles": vehicles, "minutes": minutes})
+
     player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 3)
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
@@ -690,6 +703,10 @@ async def advance(db, player):
         "raid_cooldown_until": player.get("raid_cooldown_until"),
         "next_payroll_at": player.get("next_payroll_at"),
         "pool_refresh_at": player.get("pool_refresh_at"),
+        "quests_daily_at": player.get("quests_daily_at"),
+        "quests_weekly_at": player.get("quests_weekly_at"),
+        "next_event_at": player.get("next_event_at"),
+        "temp_bonus": player.get("temp_bonus"),
         "frac_dirty": player.get("frac_dirty", 0.0), "frac_clean": player.get("frac_clean", 0.0),
         "frac_launder": player.get("frac_launder", 0.0),
     }})

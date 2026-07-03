@@ -97,6 +97,7 @@ async def startup():
     await db.opportunities.create_index([("player_id", 1), ("status", 1)])
     await db.missions.create_index([("player_id", 1), ("phase", 1)])
     await db.events.create_index([("player_id", 1), ("ts", -1)])
+    await db.quests.create_index([("player_id", 1), ("status", 1)])
     await seed_admin()
     await migrate_v2()
     await migrate_v4()

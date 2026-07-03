@@ -9,8 +9,9 @@ import { EmployeesPanel } from "../components/game/EmployeesPanel";
 import { FleetPanel } from "../components/game/FleetPanel";
 import { PropertiesPanel } from "../components/game/PropertiesPanel";
 import { IntelPanel } from "../components/game/IntelPanel";
+import { QuestsPanel } from "../components/game/QuestsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Loader2 } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2 } from "lucide-react";
 
 export default function GamePage() {
   const { state, serverNow } = useGame();
@@ -36,6 +37,7 @@ export default function GamePage() {
   }
 
   const busyCount = state.teams.filter((t) => t.status !== "idle").length;
+  const claimableQuests = (state.quests || []).filter((q) => q.status === "completed").length;
 
   return (
     <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-[#050505]">
@@ -63,6 +65,7 @@ export default function GamePage() {
         className="pointer-events-auto absolute left-2 z-30 flex gap-1 md:left-1/2 md:-translate-x-1/2 md:gap-1.5"
         style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
       >
+        <HudButton testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400" badge={claimableQuests} onClick={() => setOpenPanel("quests")} />
         <HudButton testId="open-empire-button" icon={Building2} label="Império" color="text-red-500" onClick={() => setOpenPanel("empire")} />
         <HudButton testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400" badge={busyCount} onClick={() => setOpenPanel("teams")} />
         <HudButton testId="open-employees-button" icon={IdCard} label="RH" color="text-emerald-400" onClick={() => setOpenPanel("employees")} />
@@ -71,6 +74,7 @@ export default function GamePage() {
       </div>
 
       <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} />
+      <QuestsPanel open={openPanel === "quests"} onOpenChange={(o) => setOpenPanel(o ? "quests" : null)} />
       <EmpirePanel open={openPanel === "empire"} onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} />
       <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} />
       <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} />
