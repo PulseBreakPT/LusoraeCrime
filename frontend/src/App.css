@@ -106,15 +106,6 @@
     transform: scale(1.1);
 }
 
-.opp-pulse {
-    position: absolute;
-    inset: 0;
-    border-radius: 9999px;
-    border: 1.5px solid var(--mk, #fff);
-    animation: pulse-ring 2s ease-out infinite;
-    pointer-events: none;
-}
-
 /* ---------- HQ pin ---------- */
 .hq-pin {
     display: flex;
@@ -183,6 +174,15 @@
     border-radius: 9999px;
     border: 2px solid #ef4444;
     animation: siren-ring 1s ease-out infinite;
+    pointer-events: none;
+}
+
+.unit-pulse {
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    border: 1.5px solid #fff;
+    animation: pulse-ring 2s ease-out infinite;
     pointer-events: none;
 }
 

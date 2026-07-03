@@ -27,7 +27,6 @@ const oppIcon = (opp, selected) => {
   const taken = opp.status === "taken";
   const html = `
     <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""}" style="--mk:${color}">
-      ${taken ? '' : '<span class="opp-pulse"></span>'}
       ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, 34);
@@ -46,9 +45,13 @@ const unitIcon = (phase, chased) => {
   const classes = ["unit-pin"];
   if (phase === "operating") classes.push("unit-operating");
   if (chased) classes.push("unit-chased");
+  // Só a equipa a caminho ou a regressar pulsa (em branco) — não a operar no alvo
+  // (que já tem o próprio "blink") nem em perseguição (que já tem a sirene).
+  const traveling = (phase === "en_route" || phase === "returning") && !chased;
   const html = `
     <div class="${classes.join(" ")}" style="--mk:${color}">
       ${chased ? '<span class="unit-siren"></span>' : ''}
+      ${traveling ? '<span class="unit-pulse"></span>' : ''}
       ${renderToStaticMarkup(<Navigation size={13} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, chased ? 30 : 26);
@@ -390,8 +393,12 @@ export const MapLegend = () => {
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
             <span className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-white text-[8px] text-black">⌂</span> Quartel-general</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-white/40 bg-zinc-800" /> Propriedade tua</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 animate-pulse rounded-full border border-red-500" /> Oportunidade ativa</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-cyan-400" /> Equipa em viagem</span>
+            <span className="flex items-center gap-1.5">
+              <span className="relative flex h-3 w-3 items-center justify-center rounded-full bg-cyan-400">
+                <span className="absolute -inset-1 animate-pulse rounded-full border border-white" />
+              </span>
+              Equipa a caminho / a regressar
+            </span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Equipa em operação</span>
           </div>
           <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>

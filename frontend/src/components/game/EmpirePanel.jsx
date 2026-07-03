@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { useAuth } from "../../context/AuthContext";
-import { fmtMoney, passiveRates, heatStatus, orgAlerts } from "../../lib/game";
+import { fmtMoney, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
 import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -249,7 +249,12 @@ const QuickNav = ({ testId, label, value, alert, alertText, tip, onClick }) => (
       </p>
       <p className="mt-0.5 font-mono text-[11px] font-bold text-white">{value}</p>
       {alertText && <p className="mt-0.5 font-mono text-[9px] text-amber-400">{alertText}</p>}
-      {alert && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />}
+      {alert && (
+        <span
+          className="absolute right-1.5 top-1.5 h-1.5 w-1.5 animate-pulse rounded-full"
+          style={{ background: NOTIFY_COLOR, boxShadow: `0 0 5px ${NOTIFY_COLOR}` }}
+        />
+      )}
     </button>
   </Tip>
 );

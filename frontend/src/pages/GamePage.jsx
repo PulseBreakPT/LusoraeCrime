@@ -12,7 +12,7 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import { Tip } from "../components/game/hud";
-import { fmtMoney, orgAlerts, teamsReadiness } from "../lib/game";
+import { fmtMoney, orgAlerts, teamsReadiness, NOTIFY_COLOR } from "../lib/game";
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2 } from "lucide-react";
 
 export default function GamePage() {
@@ -76,7 +76,7 @@ export default function GamePage() {
           <BrainCircuit size={16} className="text-red-500" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
           {alerts.total > 0 && (
-            <span data-testid="intel-alert-badge" className="rounded-full bg-red-600 px-1.5 font-mono text-[10px] font-bold">{alerts.total}</span>
+            <span data-testid="intel-alert-badge" className="rounded-full px-1.5 font-mono text-[10px] font-bold" style={{ background: NOTIFY_COLOR }}>{alerts.total}</span>
           )}
         </button>
       </Tip>
@@ -93,6 +93,7 @@ export default function GamePage() {
         <HudButton
           testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
           badge={alerts.claimable} badgeColor="#059669"
+          alert={alerts.claimable > 0}
           tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) por reclamar — história, diárias e semanais.` : "Missões de história, diárias, semanais e alertas dinâmicos."}
           onClick={() => setOpenPanel("quests")}
         />
@@ -104,14 +105,14 @@ export default function GamePage() {
         />
         <HudButton
           testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400"
-          badge={tr.busy} badgeColor="#DC2626"
+          badge={tr.busy} badgeColor="#0E7490"
           alert={alerts.teams > 0}
           tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Gestão de membros, veículos e despacho rápido.`}
           onClick={() => setOpenPanel("teams")}
         />
         <HudButton
           testId="open-employees-button" icon={IdCard} label="RH" color="text-emerald-400"
-          badge={alerts.hr} badgeColor="#DC2626"
+          badge={alerts.hr} badgeColor={NOTIFY_COLOR}
           tip={alerts.hr > 0 ? `Plantel precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o plantel leal."}
           onClick={() => setOpenPanel("employees")}
         />
@@ -140,7 +141,7 @@ export default function GamePage() {
   );
 }
 
-const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = "#DC2626", alert, tip, onClick }) => (
+const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = NOTIFY_COLOR, alert, tip, onClick }) => (
   <Tip tip={tip} side="top">
     <button
       data-testid={testId}
@@ -152,7 +153,12 @@ const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = "#DC2
       {badge > 0 && (
         <span className="rounded-full px-1.5 font-mono text-[10px] font-bold" style={{ background: badgeColor }}>{badge}</span>
       )}
-      {alert && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-red-500" />}
+      {alert && (
+        <span
+          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full"
+          style={{ background: NOTIFY_COLOR, boxShadow: `0 0 6px ${NOTIFY_COLOR}` }}
+        />
+      )}
     </button>
   </Tip>
 );
