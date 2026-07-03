@@ -27,7 +27,7 @@ export const ResourceBar = () => {
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="mx-auto flex max-w-4xl items-stretch gap-1 rounded-lg border border-white/10 bg-black/75 px-2 py-1.5 shadow-2xl backdrop-blur-xl sm:gap-2 sm:px-3">
+      <div className="mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-lg border border-white/10 bg-black/75 px-2 py-1.5 shadow-2xl backdrop-blur-xl sm:gap-2 sm:px-3">
         <Tip
           tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
           side="bottom"
