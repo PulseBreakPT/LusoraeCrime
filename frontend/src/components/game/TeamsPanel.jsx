@@ -4,14 +4,26 @@ import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatig
 import { Tip, Kpi, SummaryStrip, MiniBar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target } from "lucide-react";
+import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock } from "lucide-react";
+
+const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
+
+const useTick = (active) => {
+  const [, setT] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setT((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+};
 
 export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
-    state, catalog, createTeam, recallTeam, assignEmployee, assignVehicle,
+    state, catalog, serverNow, createTeam, recallTeam, assignEmployee, assignVehicle,
     refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
   } = useGame();
   const [recommendations, setRecommendations] = useState({});
+  useTick(open);
 
   // Para cada equipa pronta, pergunta ao servidor qual é a melhor oportunidade
   // que ela consegue mesmo cumprir (nunca uma abaixo dos requisitos mínimos).
@@ -36,6 +48,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   const membersOf = (teamId) => state.employees.filter((e) => e.team_id === teamId);
   const vehicleOf = (team) => state.vehicles.find((v) => v.id === team.vehicle_id);
+  const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
   const enRouteMissionOf = (team) => state.missions.find((m) => m.team_id === team.id && m.phase === "en_route");
   const freeEmployees = state.employees.filter((e) => !e.team_id && e.status === "idle");
   const freeVehicles = state.vehicles.filter((v) => !v.team_id);
@@ -92,6 +105,12 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             const rec = r.ok ? recommendations[t.id] : null;
             const best = rec?.opportunity_id ? state.opportunities.find((o) => o.id === rec.opportunity_id) : null;
             const vehicleSeats = vehicle ? catalog?.vehicle_models?.[vehicle.model_key]?.seats : null;
+            const mission = t.status !== "idle" ? missionOf(t) : null;
+            let missionEtaS = null;
+            if (mission) {
+              const nextAt = mission.phase === "en_route" ? mission.arrive_at : mission.phase === "operating" ? mission.finish_at : mission.return_at;
+              missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
+            }
             const fuelPct = vehicle ? (vehicle.fuel_l / vehicle.tank_l) * 100 : 0;
             const refuelCost = vehicle ? Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]) : 0;
             const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
@@ -122,10 +141,16 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
                 <p
                   data-testid={`team-readiness-${t.id}`}
-                  className={`mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase ${r.ok ? "text-emerald-400" : "text-amber-400"}`}
+                  className={`mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase ${
+                    r.ok ? "text-emerald-400" : mission ? "text-cyan-400" : "text-amber-400"
+                  }`}
                 >
-                  {r.ok ? <CheckCircle2 size={11} /> : <AlertTriangle size={11} />}
-                  {r.ok ? `Pronta para operar (${r.ready} membros)` : r.reason}
+                  {r.ok ? <CheckCircle2 size={11} /> : mission ? <Clock size={11} /> : <AlertTriangle size={11} />}
+                  {r.ok
+                    ? `Pronta para operar (${r.ready} membros)`
+                    : mission
+                    ? `${MISSION_NEXT_LABEL[mission.phase] || "A caminho"} ${fmtDuration(missionEtaS)}`
+                    : r.reason}
                 </p>
 
                 <div className="mt-2 flex items-start gap-1.5">
@@ -298,7 +323,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     >
                       <Zap size={11} /> Despachar → {best.name}
                       <span style={{ color: chanceColor(rec.chance) }}>({Math.round(rec.chance * 100)}%)</span>
-                      <span className="text-zinc-500">· {fmtMoney(rec.reward)}</span>
+                      <span className="text-zinc-500">· ETA {fmtDuration(rec.eta_s)} · {fmtMoney(rec.reward)}</span>
                     </button>
                   </Tip>
                 )}

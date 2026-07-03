@@ -120,10 +120,13 @@ const EmployeeCard = ({ e }) => {
               testId={`emp-rename-${e.id}`} value={e.name} onSave={(name) => renameEmployee(e.id, name)}
               textClassName="text-sm font-bold text-white"
             />
+            <Tip tip={`Nível ${e.level} de ${maxLevel} (máximo para a raridade ${RARITY_LABELS[e.rarity]}).`}>
+              <span data-testid={`employee-level-${e.id}`} className="shrink-0 font-mono text-[10px] font-bold text-cyan-400">N{e.level}/{maxLevel}</span>
+            </Tip>
             <span className="shrink-0 font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
           </div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-            {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank} · N{e.level}/{maxLevel}
+            {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">

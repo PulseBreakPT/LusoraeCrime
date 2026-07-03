@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, FUEL_LABELS, STATUS_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
+import { fmtMoney, fmtDuration, STATUS_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -99,7 +99,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       )}
                     </div>
                     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                      {v.speed} m/s · {FUEL_LABELS[v.fuel_type]} · {Math.round(v.km_total)} km ·{" "}
+                      {v.speed} m/s · {Math.round(v.km_total)} km ·{" "}
                       <Tip tip={`Autonomia com o combustível atual (${v.fuel_l.toFixed(0)}L, consumo ${v.cons}L/100km). As viagens são ida e volta a partir do QG.`}>
                         <span className="text-cyan-400">~{Math.round(vehicleRangeKm(v))} km rest.</span>
                       </Tip>
@@ -185,7 +185,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 )}
 
                 <div className="mt-2 flex gap-1.5">
-                  <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L de ${FUEL_LABELS[v.fuel_type].toLowerCase()}).`} block className="flex-1">
+                  <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L).`} block className="flex-1">
                     <button
                       data-testid={`refuel-vehicle-${v.id}`}
                       onClick={() => refuelVehicle(v.id)}
@@ -258,7 +258,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         )}
                       </p>
                       <p className="font-mono text-[10px] text-zinc-500">
-                        {m.speed} m/s · {FUEL_LABELS[m.fuel_type]} · {m.tank_l}L · {m.cons}L/100km ·{" "}
+                        {m.speed} m/s · {m.tank_l}L · {m.cons}L/100km ·{" "}
                         <Tip tip="Autonomia máxima com o depósito cheio.">
                           <span className="text-cyan-400">~{Math.round((m.tank_l / m.cons) * 100)} km</span>
                         </Tip>
