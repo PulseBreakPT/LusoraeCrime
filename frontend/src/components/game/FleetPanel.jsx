@@ -66,14 +66,25 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             const sellValue = Math.round(v.price * 0.4 * (v.condition / 100));
             const effSpeed = effectiveSpeed(v);
             const speedReduced = effSpeed < v.speed - 0.05;
+            const modelName = catalog?.vehicle_models?.[v.model_key]?.name || v.model_key;
+            const renamed = v.name !== modelName;
             return (
               <div key={v.id} data-testid={`vehicle-card-${v.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <InlineRename
-                      testId={`vehicle-rename-${v.id}`} value={v.name} onSave={(name) => renameVehicle(v.id, name)}
-                      textClassName="text-sm font-bold text-white"
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <InlineRename
+                        testId={`vehicle-rename-${v.id}`} value={v.name} onSave={(name) => renameVehicle(v.id, name)}
+                        textClassName="text-sm font-bold text-white"
+                      />
+                      {renamed && (
+                        <Tip tip="Modelo original deste veículo, antes de o renomeares.">
+                          <span data-testid={`vehicle-model-tag-${v.id}`} className="shrink-0 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-zinc-500">
+                            {modelName}
+                          </span>
+                        </Tip>
+                      )}
+                    </div>
                     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       {v.speed} m/s · {FUEL_LABELS[v.fuel_type]} · {Math.round(v.km_total)} km ·{" "}
                       <Tip tip={`Autonomia com o combustível atual (${v.fuel_l.toFixed(0)}L, consumo ${v.cons}L/100km). As viagens são ida e volta a partir do QG.`}>
