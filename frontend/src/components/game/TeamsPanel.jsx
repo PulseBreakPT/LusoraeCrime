@@ -33,7 +33,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   const bestOppFor = (t) => {
     if (state.player.heat >= 90) return null;
-    const opps = state.opportunities.filter((o) => state.player.level >= o.min_level);
+    const opps = state.opportunities.filter((o) => o.status !== "taken" && state.player.level >= o.min_level);
     if (!opps.length) return null;
     const scored = opps
       .map((o) => ({ o, score: o.reward * (o.category === t.spec || o.category === "especial" ? 1.5 : 1) }))

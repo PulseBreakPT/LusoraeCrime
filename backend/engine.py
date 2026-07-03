@@ -295,15 +295,18 @@ def _apply_outcome(player, m, outcome):
     stats["by_category"][t["category"]] = stats["by_category"].get(t["category"], 0) + 1
     heat_mult = 0.5 if ("fantasma_digital" in m.get("talents", []) and t["category"] == "tecnica") else 1.0
     if outcome == "success":
-        stats["missions_success"] += 1
-        if t["pays"] == "clean":
-            player["clean_money"] += t["reward"]
-            stats["earned_clean"] += t["reward"]
-        else:
-            player["dirty_money"] += t["reward"]
-            stats["earned_dirty"] += t["reward"]
+        # Money is *not* credited here anymore. Store as pending reward — paid on arrival at HQ
+        # if the police chase (if any) is escaped.
+        m["pending_reward"] = int(t["reward"])
+        m["pending_pays"] = t["pays"]
         player["respect"] += t["respect"]
         player["heat"] = min(100, player["heat"] + t["heat"] * heat_mult)
+        # Roll for police chase during return trip.
+        chase_chance = _compute_chase_chance(player, m)
+        if random.random() < chase_chance:
+            m["chase_active"] = True
+            m["escape_chance"] = _compute_escape_chance(player, m)
+        m["chase_chance"] = round(chase_chance, 3)
     elif outcome == "failure":
         stats["missions_failure"] += 1
         player["respect"] += max(1, t["respect"] // 4)
@@ -317,11 +320,118 @@ def _apply_outcome(player, m, outcome):
         m["fine"] = fine
 
 
+def _compute_chase_chance(player, m):
+    """Base chance the police tail the crew back to base after a successful heist."""
+    t = m["opportunity"]
+    risk = t.get("risk", 3)
+    heat = player.get("heat", 0)
+    # Base by risk (0..0.35), heat contribution up to +0.25.
+    base = 0.05 + (risk / 5) * 0.30
+    heat_bonus = (heat / 100) * 0.25
+    # Talents & skill mitigate: "fantasma_digital" and technical categories are stealthier.
+    talents = m.get("talents", []) or []
+    reduction = 0.0
+    if "fantasma_digital" in talents:
+        reduction += 0.10
+    if "cabeca_fria" in talents:
+        reduction += 0.05
+    # Team skill matters a bit.
+    skill = m.get("team_skill", 3)
+    reduction += min(0.10, max(0.0, (skill - 3) * 0.03))
+    return max(0.02, min(0.85, base + heat_bonus - reduction))
+
+
+def _compute_escape_chance(player, m):
+    """Chance of losing the police tail before reaching HQ."""
+    t = m["opportunity"]
+    risk = t.get("risk", 3)
+    skill = m.get("team_skill", 3)
+    talents = m.get("talents", []) or []
+    base = 0.55 - (risk / 5) * 0.15
+    base += min(0.20, max(0.0, (skill - 3) * 0.05))
+    if "rei_da_noite" in talents:
+        base += 0.08
+    if "conducao_defensiva" in talents:
+        base += 0.10
+    heat = player.get("heat", 0)
+    base -= (heat / 100) * 0.10
+    return max(0.10, min(0.95, base))
+
+
+async def _resolve_chase(db, player, m):
+    """Called when the vehicle reaches HQ. Decides if the chase was escaped or crew caught."""
+    if not m.get("chase_active"):
+        return "no_chase"
+    escape = m.get("escape_chance", 0.5)
+    if random.random() < escape:
+        m["chase_outcome"] = "escaped"
+        player["heat"] = min(100, player.get("heat", 0) + 5)
+        await add_event(db, m["player_id"], "success",
+                        f"{m['team_name']} despistou a polícia mesmo à porta do QG.")
+        return "escaped"
+    # Caught: lose the reward, extra heat, possible arrest.
+    m["chase_outcome"] = "caught"
+    lost = int(m.get("pending_reward", 0))
+    m["pending_reward"] = 0
+    player["heat"] = min(100, player.get("heat", 0) + 20)
+    stats = player.setdefault("stats", default_stats())
+    stats["fines_paid"] = stats.get("fines_paid", 0) + lost
+    stats["missions_police"] = stats.get("missions_police", 0) + 1
+    # 40% chance a random member gets arrested.
+    if m.get("member_ids") and random.random() < 0.4:
+        victim_id = random.choice(m["member_ids"])
+        bonuses = await get_org_bonuses(db, m["player_id"])
+        until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]))).isoformat()
+        await db.employees.update_one(
+            {"_id": ObjectId(victim_id)},
+            {"$set": {"status": "arrested", "status_until": until}},
+        )
+        emp = await db.employees.find_one({"_id": ObjectId(victim_id)})
+        if emp:
+            await push_history(db, emp["_id"], "Preso na perseguição de regresso à base.")
+            await add_event(db, m["player_id"], "police",
+                            f"{emp['name']} foi PRESO durante a perseguição policial!")
+    await add_event(db, m["player_id"], "police",
+                    f"POLÍCIA APANHOU {m['team_name']} antes do QG — perdeu {lost:,} € do assalto.")
+    return "caught"
+
+
+async def _pay_pending_reward(db, player, m):
+    reward = int(m.get("pending_reward", 0) or 0)
+    if reward <= 0:
+        return
+    pays = m.get("pending_pays") or m.get("opportunity", {}).get("pays", "dirty")
+    stats = player.setdefault("stats", default_stats())
+    if pays == "clean":
+        player["clean_money"] += reward
+        stats["earned_clean"] = stats.get("earned_clean", 0) + reward
+    else:
+        player["dirty_money"] += reward
+        stats["earned_dirty"] = stats.get("earned_dirty", 0) + reward
+    # Persist money & stats immediately.
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
+        "stats": stats,
+    }})
+    kind = "success"
+    label = "limpos" if pays == "clean" else "sujos"
+    await add_event(db, m["player_id"], kind,
+                    f"{m['team_name']} entregou {reward:,} € {label} no QG.")
+
+
 def _outcome_message(m, outcome):
     t = m["opportunity"]
     if outcome == "success":
-        symbol = "€" if t["pays"] == "dirty" else "€ limpos"
-        return f"{m['team_name']} concluiu {t['name']} em {t['district']}: +{t['reward']:,} {symbol}, +{t['respect']} respeito."
+        reward = int(m.get("pending_reward", t.get("reward", 0)) or 0)
+        symbol = "€ limpos" if t["pays"] == "clean" else "€ sujos"
+        chase = m.get("chase_active")
+        base = f"{m['team_name']} concluiu {t['name']} em {t['district']}: leva {reward:,} {symbol}"
+        if chase:
+            base += f" — POLÍCIA em perseguição (escape ≈ {int((m.get('escape_chance', 0.5)) * 100)}%)"
+        else:
+            base += ", regressa em segurança"
+        base += f", +{t['respect']} respeito."
+        return base
     if outcome == "failure":
         return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada."
     fine = m.get("fine", 0)
@@ -421,12 +531,26 @@ async def _progress_mission(db, player, m, now):
         await _crew_returns(db, m, outcome)
         phase = "returning"
         updates.update({"phase": phase, "outcome": outcome})
-        if "fine" in m:
-            updates["fine"] = m["fine"]
+        # Persist pending reward and chase state so the front-end can display them.
+        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance", "escape_chance", "fine"):
+            if k in m:
+                updates[k] = m[k]
+        # Track success now (before pay-out): the operation succeeded, delivery is separate.
+        if outcome == "success":
+            player.setdefault("stats", default_stats())["missions_success"] = \
+                player["stats"].get("missions_success", 0) + 1
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning"}, "$inc": {"missions_done": 1}})
         kind = "success" if outcome == "success" else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))
     if phase == "returning" and now >= parse_dt(m["return_at"]):
+        # Resolve chase (if any) and pay pending reward on arrival at HQ.
+        if m.get("outcome") == "success":
+            await _resolve_chase(db, player, m)
+            for k in ("pending_reward", "chase_outcome"):
+                if k in m:
+                    updates[k] = m[k]
+            if int(m.get("pending_reward", 0) or 0) > 0:
+                await _pay_pending_reward(db, player, m)
         phase = "done"
         updates["phase"] = phase
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "idle"}})
@@ -434,6 +558,11 @@ async def _progress_mission(db, player, m, now):
             await db.employees.update_many(
                 {"_id": {"$in": [ObjectId(i) for i in m["member_ids"]]}, "status": "on_mission"},
                 {"$set": {"status": "idle"}},
+            )
+        if m.get("opportunity_id"):
+            await db.opportunities.update_one(
+                {"_id": ObjectId(m["opportunity_id"])},
+                {"$set": {"status": "consumed"}},
             )
         await add_event(db, m["player_id"], "team", f"{m['team_name']} regressou à base.")
     if updates:

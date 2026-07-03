@@ -6,28 +6,41 @@ import { Button } from "../ui/button";
 import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
-  const { state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle } = useGame();
+  const { state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam } = useGame();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const inProgress = opp.status === "taken";
+  const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
 
   useEffect(() => {
-    const tick = () => setTimeLeft((Date.parse(opp.expires_at) - serverNow()) / 1000);
+    const tick = () => {
+      if (inProgress && activeMission) {
+        const nextAt = activeMission.phase === "en_route"
+          ? activeMission.arrive_at
+          : activeMission.phase === "operating"
+          ? activeMission.finish_at
+          : activeMission.return_at;
+        setTimeLeft((Date.parse(nextAt) - serverNow()) / 1000);
+      } else {
+        setTimeLeft((Date.parse(opp.expires_at) - serverNow()) / 1000);
+      }
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [opp, serverNow]);
+  }, [opp, serverNow, inProgress, activeMission]);
 
   useEffect(() => {
     setPreview(null);
-    if (!selectedTeamId) return;
+    if (!selectedTeamId || inProgress) return;
     let cancelled = false;
     previewDispatch(opp.id, selectedTeamId).then((r) => {
       if (!cancelled && r.ok) setPreview(r.data);
     });
     return () => { cancelled = true; };
-  }, [selectedTeamId, opp.id, previewDispatch]);
+  }, [selectedTeamId, opp.id, previewDispatch, inProgress]);
 
   if (!state) return null;
   const hq = state.player.hq;
@@ -122,14 +135,73 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
       <div className="mt-2 grid grid-cols-3 gap-2">
         <Metric icon={TrendingUp} label={opp.pays === "clean" ? "€ Limpos" : "€ Sujos"} value={fmtMoney(opp.reward)} color="#10B981"
-          tip={opp.pays === "clean" ? "Pago em dinheiro limpo — pronto a gastar, sem lavagem." : "Pago em dinheiro sujo — terás de o lavar (taxa 25%) antes de gastar."} />
+          tip={(opp.pays === "clean" ? "Pago em dinheiro limpo — pronto a gastar, sem lavagem." : "Pago em dinheiro sujo — terás de o lavar (taxa 25%) antes de gastar.") + " Só é creditado quando a equipa regressar ao QG (a polícia pode perseguir)."} />
         <Metric icon={AlertTriangle} label="Risco" value={"●".repeat(opp.risk) + "○".repeat(5 - opp.risk)} color="#DC2626"
           tip={`Risco ${opp.risk}/5 — reduz a probabilidade de sucesso e aumenta a chance de ferimentos, detenções e interceção policial.`} />
-        <Metric icon={Clock} label="Expira" value={fmtDuration(timeLeft)} color="#F59E0B"
-          tip="Tempo até esta oportunidade desaparecer do mapa. Despacha uma equipa antes disso." />
+        <Metric
+          icon={Clock}
+          label={inProgress && activeMission ? (activeMission.phase === "en_route" ? "Chega em" : activeMission.phase === "operating" ? "Conclui" : "Regressa") : "Expira"}
+          value={fmtDuration(timeLeft)}
+          color="#F59E0B"
+          tip={inProgress ? "Tempo até à próxima fase da missão em curso." : "Tempo até esta oportunidade desaparecer do mapa. Despacha uma equipa antes disso."}
+        />
       </div>
 
-      {policeAlert ? (
+      {inProgress && activeMission ? (
+        <div data-testid="opportunity-in-progress" className={`mt-3 rounded-md border p-3 ${activeMission.chase_active ? "border-red-500/40 bg-red-500/[0.08]" : "border-cyan-500/30 bg-cyan-500/[0.06]"}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-white">{activeMission.team_name}</p>
+              <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: activeMission.chase_active && activeMission.phase === "returning" ? "#EF4444" : "#22D3EE" }}>
+                {activeMission.chase_active && activeMission.phase === "returning"
+                  ? "PERSEGUIÇÃO POLICIAL"
+                  : activeMission.phase === "en_route"
+                  ? "A caminho do alvo"
+                  : activeMission.phase === "operating"
+                  ? "Em operação no alvo"
+                  : "A regressar à base"}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] uppercase tracking-wider text-zinc-500">
+                {activeMission.chase_active && activeMission.phase === "returning" ? "Escape" : "Sucesso previsto"}
+              </p>
+              <p className="font-mono text-sm font-bold" style={{
+                color: activeMission.chase_active && activeMission.phase === "returning"
+                  ? "#EF4444"
+                  : chanceColor(activeMission.success_chance || 0.5)
+              }}>
+                {activeMission.chase_active && activeMission.phase === "returning"
+                  ? `${Math.round((activeMission.escape_chance || 0.5) * 100)}%`
+                  : `${Math.round((activeMission.success_chance || 0) * 100)}%`}
+              </p>
+            </div>
+          </div>
+          {activeMission.outcome === "success" && Number(activeMission.pending_reward || 0) > 0 && (
+            <div className="mt-2 flex items-center justify-between rounded border border-amber-500/20 bg-amber-500/[0.06] px-2 py-1.5">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300">Carga a transportar</span>
+              <span className="font-mono text-xs font-bold text-amber-200">
+                {fmtMoney(activeMission.pending_reward)} {activeMission.pending_pays === "clean" ? "limpos" : "sujos"}
+              </span>
+            </div>
+          )}
+          <p className="mt-2 font-mono text-[10px] leading-snug text-zinc-500">
+            {activeMission.chase_active && activeMission.phase === "returning"
+              ? "Um carro-patrulha segue a equipa. Se apanhados antes do QG, perdem toda a carga."
+              : "A missão está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
+          </p>
+          {activeMission.phase === "en_route" && (
+            <Button
+              data-testid="recall-team-button"
+              onClick={async () => { setBusy(true); await recallTeam(activeMission.id); setBusy(false); onClose(); }}
+              disabled={busy}
+              className="mt-2 w-full bg-zinc-800 font-bold uppercase tracking-wider text-white hover:bg-zinc-700"
+            >
+              {busy ? "A chamar..." : "Chamar equipa de volta"}
+            </Button>
+          )}
+        </div>
+      ) : policeAlert ? (
         <p className="mt-3 flex items-center justify-center gap-1.5 rounded-md border border-red-600/40 bg-red-600/10 py-2 text-center font-mono text-xs text-red-500">
           <Siren size={13} /> Polícia em alerta máximo — reduz o calor
         </p>

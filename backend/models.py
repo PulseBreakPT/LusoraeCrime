@@ -168,6 +168,14 @@ class Mission(BaseDocument):
     arrive_at: str
     finish_at: str
     return_at: str
+    # Pending payout (credited only when the crew reaches HQ) and police chase state.
+    pending_reward: int = 0
+    pending_pays: Optional[str] = None
+    chase_active: bool = False
+    chase_chance: float = 0.0
+    escape_chance: float = 0.0
+    chase_outcome: Optional[str] = None
+    fine: int = 0
 
 
 class Event(BaseDocument):

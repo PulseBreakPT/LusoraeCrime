@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip as LTooltip, useMap } from "react-leaflet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X } from "lucide-react";
+import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X } from "lucide-react";
 import { useGame } from "../../context/GameContext";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
+import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 
 const PROP_ICONS = {
   esconderijo: Shield,
@@ -23,9 +24,10 @@ const makeDivIcon = (html, size, className = "") =>
 const oppIcon = (opp, selected) => {
   const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
   const color = CATEGORY_COLORS[opp.category] || "#fff";
+  const taken = opp.status === "taken";
   const html = `
-    <div class="opp-pin ${selected ? "opp-pin-selected" : ""}" style="--mk:${color}">
-      <span class="opp-pulse"></span>
+    <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""}" style="--mk:${color}">
+      ${taken ? '' : '<span class="opp-pulse"></span>'}
       ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, 34);
@@ -39,13 +41,26 @@ const hqIcon = () => {
   return makeDivIcon(html, 36);
 };
 
-const unitIcon = (phase) => {
-  const color = phase === "operating" ? "#EF4444" : "#22D3EE";
+const unitIcon = (phase, chased) => {
+  const color = chased ? "#EF4444" : phase === "operating" ? "#EF4444" : "#22D3EE";
+  const classes = ["unit-pin"];
+  if (phase === "operating") classes.push("unit-operating");
+  if (chased) classes.push("unit-chased");
   const html = `
-    <div class="unit-pin ${phase === "operating" ? "unit-operating" : ""}" style="--mk:${color}">
+    <div class="${classes.join(" ")}" style="--mk:${color}">
+      ${chased ? '<span class="unit-siren"></span>' : ''}
       ${renderToStaticMarkup(<Navigation size={13} strokeWidth={2.5} />)}
     </div>`;
-  return makeDivIcon(html, 26);
+  return makeDivIcon(html, chased ? 30 : 26);
+};
+
+const policeChaseIcon = () => {
+  const html = `
+    <div class="chase-pin" style="--mk:#EF4444">
+      <span class="chase-flash"></span>
+      ${renderToStaticMarkup(<Siren size={12} strokeWidth={3} />)}
+    </div>`;
+  return makeDivIcon(html, 24);
 };
 
 const propIcon = (typeKey) => {
@@ -73,32 +88,168 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
 );
 
 const MissionUnit = ({ mission, serverNow }) => {
-  const [pos, setPos] = useState(() => missionPosition(mission, serverNow()));
+  const [route, setRoute] = useState(null);
+  const cumRef = useRef(null);
+  const glowRef = useRef(null);
+  const lineRef = useRef(null);
+
   useEffect(() => {
-    const id = setInterval(() => setPos(missionPosition(mission, serverNow())), 350);
+    let cancelled = false;
+    fetchRoute(mission.origin, mission.target).then((info) => {
+      if (cancelled) return;
+      cumRef.current = buildCumulative(info.latlngs);
+      setRoute(info);
+    });
+    return () => { cancelled = true; };
+  }, [mission.id, mission.origin.lat, mission.origin.lng, mission.target.lat, mission.target.lng]);
+
+  const computePos = () => {
+    const now = serverNow();
+    const depart = Date.parse(mission.depart_at);
+    const arrive = Date.parse(mission.arrive_at);
+    const finish = Date.parse(mission.finish_at);
+    const ret = Date.parse(mission.return_at);
+    // If route not loaded yet, fallback to straight-line lerp.
+    if (!route || !cumRef.current) return { ...missionPosition(mission, now), progress: 0 };
+    const latlngs = route.latlngs;
+    const cum = cumRef.current;
+    if (now <= arrive) {
+      const t = Math.min(1, Math.max(0, (now - depart) / Math.max(1, arrive - depart)));
+      const p = pointOnRoute(latlngs, cum, t);
+      return { ...p, phase: "en_route", progress: t };
+    }
+    if (now <= finish) {
+      const last = latlngs[latlngs.length - 1];
+      return { lat: last[0], lng: last[1], phase: "operating", progress: 1 };
+    }
+    if (now <= ret) {
+      const t = Math.min(1, Math.max(0, (now - finish) / Math.max(1, ret - finish)));
+      const p = pointOnRoute(latlngs, cum, 1 - t);
+      return { ...p, phase: "returning", progress: t };
+    }
+    return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1 };
+  };
+
+  const [pos, setPos] = useState(() => computePos());
+  useEffect(() => {
+    const id = setInterval(() => setPos(computePos()), 350);
     return () => clearInterval(id);
-  }, [mission, serverNow]);
-  const icon = useMemo(() => unitIcon(pos.phase), [pos.phase]);
+  }, [mission, serverNow, route]);
+
+  // Imperatively update the polyline positions via ref — avoids React reconciling
+  // the SVG element on every tick, which is what makes zoom feel laggy.
+  useEffect(() => {
+    if (!route?.latlngs || !cumRef.current) return;
+    let latlngs = null;
+    if (pos.phase === "en_route") {
+      latlngs = sliceRoute(route.latlngs, cumRef.current, pos.progress, 1);
+    } else if (pos.phase === "returning") {
+      latlngs = sliceRoute(route.latlngs, cumRef.current, 1 - pos.progress, 0);
+    }
+    const arr = latlngs && latlngs.length > 1 ? latlngs : [];
+    if (glowRef.current) glowRef.current.setLatLngs(arr);
+    if (lineRef.current) lineRef.current.setLatLngs(arr);
+  }, [pos.progress, pos.phase, route]);
+
+  // Imperatively update style (color/dash) only when phase actually changes.
+  useEffect(() => {
+    const color = pos.phase === "en_route" ? "#22D3EE" : pos.phase === "operating" ? "#F59E0B" : "#A78BFA";
+    const dashArray = pos.phase === "returning" ? "6 6" : null;
+    if (glowRef.current) glowRef.current.setStyle({ color });
+    if (lineRef.current) lineRef.current.setStyle({ color, dashArray });
+  }, [pos.phase]);
+
+  const chased = pos.phase === "returning" && !!mission.chase_active;
+  const icon = useMemo(() => unitIcon(pos.phase, chased), [pos.phase, chased]);
   if (pos.phase === "done") return null;
+
   const nowMs = serverNow();
   const nextAt = pos.phase === "en_route" ? mission.arrive_at : pos.phase === "operating" ? mission.finish_at : mission.return_at;
   const nextLabel = pos.phase === "en_route" ? "chega em" : pos.phase === "operating" ? "conclui em" : "regressa em";
   const remaining = Math.max(0, (Date.parse(nextAt) - nowMs) / 1000);
+
+  const carryingReward = (pos.phase === "operating" || pos.phase === "returning") && mission.outcome === "success"
+    ? Number(mission.pending_reward || 0)
+    : 0;
+  const carryingPays = mission.pending_pays || mission.opportunity?.pays || "dirty";
+
+  // Police chase car: rendered ~120m behind on the same route so it visually "follows" the team.
+  let chasePos = null;
+  if (chased && route?.latlngs && cumRef.current) {
+    // returning: vehicle is at fraction (1 - progress); the tail is behind (closer to target)
+    const total = cumRef.current[cumRef.current.length - 1] || 0;
+    if (total > 0) {
+      const lag = Math.min(0.35, 220 / Math.max(1, total)); // ~220m gap or 35% whichever is smaller
+      const chaseFrac = Math.min(1, (1 - pos.progress) + lag);
+      const cp = pointOnRoute(route.latlngs, cumRef.current, chaseFrac);
+      if (cp) chasePos = cp;
+    }
+  }
+
   return (
-    <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={500}>
-      <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
-        <div className="min-w-[130px]">
-          <p className="text-[11px] font-bold text-white">{mission.team_name}</p>
-          <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: STATUS_COLORS[pos.phase] || "#22D3EE" }}>
-            {STATUS_LABELS[pos.phase] || pos.phase} · {mission.opportunity?.name}
-          </p>
-          <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
-          {mission.success_chance != null && (
-            <TipRow label="probabilidade" value={`${Math.round(mission.success_chance * 100)}%`} color="#34D399" />
-          )}
-        </div>
-      </LTooltip>
-    </Marker>
+    <>
+      {route?.latlngs && route.latlngs.length > 1 && (
+        <>
+          {/* Glow underlay */}
+          <Polyline
+            ref={glowRef}
+            positions={[]}
+            smoothFactor={2}
+            pathOptions={{ color: "#22D3EE", weight: 6, opacity: 0.18, lineCap: "round", lineJoin: "round" }}
+            interactive={false}
+          />
+          {/* Main line */}
+          <Polyline
+            ref={lineRef}
+            positions={[]}
+            smoothFactor={2}
+            pathOptions={{ color: "#22D3EE", weight: 2.4, opacity: 0.9, lineCap: "round", lineJoin: "round" }}
+            interactive={false}
+          />
+        </>
+      )}
+      <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={500}>
+        <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
+          <div className="min-w-[150px]">
+            <p className="text-[11px] font-bold text-white">{mission.team_name}</p>
+            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE" }}>
+              {chased ? "PERSEGUIÇÃO POLICIAL" : STATUS_LABELS[pos.phase] || pos.phase} · {mission.opportunity?.name}
+            </p>
+            <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
+            {mission.success_chance != null && pos.phase === "en_route" && (
+              <TipRow label="probabilidade" value={`${Math.round(mission.success_chance * 100)}%`} color="#34D399" />
+            )}
+            {carryingReward > 0 && (
+              <TipRow
+                label="a transportar"
+                value={`${fmtMoney(carryingReward)} ${carryingPays === "clean" ? "limpos" : "sujos"}`}
+                color={carryingPays === "clean" ? "#10B981" : "#F59E0B"}
+              />
+            )}
+            {chased && (
+              <TipRow label="escape" value={`${Math.round((mission.escape_chance || 0.5) * 100)}%`} color="#EF4444" />
+            )}
+            {route && !route.fallback && (
+              <TipRow label="rota" value={`${(route.distance / 1000).toFixed(1)} km`} color="#22D3EE" />
+            )}
+          </div>
+        </LTooltip>
+      </Marker>
+      {chased && chasePos && (
+        <Marker position={[chasePos.lat, chasePos.lng]} icon={policeChaseIcon()} zIndexOffset={490}>
+          <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
+            <div className="min-w-[130px]">
+              <p className="text-[11px] font-bold text-red-400">Carro-patrulha</p>
+              <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">A perseguir {mission.team_name}</p>
+              <TipRow label="chance de escape" value={`${Math.round((mission.escape_chance || 0.5) * 100)}%`} color="#EF4444" />
+              <p className="mt-1 text-[9px] text-zinc-500">
+                Se apanhados antes do QG, perdem toda a carga.
+              </p>
+            </div>
+          </LTooltip>
+        </Marker>
+      )}
+    </>
   );
 };
 
@@ -147,7 +298,20 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
       })}
       {state.opportunities.map((opp) => {
         const locked = level < opp.min_level;
+        const taken = opp.status === "taken";
         const expiresS = Math.max(0, (Date.parse(opp.expires_at) - serverNow()) / 1000);
+        const activeMission = taken ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
+        let missionEtaS = 0;
+        let missionPhaseLabel = "";
+        if (activeMission) {
+          const nextAt = activeMission.phase === "en_route"
+            ? activeMission.arrive_at
+            : activeMission.phase === "operating"
+            ? activeMission.finish_at
+            : activeMission.return_at;
+          missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
+          missionPhaseLabel = STATUS_LABELS[activeMission.phase] || activeMission.phase;
+        }
         return (
           <Marker
             key={opp.id}
@@ -165,10 +329,21 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
                   <TipRow label="recompensa" value={`${fmtMoney(opp.reward)} ${opp.pays === "clean" ? "limpos" : "sujos"}`} color={opp.pays === "clean" ? "#10B981" : "#F59E0B"} />
                   <TipRow label="risco" value={"●".repeat(opp.risk) + "○".repeat(5 - opp.risk)} color="#EF4444" />
                   <TipRow label="respeito" value={`+${opp.respect}`} color="#0A84FF" />
-                  <TipRow label="expira" value={fmtDuration(expiresS)} color="#F59E0B" />
+                  {taken && activeMission ? (
+                    <>
+                      <TipRow label="equipa" value={activeMission.team_name} color="#22D3EE" />
+                      <TipRow label={missionPhaseLabel} value={fmtDuration(missionEtaS)} color={STATUS_COLORS[activeMission.phase] || "#F59E0B"} />
+                    </>
+                  ) : (
+                    <TipRow label="expira" value={fmtDuration(expiresS)} color="#F59E0B" />
+                  )}
                 </div>
                 <p className="mt-1 text-[9px] text-zinc-500">
-                  {locked ? `Bloqueada — requer nível ${opp.min_level}` : "Clica para escolher equipa e despachar"}
+                  {taken
+                    ? "Missão em curso — clica para ver detalhes"
+                    : locked
+                    ? `Bloqueada — requer nível ${opp.min_level}`
+                    : "Clica para escolher equipa e despachar"}
                 </p>
               </div>
             </LTooltip>
@@ -208,6 +383,11 @@ export const MapLegend = () => {
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 animate-pulse rounded-full border border-red-500" /> Oportunidade ativa</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-cyan-400" /> Equipa em viagem</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Equipa em operação</span>
+          </div>
+          <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
+          <div className="space-y-1 font-mono text-[10px] text-zinc-300">
+            <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full bg-cyan-400" /> A caminho — falta percorrer</span>
+            <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-violet-400" /> Regresso — falta chegar</span>
           </div>
           <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
             Passa o rato sobre qualquer marcador para veres os detalhes. Clica numa oportunidade para despachar uma equipa.

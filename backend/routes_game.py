@@ -150,7 +150,10 @@ async def get_state(user: dict = Depends(get_current_user)):
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
     properties = await db.properties.find({"player_id": pid}).to_list(100)
     opportunities = await db.opportunities.find(
-        {"player_id": pid, "status": "active", "expires_at": {"$gt": now_iso}}
+        {"player_id": pid, "$or": [
+            {"status": "active", "expires_at": {"$gt": now_iso}},
+            {"status": "taken"},
+        ]}
     ).to_list(50)
     missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(100)
     history = await db.missions.find({"player_id": pid, "phase": "done"}).sort("return_at", -1).to_list(20)
