@@ -27,13 +27,13 @@ export const ResourceBar = () => {
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="mx-auto flex max-w-4xl items-stretch gap-2 overflow-x-auto rounded-lg border border-white/10 bg-black/75 px-3 py-1.5 shadow-2xl backdrop-blur-xl md:overflow-visible">
+      <div className="mx-auto flex max-w-4xl items-stretch gap-1 rounded-lg border border-white/10 bg-black/75 px-2 py-1.5 shadow-2xl backdrop-blur-xl sm:gap-2 sm:px-3">
         <Tip
           tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
           side="bottom"
           align="start"
         >
-          <div className="flex shrink-0 items-center gap-2 border-r border-white/10 pr-3">
+          <div className="flex shrink-0 items-center gap-1.5 border-r border-white/10 pr-2 sm:gap-2 sm:pr-3">
             <div className="flex flex-col items-center">
               <span className="flex h-7 w-7 items-center justify-center rounded bg-red-600/20 font-mono text-xs font-bold text-red-500">
                 {p.level}
@@ -64,15 +64,15 @@ export const ResourceBar = () => {
           sub={nextRespect ? `nível ${p.level + 1} aos ${nextRespect}` : "máx."}
           tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."
         />
-        <Tip tip={`Calor policial: ${hs.label}. ${hs.desc} Baixa naturalmente com o tempo ou com subornos no Império.`} side="bottom">
-          <div data-testid="stat-heat" className="flex shrink-0 items-center gap-1.5 px-1">
-            <Flame size={14} style={{ color: hs.color }} />
-            <div>
+        <Tip tip={`Calor policial: ${hs.label}. ${hs.desc} Baixa naturalmente com o tempo ou com subornos no Império.`} side="bottom" className="min-w-0">
+          <div data-testid="stat-heat" className="flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1">
+            <Flame size={14} className="shrink-0" style={{ color: hs.color }} />
+            <div className="min-w-0">
               <p className="hidden text-[8px] uppercase tracking-wider text-zinc-500 md:block">
                 Calor · <span style={{ color: hs.color }}>{hs.label}</span>
               </p>
-              <p className="font-mono text-xs font-bold text-white">{Math.round(p.heat)}%</p>
-              <MiniBar value={p.heat} color={hs.color} className="w-10" height="h-0.5" />
+              <p className="truncate font-mono text-[11px] font-bold text-white sm:text-xs">{Math.round(p.heat)}%</p>
+              <MiniBar value={p.heat} color={hs.color} className="w-7 sm:w-10" height="h-0.5" />
             </div>
           </div>
         </Tip>
@@ -98,13 +98,13 @@ export const ResourceBar = () => {
 };
 
 const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "center", testId }) => (
-  <Tip tip={tip} side="bottom" align={align}>
-    <div data-testid={testId} className="flex shrink-0 items-center gap-1.5 px-1">
-      <Icon size={14} style={{ color }} />
-      <div>
+  <Tip tip={tip} side="bottom" align={align} className="min-w-0">
+    <div data-testid={testId} className="flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1">
+      <Icon size={14} className="shrink-0" style={{ color }} />
+      <div className="min-w-0">
         <p className="hidden text-[8px] uppercase tracking-wider text-zinc-500 md:block">{label}</p>
-        <p className="font-mono text-xs font-bold text-white">{value}</p>
-        {sub && <p className="font-mono text-[9px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
+        <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-[11px] font-bold text-white sm:text-xs">{value}</p>
+        {sub && <p title={sub} className="truncate font-mono text-[9px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
       </div>
     </div>
   </Tip>
