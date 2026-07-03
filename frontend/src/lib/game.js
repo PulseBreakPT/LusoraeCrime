@@ -1,5 +1,9 @@
 import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMask, Terminal, Crown, Star, Zap, Eye, Target, Landmark, Globe, CreditCard } from "lucide-react";
 
+// Cor única para "precisa da tua atenção" (badges/dots de notificação) — o
+// mesmo laranja já usado no resto do site (heatStatus "Alerta", feridos, etc.).
+export const NOTIFY_COLOR = "#F97316";
+
 export const CATEGORY_COLORS = {
   assalto: "#EF4444",
   logistica: "#F59E0B",
