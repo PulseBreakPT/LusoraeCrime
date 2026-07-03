@@ -1,5 +1,6 @@
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, SPEC_LABELS, chanceColor } from "../../lib/game";
+import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
+import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { BrainCircuit, Lightbulb, ArrowRight } from "lucide-react";
 
@@ -89,6 +90,9 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
   const pt = catalog?.property_types || {};
   const dirtyPerH = state.properties.reduce((a, p) => a + (pt[p.type_key]?.dirty_per_h || 0) * p.level, 0);
   const launderPerH = state.properties.reduce((a, p) => a + (pt[p.type_key]?.launder_per_h || 0) * p.level, 0);
+  const fleetValue = vehs.reduce((a, v) => a + sellValueOf(v), 0);
+  const propValue = state.properties.reduce((a, p) => a + (pt[p.type_key] ? Math.round(pt[p.type_key].price * 0.7 * p.level) : 0), 0);
+  const netWorth = state.player.clean_money + state.player.dirty_money + fleetValue + propValue;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -104,11 +108,12 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Section title="Operações" testId="intel-operations">
           <Grid>
-            <Cell label="Missões" value={total} />
+            <Cell label="Missões" value={total} tip="Total de operações concluídas (com qualquer resultado)." />
             <Cell label="Taxa de sucesso" value={successRate === null ? "—" : `${successRate}%`}
-                  color={successRate === null ? undefined : chanceColor(successRate / 100)} />
-            <Cell label="Falhadas" value={s.missions_failure || 0} color="#F59E0B" />
-            <Cell label="Interceções" value={s.missions_police || 0} color="#EF4444" />
+                  color={successRate === null ? undefined : chanceColor(successRate / 100)}
+                  tip="Percentagem de operações bem-sucedidas. Melhora com equipas compatíveis, membros treinados e calor baixo." />
+            <Cell label="Falhadas" value={s.missions_failure || 0} color="#F59E0B" tip="Operações falhadas — sem recompensa e com possíveis ferimentos." />
+            <Cell label="Interceções" value={s.missions_police || 0} color="#EF4444" tip="Operações intercetadas pela polícia — risco de detenções e multas." />
           </Grid>
           {Object.keys(s.by_category || {}).length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
@@ -123,37 +128,40 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Section title="Economia" testId="intel-economy">
           <Grid>
-            <Cell label="Ganho sujo" value={fmtMoney(s.earned_dirty || 0)} color="#F59E0B" />
-            <Cell label="Ganho limpo" value={fmtMoney(s.earned_clean || 0)} color="#10B981" />
-            <Cell label="Lavado total" value={fmtMoney(s.laundered_total || 0)} color="#34D399" />
-            <Cell label="Multas/Apreensões" value={fmtMoney(s.fines_paid || 0)} color="#EF4444" />
+            <Cell label="Ganho sujo" value={fmtMoney(s.earned_dirty || 0)} color="#F59E0B" tip="Total de dinheiro sujo ganho em operações desde o início." />
+            <Cell label="Ganho limpo" value={fmtMoney(s.earned_clean || 0)} color="#10B981" tip="Total de dinheiro limpo ganho diretamente em operações." />
+            <Cell label="Lavado total" value={fmtMoney(s.laundered_total || 0)} color="#34D399" tip="Total convertido de sujo para limpo (manual e passivo)." />
+            <Cell label="Multas/Apreensões" value={fmtMoney(s.fines_paid || 0)} color="#EF4444" tip="Dinheiro perdido para a polícia em multas e apreensões." />
+            <Cell label="Fortuna total" value={fmtMoney(netWorth)} tip="Caixa (limpo + sujo) + valor de revenda da frota e do património." />
+            <Cell label="Salários/ciclo" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip="Folha salarial atual, paga a cada 30 minutos." />
           </Grid>
         </Section>
 
         <Section title="Recursos humanos" testId="intel-hr">
           <Grid>
-            <Cell label="Funcionários" value={`${emps.length}/${state.caps.employees.max}`} />
-            <Cell label="Nível médio" value={avgLevel} />
-            <Cell label="Fadiga média" value={`${avgFatigue}%`} color={avgFatigue >= 60 ? "#EF4444" : undefined} />
-            <Cell label="Em formação" value={emps.filter((e) => e.status === "training").length} color="#22D3EE" />
+            <Cell label="Funcionários" value={`${emps.length}/${state.caps.employees.max}`} tip="Plantel atual vs. capacidade (compra esconderijos para expandir)." />
+            <Cell label="Nível médio" value={avgLevel} tip="Nível médio do plantel — sobe com XP de operações e formações." />
+            <Cell label="Fadiga média" value={`${avgFatigue}%`} color={avgFatigue >= 60 ? "#EF4444" : undefined} tip="Fadiga média — aos 90% um funcionário fica indisponível." />
+            <Cell label="Em formação" value={emps.filter((e) => e.status === "training").length} color="#22D3EE" tip="Funcionários em cursos de formação neste momento." />
           </Grid>
         </Section>
 
         <Section title="Frota" testId="intel-fleet">
           <Grid>
-            <Cell label="Veículos" value={`${vehs.length}/${state.caps.vehicles.max}`} />
-            <Cell label="Condição média" value={`${avgCond}%`} color={avgCond < 50 ? "#EF4444" : undefined} />
-            <Cell label="Km totais" value={totalKm} />
-            <Cell label="Custos frota" value={fmtMoney(fleetCosts)} color="#F59E0B" />
+            <Cell label="Veículos" value={`${vehs.length}/${state.caps.vehicles.max}`} tip="Veículos na garagem vs. capacidade total (compra garagens para expandir)." />
+            <Cell label="Condição média" value={`${avgCond}%`} color={avgCond < 50 ? "#EF4444" : undefined} tip="Abaixo de 50% os veículos perdem velocidade; abaixo de 30% não operam." />
+            <Cell label="Km totais" value={totalKm} tip="Quilómetros percorridos por toda a frota." />
+            <Cell label="Custos frota" value={fmtMoney(fleetCosts)} color="#F59E0B" tip="Total gasto em combustível e reparações." />
+            <Cell label="Valor frota" value={fmtMoney(fleetValue)} tip="Valor de revenda atual de todos os veículos (40% do preço × condição)." />
           </Grid>
         </Section>
 
         <Section title="Património" testId="intel-properties">
           <Grid>
-            <Cell label="Propriedades" value={state.properties.length} />
-            <Cell label="Produção passiva" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B" />
-            <Cell label="Lavagem passiva" value={`${fmtMoney(launderPerH)}/h`} color="#34D399" />
-            <Cell label="Calor" value={`${Math.round(state.player.heat)}%`} color={state.player.heat >= 70 ? "#EF4444" : undefined} />
+            <Cell label="Propriedades" value={state.properties.length} tip="Número de propriedades do império." />
+            <Cell label="Produção passiva" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B" tip="Dinheiro sujo gerado automaticamente pelos laboratórios." />
+            <Cell label="Lavagem passiva" value={`${fmtMoney(launderPerH)}/h`} color="#34D399" tip="Lavagem automática das empresas de fachada (sem taxa)." />
+            <Cell label="Calor" value={`${Math.round(state.player.heat)}%`} color={state.player.heat >= 70 ? "#EF4444" : undefined} tip="Aos 70% há risco de rusgas; aos 90% as operações ficam bloqueadas." />
           </Grid>
         </Section>
 
@@ -199,9 +207,11 @@ const Section = ({ title, testId, children }) => (
 
 const Grid = ({ children }) => <div className="grid grid-cols-2 gap-2">{children}</div>;
 
-const Cell = ({ label, value, color = "#FFFFFF" }) => (
-  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
-    <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
-    <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
-  </div>
+const Cell = ({ label, value, color = "#FFFFFF", tip }) => (
+  <Tip tip={tip} block>
+    <div className="h-full rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+      <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
+      <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
+    </div>
+  </Tip>
 );

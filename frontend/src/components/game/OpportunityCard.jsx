@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
+import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const { state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle } = useGame();
@@ -104,10 +105,28 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <Metric icon={TrendingUp} label={opp.pays === "clean" ? "€ Limpos" : "€ Sujos"} value={fmtMoney(opp.reward)} color="#10B981" />
-        <Metric icon={AlertTriangle} label="Risco" value={"●".repeat(opp.risk) + "○".repeat(5 - opp.risk)} color="#DC2626" />
-        <Metric icon={Clock} label="Expira" value={fmtDuration(timeLeft)} color="#F59E0B" />
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Chip icon={MapPin} value={`${(distM / 1000).toFixed(1)} km`} color="#22D3EE"
+          tip="Distância do QG ao alvo — determina o tempo de viagem e o combustível gasto (ida e volta)." />
+        <Chip icon={Timer} value={fmtDuration(opp.duration_s)} color="#A78BFA"
+          tip="Duração da operação no local, sem contar as viagens." />
+        <Chip icon={Trophy} value={`+${opp.respect}`} color="#0A84FF"
+          tip="Respeito ganho em caso de sucesso — acumula para subir o nível da organização." />
+        <Chip icon={Flame} value={`+${Math.round(opp.heat)}`} color="#EF4444"
+          tip="Calor policial gerado por esta operação — sobe mesmo com sucesso." />
+        {opp.min_level > 1 && (
+          <Chip icon={Lock} value={`N${opp.min_level}`} color={lockedByLevel ? "#EF4444" : "#71717A"}
+            tip={`Nível mínimo da organização para esta operação: ${opp.min_level}.`} />
+        )}
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <Metric icon={TrendingUp} label={opp.pays === "clean" ? "€ Limpos" : "€ Sujos"} value={fmtMoney(opp.reward)} color="#10B981"
+          tip={opp.pays === "clean" ? "Pago em dinheiro limpo — pronto a gastar, sem lavagem." : "Pago em dinheiro sujo — terás de o lavar (taxa 25%) antes de gastar."} />
+        <Metric icon={AlertTriangle} label="Risco" value={"●".repeat(opp.risk) + "○".repeat(5 - opp.risk)} color="#DC2626"
+          tip={`Risco ${opp.risk}/5 — reduz a probabilidade de sucesso e aumenta a chance de ferimentos, detenções e interceção policial.`} />
+        <Metric icon={Clock} label="Expira" value={fmtDuration(timeLeft)} color="#F59E0B"
+          tip="Tempo até esta oportunidade desaparecer do mapa. Despacha uma equipa antes disso." />
       </div>
 
       {policeAlert ? (
@@ -137,14 +156,20 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <div className={r.ok ? "" : "opacity-50"}>
                     <p className="text-xs font-semibold text-white">
                       {t.name}
-                      {match && <span className="ml-1.5 font-mono text-[9px] uppercase text-emerald-400">match</span>}
+                      {match && (
+                        <Tip tip="A especialização da equipa combina com a categoria da operação — bónus de probabilidade de sucesso.">
+                          <span className="ml-1.5 font-mono text-[9px] uppercase text-emerald-400">match</span>
+                        </Tip>
+                      )}
                     </p>
                     <p className="font-mono text-[10px] text-zinc-500">
                       {r.ok ? `${r.members} membros · ${r.vehicle.name}` : SPEC_LABELS[t.spec]}
                     </p>
                   </div>
                   {r.ok ? (
-                    <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
+                    <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
+                      <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
+                    </Tip>
                   ) : (
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
@@ -179,14 +204,15 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 </p>
               </div>
               <div className="mt-1 grid grid-cols-4 gap-1">
-                <PreviewFactor label="Risco" value={preview.breakdown.risco} />
-                <PreviewFactor label="Equipa" value={preview.breakdown.equipa} />
-                <PreviewFactor label="Match" value={preview.breakdown.match} />
-                <PreviewFactor label="Calor" value={preview.breakdown.calor} />
+                <PreviewFactor label="Risco" value={preview.breakdown.risco} tip="Penalização base do risco da operação." />
+                <PreviewFactor label="Equipa" value={preview.breakdown.equipa} tip="Competência dos membros nos atributos relevantes." />
+                <PreviewFactor label="Match" value={preview.breakdown.match} tip="Compatibilidade entre a especialização da equipa e a categoria da operação." />
+                <PreviewFactor label="Calor" value={preview.breakdown.calor} tip="Pressão policial atual — quanto mais calor, pior." />
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                 <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
                 {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
+                <span className="text-[#0A84FF]"> · +{opp.respect} resp.</span>
                 {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
               </p>
             </div>
@@ -205,21 +231,25 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   );
 };
 
-const PreviewFactor = ({ label, value }) => (
-  <div className="rounded bg-black/40 px-1 py-0.5 text-center">
-    <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
-    <p className="font-mono text-[10px] font-bold" style={{ color: value >= 0 ? "#34D399" : "#EF4444" }}>
-      {pctSigned(value)}
-    </p>
-  </div>
+const PreviewFactor = ({ label, value, tip }) => (
+  <Tip tip={tip} block>
+    <div className="rounded bg-black/40 px-1 py-0.5 text-center">
+      <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
+      <p className="font-mono text-[10px] font-bold" style={{ color: value >= 0 ? "#34D399" : "#EF4444" }}>
+        {pctSigned(value)}
+      </p>
+    </div>
+  </Tip>
 );
 
-const Metric = ({ icon: Icon, label, value, color }) => (
-  <div className="rounded-md border border-white/10 bg-white/[0.03] p-2">
-    <div className="flex items-center gap-1">
-      <Icon size={10} style={{ color }} />
-      <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
+const Metric = ({ icon: Icon, label, value, color, tip }) => (
+  <Tip tip={tip} block>
+    <div className="h-full rounded-md border border-white/10 bg-white/[0.03] p-2">
+      <div className="flex items-center gap-1">
+        <Icon size={10} style={{ color }} />
+        <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
+      </div>
+      <p className="mt-0.5 font-mono text-xs font-bold text-white">{value}</p>
     </div>
-    <p className="mt-0.5 font-mono text-xs font-bold text-white">{value}</p>
-  </div>
+  </Tip>
 );

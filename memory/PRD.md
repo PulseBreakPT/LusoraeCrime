@@ -44,6 +44,17 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - EmployeesPanel reformulado: tabs Plantel/Recrutar, cartões com barras moral/lealdade/fadiga, atributos, talentos, ações (treinar, descansar, promover, bónus, despedir, curar, libertar), countdowns
 - Migração v4 automática de funcionários do schema antigo
 - Testes: backend 29/29 pytest + frontend Playwright 100% (iteration_2)
+### UI "Centro de Comando" (03/07/2026)
+- Infra partilhada `components/game/hud.jsx`: Tip (tooltip CSS `.lus-tip`, sides/align), MiniBar, Chip, Kpi, SummaryStrip
+- Helpers `lib/game.js`: heatStatus (Calmo/Vigiado/Alerta/Crítico), ATTR_FULL, vehicleRangeKm, refuel/repair/sellValueOf, passiveRates, teamsReadiness, orgAlerts
+- ResourceBar: nível c/ barra de respeito, fluxos passivos €/h, calor c/ estado+minibar, equipas prontas, ops ativas, salários+countdown — tudo c/ tooltips
+- HUD buttons c/ badges inteligentes (RH problemas, Frota avarias/combustível, Missões por reclamar, Equipas ocupadas, alertas pulsantes Império/Imóveis) + Intel c/ total de alertas
+- LiveMap: tooltips hover em todos os marcadores (opp: recompensa/risco/respeito/expira; propriedades: nível/benefício; unidades: fase/countdown/probabilidade) + legenda colapsável (map-legend-toggle)
+- Painéis c/ summary strips: Equipas (prontas/operação/afetos/fadiga), RH (moral/lealdade/fadiga/disponíveis + chips de estado), Frota (operacionais/condição/autonomia/custos), Imóveis (produção/lavagem/calor/valor)
+- Império: fluxo de caixa passivo c/ balanço €/h, calor c/ thresholds 70/90, quick-nav c/ alertas
+- Frota: autonomia km por veículo e no stand; RH: impacto na folha salarial ao contratar, tooltips raridade/atributos/estados; Imóveis: preview do benefício no próximo nível
+- Intel: fortuna total, valor frota, salários/ciclo, tooltips em todas as células; Quests: badges de contagem nas tabs; ActivityFeed: tempo relativo + nº registos
+- NOTA infra: .env recriados pós-fork; CORS exige origens explícitas (não "*" c/ credentials); testar via preview URL
 
 ## Backlog priorizado
 ### P0 (próxima fase)

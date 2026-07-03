@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, FUEL_LABELS, effectiveSpeed } from "../../lib/game";
+import { fmtMoney, FUEL_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
+import { Tip, Kpi, SummaryStrip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound } from "lucide-react";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote } from "lucide-react";
 
 const VStat = ({ label, value }) => (
   <div className="rounded bg-black/40 px-1.5 py-1 text-center">
@@ -36,6 +37,26 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
           <SheetDescription className="text-zinc-500">Abastece, repara, atribui e abate veículos.</SheetDescription>
         </SheetHeader>
 
+        {(() => {
+          const vs = state.vehicles;
+          const operational = vs.filter((v) => v.condition >= 30 && v.fuel_l >= v.tank_l * 0.12).length;
+          const avgCond = vs.length ? Math.round(vs.reduce((a, v) => a + v.condition, 0) / vs.length) : 0;
+          const totalRange = Math.round(vs.reduce((a, v) => a + vehicleRangeKm(v), 0));
+          const totalCosts = vs.reduce((a, v) => a + (v.fuel_spent_total || 0) + (v.repair_spent_total || 0), 0);
+          return (
+            <SummaryStrip cols={4} className="mt-3" testId="fleet-summary">
+              <Kpi icon={CheckCircle2} label="Operacionais" value={`${operational}/${vs.length}`} color={operational === vs.length ? "#34D399" : "#F59E0B"}
+                tip="Veículos prontos a sair: condição ≥ 30% e combustível suficiente." />
+              <Kpi icon={Wrench} label="Condição" value={`${avgCond}%`} color={avgCond < 50 ? "#EF4444" : "#34D399"} bar={avgCond} barColor={avgCond < 50 ? "#EF4444" : "#34D399"}
+                tip="Condição média da frota — veículos degradam-se a cada operação e perdem velocidade abaixo de 50%." />
+              <Kpi icon={Route} label="Autonomia" value={`${totalRange} km`} color="#22D3EE"
+                tip="Autonomia total combinada com o combustível atual nos depósitos." />
+              <Kpi icon={Banknote} label="Custos" value={fmtMoney(totalCosts)} color="#F59E0B"
+                tip="Total acumulado gasto em combustível e reparações de toda a frota." />
+            </SummaryStrip>
+          );
+        })()}
+
         <div className="mt-4 space-y-2" data-testid="fleet-list">
           {state.vehicles.map((v) => {
             const busy = vehicleBusy(v);
@@ -51,10 +72,17 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   <div>
                     <p className="text-sm font-bold text-white">{v.name}</p>
                     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                      {v.speed} m/s · {FUEL_LABELS[v.fuel_type]} · {Math.round(v.km_total)} km
+                      {v.speed} m/s · {FUEL_LABELS[v.fuel_type]} · {Math.round(v.km_total)} km ·{" "}
+                      <Tip tip={`Autonomia com o combustível atual (${v.fuel_l.toFixed(0)}L, consumo ${v.cons}L/100km). As viagens são ida e volta a partir do QG.`}>
+                        <span className="text-cyan-400">~{Math.round(vehicleRangeKm(v))} km rest.</span>
+                      </Tip>
                     </p>
                   </div>
-                  {busy && <span className="rounded-full bg-red-600/20 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-red-400">Em missão</span>}
+                  {busy && (
+                    <Tip tip="Este veículo está atribuído a uma equipa em operação — fica disponível quando ela regressar." align="end">
+                      <span className="rounded-full bg-red-600/20 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-red-400">Em missão</span>
+                    </Tip>
+                  )}
                 </div>
                 {speedReduced && (
                   <p className="mt-1 font-mono text-[10px] text-amber-400">
@@ -109,30 +137,36 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 )}
 
                 <div className="mt-2 flex gap-1.5">
-                  <button
-                    data-testid={`refuel-vehicle-${v.id}`}
-                    onClick={() => refuelVehicle(v.id)}
-                    disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 transition-colors hover:bg-white/5 disabled:opacity-40"
-                  >
-                    <Fuel size={11} /> {fmtMoney(refuelCost)}
-                  </button>
-                  <button
-                    data-testid={`repair-vehicle-${v.id}`}
-                    onClick={() => repairVehicle(v.id)}
-                    disabled={busy || v.condition > 99 || state.player.clean_money < repairCost}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-white/5 disabled:opacity-40"
-                  >
-                    <Wrench size={11} /> {fmtMoney(repairCost)}
-                  </button>
-                  <button
-                    data-testid={`sell-vehicle-${v.id}`}
-                    onClick={() => sellVehicle(v.id)}
-                    disabled={busy}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5 disabled:opacity-40"
-                  >
-                    <Trash2 size={11} /> {fmtMoney(sellValue)}
-                  </button>
+                  <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L de ${FUEL_LABELS[v.fuel_type].toLowerCase()}).`} block className="flex-1">
+                    <button
+                      data-testid={`refuel-vehicle-${v.id}`}
+                      onClick={() => refuelVehicle(v.id)}
+                      disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
+                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                    >
+                      <Fuel size={11} /> {fmtMoney(refuelCost)}
+                    </button>
+                  </Tip>
+                  <Tip tip={`Reparar até 100% de condição — recupera velocidade máxima${state.bonuses?.repair_discount ? " (desconto de oficina aplicado)" : ""}.`} block className="flex-1">
+                    <button
+                      data-testid={`repair-vehicle-${v.id}`}
+                      onClick={() => repairVehicle(v.id)}
+                      disabled={busy || v.condition > 99 || state.player.clean_money < repairCost}
+                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                    >
+                      <Wrench size={11} /> {fmtMoney(repairCost)}
+                    </button>
+                  </Tip>
+                  <Tip tip={`Vender este veículo por ${fmtMoney(sellValue)} (40% do preço × condição). Ação irreversível.`} block className="flex-1">
+                    <button
+                      data-testid={`sell-vehicle-${v.id}`}
+                      onClick={() => sellVehicle(v.id)}
+                      disabled={busy}
+                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                    >
+                      <Trash2 size={11} /> {fmtMoney(sellValue)}
+                    </button>
+                  </Tip>
                 </div>
 
                 <button
@@ -176,18 +210,23 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         )}
                       </p>
                       <p className="font-mono text-[10px] text-zinc-500">
-                        {m.speed} m/s · {FUEL_LABELS[m.fuel_type]} · {m.tank_l}L · {m.cons}L/100km
+                        {m.speed} m/s · {FUEL_LABELS[m.fuel_type]} · {m.tank_l}L · {m.cons}L/100km ·{" "}
+                        <Tip tip="Autonomia máxima com o depósito cheio.">
+                          <span className="text-cyan-400">~{Math.round((m.tank_l / m.cons) * 100)} km</span>
+                        </Tip>
                       </p>
                     </div>
-                    <Button
-                      data-testid={`buy-vehicle-${key}`}
-                      onClick={() => buyVehicle(key)}
-                      disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
-                      size="sm"
-                      className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
-                    >
-                      {fmtMoney(m.price)}
-                    </Button>
+                    <Tip tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`} align="end">
+                      <Button
+                        data-testid={`buy-vehicle-${key}`}
+                        onClick={() => buyVehicle(key)}
+                        disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
+                        size="sm"
+                        className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                      >
+                        {fmtMoney(m.price)}
+                      </Button>
+                    </Tip>
                   </div>
                 );
               })}

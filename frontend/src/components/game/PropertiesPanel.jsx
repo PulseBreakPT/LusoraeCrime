@@ -1,8 +1,9 @@
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, propertyBenefit } from "../../lib/game";
+import { fmtMoney, propertyBenefit, passiveRates } from "../../lib/game";
+import { Tip, Kpi, SummaryStrip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren } from "lucide-react";
+import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote } from "lucide-react";
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
   const { state, catalog, buyProperty, sellProperty, upgradeProperty } = useGame();
@@ -18,6 +19,26 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Compra, melhora e vende propriedades do império.</SheetDescription>
         </SheetHeader>
+
+        {(() => {
+          const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog);
+          const sellTotal = state.properties.reduce((a, p) => {
+            const pt = catalog?.property_types?.[p.type_key];
+            return a + (pt ? Math.round(pt.price * 0.7 * p.level) : 0);
+          }, 0);
+          return (
+            <SummaryStrip cols={4} className="mt-3" testId="properties-summary">
+              <Kpi icon={TrendingUp} label="Produção" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B"
+                tip="Dinheiro sujo gerado por hora pelos laboratórios — acumula automaticamente, mas gera calor." />
+              <Kpi icon={Droplets} label="Lavagem" value={`${fmtMoney(launderPerH)}/h`} color="#34D399"
+                tip="Lavagem passiva por hora das empresas de fachada — converte sujo em limpo sem taxa." />
+              <Kpi icon={Flame} label="Calor" value={`+${heatPerH.toFixed(1)}/h`} color={heatPerH > 0 ? "#EF4444" : "#71717A"}
+                tip="Calor policial gerado por hora pelas propriedades ilegais (laboratórios)." />
+              <Kpi icon={Banknote} label="Valor" value={fmtMoney(sellTotal)}
+                tip="Valor de revenda total do património (70% do preço × nível de cada propriedade)." />
+            </SummaryStrip>
+          );
+        })()}
 
         <div className="mt-4 space-y-2" data-testid="properties-list">
           {state.player.heat >= 70 && state.properties.some((p) => p.type_key === "laboratorio") && (
@@ -54,22 +75,31 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     {p.total_laundered > 0 && <>Lavado: <span className="text-emerald-400">{fmtMoney(p.total_laundered)}</span></>}
                   </p>
                 )}
+                {!maxed && (
+                  <p className="mt-1 font-mono text-[10px] text-cyan-400/80">
+                    Nível {p.level + 1}: {propertyBenefit(pt, p.level + 1)}
+                  </p>
+                )}
                 <div className="mt-2 flex gap-1.5">
-                  <button
-                    data-testid={`upgrade-property-${p.id}`}
-                    onClick={() => upgradeProperty(p.id)}
-                    disabled={maxed || state.player.clean_money < upgradeCost}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-400 transition-colors hover:bg-white/5 disabled:opacity-40"
-                  >
-                    <ArrowUpCircle size={11} /> {maxed ? "Máx." : fmtMoney(upgradeCost)}
-                  </button>
-                  <button
-                    data-testid={`sell-property-${p.id}`}
-                    onClick={() => sellProperty(p.id)}
-                    className="flex flex-1 items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5"
-                  >
-                    <Trash2 size={11} /> {fmtMoney(sellValue)}
-                  </button>
+                  <Tip tip={maxed ? "Nível máximo atingido." : `Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} — benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`} block className="flex-1">
+                    <button
+                      data-testid={`upgrade-property-${p.id}`}
+                      onClick={() => upgradeProperty(p.id)}
+                      disabled={maxed || state.player.clean_money < upgradeCost}
+                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                    >
+                      <ArrowUpCircle size={11} /> {maxed ? "Máx." : fmtMoney(upgradeCost)}
+                    </button>
+                  </Tip>
+                  <Tip tip={`Vender por ${fmtMoney(sellValue)} (70% do investido). Perdes o benefício imediatamente — cuidado com as capacidades.`} block className="flex-1">
+                    <button
+                      data-testid={`sell-property-${p.id}`}
+                      onClick={() => sellProperty(p.id)}
+                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5"
+                    >
+                      <Trash2 size={11} /> {fmtMoney(sellValue)}
+                    </button>
+                  </Tip>
                 </div>
               </div>
             );
@@ -93,15 +123,17 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                           </span>
                         )}
                       </p>
-                      <Button
-                        data-testid={`buy-property-${key}`}
-                        onClick={() => buyProperty(key)}
-                        disabled={locked || state.player.clean_money < pt.price}
-                        size="sm"
-                        className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
-                      >
-                        {fmtMoney(pt.price)}
-                      </Button>
+                      <Tip tip={locked ? `Desbloqueia ao nível ${pt.min_level} da organização.` : `Comprar por ${fmtMoney(pt.price)} limpos. Benefício imediato: ${propertyBenefit(pt, 1)}.`} align="end">
+                        <Button
+                          data-testid={`buy-property-${key}`}
+                          onClick={() => buyProperty(key)}
+                          disabled={locked || state.player.clean_money < pt.price}
+                          size="sm"
+                          className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                        >
+                          {fmtMoney(pt.price)}
+                        </Button>
+                      </Tip>
                     </div>
                     <p className="mt-1 text-[10px] text-zinc-500">{pt.desc}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, 1)}</p>

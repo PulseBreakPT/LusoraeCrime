@@ -194,6 +194,12 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
     });
   const claimable = quests.filter((q) => q.status === "completed").length;
   const alertsBadge = alerts.filter((q) => q.status === "active" || q.status === "completed").length;
+  const tabCounts = {
+    historia: principals.filter((q) => q.status === "active" || q.status === "completed").length,
+    diarias: dailies.filter((q) => q.status === "active" || q.status === "completed").length,
+    semanais: weeklies.filter((q) => q.status === "active" || q.status === "completed").length,
+    alertas: alertsBadge,
+  };
 
   const dailyMs = state.player.quests_daily_at ? Date.parse(state.player.quests_daily_at) - serverNow() : null;
   const weeklyMs = state.player.quests_weekly_at ? Date.parse(state.player.quests_weekly_at) - serverNow() : null;
@@ -237,6 +243,11 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
               }`}
             >
               {t.label}
+              {tabCounts[t.key] > 0 && (
+                <span className={`ml-1 rounded-full px-1 font-mono text-[8px] font-bold ${tab === t.key ? "bg-black/15 text-black" : "bg-white/10 text-zinc-300"}`}>
+                  {tabCounts[t.key]}
+                </span>
+              )}
               {t.key === "alertas" && alertsBadge > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
               )}

@@ -2,13 +2,24 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import {
   fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS,
-  ATTR_LABELS, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
+  ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
 } from "../../lib/game";
+import { Tip, Kpi, SummaryStrip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
+  HeartPulse, ShieldCheck, BatteryMedium, UserCheck,
 } from "lucide-react";
+
+const EMP_STATUS_TIPS = {
+  idle: "Disponível para missões, treino ou descanso.",
+  on_mission: "Em operação — regressa quando a equipa voltar ao QG.",
+  training: "Em formação — ganha atributos e XP quando terminar.",
+  resting: "A descansar — recupera 50 de fadiga e +5 de moral.",
+  injured: "Ferido — não pode operar. Paga a clínica para o curar.",
+  arrested: "Preso — contrata o advogado ou paga suborno para o libertar.",
+};
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -31,25 +42,28 @@ const StatBar = ({ label, value, color }) => (
   </div>
 );
 
-const RarityBadge = ({ rarity }) => (
-  <span
-    className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
-    style={{ color: RARITY_COLORS[rarity], background: `${RARITY_COLORS[rarity]}1a` }}
-  >
-    {RARITY_LABELS[rarity]}
-  </span>
+const RarityBadge = ({ rarity, rar }) => (
+  <Tip tip={rar ? `Raridade ${RARITY_LABELS[rarity]}: atributos ×${rar.mult}, nível máx. ${rar.max_level}, ${rar.talent_slots} slot(s) de talento.` : null} align="end">
+    <span
+      className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+      style={{ color: RARITY_COLORS[rarity], background: `${RARITY_COLORS[rarity]}1a` }}
+    >
+      {RARITY_LABELS[rarity]}
+    </span>
+  </Tip>
 );
 
 const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => (
-  <button
-    data-testid={testId}
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    className={`flex items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] transition-colors hover:bg-white/5 disabled:opacity-40 ${color}`}
-  >
-    <Icon size={11} /> {label}
-  </button>
+  <Tip tip={title} block>
+    <button
+      data-testid={testId}
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] transition-colors hover:bg-white/5 disabled:opacity-40 ${color}`}
+    >
+      <Icon size={11} /> {label}
+    </button>
+  </Tip>
 );
 
 const EmployeeCard = ({ e }) => {
@@ -98,15 +112,17 @@ const EmployeeCard = ({ e }) => {
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <RarityBadge rarity={e.rarity} />
-          <span
-            data-testid={`employee-status-${e.id}`}
-            className="rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase"
-            style={{ color: EMP_STATUS_COLORS[e.status], background: `${EMP_STATUS_COLORS[e.status]}1a` }}
-          >
-            {EMP_STATUS_LABELS[e.status] || e.status}
-            {remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
-          </span>
+          <RarityBadge rarity={e.rarity} rar={rar} />
+          <Tip tip={EMP_STATUS_TIPS[e.status]} align="end">
+            <span
+              data-testid={`employee-status-${e.id}`}
+              className="rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase"
+              style={{ color: EMP_STATUS_COLORS[e.status], background: `${EMP_STATUS_COLORS[e.status]}1a` }}
+            >
+              {EMP_STATUS_LABELS[e.status] || e.status}
+              {remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
+            </span>
+          </Tip>
         </div>
       </div>
 
@@ -133,28 +149,30 @@ const EmployeeCard = ({ e }) => {
       )}
 
       <div className="mt-2 grid grid-cols-5 gap-1">
-        {Object.entries(e.attrs || {}).map(([k, v]) => (
-          <div
-            key={k}
-            className={`rounded px-1 py-0.5 text-center font-mono text-[9px] ${
-              (sp.attrs || []).includes(k) ? "bg-red-500/15 text-red-300" : "bg-black/40 text-zinc-500"
-            }`}
-          >
-            {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
-          </div>
-        ))}
+        {Object.entries(e.attrs || {}).map(([k, v]) => {
+          const key = (sp.attrs || []).includes(k);
+          return (
+            <Tip key={k} tip={`${ATTR_FULL[k] || k}: ${v}${key ? " — atributo-chave desta especialização, pesa mais nas operações." : ""}`} block>
+              <div
+                className={`rounded px-1 py-0.5 text-center font-mono text-[9px] ${
+                  key ? "bg-red-500/15 text-red-300" : "bg-black/40 text-zinc-500"
+                }`}
+              >
+                {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
+              </div>
+            </Tip>
+          );
+        })}
       </div>
 
       {(e.talents || []).length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {e.talents.map((t) => (
-            <span
-              key={t}
-              title={catalog.talents[t]?.desc}
-              className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300"
-            >
-              <Sparkles size={9} /> {catalog.talents[t]?.name || t}
-            </span>
+            <Tip key={t} tip={catalog.talents[t]?.desc}>
+              <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300">
+                <Sparkles size={9} /> {catalog.talents[t]?.name || t}
+              </span>
+            </Tip>
           ))}
         </div>
       )}
@@ -172,7 +190,9 @@ const EmployeeCard = ({ e }) => {
             <option key={t.id} value={t.id}>{`${t.name} · ${state.employees.filter((x) => x.team_id === t.id).length} membros`}</option>
           ))}
         </select>
-        <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
+        <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de 30 min, pago com dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
+          <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
+        </Tip>
       </div>
 
       {e.status === "injured" && (
@@ -276,6 +296,11 @@ const CandidateCard = ({ c }) => {
   const lackMoney = state.player.clean_money < c.cost;
   const full = caps.used >= caps.max;
   const topAttrs = Object.entries(c.attrs || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const newPayroll = (state.salary_total || 0) + c.salary;
+  const blockers = [];
+  if (full) blockers.push("esconderijos cheios");
+  if (lackRespect) blockers.push(`faltam ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} de respeito`);
+  if (lackMoney) blockers.push(`faltam ${fmtMoney(c.cost - state.player.clean_money)}`);
 
   return (
     <div data-testid={`candidate-card-${c.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
@@ -285,40 +310,50 @@ const CandidateCard = ({ c }) => {
             {c.name} <span className="font-mono text-[10px] font-normal text-zinc-500">{c.age} anos</span>
           </p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-            {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec} · {fmtMoney(c.salary)}/ciclo
+            {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec} ·{" "}
+            <Tip tip={`Impacto na folha salarial: ${fmtMoney(state.salary_total || 0)} → ${fmtMoney(newPayroll)} por ciclo de 30 min.`}>
+              <span>{fmtMoney(c.salary)}/ciclo</span>
+            </Tip>
           </p>
         </div>
-        <RarityBadge rarity={c.rarity} />
+        <RarityBadge rarity={c.rarity} rar={catalog.rarities[c.rarity]} />
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
         {topAttrs.map(([k, v]) => (
-          <span key={k} className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
-            {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
-          </span>
+          <Tip key={k} tip={`${ATTR_FULL[k] || k}: ${v} — um dos melhores atributos deste candidato.`}>
+            <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
+              {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
+            </span>
+          </Tip>
         ))}
         {(c.talents || []).map((t) => (
-          <span key={t} title={catalog.talents[t]?.desc}
-            className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300">
-            <Sparkles size={9} /> {catalog.talents[t]?.name || t}
-          </span>
+          <Tip key={t} tip={catalog.talents[t]?.desc}>
+            <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300">
+              <Sparkles size={9} /> {catalog.talents[t]?.name || t}
+            </span>
+          </Tip>
         ))}
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="font-mono text-[10px] text-zinc-500">
           {c.min_respect > 0 && (
-            <span className={lackRespect ? "text-red-400" : "text-zinc-500"}>{c.min_respect.toLocaleString("pt-PT")} respeito</span>
+            <Tip tip={`Requisito de reputação: ${c.min_respect.toLocaleString("pt-PT")} de respeito para este candidato confiar em ti.`}>
+              <span className={lackRespect ? "text-red-400" : "text-zinc-500"}>{c.min_respect.toLocaleString("pt-PT")} respeito</span>
+            </Tip>
           )}
         </div>
-        <button
-          data-testid={`hire-candidate-${c.id}`}
-          onClick={() => recruitEmployee(c.id)}
-          disabled={lackRespect || lackMoney || full}
-          className="rounded bg-white px-3 py-1.5 font-mono text-[10px] font-bold uppercase text-black transition-colors hover:bg-gray-200 disabled:opacity-40"
-        >
-          {fmtMoney(c.cost)}
-        </button>
+        <Tip tip={blockers.length ? `Não podes contratar: ${blockers.join(" · ")}.` : `Contratar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`} align="end">
+          <button
+            data-testid={`hire-candidate-${c.id}`}
+            onClick={() => recruitEmployee(c.id)}
+            disabled={lackRespect || lackMoney || full}
+            className="rounded bg-white px-3 py-1.5 font-mono text-[10px] font-bold uppercase text-black transition-colors hover:bg-gray-200 disabled:opacity-40"
+          >
+            {fmtMoney(c.cost)}
+          </button>
+        </Tip>
       </div>
     </div>
   );
@@ -367,6 +402,45 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
             </p>
           </div>
         </div>
+
+        {(() => {
+          const emps = state.employees;
+          const avg = (fn) => (emps.length ? Math.round(emps.reduce((a, e) => a + fn(e), 0) / emps.length) : 0);
+          const avgMorale = avg((e) => e.morale);
+          const avgLoyalty = avg((e) => e.loyalty);
+          const avgFatigue = avg((e) => e.fatigue);
+          const available = emps.filter((e) => e.status === "idle" && e.fatigue < 90).length;
+          const statusCounts = {};
+          emps.forEach((e) => { statusCounts[e.status] = (statusCounts[e.status] || 0) + 1; });
+          return (
+            <>
+              <SummaryStrip cols={4} className="mt-2" testId="hr-summary">
+                <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
+                  tip="Moral média do plantel. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
+                <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
+                  tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
+                <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
+                  tip="Fadiga média. Aos 90% um funcionário fica indisponível — manda-o descansar (recupera 50)." />
+                <Kpi icon={UserCheck} label="Disponíveis" value={`${available}/${emps.length}`} color={available > 0 ? "#34D399" : "#EF4444"}
+                  tip="Funcionários prontos para operar já: sem tarefa atribuída e com fadiga abaixo de 90%." />
+              </SummaryStrip>
+              {Object.keys(statusCounts).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">
+                  {Object.entries(statusCounts).map(([s, n]) => (
+                    <Tip key={s} tip={EMP_STATUS_TIPS[s]}>
+                      <span
+                        className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase"
+                        style={{ color: EMP_STATUS_COLORS[s], background: `${EMP_STATUS_COLORS[s]}14` }}
+                      >
+                        {n} {EMP_STATUS_LABELS[s]}
+                      </span>
+                    </Tip>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {capFull && (
           <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2" data-testid="hr-cap-full">

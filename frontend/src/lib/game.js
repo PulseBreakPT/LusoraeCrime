@@ -204,6 +204,87 @@ export function missionPosition(mission, nowMs) {
   return { lat: o.lat, lng: o.lng, phase: "done" };
 }
 
+export const ATTR_FULL = {
+  forca: "Força", inteligencia: "Inteligência", discricao: "Discrição", conducao: "Condução",
+  tiro: "Tiro", hack: "Hacking", negociacao: "Negociação", sangue_frio: "Sangue-frio", resistencia: "Resistência",
+};
+
+export function heatStatus(h) {
+  if (h >= 90) return { label: "Crítico", color: "#EF4444", desc: "Polícia em alerta máximo — operações bloqueadas até subornares ou o calor baixar." };
+  if (h >= 70) return { label: "Alerta", color: "#F97316", desc: "Risco de rusga aos laboratórios e interceções frequentes." };
+  if (h >= 40) return { label: "Vigiado", color: "#F59E0B", desc: "A polícia está atenta — probabilidade de sucesso reduzida." };
+  return { label: "Calmo", color: "#34D399", desc: "Radar limpo — momento ideal para operar." };
+}
+
+export function vehicleRangeKm(v) {
+  if (!v || !v.cons) return 0;
+  return (v.fuel_l / v.cons) * 100;
+}
+
+export function refuelCostOf(v, fuelPrices) {
+  return Math.ceil((v.tank_l - v.fuel_l) * (fuelPrices?.[v.fuel_type] || 0));
+}
+
+export function repairCostOf(v) {
+  return Math.max(50, Math.round((100 - v.condition) * v.price * 0.002));
+}
+
+export function sellValueOf(v) {
+  return Math.round(v.price * 0.4 * (v.condition / 100));
+}
+
+export function passiveRates(state, catalog) {
+  const pt = catalog?.property_types || {};
+  let dirtyPerH = 0, launderPerH = 0, heatPerH = 0;
+  (state?.properties || []).forEach((p) => {
+    const t = pt[p.type_key];
+    if (!t) return;
+    dirtyPerH += (t.dirty_per_h || 0) * p.level;
+    launderPerH += (t.launder_per_h || 0) * p.level;
+    heatPerH += (t.heat_per_h || 0) * p.level;
+  });
+  return { dirtyPerH, launderPerH, heatPerH };
+}
+
+export function teamsReadiness(state) {
+  let ready = 0, busy = 0;
+  const teams = state?.teams || [];
+  teams.forEach((t) => {
+    if (t.status !== "idle") { busy += 1; return; }
+    const members = (state.employees || []).filter((e) => e.team_id === t.id);
+    const active = members.filter((e) => e.status === "idle" && e.fatigue < 90);
+    const vehicle = (state.vehicles || []).find((v) => v.id === t.vehicle_id);
+    const ok = active.length > 0 && vehicle && vehicle.condition >= 30 && vehicle.fuel_l >= vehicle.tank_l * 0.12;
+    if (ok) ready += 1;
+  });
+  return { ready, busy, total: teams.length };
+}
+
+export function orgAlerts(state) {
+  const emps = state?.employees || [];
+  const vehs = state?.vehicles || [];
+  const teams = state?.teams || [];
+  const injured = emps.filter((e) => e.status === "injured").length;
+  const arrested = emps.filter((e) => e.status === "arrested").length;
+  const exhausted = emps.filter((e) => e.status === "idle" && e.fatigue >= 70).length;
+  const betrayal = emps.filter((e) => (e.betrayal_risk || 0) >= 25).length;
+  const lowFuel = vehs.filter((v) => v.fuel_l < v.tank_l * 0.25).length;
+  const damaged = vehs.filter((v) => v.condition < 30).length;
+  const teamsNoVehicle = teams.filter((t) => !t.vehicle_id).length;
+  const teamsNoMembers = teams.filter((t) => emps.every((e) => e.team_id !== t.id)).length;
+  const raidRisk = (state?.player?.heat || 0) >= 70 && (state?.properties || []).some((p) => p.type_key === "laboratorio");
+  const claimable = (state?.quests || []).filter((q) => q.status === "completed").length;
+  const hr = injured + arrested + exhausted + betrayal;
+  const fleet = lowFuel + damaged;
+  const teamsIssues = teamsNoVehicle + teamsNoMembers;
+  return {
+    injured, arrested, exhausted, betrayal, lowFuel, damaged,
+    teamsNoVehicle, teamsNoMembers, raidRisk, claimable,
+    hr, fleet, teams: teamsIssues,
+    total: hr + fleet + teamsIssues + (raidRisk ? 1 : 0),
+  };
+}
+
 export function formatApiErrorDetail(detail) {
   if (detail == null) return "Algo correu mal. Tenta novamente.";
   if (typeof detail === "string") return detail;

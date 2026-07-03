@@ -101,3 +101,169 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: >
+  Enriquecer toda a interface do Lusorae com informação útil (centro de comando profissional):
+  tooltips em todos os botões/ícones/ações, badges inteligentes, mini-barras de progresso,
+  strips de resumo agregado em todos os painéis, tooltips nos marcadores do mapa + legenda,
+  fluxo de caixa no Império, autonomia na Frota, impacto salarial no recrutamento — sem peso visual.
+  Alterações 100% frontend; backend intocado (apenas .env recriados após fork: MONGO_URL, JWT, CORS, REACT_APP_BACKEND_URL).
+
+backend:
+  - task: "Backend inalterado — .env recriado (MONGO_URL/DB_NAME/JWT_SECRET/CORS_ORIGINS)"
+    implemented: true
+    working: true
+    file: "backend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Fork sem .env; recriados. Login/state verificados via curl e UI no preview URL. CORS com origens explícitas (wildcard + credentials falhava)."
+
+frontend:
+  - task: "Infra HUD partilhada (Tip/MiniBar/Chip/Kpi/SummaryStrip) + CSS tooltips"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/hud.jsx, frontend/src/App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Tooltips CSS-only (.lus-tip, sides top/bottom, align start/center/end), verificados por screenshot."
+  - task: "ResourceBar centro de comando (nível+progresso, fluxos /h, calor c/ estado, prontas, ops, salários+countdown)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/ResourceBar.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verificado por screenshot; tooltip do calor renderiza abaixo da barra; overflow visível em md+."
+  - task: "HUD buttons com badges inteligentes + tooltips (RH/Frota/Equipas/Império/Imóveis/Missões/Intel)"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/GamePage.jsx, frontend/src/lib/game.js (orgAlerts/teamsReadiness)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Badges por contagem de alertas; alerta pulsante; Intel com total de alertas."
+  - task: "LiveMap tooltips nos marcadores (opp/HQ/propriedades/unidades) + legenda colapsável"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/LiveMap.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Hover em opp mostra recompensa/risco/respeito/expira. Legenda (map-legend-toggle/panel) acima do badge Emergent."
+  - task: "OpportunityCard enriquecido (chips distância/duração/respeito/calor/nível, tooltips métricas e fatores, +respeito no preview)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/OpportunityCard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verificado por screenshot (chips 4.6km/42s/+25/+4, MATCH tooltip, ETA)."
+  - task: "TeamsPanel (summary strip prontas/operação/afetos/fadiga, minibars veículo, tooltips ações)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/TeamsPanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verificado por screenshot (teams-summary)."
+  - task: "EmployeesPanel (summary moral/lealdade/fadiga/disponíveis, chips de estado, ATTR_FULL tooltips, impacto salarial candidato, raridade tooltip)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/EmployeesPanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verificado por screenshot (hr-summary, hr-status-chips)."
+  - task: "FleetPanel (summary operacionais/condição/autonomia/custos, autonomia km por veículo e no stand, tooltips ações)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/FleetPanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verificado por screenshot (fleet-summary, ~563 km rest.)."
+  - task: "PropertiesPanel (summary produção/lavagem/calor/valor, preview do próximo nível, tooltips upgrade/vender/comprar)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/PropertiesPanel.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Lint ok; padrão idêntico aos painéis verificados."
+  - task: "EmpirePanel (fluxo de caixa passivo c/ balanço, calor c/ estado+thresholds, quick-nav c/ alertas, tooltips)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/EmpirePanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verificado por screenshot (empire-cashflow, balanço -960 €/h)."
+  - task: "IntelPanel (+fortuna total, salários/ciclo, valor frota, tooltips em todas as células) e QuestsPanel (badges de contagem nas tabs) e ActivityFeed (tempo relativo + nº registos)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/IntelPanel.jsx, QuestsPanel.jsx, ActivityFeed.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Lint ok; feed com tempo relativo visível em screenshot."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 3
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "UI enrichment — verificação visual manual concluída; testes automatizados de frontend pendentes de autorização do utilizador"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: >
+      Enriquecimento completo da UI (frontend-only). Novos test-ids: intel-alert-badge, map-legend-toggle,
+      map-legend-panel, teams-summary, hr-summary, hr-status-chips, fleet-summary, properties-summary,
+      empire-cashflow, stat-teams-ready, stat-active-ops, stat-payroll. Tooltips CSS via .lus-tip (hover).
+      .env recriados pós-fork (backend + frontend); CORS com origens explícitas. Credenciais em
+      /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!). Testar SEMPRE via preview URL
+      (localhost:3000 dá CORS por ser cross-origin com credentials).
