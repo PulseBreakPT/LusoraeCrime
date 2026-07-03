@@ -1,10 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { toast } from "sonner";
+import { api } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { formatApiErrorDetail } from "../lib/game";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GameContext = createContext(null);
 
 export function GameProvider({ children }) {
@@ -18,7 +17,7 @@ export function GameProvider({ children }) {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
-      const { data } = await axios.get(`${API}/game/state`, { withCredentials: true });
+      const { data } = await api.get("/game/state");
       offsetRef.current = Date.parse(data.server_time) - Date.now();
       setState(data);
     } catch (e) {
@@ -31,7 +30,7 @@ export function GameProvider({ children }) {
   useEffect(() => {
     if (!user) return;
     refresh();
-    axios.get(`${API}/game/catalog`, { withCredentials: true }).then((r) => setCatalog(r.data)).catch(() => {});
+    api.get("/game/catalog").then((r) => setCatalog(r.data)).catch(() => {});
     const id = setInterval(refresh, 4000);
     return () => clearInterval(id);
   }, [user, refresh]);
@@ -41,7 +40,7 @@ export function GameProvider({ children }) {
   const action = useCallback(
     async (path, payload, successMsg) => {
       try {
-        const { data } = await axios.post(`${API}/game/${path}`, payload, { withCredentials: true });
+        const { data } = await api.post(`/game/${path}`, payload);
         if (successMsg) toast.success(successMsg);
         await refresh();
         return { ok: true, data };
@@ -58,11 +57,7 @@ export function GameProvider({ children }) {
   const recallTeam = (missionId) => action("missions/recall", { mission_id: missionId }, "Equipa chamada de volta");
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
-      const { data } = await axios.post(
-        `${API}/game/dispatch/preview`,
-        { opportunity_id: opportunityId, team_id: teamId },
-        { withCredentials: true }
-      );
+      const { data } = await api.post("/game/dispatch/preview", { opportunity_id: opportunityId, team_id: teamId });
       return { ok: true, data };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };

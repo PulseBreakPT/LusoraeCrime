@@ -122,8 +122,11 @@ async def register(body: RegisterInput, response: Response):
     })
     user_id = str(result.inserted_id)
     await create_player_for_user(user_id, body.org_name)
-    set_auth_cookies(response, create_access_token(user_id, email), create_refresh_token(user_id))
-    return {"id": user_id, "email": email, "name": body.org_name}
+    access = create_access_token(user_id, email)
+    refresh_tok = create_refresh_token(user_id)
+    set_auth_cookies(response, access, refresh_tok)
+    return {"id": user_id, "email": email, "name": body.org_name,
+            "access_token": access, "refresh_token": refresh_tok}
 
 
 @router.post("/login")
@@ -150,8 +153,10 @@ async def login(body: LoginInput, request: Request, response: Response):
 
     await db.login_attempts.delete_one({"identifier": identifier})
     user_id = str(user["_id"])
-    set_auth_cookies(response, create_access_token(user_id, email), create_refresh_token(user_id))
-    return user_public(user)
+    access = create_access_token(user_id, email)
+    refresh_tok = create_refresh_token(user_id)
+    set_auth_cookies(response, access, refresh_tok)
+    return {**user_public(user), "access_token": access, "refresh_token": refresh_tok}
 
 
 @router.post("/logout")
@@ -170,6 +175,10 @@ async def me(user: dict = Depends(get_current_user)):
 async def refresh(request: Request, response: Response):
     token = request.cookies.get("refresh_token")
     if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
         raise HTTPException(status_code=401, detail="Sem refresh token")
     try:
         payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
@@ -180,7 +189,7 @@ async def refresh(request: Request, response: Response):
             raise HTTPException(status_code=401, detail="Utilizador não encontrado")
         access = create_access_token(str(user["_id"]), user["email"])
         response.set_cookie("access_token", access, httponly=True, secure=True, samesite="lax", max_age=3600, path="/")
-        return {"ok": True}
+        return {"ok": True, "access_token": access}
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")
 

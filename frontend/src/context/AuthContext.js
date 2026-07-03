@@ -1,24 +1,31 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import axios from "axios";
+import { api, setTokens, clearTokens, getToken } from "../lib/api";
 import { formatApiErrorDetail } from "../lib/game";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    axios
-      .get(`${API}/auth/me`, { withCredentials: true })
+    if (!getToken()) {
+      setUser(false);
+      return;
+    }
+    api
+      .get("/auth/me")
       .then((r) => setUser(r.data))
-      .catch(() => setUser(false));
+      .catch(() => {
+        clearTokens();
+        setUser(false);
+      });
   }, []);
 
   const login = async (email, password) => {
     try {
-      const { data } = await axios.post(`${API}/auth/login`, { email, password }, { withCredentials: true });
-      setUser(data);
+      const { data } = await api.post("/auth/login", { email, password });
+      if (data.access_token) setTokens(data.access_token, data.refresh_token);
+      setUser({ id: data.id, email: data.email, name: data.name });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
@@ -27,12 +34,9 @@ export function AuthProvider({ children }) {
 
   const register = async (orgName, email, password) => {
     try {
-      const { data } = await axios.post(
-        `${API}/auth/register`,
-        { org_name: orgName, email, password },
-        { withCredentials: true }
-      );
-      setUser(data);
+      const { data } = await api.post("/auth/register", { org_name: orgName, email, password });
+      if (data.access_token) setTokens(data.access_token, data.refresh_token);
+      setUser({ id: data.id, email: data.email, name: data.name });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
@@ -41,8 +45,9 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+      await api.post("/auth/logout", {});
     } finally {
+      clearTokens();
       setUser(false);
     }
   };
