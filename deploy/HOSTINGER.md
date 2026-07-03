@@ -105,6 +105,21 @@ certificado — o `.env.production` existente não é apagado, mas as linhas
 `SITE_DOMAIN`/`CORS_ORIGINS` têm de ser atualizadas manualmente nele se o
 script não as tiver sobrescrito porque o ficheiro já existia.)
 
+Alternativa mais rápida, sem correr o script todo outra vez (usa isto se
+o `.env.production` já existir e só quiseres trocar o domínio):
+
+```bash
+cd ~/lusoraecrime-app/deploy
+sed -i 's/^SITE_DOMAIN=.*/SITE_DOMAIN=oteudominio.pt/' .env.production
+sed -i 's|^CORS_ORIGINS=.*|CORS_ORIGINS=https://oteudominio.pt,https://www.oteudominio.pt|' .env.production
+docker compose --env-file .env.production up -d --build --remove-orphans backend web
+```
+
+O `Caddyfile` já inclui um redirect automático de `www.<domínio>` para o
+domínio canónico (só emite certificado para o `www` se esse subdomínio
+também resolver para este VPS — caso contrário fica só um aviso nos logs,
+sem afetar o domínio principal).
+
 ---
 
 ## Operações do dia-a-dia
