@@ -196,17 +196,19 @@ else
   docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" up -d --build --remove-orphans \$SERVICES
 fi
 
-log "A aguardar backend ficar saudável (máx 3 min)..."
-for i in \$(seq 1 36); do
-  if curl -fsS "http://127.0.0.1:8001/api/" >/dev/null 2>&1; then
-    ok "Backend saudável (tentativa \$i)"
-    break
-  fi
-  if [ "\$i" -eq 36 ]; then
-    err "Backend não respondeu em 3 min. Últimos logs:\$(docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" logs --tail=50 backend)"
-  fi
-  sleep 5
-done
+if [[ -z "\$SERVICES" || " \$SERVICES " == *" backend "* ]]; then
+  log "A aguardar backend ficar saudável (máx 3 min)..."
+  for i in \$(seq 1 36); do
+    if curl -fsS "http://127.0.0.1:8001/api/" >/dev/null 2>&1; then
+      ok "Backend saudável (tentativa \$i)"
+      break
+    fi
+    if [ "\$i" -eq 36 ]; then
+      err "Backend não respondeu em 3 min. Últimos logs:\$(docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" logs --tail=50 backend)"
+    fi
+    sleep 5
+  done
+fi
 
 echo ""
 docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" ps
