@@ -36,37 +36,44 @@ domínio, basta re-correr o setup com `SITE_DOMAIN=teudominio.pt`.
 
 ---
 
-## ⚠️ Estás a substituir o projeto antigo (RedeSocial)
+## ⚠️ Estás a substituir o projeto antigo
 
-Se o VPS ainda tem o stack antigo a correr (comando `lusorae`, projeto
-Docker `lusorae`), ele **ocupa as portas 80 e 443** — o novo stack não
-consegue arrancar enquanto isso não for resolvido.
+Se o VPS ainda tem outro stack a correr (o RedeSocial, ou uma tentativa
+anterior de deploy deste próprio projeto), ele **ocupa as portas 80 e
+443** — o novo stack não consegue arrancar enquanto isso não for
+resolvido. O nome do projeto Docker Compose varia (`lusorae`,
+`crimelife`, etc.) — confirma qual é antes de parares nada:
 
 ```bash
 ssh root@195.200.14.60
 
-# Vê o que está a correr
+# Vê o que está a correr e a que projeto Compose pertence
 docker ps
+docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' <nome-do-container>
 
-# Pára o stack antigo (liberta as portas 80/443, mantém os dados no volume)
-docker compose -p lusorae down
+# Pára esse stack (liberta as portas 80/443, mantém os dados no volume)
+docker compose -p <nome-do-projeto> down
 ```
 
-Isto **não apaga dados** — só pára os containers. Os volumes do MongoDB
-antigo continuam no disco (`docker volume ls | grep lusorae`) até
-decidires removê-los explicitamente. Só faz `docker volume rm` se tiveres
-a certeza de que já não precisas desses dados.
+Isto **não apaga dados** — só pára os containers. Os volumes do stack
+antigo continuam no disco (`docker volume ls`) até decidires removê-los
+explicitamente. Só faz `docker volume rm` se tiveres a certeza de que já
+não precisas desses dados.
 
 ---
 
 ## Instalação (3 comandos)
 
+O repositório é privado — clona por SSH (usa a deploy key já configurada
+em Settings → Deploy keys do repo; se o VPS ainda não tiver a chave
+privada correspondente, gera uma nova e adiciona-a lá antes deste passo).
+
 ```bash
 # 1. SSH no VPS
 ssh root@195.200.14.60
 
-# 2. Clonar o repositório
-git clone https://github.com/PulseBreakPT/LusoraeCrime.git lusoraecrime-app
+# 2. Clonar o repositório (SSH — não pede password)
+git clone git@github.com:PulseBreakPT/LusoraeCrime.git lusoraecrime-app
 cd lusoraecrime-app
 
 # 3. Correr o setup (instala Docker, gera segredos, faz build e arranca tudo)
@@ -97,6 +104,21 @@ sudo SITE_DOMAIN=oteudominio.pt ACME_EMAIL=tu@email.com bash deploy/hostinger-se
 certificado — o `.env.production` existente não é apagado, mas as linhas
 `SITE_DOMAIN`/`CORS_ORIGINS` têm de ser atualizadas manualmente nele se o
 script não as tiver sobrescrito porque o ficheiro já existia.)
+
+Alternativa mais rápida, sem correr o script todo outra vez (usa isto se
+o `.env.production` já existir e só quiseres trocar o domínio):
+
+```bash
+cd ~/lusoraecrime-app/deploy
+sed -i 's/^SITE_DOMAIN=.*/SITE_DOMAIN=oteudominio.pt/' .env.production
+sed -i 's|^CORS_ORIGINS=.*|CORS_ORIGINS=https://oteudominio.pt,https://www.oteudominio.pt|' .env.production
+docker compose --env-file .env.production up -d --build --remove-orphans backend web
+```
+
+O `Caddyfile` já inclui um redirect automático de `www.<domínio>` para o
+domínio canónico (só emite certificado para o `www` se esse subdomínio
+também resolver para este VPS — caso contrário fica só um aviso nos logs,
+sem afetar o domínio principal).
 
 ---
 

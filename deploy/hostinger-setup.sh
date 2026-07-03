@@ -59,8 +59,19 @@ if [[ -n "$BUSY_CONTAINERS" ]]; then
   err "As portas 80/443 já estão ocupadas por outro stack Docker:"
   echo "$BUSY_CONTAINERS"
   echo
-  echo "   Se for o projeto antigo (RedeSocial), pára-o primeiro com:"
-  echo "     docker compose -p lusorae down"
+  BUSY_PROJECTS="$(docker ps --format '{{.Names}}' --filter 'publish=80' --filter 'publish=443' 2>/dev/null \
+    | xargs -r -I{} docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' {} 2>/dev/null \
+    | sort -u)"
+  if [[ -n "$BUSY_PROJECTS" ]]; then
+    echo "   Pertencem ao(s) projeto(s) Docker Compose: ${BUSY_PROJECTS}"
+    echo "   Pára-o(s) primeiro (não apaga volumes/dados) com:"
+    while IFS= read -r p; do
+      echo "     docker compose -p ${p} down"
+    done <<< "$BUSY_PROJECTS"
+  else
+    echo "   Identifica o stack (docker ps -a) e pára-o com 'docker compose -p <nome> down'"
+    echo "   ou 'docker stop <container>' antes de continuar."
+  fi
   echo
   echo "   Depois volta a correr este script."
   exit 1

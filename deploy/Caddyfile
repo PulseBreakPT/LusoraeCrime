@@ -54,3 +54,10 @@
 		max_size 25MB
 	}
 }
+
+# www → redirect para o domínio canónico (só importa/emite certificado se
+# www.{$SITE_DOMAIN} também resolver para este servidor; caso contrário o
+# Caddy só regista um aviso nos logs, sem afetar o domínio principal).
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
