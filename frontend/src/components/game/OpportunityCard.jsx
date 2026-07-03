@@ -3,11 +3,15 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
-  const { state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam } = useGame();
+  const {
+    state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
+    recommendTeamForOpportunity,
+  } = useGame();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [recommendedTeamId, setRecommendedTeamId] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -41,6 +45,24 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     });
     return () => { cancelled = true; };
   }, [selectedTeamId, opp.id, previewDispatch, inProgress]);
+
+  // Ao abrir uma oportunidade, pré-seleciona automaticamente a equipa com maior
+  // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
+  // sempre escolher outra equipa manualmente clicando numa linha diferente.
+  useEffect(() => {
+    setSelectedTeamId(null);
+    setRecommendedTeamId(null);
+    if (inProgress) return;
+    let cancelled = false;
+    recommendTeamForOpportunity(opp.id).then((r) => {
+      if (cancelled) return;
+      if (r.ok && r.data?.team_id) {
+        setRecommendedTeamId(r.data.team_id);
+        setSelectedTeamId(r.data.team_id);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [opp.id, inProgress, recommendTeamForOpportunity]);
 
   if (!state) return null;
   const hq = state.player.hq;
@@ -233,6 +255,13 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <div className={r.ok ? "" : "opacity-50"}>
                     <p className="text-xs font-semibold text-white">
                       {t.name}
+                      {t.id === recommendedTeamId && (
+                        <Tip tip="Sugestão automática: a equipa com maior probabilidade de sucesso para esta operação. Podes escolher outra clicando nela.">
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 font-mono text-[9px] uppercase text-amber-400">
+                            <Sparkles size={9} /> recomendada
+                          </span>
+                        </Tip>
+                      )}
                       {match && (
                         <Tip tip="A especialização da equipa combina com a categoria da operação — bónus de probabilidade de sucesso.">
                           <span className="ml-1.5 font-mono text-[9px] uppercase text-emerald-400">match</span>
@@ -298,7 +327,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             data-testid="dispatch-team-button"
             onClick={handleDispatch}
             disabled={!selectedTeamId || busy}
-            className="mt-3 w-full bg-red-600 font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all duration-300 hover:bg-red-700"
+            className="mt-3 w-full bg-green-600 font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] transition-all duration-300 hover:bg-green-700"
           >
             {busy ? "A destacar..." : "Destacar equipa"}
           </Button>

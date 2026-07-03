@@ -149,18 +149,21 @@ def random_employee_name():
 
 VEHICLE_MODELS = {
     "usado": {"name": "Sedan Usado", "min_level": 1, "price": 6000, "speed": 9,
-              "fuel_type": "gasolina", "tank_l": 45, "cons": 8.0},
+              "fuel_type": "gasolina", "tank_l": 45, "cons": 8.0, "seats": 4},
     "moto": {"name": "Moto Rápida", "min_level": 1, "price": 12000, "speed": 15,
-             "fuel_type": "gasolina", "tank_l": 15, "cons": 4.5},
+             "fuel_type": "gasolina", "tank_l": 15, "cons": 4.5, "seats": 2},
     "van": {"name": "Van Reforçada", "min_level": 2, "price": 18000, "speed": 12,
-            "fuel_type": "gasoleo", "tank_l": 70, "cons": 10.0},
+            "fuel_type": "gasoleo", "tank_l": 70, "cons": 10.0, "seats": 6},
     "desportivo": {"name": "Desportivo", "min_level": 3, "price": 30000, "speed": 19,
-                   "fuel_type": "gasolina", "tank_l": 55, "cons": 12.0},
+                   "fuel_type": "gasolina", "tank_l": 55, "cons": 12.0, "seats": 2},
     "suv_blindado": {"name": "SUV Blindado", "min_level": 4, "price": 45000, "speed": 14,
-                     "fuel_type": "gasoleo", "tank_l": 80, "cons": 13.0},
+                     "fuel_type": "gasoleo", "tank_l": 80, "cons": 13.0, "seats": 5},
     "supercarro": {"name": "Supercarro", "min_level": 5, "price": 65000, "speed": 26,
-                   "fuel_type": "gasolina", "tank_l": 60, "cons": 15.0},
+                   "fuel_type": "gasolina", "tank_l": 60, "cons": 15.0, "seats": 2},
 }
+
+# Nº máximo de membros ativos por equipa (independente do veículo).
+TEAM_MAX_MEMBERS = 4
 
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
 

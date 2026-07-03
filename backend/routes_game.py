@@ -20,7 +20,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
                        VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
-                       random_employee_name)
+                       TEAM_MAX_MEMBERS, random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -41,6 +41,14 @@ async def get_player(user: dict) -> dict:
 class DispatchInput(BaseModel):
     opportunity_id: str
     team_id: str
+
+
+class TeamIdInput(BaseModel):
+    team_id: str
+
+
+class OpportunityIdInput(BaseModel):
+    opportunity_id: str
 
 
 class TeamCreateInput(BaseModel):
@@ -148,6 +156,7 @@ async def catalog():
         "property_types": PROPERTY_TYPES,
         "property_max_level": PROPERTY_MAX_LEVEL,
         "base_caps": {"employees": BASE_EMPLOYEE_CAP, "vehicles": BASE_VEHICLE_CAP},
+        "team_max_members": TEAM_MAX_MEMBERS,
         "opportunity_types": {k: {kk: vv for kk, vv in v.items() if kk != "duration_s"} for k, v in OPPORTUNITY_TYPES.items()},
     }
 
@@ -359,6 +368,87 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     return {"mission_id": str(result.inserted_id)}
 
 
+async def _try_prepare_dispatch(player, opp, team):
+    """Como _prepare_dispatch, mas devolve None em vez de rebentar quando a
+    combinação equipa/oportunidade não é viável — usado pelos endpoints de
+    recomendação, que avaliam várias combinações e só querem as viáveis."""
+    try:
+        return await _prepare_dispatch(player, opp, team)
+    except HTTPException:
+        return None
+
+
+def _rank_key(prep):
+    # Melhor primeiro: maior probabilidade de sucesso, depois mais perto,
+    # depois maior recompensa (desempate).
+    return (-prep["chance"], prep["dist"], -prep["reward"])
+
+
+@router.post("/dispatch/recommend_opportunity")
+async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_current_user)):
+    """Para uma equipa, sugere a melhor oportunidade que ela consegue mesmo
+    cumprir (nunca uma que não cumpra os requisitos mínimos)."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
+    if not team:
+        raise HTTPException(status_code=404, detail="Equipa não encontrada")
+    if player["heat"] >= 90:
+        return {"opportunity_id": None}
+    now = now_utc()
+    opps = await db.opportunities.find({
+        "player_id": pid, "status": "active", "expires_at": {"$gt": now.isoformat()},
+        "min_level": {"$lte": player["level"]},
+    }).to_list(50)
+    best_opp, best_prep = None, None
+    for opp in opps:
+        prep = await _try_prepare_dispatch(player, opp, team)
+        if not prep or len(prep["members"]) < prep["min_members"]:
+            continue
+        if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+            best_opp, best_prep = opp, prep
+    if not best_opp:
+        return {"opportunity_id": None}
+    return {
+        "opportunity_id": str(best_opp["_id"]),
+        "chance": round(best_prep["chance"], 3),
+        "reward": best_prep["reward"],
+        "eta_s": round(best_prep["travel_s"]),
+        "dist_km": round(best_prep["dist"] / 1000, 2),
+    }
+
+
+@router.post("/dispatch/recommend_team")
+async def recommend_team(body: OpportunityIdInput, user: dict = Depends(get_current_user)):
+    """Para uma oportunidade, sugere a equipa com maior probabilidade de
+    sucesso entre as que cumprem mesmo os requisitos mínimos."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    now = now_utc()
+    opp = await db.opportunities.find_one({"_id": _oid(body.opportunity_id, "Oportunidade inválida"), "player_id": pid})
+    if not opp or opp["status"] != "active" or parse_dt(opp["expires_at"]) <= now:
+        return {"team_id": None}
+    if player["heat"] >= 90 or player["level"] < opp["min_level"]:
+        return {"team_id": None}
+    teams = await db.teams.find({"player_id": pid, "status": "idle"}).to_list(50)
+    best_team, best_prep = None, None
+    for team in teams:
+        prep = await _try_prepare_dispatch(player, opp, team)
+        if not prep or len(prep["members"]) < prep["min_members"]:
+            continue
+        if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+            best_team, best_prep = team, prep
+    if not best_team:
+        return {"team_id": None}
+    return {
+        "team_id": str(best_team["_id"]),
+        "chance": round(best_prep["chance"], 3),
+        "reward": best_prep["reward"],
+        "eta_s": round(best_prep["travel_s"]),
+        "dist_km": round(best_prep["dist"] / 1000, 2),
+    }
+
+
 @router.post("/missions/recall")
 async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
@@ -481,6 +571,9 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
         team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
         if not team:
             raise HTTPException(status_code=404, detail="Equipa não encontrada")
+        current = await db.employees.count_documents({"player_id": pid, "team_id": body.team_id})
+        if current >= TEAM_MAX_MEMBERS:
+            raise HTTPException(status_code=400, detail=f"A equipa já está no limite de {TEAM_MAX_MEMBERS} membros")
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"team_id": body.team_id}})
     return {"ok": True}
 
