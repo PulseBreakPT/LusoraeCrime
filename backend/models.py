@@ -141,6 +141,9 @@ class Opportunity(BaseDocument):
     risk: int
     heat: float
     pays: str
+    rare: bool = False
+    dist_km: float = 0.0
+    min_members: int = 1
     duration_s: int
     min_level: int
     status: str

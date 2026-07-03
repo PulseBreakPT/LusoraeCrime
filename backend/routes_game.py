@@ -263,7 +263,7 @@ async def _prepare_dispatch(player, opp, team):
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
         "reward": reward, "reward_mult": mult, "team_skill": team_skill,
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
-        "talents": member_talents,
+        "talents": member_talents, "min_members": opp.get("min_members", 1),
     }
 
 
@@ -300,6 +300,8 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "effective_speed": round(prep["speed"], 1),
         "spec_match": prep["spec_match"],
         "talents": prep["talents"],
+        "min_members": prep["min_members"],
+        "min_members_met": len(prep["members"]) >= prep["min_members"],
     }
 
 
@@ -309,6 +311,11 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     pid = str(player["_id"])
     now = now_utc()
     prep = await _prepare_dispatch(player, opp, team)
+    if len(prep["members"]) < prep["min_members"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Esta operação requer pelo menos {prep['min_members']} membros na equipa (tens {len(prep['members'])} disponíveis)",
+        )
     vehicle = prep["vehicle"]
     members = prep["members"]
 

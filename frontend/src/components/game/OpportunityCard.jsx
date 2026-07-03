@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const { state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam } = useGame();
@@ -56,6 +56,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     if (members.length === 0) return { ok: false, reason: "Sem membros" };
     const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
     if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
+    if (ready.length < opp.min_members) return { ok: false, reason: `Mín. ${opp.min_members} membros` };
     const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
     if (!vehicle) return { ok: false, reason: "Sem veículo" };
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
@@ -90,7 +91,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       if (free.length) return { icon: Car, label: free[0].name, color: "text-cyan-400", can: true, run: () => assignVehicle(free[0].id, t.id) };
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
     }
-    if (r.reason === "Sem membros" || r.reason === "Membros indisponíveis") {
+    if (r.reason === "Sem membros" || r.reason === "Membros indisponíveis" || r.reason.startsWith("Mín. ")) {
       return { icon: IdCard, label: "RH", color: "text-emerald-400", can: true, run: () => { onClose(); onNavigate && onNavigate("employees"); } };
     }
     return null;
@@ -130,6 +131,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         {opp.min_level > 1 && (
           <Chip icon={Lock} value={`N${opp.min_level}`} color={lockedByLevel ? "#EF4444" : "#71717A"}
             tip={`Nível mínimo da organização para esta operação: ${opp.min_level}.`} />
+        )}
+        {opp.min_members > 1 && (
+          <Chip icon={Users} value={`Mín. ${opp.min_members}`} color="#71717A"
+            tip={`Esta operação é de risco ${opp.risk}/5 e requer pelo menos ${opp.min_members} membros disponíveis na equipa para poder ser despachada.`} />
         )}
       </div>
 

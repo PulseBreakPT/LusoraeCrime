@@ -381,7 +381,10 @@ class TestDispatch:
         s, _ = fresh_user
         st = get_state(s)
         team = st["teams"][0]
-        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        # Crew Alfa starts with exactly 2 idle members — only pick opportunities
+        # dispatchable with that (risk-bumped-by-distance min_members can exceed 2).
+        opps = [o for o in st["opportunities"]
+                if o["min_level"] <= st["player"]["level"] and o["min_members"] <= 2]
         assert opps
         r = s.post(f"{BASE_URL}/api/game/dispatch",
                    json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
@@ -393,6 +396,59 @@ class TestDispatch:
         # members on_mission
         on_mission = [e for e in st2["employees"] if e["status"] == "on_mission"]
         assert len(on_mission) >= 1
+
+
+# ---------------- Dispatch min_members / distance scaling (regression) ----------------
+class TestDispatchMinMembers:
+    def test_opportunity_exposes_min_members_and_rare(self):
+        s, _ = register_new()
+        st = get_state(s)
+        for o in st["opportunities"]:
+            assert "min_members" in o and o["min_members"] >= 1
+            assert "rare" in o and isinstance(o["rare"], bool)
+
+    def test_dispatch_preview_reports_min_members(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "min_members" in d and "min_members_met" in d
+        assert d["min_members"] == opps[0]["min_members"]
+
+    def test_dispatch_succeeds_at_min_members(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]  # 2 idle members by default
+        candidates = [o for o in st["opportunities"]
+                      if o["min_level"] <= st["player"]["level"] and o["min_members"] <= 2]
+        assert candidates
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": candidates[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+
+    def test_dispatch_blocked_below_min_members(self):
+        s, _ = register_new()
+        opp = None
+        st = None
+        for _ in range(5):  # spawns are randomized; a few polls give new candidates
+            st = get_state(s)
+            candidates = [o for o in st["opportunities"]
+                          if o["min_level"] <= st["player"]["level"] and o["min_members"] > 2]
+            if candidates:
+                opp = candidates[0]
+                break
+        if not opp:
+            pytest.skip("no min_members>2 opportunity spawned for a level-1 org within retry budget")
+        team = st["teams"][0]
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 400
+        assert str(opp["min_members"]) in r.json()["detail"]
 
 
 # ---------------- Fleet regression ----------------

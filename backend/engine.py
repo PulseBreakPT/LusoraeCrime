@@ -255,6 +255,29 @@ def _sample_on_land(spot):
 
 # ---------------- Oportunidades ----------------
 
+def distance_risk_bump(dist_km):
+    """Risco extra por operações longe do QG. Os spots reais de Lisboa vão de
+    ~0.3 a 8.2km do QG; só o anel exterior (Benfica/Lumiar/P.Nações, >=6km)
+    atinge o bónus +2."""
+    if dist_km >= 6.0:
+        return 2
+    if dist_km >= 3.0:
+        return 1
+    return 0
+
+
+def distance_reward_mult(dist_km):
+    """+6% de recompensa por km de distância ao QG, capado a +50%
+    (cap atingido só pelo ponto mais distante, ~8.3km)."""
+    return 1 + min(0.50, 0.06 * dist_km)
+
+
+def min_members_for(risk):
+    """Nº mínimo de membros na equipa para poder despachar, com base no
+    risco final (1-5) da oportunidade."""
+    return max(1, risk - 1)
+
+
 async def spawn_opportunities(db, player, rare_chance=0.0):
     now = now_utc()
     pid = str(player["_id"])
@@ -265,6 +288,7 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
     target = min(5 + level * 2, 14)
     keys = [k for k, v in OPPORTUNITY_TYPES.items() if v["min_level"] <= level]
     weights = [OPPORTUNITY_TYPES[k]["weight"] for k in keys]
+    hq = player["hq"]
     docs = []
     for _ in range(max(0, target - active)):
         key = random.choices(keys, weights=weights)[0]
@@ -275,16 +299,21 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
         if rare:
             mult *= 2.0
         lat, lng = _sample_on_land(spot)
+        dist_km = haversine_m(hq["lat"], hq["lng"], lat, lng) / 1000
+        risk = min(5, t["risk"] + distance_risk_bump(dist_km))
+        mult *= distance_reward_mult(dist_km)
         docs.append({
             "player_id": pid, "type_key": key, "name": t["name"],
             "category": t["category"], "district": spot["name"],
             "lat": lat,
             "lng": lng,
+            "dist_km": round(dist_km, 2),
             "reward": int(t["base_reward"] * mult),
             "respect": int(t["respect"] * (1 + 0.15 * (level - 1)) * (1.5 if rare else 1.0)),
-            "risk": t["risk"], "heat": t["heat"], "pays": t["pays"], "rare": rare,
+            "risk": risk, "heat": t["heat"], "pays": t["pays"], "rare": rare,
             "duration_s": random.randint(*t["duration_s"]),
-            "min_level": t["min_level"], "status": "active",
+            "min_level": t["min_level"], "min_members": min_members_for(risk),
+            "status": "active",
             "expires_at": (now + timedelta(seconds=random.randint(240, 600))).isoformat(),
             "created_at": now.isoformat(),
         })
