@@ -57,14 +57,25 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const maxed = p.level >= (catalog?.property_max_level || 3);
             const upgradeCost = Math.round(pt.price * 0.6 * (p.level + 1));
             const sellValue = Math.round(pt.price * 0.7 * p.level);
+            const originalName = `${pt.name} — ${p.district}`;
+            const renamed = p.name !== originalName;
             return (
               <div key={p.id} data-testid={`property-card-${p.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <InlineRename
-                      testId={`property-rename-${p.id}`} value={p.name} onSave={(name) => renameProperty(p.id, name)}
-                      textClassName="text-sm font-bold text-white"
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <InlineRename
+                        testId={`property-rename-${p.id}`} value={p.name} onSave={(name) => renameProperty(p.id, name)}
+                        textClassName="text-sm font-bold text-white"
+                      />
+                      {renamed && (
+                        <Tip tip="Nome original desta propriedade, antes de a renomeares.">
+                          <span data-testid={`property-original-tag-${p.id}`} className="shrink-0 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-zinc-500">
+                            {pt.name} · {p.district}
+                          </span>
+                        </Tip>
+                      )}
+                    </div>
                     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       Nível {"●".repeat(p.level)}{"○".repeat((catalog?.property_max_level || 3) - p.level)}
                     </p>
