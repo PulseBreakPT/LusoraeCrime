@@ -1,4 +1,4 @@
-import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMask, Terminal, Crown, Star } from "lucide-react";
+import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMask, Terminal, Crown, Star, Zap, Eye, Target, Landmark, Globe, CreditCard } from "lucide-react";
 
 export const CATEGORY_COLORS = {
   assalto: "#EF4444",
@@ -20,6 +20,12 @@ export const TYPE_ICONS = {
   hack: Terminal,
   operacao_vip: Crown,
   missao_especial: Star,
+  entrega_expressa: Zap,
+  vigilancia_digital: Eye,
+  assalto_armado: Target,
+  suborno_oficial: Landmark,
+  rota_internacional: Globe,
+  ciberataque_bancario: CreditCard,
 };
 
 export const SPEC_LABELS = {
