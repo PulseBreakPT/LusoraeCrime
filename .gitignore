@@ -86,3 +86,6 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Deploy: keep the documented example, ignore real secrets
+!deploy/.env.production.example
