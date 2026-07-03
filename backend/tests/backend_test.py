@@ -333,6 +333,32 @@ class TestHRActions:
         e2 = [e for e in st2["employees"] if e["id"] == emp["id"]][0]
         assert e2["team_id"] is None
 
+    def test_rename_employee(self):
+        s, _ = register_new()
+        emp = get_state(s)["employees"][0]
+        r = s.post(f"{BASE_URL}/api/game/employees/rename",
+                   json={"employee_id": emp["id"], "name": "Zé das Sombras"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st2 = get_state(s)
+        e2 = [e for e in st2["employees"] if e["id"] == emp["id"]][0]
+        assert e2["name"] == "Zé das Sombras"
+        assert e2["history"] and "Zé das Sombras" in e2["history"][-1]["text"]
+
+    def test_rename_employee_rejects_blank(self):
+        s, _ = register_new()
+        emp = get_state(s)["employees"][0]
+        r = s.post(f"{BASE_URL}/api/game/employees/rename",
+                   json={"employee_id": emp["id"], "name": "   "}, timeout=TIMEOUT)
+        assert r.status_code == 400
+
+    def test_rename_employee_rejects_other_players_employee(self):
+        s1, _ = register_new()
+        s2, _ = register_new()
+        emp = get_state(s1)["employees"][0]
+        r = s2.post(f"{BASE_URL}/api/game/employees/rename",
+                    json={"employee_id": emp["id"], "name": "Impostor"}, timeout=TIMEOUT)
+        assert r.status_code == 404
+
 
 # ---------------- Dispatch (regression) ----------------
 class TestDispatch:
@@ -407,6 +433,23 @@ class TestFleet:
                     json={"model_key": "moto"}, timeout=TIMEOUT)
         assert r.status_code == 400
 
+    def test_rename_vehicle(self):
+        s, _ = register_new()
+        v = get_state(s)["vehicles"][0]
+        r = s.post(f"{BASE_URL}/api/game/vehicles/rename",
+                   json={"vehicle_id": v["id"], "name": "Batmóvel"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st2 = get_state(s)
+        v2 = [x for x in st2["vehicles"] if x["id"] == v["id"]][0]
+        assert v2["name"] == "Batmóvel"
+
+    def test_rename_vehicle_rejects_blank(self):
+        s, _ = register_new()
+        v = get_state(s)["vehicles"][0]
+        r = s.post(f"{BASE_URL}/api/game/vehicles/rename",
+                   json={"vehicle_id": v["id"], "name": ""}, timeout=TIMEOUT)
+        assert r.status_code in (400, 422)
+
 
 # ---------------- Properties regression ----------------
 class TestProperties:
@@ -442,6 +485,26 @@ class TestProperties:
         # After upgrade lvl=2, cap contribution is 2*2=4; if used >= (max-4) → block
         # depends on counts, so accept 200 or 400 but ensure not 500
         assert r.status_code in (200, 400)
+
+    def test_rename_property(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s)["properties"][0]
+        r = s.post(f"{BASE_URL}/api/game/properties/rename",
+                   json={"property_id": prop["id"], "name": "QG Secreto"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st2 = get_state(s)
+        p2 = [x for x in st2["properties"] if x["id"] == prop["id"]][0]
+        assert p2["name"] == "QG Secreto"
+
+    def test_rename_property_rejects_other_players_property(self):
+        s1, _ = register_new()
+        s2, _ = register_new()
+        s1.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s1)["properties"][0]
+        r = s2.post(f"{BASE_URL}/api/game/properties/rename",
+                    json={"property_id": prop["id"], "name": "Impostor"}, timeout=TIMEOUT)
+        assert r.status_code == 404
 
 
 # ---------------- Police / Launder regression ----------------

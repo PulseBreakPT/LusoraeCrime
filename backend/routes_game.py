@@ -2,7 +2,7 @@ import math
 import random
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import timedelta
 
@@ -55,6 +55,11 @@ class EmployeeIdInput(BaseModel):
     employee_id: str
 
 
+class EmployeeRenameInput(BaseModel):
+    employee_id: str
+    name: str = Field(min_length=1, max_length=40)
+
+
 class AssignEmployeeInput(BaseModel):
     employee_id: str
     team_id: Optional[str] = None
@@ -73,6 +78,11 @@ class VehicleIdInput(BaseModel):
     vehicle_id: str
 
 
+class VehicleRenameInput(BaseModel):
+    vehicle_id: str
+    name: str = Field(min_length=1, max_length=40)
+
+
 class MissionIdInput(BaseModel):
     mission_id: str
 
@@ -88,6 +98,11 @@ class PropertyBuyInput(BaseModel):
 
 class PropertyIdInput(BaseModel):
     property_id: str
+
+
+class PropertyRenameInput(BaseModel):
+    property_id: str
+    name: str = Field(min_length=1, max_length=40)
 
 
 class LaunderInput(BaseModel):
@@ -607,6 +622,21 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     return {"severance": severance}
 
 
+@router.post("/employees/rename")
+async def rename_employee(body: EmployeeRenameInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome não pode estar vazio")
+    old_name = emp["name"]
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"name": name}})
+    if name != old_name:
+        await push_history(db, emp["_id"], f"Renomeado de {old_name} para {name}.")
+    return {"ok": True}
+
+
 # ---------------- Veículos ----------------
 
 @router.post("/vehicles/buy")
@@ -725,6 +755,20 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
     return {"ok": True}
 
 
+@router.post("/vehicles/rename")
+async def rename_vehicle(body: VehicleRenameInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    vehicle = await db.vehicles.find_one({"_id": _oid(body.vehicle_id, "Veículo inválido"), "player_id": pid})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome não pode estar vazio")
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"name": name}})
+    return {"ok": True}
+
+
 # ---------------- Propriedades ----------------
 
 @router.post("/properties/buy")
@@ -791,6 +835,20 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.properties_upgraded": 1}})
     await db.properties.update_one({"_id": prop["_id"]}, {"$inc": {"level": 1}})
     await add_event(db, pid, "property", f"{prop['name']} melhorado para nível {prop['level'] + 1} por {cost:,} €.")
+    return {"ok": True}
+
+
+@router.post("/properties/rename")
+async def rename_property(body: PropertyRenameInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    prop = await db.properties.find_one({"_id": _oid(body.property_id, "Propriedade inválida"), "player_id": pid})
+    if not prop:
+        raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome não pode estar vazio")
+    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"name": name}})
     return {"ok": True}
 
 

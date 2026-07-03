@@ -1,6 +1,9 @@
 // Blocos partilhados do centro de comando — tooltips, mini-barras, chips e células KPI.
 // Mantêm a UI densa em informação mas visualmente leve e consistente.
 
+import { useState } from "react";
+import { Pencil, Check, X } from "lucide-react";
+
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
   if (!tip) return children;
   return (
@@ -59,3 +62,66 @@ export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => 
     {children}
   </div>
 );
+
+// Nome de um item (veículo/funcionário/propriedade) com um lápis ao lado que troca
+// para um input inline + guardar/cancelar. Substitui o <p>{item.name}</p> estático.
+export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassName = "" }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  if (editing) {
+    const save = () => {
+      const trimmed = draft.trim();
+      if (trimmed && trimmed !== value) onSave(trimmed);
+      setEditing(false);
+    };
+    return (
+      <span className="flex min-w-0 flex-1 items-center gap-1">
+        <input
+          data-testid={testId && `${testId}-input`}
+          autoFocus
+          value={draft}
+          maxLength={maxLength}
+          onChange={(ev) => setDraft(ev.target.value)}
+          onBlur={save}
+          onKeyDown={(ev) => {
+            if (ev.key === "Enter") save();
+            if (ev.key === "Escape") setEditing(false);
+          }}
+          className="w-full min-w-0 rounded border border-white/10 bg-black/60 px-1.5 py-0.5 font-mono text-xs text-white"
+        />
+        <button
+          data-testid={testId && `${testId}-save`}
+          onMouseDown={(ev) => ev.preventDefault()}
+          onClick={save}
+          className="shrink-0 text-emerald-400 transition-colors hover:text-emerald-300"
+        >
+          <Check size={14} />
+        </button>
+        <button
+          data-testid={testId && `${testId}-cancel`}
+          onMouseDown={(ev) => ev.preventDefault()}
+          onClick={() => setEditing(false)}
+          className="shrink-0 text-zinc-500 transition-colors hover:text-white"
+        >
+          <X size={14} />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+      <span className={`truncate ${textClassName}`}>{value}</span>
+      <Tip tip="Renomear">
+        <button
+          data-testid={testId && `${testId}-edit`}
+          onClick={() => { setDraft(value); setEditing(true); }}
+          className="shrink-0 text-zinc-600 transition-colors hover:text-white"
+        >
+          <Pencil size={11} />
+        </button>
+      </Tip>
+    </span>
+  );
+};

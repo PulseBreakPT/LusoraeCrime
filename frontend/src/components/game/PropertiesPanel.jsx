@@ -1,12 +1,12 @@
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, propertyBenefit, passiveRates } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote } from "lucide-react";
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, buyProperty, sellProperty, upgradeProperty } = useGame();
+  const { state, catalog, buyProperty, sellProperty, upgradeProperty, renameProperty } = useGame();
   if (!state) return null;
 
   return (
@@ -60,8 +60,11 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             return (
               <div key={p.id} data-testid={`property-card-${p.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-white">{p.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <InlineRename
+                      testId={`property-rename-${p.id}`} value={p.name} onSave={(name) => renameProperty(p.id, name)}
+                      textClassName="text-sm font-bold text-white"
+                    />
                     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       Nível {"●".repeat(p.level)}{"○".repeat((catalog?.property_max_level || 3) - p.level)}
                     </p>

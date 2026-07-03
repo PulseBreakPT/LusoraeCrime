@@ -4,7 +4,7 @@ import {
   fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS,
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
@@ -69,7 +69,7 @@ const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title 
 const EmployeeCard = ({ e }) => {
   const {
     state, catalog, serverNow, assignEmployee, trainEmployee, restEmployee,
-    promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee,
+    promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
   } = useGame();
   const [manage, setManage] = useState(false);
   const [course, setCourse] = useState("");
@@ -104,9 +104,13 @@ const EmployeeCard = ({ e }) => {
     <div data-testid={`employee-card-${e.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-white">
-            {e.name} <span className="font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
-          </p>
+          <div className="flex items-center gap-1.5">
+            <InlineRename
+              testId={`emp-rename-${e.id}`} value={e.name} onSave={(name) => renameEmployee(e.id, name)}
+              textClassName="text-sm font-bold text-white"
+            />
+            <span className="shrink-0 font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
+          </div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank} · N{e.level}/{maxLevel}
           </p>
