@@ -7,7 +7,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
-  Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle,
+  Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
 } from "lucide-react";
 
 const useTick = (active) => {
@@ -169,7 +169,7 @@ const EmployeeCard = ({ e }) => {
         >
           <option value="">Sem equipa</option>
           {state.teams.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
+            <option key={t.id} value={t.id}>{`${t.name} · ${state.employees.filter((x) => x.team_id === t.id).length} membros`}</option>
           ))}
         </select>
         <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
@@ -324,13 +324,16 @@ const CandidateCard = ({ c }) => {
   );
 };
 
-export const EmployeesPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, serverNow, refreshPool } = useGame();
+export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
+  const { state, catalog, serverNow, refreshPool, buyProperty } = useGame();
   const [tab, setTab] = useState("roster");
   useTick(open);
   if (!state || !catalog) return null;
 
   const caps = state.caps.employees;
+  const hideout = catalog.property_types?.esconderijo;
+  const canBuyHideout = hideout && state.player.level >= hideout.min_level && state.player.clean_money >= hideout.price;
+  const capFull = caps.used >= caps.max;
   const payrollMs = state.player.next_payroll_at ? Date.parse(state.player.next_payroll_at) - serverNow() : null;
   const poolMs = state.player.pool_refresh_at ? Date.parse(state.player.pool_refresh_at) - serverNow() : null;
 
@@ -364,6 +367,29 @@ export const EmployeesPanel = ({ open, onOpenChange }) => {
             </p>
           </div>
         </div>
+
+        {capFull && (
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2" data-testid="hr-cap-full">
+            <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
+            {canBuyHideout ? (
+              <button
+                data-testid="hr-buy-hideout-inline"
+                onClick={() => buyProperty("esconderijo")}
+                className="flex items-center gap-1 rounded border border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 transition-colors hover:bg-white/10"
+              >
+                <Warehouse size={10} /> Comprar esconderijo · {fmtMoney(hideout.price)}
+              </button>
+            ) : (
+              <button
+                data-testid="hr-nav-properties"
+                onClick={() => onNavigate && onNavigate("properties")}
+                className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+              >
+                Ver Imóveis
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/40 p-1">
           <button

@@ -1,12 +1,76 @@
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, SPEC_LABELS, chanceColor } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { BrainCircuit } from "lucide-react";
+import { BrainCircuit, Lightbulb, ArrowRight } from "lucide-react";
 
 const OUTCOME_LABELS = { success: "Sucesso", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
 const OUTCOME_COLORS = { success: "#34D399", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
 
-export const IntelPanel = ({ open, onOpenChange }) => {
+const RecommendedActions = ({ onNavigate }) => {
+  const { state, bribePolice, launder } = useGame();
+  const p = state.player;
+  const recs = [];
+  const bribeCost = Math.max(1000, Math.round(p.heat * 150));
+  if (p.heat >= 40) {
+    recs.push({
+      id: "bribe", text: `Calor a ${Math.round(p.heat)}% — a polícia aproxima-se`,
+      action: `Subornar · ${fmtMoney(bribeCost)}`, run: () => bribePolice(), can: p.clean_money >= bribeCost,
+    });
+  }
+  if (p.dirty_money >= 15000) {
+    recs.push({
+      id: "launder", text: `${fmtMoney(p.dirty_money)} sujos no cofre — um alvo apetecível`,
+      action: `Lavar tudo (+${fmtMoney(Math.floor(p.dirty_money * 0.75))})`, run: () => launder(p.dirty_money), can: true,
+    });
+  }
+  const damaged = state.vehicles.filter((v) => v.condition < 50).length;
+  if (damaged) recs.push({ id: "fleet", text: `${damaged} veículo(s) em mau estado`, action: "Abrir Frota", run: () => onNavigate && onNavigate("fleet"), can: true });
+  const lowFuel = state.vehicles.filter((v) => v.fuel_l < v.tank_l * 0.25).length;
+  if (lowFuel) recs.push({ id: "fuel", text: `${lowFuel} veículo(s) quase sem combustível`, action: "Abrir Frota", run: () => onNavigate && onNavigate("fleet"), can: true });
+  const tired = state.employees.filter((e) => e.fatigue > 60).length;
+  if (tired) recs.push({ id: "rest", text: `${tired} funcionário(s) exaustos — vão falhar operações`, action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true });
+  const troubled = state.employees.filter((e) => e.status === "injured" || e.status === "arrested").length;
+  if (troubled) recs.push({ id: "troubled", text: `${troubled} funcionário(s) feridos ou presos`, action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true });
+  const disloyal = state.employees.filter((e) => (e.betrayal_risk || 0) >= 25).length;
+  if (disloyal) recs.push({ id: "loyalty", text: `${disloyal} funcionário(s) com risco de traição`, action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true });
+  const teamsNoVehicle = state.teams.filter((t) => !t.vehicle_id).length;
+  if (teamsNoVehicle) recs.push({ id: "novehicle", text: `${teamsNoVehicle} equipa(s) sem veículo`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
+  const teamsNoMembers = state.teams.filter((t) => state.employees.every((e) => e.team_id !== t.id)).length;
+  if (teamsNoMembers) recs.push({ id: "nomembers", text: `${teamsNoMembers} equipa(s) sem membros`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
+  const claimable = (state.quests || []).filter((q) => q.status === "completed").length;
+  if (claimable) recs.push({ id: "quests", text: `${claimable} recompensa(s) de missão por reclamar`, action: "Abrir Missões", run: () => onNavigate && onNavigate("quests"), can: true });
+
+  return (
+    <div className="mt-4" data-testid="intel-recommendations">
+      <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
+        <Lightbulb size={12} className="text-amber-400" /> Ações recomendadas
+      </h3>
+      {recs.length === 0 ? (
+        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-400">
+          Tudo sob controlo. O império está a funcionar em pleno.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {recs.map((r) => (
+            <div key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+              <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
+              <button
+                data-testid={`intel-rec-action-${r.id}`}
+                onClick={r.run}
+                disabled={!r.can}
+                className="flex shrink-0 items-center gap-1 rounded border border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-cyan-300 transition-colors hover:bg-white/10 disabled:opacity-40"
+              >
+                {r.action} <ArrowRight size={10} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, catalog } = useGame();
   if (!state) return null;
   const s = state.player.stats || {};
@@ -35,6 +99,8 @@ export const IntelPanel = ({ open, onOpenChange }) => {
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Todos os dados do teu império num só lugar.</SheetDescription>
         </SheetHeader>
+
+        <RecommendedActions onNavigate={onNavigate} />
 
         <Section title="Operações" testId="intel-operations">
           <Grid>

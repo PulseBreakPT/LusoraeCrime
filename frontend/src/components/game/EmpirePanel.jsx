@@ -5,14 +5,15 @@ import { fmtMoney } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Building2, Banknote, LogOut, MapPin, Siren } from "lucide-react";
+import { Building2, Banknote, LogOut, MapPin, Siren, LayoutGrid, ChevronRight } from "lucide-react";
 
-export const EmpirePanel = ({ open, onOpenChange }) => {
+export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, launder, bribePolice } = useGame();
   const { logout } = useAuth();
   const [amount, setAmount] = useState("");
   if (!state) return null;
   const p = state.player;
+  const nav = (panel) => onNavigate && onNavigate(panel);
 
   const handleLaunder = async () => {
     const value = parseInt(amount, 10);
@@ -59,6 +60,18 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
           </p>
           <p className="mt-1 text-sm font-semibold text-white">{p.hq.name}</p>
           <p className="font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
+        </div>
+
+        <div className="mt-3">
+          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <LayoutGrid size={12} /> Gestão rápida
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <QuickNav testId="empire-nav-employees" label="Funcionários" value={`${state.caps.employees.used}/${state.caps.employees.max} · ${fmtMoney(state.salary_total || 0)}/ciclo`} onClick={() => nav("employees")} />
+            <QuickNav testId="empire-nav-fleet" label="Frota" value={`${state.caps.vehicles.used}/${state.caps.vehicles.max} veículos`} onClick={() => nav("fleet")} />
+            <QuickNav testId="empire-nav-properties" label="Imóveis" value={`${state.properties.length} propriedades`} onClick={() => nav("properties")} />
+            <QuickNav testId="empire-nav-quests" label="Missões" value={`${(state.quests || []).filter((q) => q.status === "completed").length} por reclamar`} onClick={() => nav("quests")} />
+          </div>
         </div>
 
         <div className="mt-6">
@@ -155,4 +168,17 @@ const StatBox = ({ label, value, accent = "#FFFFFF" }) => (
     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
     <p className="mt-0.5 font-mono text-sm font-bold" style={{ color: accent }}>{value}</p>
   </div>
+);
+
+const QuickNav = ({ testId, label, value, onClick }) => (
+  <button
+    data-testid={testId}
+    onClick={onClick}
+    className="group rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.08]"
+  >
+    <p className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+      {label} <ChevronRight size={11} className="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
+    </p>
+    <p className="mt-0.5 font-mono text-[11px] font-bold text-white">{value}</p>
+  </button>
 );

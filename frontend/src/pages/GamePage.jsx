@@ -59,7 +59,7 @@ export default function GamePage() {
       </button>
       <ActivityFeed />
       <ActivityFeedMobile />
-      {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} />}
+      {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={setOpenPanel} />}
 
       <div
         className="pointer-events-auto absolute left-2 z-30 flex gap-1 md:left-1/2 md:-translate-x-1/2 md:gap-1.5"
@@ -73,13 +73,13 @@ export default function GamePage() {
         <HudButton testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-purple-300" onClick={() => setOpenPanel("properties")} />
       </div>
 
-      <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} />
-      <QuestsPanel open={openPanel === "quests"} onOpenChange={(o) => setOpenPanel(o ? "quests" : null)} />
-      <EmpirePanel open={openPanel === "empire"} onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} />
-      <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} />
-      <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} />
-      <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} />
-      <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} />
+      <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={setOpenPanel} />
+      <QuestsPanel open={openPanel === "quests"} onOpenChange={(o) => setOpenPanel(o ? "quests" : null)} onNavigate={setOpenPanel} />
+      <EmpirePanel open={openPanel === "empire"} onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} onNavigate={setOpenPanel} />
+      <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={setOpenPanel} />
+      <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={setOpenPanel} />
+      <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={setOpenPanel} />
+      <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={setOpenPanel} />
     </div>
   );
 }

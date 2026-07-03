@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, FUEL_LABELS, effectiveSpeed } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown } from "lucide-react";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound } from "lucide-react";
 
 const VStat = ({ label, value }) => (
   <div className="rounded bg-black/40 px-1.5 py-1 text-center">
@@ -12,13 +12,14 @@ const VStat = ({ label, value }) => (
   </div>
 );
 
-export const FleetPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle } = useGame();
+export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
+  const { state, catalog, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, buyProperty } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   if (!state) return null;
   const caps = state.caps.vehicles;
 
   const teamOf = (v) => state.teams.find((t) => t.id === v.team_id);
+  const teamMembers = (teamId) => state.employees.filter((e) => e.team_id === teamId).length;
   const vehicleBusy = (v) => {
     const t = teamOf(v);
     return t && t.status !== "idle";
@@ -94,9 +95,18 @@ export const FleetPanel = ({ open, onOpenChange }) => {
                 >
                   <option value="">Na garagem (sem equipa)</option>
                   {state.teams.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
+                    <option key={t.id} value={t.id}>{`${t.name} · ${teamMembers(t.id)} membros`}</option>
                   ))}
                 </select>
+                {v.team_id && teamMembers(v.team_id) === 0 && (
+                  <button
+                    data-testid={`vehicle-team-empty-${v.id}`}
+                    onClick={() => onNavigate && onNavigate("employees")}
+                    className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
+                  >
+                    <UserRound size={10} /> Equipa sem membros — atribuir no RH
+                  </button>
+                )}
 
                 <div className="mt-2 flex gap-1.5">
                   <button
@@ -182,9 +192,32 @@ export const FleetPanel = ({ open, onOpenChange }) => {
                 );
               })}
           </div>
-          {caps.used >= caps.max && (
-            <p className="mt-2 font-mono text-[10px] text-amber-400">Garagem cheia. Compra uma garagem em Imóveis.</p>
-          )}
+          {caps.used >= caps.max && (() => {
+            const garagem = catalog?.property_types?.garagem;
+            const canBuy = garagem && state.player.level >= garagem.min_level && state.player.clean_money >= garagem.price;
+            return (
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
+                <p className="font-mono text-[10px] text-amber-400">Garagem cheia</p>
+                {canBuy ? (
+                  <button
+                    data-testid="fleet-buy-garage-inline"
+                    onClick={() => buyProperty("garagem")}
+                    className="flex items-center gap-1 rounded border border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 transition-colors hover:bg-white/10"
+                  >
+                    <Warehouse size={10} /> Comprar garagem · {fmtMoney(garagem.price)}
+                  </button>
+                ) : (
+                  <button
+                    data-testid="fleet-nav-properties"
+                    onClick={() => onNavigate && onNavigate("properties")}
+                    className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+                  >
+                    Ver Imóveis
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </SheetContent>
     </Sheet>

@@ -5,7 +5,7 @@ import {
   DIFFICULTY_LABELS, DIFFICULTY_COLORS, CHAPTER_LABELS, QUEST_TYPE_LABELS,
 } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles } from "lucide-react";
+import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles, ArrowRight } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -52,7 +52,13 @@ const ProgressBar = ({ q }) => {
   );
 };
 
-const QuestCard = ({ q, featured, onClose }) => {
+const NAV_BY_CATEGORY = {
+  funcionarios: ["employees", "Abrir RH"],
+  frota: ["fleet", "Abrir Frota"],
+  economia: ["empire", "Abrir Império"],
+};
+
+const QuestCard = ({ q, featured, onClose, onNavigate }) => {
   const { catalog, serverNow, claimQuest, chooseQuest } = useGame();
   const dim = q.status === "claimed" || q.status === "expired";
   const locked = q.status === "locked";
@@ -166,7 +172,7 @@ const TABS = [
   { key: "alertas", label: "Alertas" },
 ];
 
-export const QuestsPanel = ({ open, onOpenChange }) => {
+export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, serverNow } = useGame();
   const [tab, setTab] = useState("historia");
   useTick(open);
@@ -216,7 +222,7 @@ export const QuestsPanel = ({ open, onOpenChange }) => {
 
         {featured && (
           <div className="mt-3" data-testid="quest-featured">
-            <QuestCard q={featured} featured onClose={close} />
+            <QuestCard q={featured} featured onClose={close} onNavigate={onNavigate} />
           </div>
         )}
 
@@ -247,7 +253,7 @@ export const QuestsPanel = ({ open, onOpenChange }) => {
                 </h3>
                 <div className="space-y-2">
                   {qs.map((q) => (
-                    <QuestCard key={q.id || q.quest_key} q={q} onClose={close} />
+                    <QuestCard key={q.id || q.quest_key} q={q} onClose={close} onNavigate={onNavigate} />
                   ))}
                 </div>
               </div>
@@ -263,7 +269,7 @@ export const QuestsPanel = ({ open, onOpenChange }) => {
             <div className="space-y-2">
               {dailies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Sem missões diárias de momento.</p>}
               {dailies.map((q) => (
-                <QuestCard key={q.id} q={q} onClose={close} />
+                <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
               ))}
             </div>
           </div>
@@ -277,7 +283,7 @@ export const QuestsPanel = ({ open, onOpenChange }) => {
             <div className="space-y-2">
               {weeklies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Sem missões semanais de momento.</p>}
               {weeklies.map((q) => (
-                <QuestCard key={q.id} q={q} onClose={close} />
+                <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
               ))}
             </div>
           </div>
@@ -291,7 +297,7 @@ export const QuestsPanel = ({ open, onOpenChange }) => {
               </p>
             )}
             {alerts.map((q) => (
-              <QuestCard key={q.id} q={q} onClose={close} />
+              <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
             ))}
           </div>
         )}

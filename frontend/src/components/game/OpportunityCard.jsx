@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Button } from "../ui/button";
-import { X, Clock, TrendingUp, AlertTriangle, Siren } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard } from "lucide-react";
 
-export const OpportunityCard = ({ opp, onClose }) => {
-  const { state, dispatchTeam, previewDispatch, serverNow } = useGame();
+export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
+  const { state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle } = useGame();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -60,6 +60,28 @@ export const OpportunityCard = ({ opp, onClose }) => {
 
   const anyReady = state.teams.some((t) => readiness(t).ok);
 
+  const fixFor = (t, r) => {
+    const money = state.player.clean_money;
+    const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
+    if (r.reason === "Sem combustível" && vehicle) {
+      const cost = Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]);
+      return { icon: Fuel, label: fmtMoney(cost), color: "text-amber-400", can: money >= cost, run: () => refuelVehicle(vehicle.id) };
+    }
+    if (r.reason === "Veículo avariado" && vehicle) {
+      const cost = Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002));
+      return { icon: Wrench, label: fmtMoney(cost), color: "text-emerald-400", can: money >= cost, run: () => repairVehicle(vehicle.id) };
+    }
+    if (r.reason === "Sem veículo") {
+      const free = state.vehicles.filter((v) => !v.team_id);
+      if (free.length) return { icon: Car, label: free[0].name, color: "text-cyan-400", can: true, run: () => assignVehicle(free[0].id, t.id) };
+      return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
+    }
+    if (r.reason === "Sem membros" || r.reason === "Membros indisponíveis") {
+      return { icon: IdCard, label: "RH", color: "text-emerald-400", can: true, run: () => { onClose(); onNavigate && onNavigate("employees"); } };
+    }
+    return null;
+  };
+
   return (
     <div
       data-testid="opportunity-card"
@@ -96,23 +118,23 @@ export const OpportunityCard = ({ opp, onClose }) => {
         <p className="mt-3 text-center font-mono text-xs text-red-500">Requer nível {opp.min_level}</p>
       ) : (
         <>
-          <div className="mt-3 max-h-32 space-y-1 overflow-y-auto">
+          <div className="mt-3 max-h-36 space-y-1 overflow-y-auto">
             {state.teams.map((t) => {
               const r = readiness(t);
               const match = t.spec === opp.category || opp.category === "especial";
+              const fix = !r.ok ? fixFor(t, r) : null;
               return (
-                <button
+                <div
                   key={t.id}
                   data-testid={`select-team-${t.id}`}
                   onClick={() => r.ok && setSelectedTeamId(t.id)}
-                  disabled={!r.ok}
-                  className={`flex w-full items-center justify-between rounded-md border px-2.5 py-1.5 text-left transition-colors ${
+                  className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors ${
                     selectedTeamId === t.id
                       ? "border-white/40 bg-white/10"
                       : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
-                  } ${!r.ok ? "opacity-45" : ""}`}
+                  } ${r.ok ? "cursor-pointer" : ""}`}
                 >
-                  <div>
+                  <div className={r.ok ? "" : "opacity-50"}>
                     <p className="text-xs font-semibold text-white">
                       {t.name}
                       {match && <span className="ml-1.5 font-mono text-[9px] uppercase text-emerald-400">match</span>}
@@ -124,9 +146,22 @@ export const OpportunityCard = ({ opp, onClose }) => {
                   {r.ok ? (
                     <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
                   ) : (
-                    <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
+                      {fix && (
+                        <button
+                          data-testid={`fix-team-${t.id}`}
+                          onClick={(ev) => { ev.stopPropagation(); fix.run(); }}
+                          disabled={!fix.can}
+                          title={r.reason}
+                          className={`flex items-center gap-1 rounded border border-white/15 px-1.5 py-1 font-mono text-[9px] font-bold ${fix.color} transition-colors hover:bg-white/10 disabled:opacity-40`}
+                        >
+                          <fix.icon size={10} /> {fix.label}
+                        </button>
+                      )}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
