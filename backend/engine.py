@@ -202,6 +202,57 @@ async def push_history(db, emp_id, text):
     }})
 
 
+# River Tejo shoreline approximation (west→east). A sampled point is on land when its
+# latitude is north of the interpolated shore at that longitude. Coarse but effective.
+_TEJO_SHORE = [
+    (-9.240, 38.690),  # west of Belém
+    (-9.200, 38.694),  # Belém
+    (-9.180, 38.700),  # Alcântara docks
+    (-9.150, 38.703),  # Cais do Sodré waterfront
+    (-9.130, 38.706),  # Terreiro do Paço
+    (-9.110, 38.711),  # Alfama waterfront
+    (-9.100, 38.720),  # Santa Apolónia bend
+    (-9.093, 38.750),  # Marvila / P. das Nações south
+    (-9.093, 38.780),  # P. das Nações north (river ends)
+]
+
+_LISBON_BOUNDS = {"lat_min": 38.685, "lat_max": 38.800, "lng_min": -9.240, "lng_max": -9.085}
+
+
+def is_on_land(lat, lng):
+    """Reject points that fall on the Tejo or outside Lisbon's coarse bounds."""
+    b = _LISBON_BOUNDS
+    if not (b["lat_min"] <= lat <= b["lat_max"] and b["lng_min"] <= lng <= b["lng_max"]):
+        return False
+    # Interpolate the shore latitude at this longitude.
+    pts = _TEJO_SHORE
+    if lng <= pts[0][0]:
+        shore = pts[0][1]
+    elif lng >= pts[-1][0]:
+        shore = pts[-1][1]
+    else:
+        for i in range(1, len(pts)):
+            if lng <= pts[i][0]:
+                x0, y0 = pts[i - 1]
+                x1, y1 = pts[i]
+                t = (lng - x0) / max(1e-9, (x1 - x0))
+                shore = y0 + t * (y1 - y0)
+                break
+    # Give the shore a ~110m buffer so pins don't visually sit at the water's edge.
+    return lat >= shore + 0.0010
+
+
+def _sample_on_land(spot):
+    """Sample a nearby (lat,lng) around a Lisbon spot that stays on land. Falls back to
+    the spot itself if all attempts land in the river."""
+    for _ in range(10):
+        lat = spot["lat"] + random.uniform(-0.008, 0.008)
+        lng = spot["lng"] + random.uniform(-0.010, 0.010)
+        if is_on_land(lat, lng):
+            return lat, lng
+    return spot["lat"], spot["lng"]
+
+
 # ---------------- Oportunidades ----------------
 
 async def spawn_opportunities(db, player, rare_chance=0.0):
@@ -223,11 +274,12 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
         rare = random.random() < rare_chance
         if rare:
             mult *= 2.0
+        lat, lng = _sample_on_land(spot)
         docs.append({
             "player_id": pid, "type_key": key, "name": t["name"],
             "category": t["category"], "district": spot["name"],
-            "lat": spot["lat"] + random.uniform(-0.008, 0.008),
-            "lng": spot["lng"] + random.uniform(-0.010, 0.010),
+            "lat": lat,
+            "lng": lng,
             "reward": int(t["base_reward"] * mult),
             "respect": int(t["respect"] * (1 + 0.15 * (level - 1)) * (1.5 if rare else 1.0)),
             "risk": t["risk"], "heat": t["heat"], "pays": t["pays"], "rare": rare,

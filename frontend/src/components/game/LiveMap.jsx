@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -77,6 +77,15 @@ const PanTo = ({ target }) => {
   useEffect(() => {
     if (target) map.panTo([target.lat, target.lng], { animate: true, duration: 0.6 });
   }, [target, map]);
+  return null;
+};
+
+// Closes the opportunity/mission modal when the user clicks on the map background.
+// Clicks on markers do not propagate to this handler (Leaflet stops them).
+const MapBackgroundClick = ({ onClick }) => {
+  useMapEvents({
+    click: () => { if (onClick) onClick(); },
+  });
   return null;
 };
 
@@ -271,6 +280,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
       />
+      <MapBackgroundClick onClick={() => onSelectOpp(null)} />
       <Marker position={[hq.lat, hq.lng]} icon={hqMarkerIcon} zIndexOffset={400}>
         <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">
           <div className="min-w-[130px]">
