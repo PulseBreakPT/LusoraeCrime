@@ -2,14 +2,15 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Users, Car, UserRound } from "lucide-react";
+import { Users, Car, UserRound, Undo2 } from "lucide-react";
 
 export const TeamsPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, createTeam } = useGame();
+  const { state, catalog, createTeam, recallTeam } = useGame();
   if (!state) return null;
 
   const membersOf = (teamId) => state.employees.filter((e) => e.team_id === teamId);
   const vehicleOf = (team) => state.vehicles.find((v) => v.id === team.vehicle_id);
+  const enRouteMissionOf = (team) => state.missions.find((m) => m.team_id === team.id && m.phase === "en_route");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -25,6 +26,7 @@ export const TeamsPanel = ({ open, onOpenChange }) => {
           {state.teams.map((t) => {
             const members = membersOf(t.id);
             const vehicle = vehicleOf(t);
+            const enRoute = enRouteMissionOf(t);
             return (
               <div key={t.id} data-testid={`team-card-${t.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
@@ -68,6 +70,16 @@ export const TeamsPanel = ({ open, onOpenChange }) => {
                     <span className="text-red-400">Sem veículo — atribui na Frota</span>
                   )}
                 </p>
+
+                {enRoute && (
+                  <button
+                    data-testid={`recall-team-${t.id}`}
+                    onClick={() => recallTeam(enRoute.id)}
+                    className="mt-2 flex w-full items-center justify-center gap-1 rounded border border-amber-500/30 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-amber-400 transition-colors hover:bg-amber-500/10"
+                  >
+                    <Undo2 size={11} /> Chamar de volta ({enRoute.opportunity.name})
+                  </button>
+                )}
               </div>
             );
           })}

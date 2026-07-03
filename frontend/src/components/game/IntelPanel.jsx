@@ -3,8 +3,8 @@ import { fmtMoney, SPEC_LABELS, chanceColor } from "../../lib/game";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { BrainCircuit } from "lucide-react";
 
-const OUTCOME_LABELS = { success: "Sucesso", failure: "Falhou", police: "Polícia" };
-const OUTCOME_COLORS = { success: "#34D399", failure: "#F59E0B", police: "#EF4444" };
+const OUTCOME_LABELS = { success: "Sucesso", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
+const OUTCOME_COLORS = { success: "#34D399", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
 
 export const IntelPanel = ({ open, onOpenChange }) => {
   const { state, catalog } = useGame();

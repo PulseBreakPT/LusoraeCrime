@@ -73,6 +73,10 @@ class VehicleIdInput(BaseModel):
     vehicle_id: str
 
 
+class MissionIdInput(BaseModel):
+    mission_id: str
+
+
 class VehicleAssignInput(BaseModel):
     vehicle_id: str
     team_id: Optional[str] = None
@@ -302,6 +306,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
         "talents": prep["talents"],
+        "opportunity_id": str(opp["_id"]),
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
@@ -327,6 +332,39 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"stats.ops_dispatched": 1}})
     await add_event(db, pid, "dispatch", f"{team['name']} ({len(members)} membros) destacada para {opp['name']} em {opp['district']}.")
     return {"mission_id": str(result.inserted_id)}
+
+
+@router.post("/missions/recall")
+async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    m = await db.missions.find_one({"_id": _oid(body.mission_id, "Missão inválida"), "player_id": pid})
+    if not m:
+        raise HTTPException(status_code=404, detail="Missão não encontrada")
+    if m["phase"] != "en_route":
+        raise HTTPException(status_code=400, detail="Só podes chamar de volta uma equipa que ainda vai a caminho do alvo")
+    now = now_utc()
+    depart = parse_dt(m["depart_at"])
+    arrive = parse_dt(m["arrive_at"])
+    total = max(1.0, (arrive - depart).total_seconds())
+    elapsed = max(1.0, min(total, (now - depart).total_seconds()))
+    t = elapsed / total
+    o, tg = m["origin"], m["target"]
+    turn_point = {"lat": o["lat"] + (tg["lat"] - o["lat"]) * t, "lng": o["lng"] + (tg["lng"] - o["lng"]) * t}
+    ret = now + timedelta(seconds=elapsed)
+    await db.missions.update_one({"_id": m["_id"]}, {"$set": {
+        "phase": "returning", "outcome": "recalled",
+        "target": turn_point, "arrive_at": now.isoformat(), "finish_at": now.isoformat(),
+        "return_at": ret.isoformat(),
+    }})
+    await db.teams.update_one({"_id": ObjectId(m["team_id"])}, {"$set": {"status": "returning"}})
+    if m.get("opportunity_id"):
+        await db.opportunities.update_one(
+            {"_id": ObjectId(m["opportunity_id"]), "status": "taken", "expires_at": {"$gt": now.isoformat()}},
+            {"$set": {"status": "active"}},
+        )
+    await add_event(db, pid, "team", f"{m['team_name']} foi chamada de volta à base sem completar {m['opportunity']['name']}.")
+    return {"ok": True, "return_at": ret.isoformat()}
 
 
 @router.post("/teams/create")

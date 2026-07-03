@@ -55,6 +55,7 @@ export function GameProvider({ children }) {
 
   const dispatchTeam = (opportunityId, teamId) =>
     action("dispatch", { opportunity_id: opportunityId, team_id: teamId }, "Equipa destacada");
+  const recallTeam = (missionId) => action("missions/recall", { mission_id: missionId }, "Equipa chamada de volta");
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
       const { data } = await axios.post(
@@ -107,6 +108,7 @@ export function GameProvider({ children }) {
     <GameContext.Provider
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
+        recallTeam,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
         promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,

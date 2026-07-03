@@ -156,6 +156,8 @@ class Mission(BaseDocument):
     spec_match: bool
     member_ids: List[str] = []
     vehicle_id: Optional[str] = None
+    opportunity_id: Optional[str] = None
+    talents: List[str] = []
     opportunity: dict
     origin: dict
     target: dict
