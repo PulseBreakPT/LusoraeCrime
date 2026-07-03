@@ -8,7 +8,7 @@ reverse-proxy de `/api`, com HTTPS automático via Let's Encrypt).
 **[HOSTINGER.md](./HOSTINGER.md)** — deploy num VPS Ubuntu em 3 comandos.
 
 ```bash
-git clone https://github.com/PulseBreakPT/LusoraeCrime.git lusoraecrime-app
+git clone git@github.com:PulseBreakPT/LusoraeCrime.git lusoraecrime-app
 cd lusoraecrime-app
 sudo bash deploy/hostinger-setup.sh
 ```
