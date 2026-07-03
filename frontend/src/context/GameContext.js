@@ -76,15 +76,18 @@ export function GameProvider({ children }) {
   const healEmployee = (employeeId) => action("employees/heal", { employee_id: employeeId }, "Tratamento pago");
   const releaseEmployee = (employeeId) => action("employees/release", { employee_id: employeeId }, "Libertado");
   const fireEmployee = (employeeId) => action("employees/fire", { employee_id: employeeId }, "Despedido");
+  const renameEmployee = (employeeId, name) => action("employees/rename", { employee_id: employeeId, name }, "Renomeado");
   const buyVehicle = (modelKey) => action("vehicles/buy", { model_key: modelKey }, "Veículo adquirido");
   const sellVehicle = (vehicleId) => action("vehicles/sell", { vehicle_id: vehicleId }, "Veículo abatido");
   const refuelVehicle = (vehicleId) => action("vehicles/refuel", { vehicle_id: vehicleId }, "Depósito cheio");
   const repairVehicle = (vehicleId) => action("vehicles/repair", { vehicle_id: vehicleId }, "Veículo reparado");
   const assignVehicle = (vehicleId, teamId) =>
     action("vehicles/assign", { vehicle_id: vehicleId, team_id: teamId }, teamId ? "Veículo atribuído" : "Veículo na garagem");
+  const renameVehicle = (vehicleId, name) => action("vehicles/rename", { vehicle_id: vehicleId, name }, "Veículo renomeado");
   const buyProperty = (typeKey) => action("properties/buy", { type_key: typeKey }, "Propriedade comprada");
   const sellProperty = (propertyId) => action("properties/sell", { property_id: propertyId }, "Propriedade vendida");
   const upgradeProperty = (propertyId) => action("properties/upgrade", { property_id: propertyId }, "Propriedade melhorada");
+  const renameProperty = (propertyId, name) => action("properties/rename", { property_id: propertyId, name }, "Propriedade renomeada");
   const bribePolice = () => action("police/bribe", {}, "Suborno pago");
   const launder = (amount) => action("launder", { amount }, "Dinheiro lavado");
   const claimQuest = useCallback(async (questId) => {
@@ -105,9 +108,9 @@ export function GameProvider({ children }) {
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
         recallTeam,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
-        promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee,
-        buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
-        buyProperty, sellProperty, upgradeProperty, bribePolice, launder,
+        promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
+        buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle,
+        buyProperty, sellProperty, upgradeProperty, renameProperty, bribePolice, launder,
         claimQuest, chooseQuest,
       }}
     >

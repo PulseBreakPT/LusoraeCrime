@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, FUEL_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote } from "lucide-react";
@@ -14,7 +14,7 @@ const VStat = ({ label, value }) => (
 );
 
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, buyProperty } = useGame();
+  const { state, catalog, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle, buyProperty } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   if (!state) return null;
   const caps = state.caps.vehicles;
@@ -69,8 +69,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             return (
               <div key={v.id} data-testid={`vehicle-card-${v.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-white">{v.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <InlineRename
+                      testId={`vehicle-rename-${v.id}`} value={v.name} onSave={(name) => renameVehicle(v.id, name)}
+                      textClassName="text-sm font-bold text-white"
+                    />
                     <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       {v.speed} m/s · {FUEL_LABELS[v.fuel_type]} · {Math.round(v.km_total)} km ·{" "}
                       <Tip tip={`Autonomia com o combustível atual (${v.fuel_l.toFixed(0)}L, consumo ${v.cons}L/100km). As viagens são ida e volta a partir do QG.`}>
