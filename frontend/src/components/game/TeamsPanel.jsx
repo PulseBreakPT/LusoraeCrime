@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
+import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -8,10 +9,30 @@ import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, 
 export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, createTeam, recallTeam, assignEmployee, assignVehicle,
-    refuelVehicle, repairVehicle, restEmployee, dispatchTeam,
+    refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
   } = useGame();
+  const [recommendations, setRecommendations] = useState({});
+
+  // Para cada equipa pronta, pergunta ao servidor qual é a melhor oportunidade
+  // que ela consegue mesmo cumprir (nunca uma abaixo dos requisitos mínimos).
+  // Só volta a perguntar quando o conjunto de equipas prontas ou o número de
+  // oportunidades disponíveis muda — não a cada refrescamento de 4s.
+  const readyIds = state ? state.teams.filter((t) => t.status === "idle").map((t) => t.id) : [];
+  const recomputeKey = `${readyIds.join(",")}|${state?.opportunities?.length || 0}|${state?.player?.heat || 0}`;
+  useEffect(() => {
+    if (!state || readyIds.length === 0) return;
+    let cancelled = false;
+    Promise.all(readyIds.map((id) => recommendOpportunityForTeam(id).then((r) => [id, r.ok ? r.data : null])))
+      .then((pairs) => {
+        if (!cancelled) setRecommendations(Object.fromEntries(pairs));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recomputeKey, recommendOpportunityForTeam]);
+
   if (!state) return null;
   const money = state.player.clean_money;
+  const teamMaxMembers = catalog?.team_max_members || 4;
 
   const membersOf = (teamId) => state.employees.filter((e) => e.team_id === teamId);
   const vehicleOf = (team) => state.vehicles.find((v) => v.id === team.vehicle_id);
@@ -29,16 +50,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
     if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
     return { ok: true, ready: ready.length };
-  };
-
-  const bestOppFor = (t) => {
-    if (state.player.heat >= 90) return null;
-    const opps = state.opportunities.filter((o) => o.status !== "taken" && state.player.level >= o.min_level);
-    if (!opps.length) return null;
-    const scored = opps
-      .map((o) => ({ o, score: o.reward * (o.category === t.spec || o.category === "especial" ? 1.5 : 1) }))
-      .sort((a, b) => b.score - a.score);
-    return scored[0].o;
   };
 
   return (
@@ -78,7 +89,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             const vehicle = vehicleOf(t);
             const enRoute = enRouteMissionOf(t);
             const r = readiness(t, members, vehicle);
-            const best = r.ok ? bestOppFor(t) : null;
+            const rec = r.ok ? recommendations[t.id] : null;
+            const best = rec?.opportunity_id ? state.opportunities.find((o) => o.id === rec.opportunity_id) : null;
+            const vehicleSeats = vehicle ? catalog?.vehicle_models?.[vehicle.model_key]?.seats : null;
             const fuelPct = vehicle ? (vehicle.fuel_l / vehicle.tank_l) * 100 : 0;
             const refuelCost = vehicle ? Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]) : 0;
             const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
@@ -118,6 +131,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 <div className="mt-2 flex items-start gap-1.5">
                   <UserRound size={12} className="mt-1 shrink-0 text-zinc-500" />
                   <div className="min-w-0 flex-1">
+                    <Tip tip={`Membros atuais na equipa vs. capacidade máxima (${teamMaxMembers}).`}>
+                      <span data-testid={`team-members-cap-${t.id}`} className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                        Membros: <span className={members.length >= teamMaxMembers ? "text-amber-400" : "text-zinc-300"}>{members.length}/{teamMaxMembers}</span>
+                      </span>
+                    </Tip>
                     {members.length === 0 && freeEmployees.length === 0 ? (
                       <button
                         data-testid={`team-nav-rh-${t.id}`}
@@ -153,7 +171,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                             )}
                           </span>
                         ))}
-                        {freeEmployees.length > 0 && (
+                        {freeEmployees.length > 0 && members.length < teamMaxMembers && (
                           <select
                             data-testid={`team-add-member-${t.id}`}
                             value=""
@@ -167,6 +185,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                               </option>
                             ))}
                           </select>
+                        )}
+                        {freeEmployees.length > 0 && members.length >= teamMaxMembers && (
+                          <span className="font-mono text-[9px] text-zinc-600">equipa cheia</span>
                         )}
                       </div>
                     )}
@@ -196,6 +217,16 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     </select>
                   ) : (
                     <span className="font-mono text-[11px] text-zinc-400">{vehicle ? vehicle.name : "Sem veículo"}</span>
+                  )}
+                  {vehicle && vehicleSeats != null && (
+                    <Tip tip={`Lugares ocupados pela equipa vs. capacidade do veículo (${vehicleSeats}). Só informativo — não impede o despacho.`}>
+                      <span
+                        data-testid={`team-vehicle-seats-${t.id}`}
+                        className={`shrink-0 font-mono text-[9px] ${members.length > vehicleSeats ? "text-amber-400" : "text-zinc-500"}`}
+                      >
+                        {members.length}/{vehicleSeats} lugares
+                      </span>
+                    </Tip>
                   )}
                   {!vehicle && freeVehicles.length === 0 && (
                     <button
@@ -255,14 +286,19 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   </div>
                 )}
 
-                {best && (
-                  <Tip tip={`Melhor alvo para esta equipa neste momento (recompensa × compatibilidade): ${best.name}, risco ${best.risk}/5, +${best.respect} respeito.`} block>
+                {best && rec && (
+                  <Tip
+                    tip={`Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`}
+                    block
+                  >
                     <button
                       data-testid={`team-dispatch-best-${t.id}`}
                       onClick={() => dispatchTeam(best.id, t.id)}
-                      className="mt-2 flex w-full items-center justify-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-red-400 transition-colors hover:bg-red-500/20"
+                      className="mt-2 flex w-full items-center justify-center gap-1 rounded border border-green-500/30 bg-green-500/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-green-400 transition-colors hover:bg-green-500/20"
                     >
-                      <Zap size={11} /> Despachar → {best.name} ({fmtMoney(best.reward)})
+                      <Zap size={11} /> Despachar → {best.name}
+                      <span style={{ color: chanceColor(rec.chance) }}>({Math.round(rec.chance * 100)}%)</span>
+                      <span className="text-zinc-500">· {fmtMoney(rec.reward)}</span>
                     </button>
                   </Tip>
                 )}

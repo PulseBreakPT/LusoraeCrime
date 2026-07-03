@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import {
-  fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS,
+  fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, STATUS_LABELS,
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
 } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
-  HeartPulse, ShieldCheck, BatteryMedium, UserCheck,
+  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -86,6 +86,17 @@ const EmployeeCard = ({ e }) => {
   const untilIso = e.status === "training" ? e.training?.ends_at : e.status_until;
   const remaining = untilIso ? Math.max(0, (Date.parse(untilIso) - serverNow()) / 1000) : null;
 
+  const team = e.team_id ? state.teams.find((t) => t.id === e.team_id) : null;
+  const vehicle = team?.vehicle_id ? state.vehicles.find((v) => v.id === team.vehicle_id) : null;
+  const mission = e.status === "on_mission" && team ? state.missions.find((m) => m.team_id === team.id) : null;
+  let missionEtaS = null;
+  let missionPhaseLabel = "";
+  if (mission) {
+    const nextAt = mission.phase === "en_route" ? mission.arrive_at : mission.phase === "operating" ? mission.finish_at : mission.return_at;
+    missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
+    missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
+  }
+
   const rankIdx = Math.max(0, catalog.ranks.indexOf(e.rank));
   const isTopRank = rankIdx >= catalog.ranks.length - 1;
   const nextRankReq = isTopRank ? null : catalog.rank_req_level[rankIdx + 1];
@@ -117,14 +128,17 @@ const EmployeeCard = ({ e }) => {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <RarityBadge rarity={e.rarity} rar={rar} />
-          <Tip tip={EMP_STATUS_TIPS[e.status]} align="end">
+          <Tip
+            tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · termina em ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
+            align="end"
+          >
             <span
               data-testid={`employee-status-${e.id}`}
-              className="rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase"
+              className="rounded-full px-2 py-0.5 text-right font-mono text-[9px] font-bold uppercase"
               style={{ color: EMP_STATUS_COLORS[e.status], background: `${EMP_STATUS_COLORS[e.status]}1a` }}
             >
-              {EMP_STATUS_LABELS[e.status] || e.status}
-              {remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
+              {mission ? mission.opportunity?.name || EMP_STATUS_LABELS[e.status] : EMP_STATUS_LABELS[e.status] || e.status}
+              {mission ? <> · {fmtDuration(missionEtaS)}</> : remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
             </span>
           </Tip>
         </div>
@@ -198,6 +212,13 @@ const EmployeeCard = ({ e }) => {
           <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
         </Tip>
       </div>
+      {vehicle && (
+        <Tip tip={`Veículo atribuído à equipa ${team.name}: ${vehicle.name}.`}>
+          <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-500">
+            <Car size={10} className="shrink-0 text-cyan-400" /> {vehicle.name}
+          </p>
+        </Tip>
+      )}
 
       {e.status === "injured" && (
         <div className="mt-2">

@@ -42,7 +42,11 @@ export function GameProvider({ children }) {
       try {
         const { data } = await api.post(`/game/${path}`, payload);
         if (successMsg) toast.success(successMsg);
-        await refresh();
+        // Não esperamos pelo refresh completo do estado para responder ao
+        // utilizador — isso fazia os botões parecerem lentos (dois pedidos
+        // de rede em série). O polling de 4s e este refresh em segundo plano
+        // já mantêm o estado atualizado a seguir.
+        refresh();
         return { ok: true, data };
       } catch (e) {
         toast.error(formatApiErrorDetail(e.response?.data?.detail) || e.message);
@@ -61,6 +65,22 @@ export function GameProvider({ children }) {
       return { ok: true, data };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  }, []);
+  const recommendOpportunityForTeam = useCallback(async (teamId) => {
+    try {
+      const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId });
+      return { ok: true, data };
+    } catch (e) {
+      return { ok: false };
+    }
+  }, []);
+  const recommendTeamForOpportunity = useCallback(async (opportunityId) => {
+    try {
+      const { data } = await api.post("/game/dispatch/recommend_team", { opportunity_id: opportunityId });
+      return { ok: true, data };
+    } catch (e) {
+      return { ok: false };
     }
   }, []);
   const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
@@ -106,7 +126,7 @@ export function GameProvider({ children }) {
     <GameContext.Provider
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
-        recallTeam,
+        recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
         promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle,

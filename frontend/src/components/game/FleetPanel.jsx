@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, FUEL_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
+import { fmtMoney, fmtDuration, FUEL_LABELS, STATUS_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -14,17 +14,19 @@ const VStat = ({ label, value }) => (
 );
 
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle, buyProperty } = useGame();
+  const { state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle, buyProperty } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   if (!state) return null;
   const caps = state.caps.vehicles;
 
   const teamOf = (v) => state.teams.find((t) => t.id === v.team_id);
-  const teamMembers = (teamId) => state.employees.filter((e) => e.team_id === teamId).length;
+  const teamMembersList = (teamId) => state.employees.filter((e) => e.team_id === teamId);
+  const teamMembers = (teamId) => teamMembersList(teamId).length;
   const vehicleBusy = (v) => {
     const t = teamOf(v);
     return t && t.status !== "idle";
   };
+  const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -59,7 +61,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-4 space-y-2" data-testid="fleet-list">
           {state.vehicles.map((v) => {
+            const team = teamOf(v);
+            const members = team ? teamMembersList(team.id) : [];
             const busy = vehicleBusy(v);
+            const mission = busy ? missionOf(team) : null;
+            const seats = catalog?.vehicle_models?.[v.model_key]?.seats;
             const fuelPct = (v.fuel_l / v.tank_l) * 100;
             const refuelCost = Math.ceil((v.tank_l - v.fuel_l) * state.fuel_prices[v.fuel_type]);
             const repairCost = Math.max(50, Math.round((100 - v.condition) * v.price * 0.002));
@@ -68,6 +74,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             const speedReduced = effSpeed < v.speed - 0.05;
             const modelName = catalog?.vehicle_models?.[v.model_key]?.name || v.model_key;
             const renamed = v.name !== modelName;
+            let missionEtaS = null;
+            let missionPhaseLabel = "";
+            if (mission) {
+              const nextAt = mission.phase === "en_route" ? mission.arrive_at : mission.phase === "operating" ? mission.finish_at : mission.return_at;
+              missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
+              missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
+            }
             return (
               <div key={v.id} data-testid={`vehicle-card-${v.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
@@ -90,14 +103,35 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Tip tip={`Autonomia com o combustível atual (${v.fuel_l.toFixed(0)}L, consumo ${v.cons}L/100km). As viagens são ida e volta a partir do QG.`}>
                         <span className="text-cyan-400">~{Math.round(vehicleRangeKm(v))} km rest.</span>
                       </Tip>
+                      {seats != null && (
+                        <>
+                          {" · "}
+                          <Tip tip={`Lugares ocupados pela equipa atribuída vs. capacidade do veículo (${seats}).`}>
+                            <span className={members.length > seats ? "text-amber-400" : "text-zinc-500"}>{members.length}/{seats} lugares</span>
+                          </Tip>
+                        </>
+                      )}
                     </p>
                   </div>
-                  {busy && (
-                    <Tip tip="Este veículo está atribuído a uma equipa em operação — fica disponível quando ela regressar." align="end">
-                      <span className="rounded-full bg-red-600/20 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-red-400">Em missão</span>
+                  {busy && mission && (
+                    <Tip tip={`${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · termina em ${fmtDuration(missionEtaS)}. Fica disponível quando a equipa regressar ao QG.`} align="end">
+                      <span data-testid={`vehicle-mission-badge-${v.id}`} className="rounded-full bg-red-600/20 px-2 py-0.5 text-right font-mono text-[10px] font-bold uppercase text-red-400">
+                        {mission.opportunity?.name || "Em missão"}
+                        <br />
+                        <span className="font-normal normal-case text-red-300/80">{missionPhaseLabel} · {fmtDuration(missionEtaS)}</span>
+                      </span>
                     </Tip>
                   )}
                 </div>
+                {team && (
+                  <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-400">
+                    <UserRound size={10} className="shrink-0 text-zinc-500" />
+                    {team.name}
+                    {members.length > 0 && (
+                      <span className="text-zinc-500">· {members.map((m) => m.name.split(" ")[0]).join(", ")}</span>
+                    )}
+                  </p>
+                )}
                 {speedReduced && (
                   <p className="mt-1 font-mono text-[10px] text-amber-400">
                     Velocidade reduzida para {effSpeed.toFixed(1)} m/s — repara o veículo
