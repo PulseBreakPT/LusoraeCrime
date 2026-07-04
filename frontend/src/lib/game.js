@@ -307,8 +307,18 @@ export function haversineM(lat1, lng1, lat2, lng2) {
 export function fmtDuration(seconds) {
   const s = Math.max(0, Math.round(seconds));
   if (!displayPrefs.showSeconds) {
+    if (s >= 3600) {
+      const h = Math.floor(s / 3600);
+      const m = Math.round((s % 3600) / 60);
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
     const m = Math.max(1, Math.round(s / 60));
     return `${m}m`;
+  }
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
   }
   const m = Math.floor(s / 60);
   const r = s % 60;
