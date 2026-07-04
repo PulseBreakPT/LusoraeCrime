@@ -71,7 +71,6 @@ export const ResourceBar = () => {
         />
         <Stat
           testId="stat-respect" icon={Trophy} color="#0A84FF" label="Respeito" value={<AnimatedNumber value={p.respect} />}
-          sub={nextRespect ? `nível ${p.level + 1} aos ${nextRespect}` : "máx."}
           tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."
         />
         <Tip tip={`Calor policial: ${hs.label}. ${hs.desc} Baixa naturalmente com o tempo ou com subornos no Império.`} side="bottom" className="min-w-0">
