@@ -1304,3 +1304,92 @@ class TestRefuelDuration:
                 assert v3["fuel_l"] == v3["tank_l"]
                 return
         pytest.fail("refuel did not complete within the expected window")
+
+
+# ---------------- Conteúdo novo: 50 missões, 10 funcionários, 5 veículos, 5 imóveis, 50 quests ----------------
+class TestNewOpportunityContent:
+    def test_catalog_exposes_at_least_67_opportunity_types(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        types = r.json()["opportunity_types"]
+        assert len(types) >= 67
+        # amostra de tipos novos, um por categoria
+        for key in ("assalto_museu", "porto_franco", "guerra_cibernetica", "golpe_estado_local", "golpe_banco_central"):
+            assert key in types, key
+
+    def test_new_opportunity_types_expose_full_schema(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        types = r.json()["opportunity_types"]
+        for key in ("roubo_joalharia", "entrega_local", "phishing_bancario", "boato_rua", "roubo_obra_arte"):
+            t = types[key]
+            assert t["category"] in ("assalto", "logistica", "tecnica", "influencia", "especial")
+            assert 1 <= t["min_level"] <= 5
+            assert t["pays"] in ("clean", "dirty")
+
+
+class TestNewEmployeeContent:
+    def test_catalog_exposes_new_specializations(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        specs = r.json()["specializations"]
+        for role in ("franco_atirador", "arrombador", "piloto", "estafeta", "engenheiro_social",
+                     "criptografo", "relacoes_publicas", "chantagista", "quimico", "recrutador"):
+            assert role in specs, role
+
+
+class TestNewVehicleContent:
+    def test_catalog_exposes_new_vehicle_models(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        models = r.json()["vehicle_models"]
+        for key in ("carrinha_entrega", "berlina_blindada", "buggy_todo_terreno", "limousine", "carro_furtivo"):
+            assert key in models, key
+            assert models[key]["seats"] >= 1
+
+    def test_buy_new_vehicle_model(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/vehicles/buy", json={"model_key": "carrinha_entrega"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st = get_state(s)
+        assert any(v["model_key"] == "carrinha_entrega" for v in st["vehicles"])
+
+
+class TestNewPropertyContent:
+    def test_catalog_exposes_new_property_types(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        props = r.json()["property_types"]
+        for key in ("posto_vigilancia", "escritorio_advocacia", "arsenal", "casa_cambio", "centro_logistico"):
+            assert key in props, key
+
+    def test_buy_new_property_type(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "posto_vigilancia"}, timeout=TIMEOUT)
+        # posto_vigilancia exige nível 2 — uma conta nova (nível 1) é bloqueada.
+        assert r.status_code == 400
+        assert "nível" in r.json()["detail"].lower()
+
+
+class TestNewQuestContent:
+    def test_fresh_account_sees_chapter_5_and_6_as_locked(self):
+        s, _ = register_new()
+        st = get_state(s)
+        keys = {q["quest_key"] for q in st["quests"]}
+        assert "c5_fleet5" in keys
+        assert "c6_level10" in keys
+        c5 = next(q for q in st["quests"] if q["quest_key"] == "c5_fleet5")
+        c6 = next(q for q in st["quests"] if q["quest_key"] == "c6_level10")
+        assert c5["status"] == "locked"
+        assert c6["status"] == "locked"
+        assert c5["chapter"] == 5
+        assert c6["chapter"] == 6
+
+    def test_daily_and_weekly_quests_come_from_the_expanded_pool(self):
+        s, _ = register_new()
+        st = get_state(s)
+        daily = [q for q in st["quests"] if q["type"] == "diaria" and q["status"] == "active"]
+        weekly = [q for q in st["quests"] if q["type"] == "semanal" and q["status"] == "active"]
+        assert len(daily) == 3
+        assert len(weekly) == 2

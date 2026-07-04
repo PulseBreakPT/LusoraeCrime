@@ -33,6 +33,66 @@ export const TYPE_ICONS = {
   suborno_oficial: Landmark,
   rota_internacional: Globe,
   ciberataque_bancario: CreditCard,
+
+  // Assalto
+  roubo_joalharia: Crosshair,
+  assalto_licorista: Car,
+  roubo_carga: Swords,
+  assalto_penhores: Target,
+  assalto_blindado: Crosshair,
+  emboscada_rival: Car,
+  assalto_casino: Swords,
+  sequestro_relampago: Target,
+  assalto_museu: Crosshair,
+  guerra_territorio: Car,
+
+  // Logística
+  entrega_local: Package,
+  recolha_mercadoria: Truck,
+  transporte_armas: Zap,
+  rota_costeira: Globe,
+  contrabando_tabaco: Package,
+  frota_fantasma: Truck,
+  rota_alfandega: Zap,
+  carga_diplomatica: Globe,
+  rede_distribuicao: Package,
+  porto_franco: Truck,
+
+  // Técnica
+  phishing_bancario: Terminal,
+  clonagem_cartoes: Eye,
+  hack_semaforos: CreditCard,
+  fraude_criptomoedas: Terminal,
+  invasao_servidor: Eye,
+  ciberespionagem: CreditCard,
+  ataque_ddos: Terminal,
+  roubo_dados: Eye,
+  sabotagem_industrial: CreditCard,
+  guerra_cibernetica: Terminal,
+
+  // Influência
+  protecao_comercio: HandCoins,
+  boato_rua: Banknote,
+  suborno_funcionario: Landmark,
+  chantagem_politico: HandCoins,
+  lavagem_casino: Banknote,
+  infiltracao_sindicato: Landmark,
+  acordo_autarca: HandCoins,
+  campanha_difamacao: Banknote,
+  controlo_imprensa: Landmark,
+  golpe_estado_local: HandCoins,
+
+  // Especial
+  roubo_obra_arte: Star,
+  operacao_encoberta: Crown,
+  resgate_refem: VenetianMask,
+  leilao_clandestino: Star,
+  venda_armamento: Crown,
+  fuga_prisao: VenetianMask,
+  assassinato_contrato: Star,
+  golpe_banco_central: Crown,
+  trafico_influencia_internacional: VenetianMask,
+  operacao_fantasma: Star,
 };
 
 export const SPEC_LABELS = {
@@ -126,6 +186,8 @@ export const CHAPTER_LABELS = {
   2: "Capítulo 2 — Expansão",
   3: "Capítulo 3 — Organização",
   4: "Capítulo 4 — Domínio",
+  5: "Capítulo 5 — Consolidação",
+  6: "Capítulo 6 — Legado",
 };
 
 export function effectiveSpeed(v) {
