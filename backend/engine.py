@@ -38,10 +38,13 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
                        RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
                        PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
-                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN)
-from quests import process_quests
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN,
+                       FUEL_PRICES, random_employee_name)
+from quests import process_quests, make_instance
+from quests_data import QUEST_DEFS
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
+REST_DURATION_S = 90
 
 
 def now_utc():
@@ -1101,6 +1104,196 @@ async def _refresh_recruitment_pool(db, player, now):
     player["pool_refresh_at"] = (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()
 
 
+async def grant_quest_rewards(db, player, rw):
+    pid = str(player["_id"])
+    now_iso = now_utc().isoformat()
+    parts, inc, sets = [], {}, {}
+    if rw.get("dirty"):
+        inc["dirty_money"] = rw["dirty"]
+        parts.append(f"+{rw['dirty']:,} € sujos")
+    if rw.get("clean"):
+        inc["clean_money"] = inc.get("clean_money", 0) + rw["clean"]
+        parts.append(f"+{rw['clean']:,} € limpos")
+    if rw.get("respect"):
+        inc["respect"] = rw["respect"]
+        parts.append(f"+{rw['respect']} respeito")
+    if rw.get("heat"):
+        sets["heat"] = max(0.0, min(100.0, player["heat"] + rw["heat"]))
+        parts.append(f"{rw['heat']} calor")
+    if rw.get("vehicle"):
+        m = VEHICLE_MODELS[rw["vehicle"]]
+        caps, _ = await get_caps(db, pid)
+        used = await db.vehicles.count_documents({"player_id": pid})
+        if used < caps["vehicles"]:
+            await db.vehicles.insert_one(vehicle_doc(pid, rw["vehicle"], now_iso))
+            parts.append(f"{m['name']} novo na garagem")
+        else:
+            inc["clean_money"] = inc.get("clean_money", 0) + m["price"]
+            parts.append(f"+{m['price']:,} € limpos (garagem cheia)")
+    if rw.get("employee"):
+        er = rw["employee"]
+        role, rarity = er["role"], er["rarity"]
+        caps, _ = await get_caps(db, pid)
+        used = await db.employees.count_documents({"player_id": pid})
+        if used < caps["employees"]:
+            sp = SPECIALIZATIONS[role]
+            await db.employees.insert_one({
+                "player_id": pid, "name": random_employee_name(), "age": random.randint(20, 50),
+                "role_key": role, "spec": sp["spec"], "rarity": rarity,
+                "rank": "recruta", "level": 1, "xp": 0,
+                "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
+                "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
+                "attrs": gen_attrs(role, rarity), "talents": gen_talents(role, rarity),
+                "status": "idle", "status_until": None, "team_id": None, "training": None,
+                "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
+                "hired_at": now_iso,
+            })
+            parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
+        else:
+            fb = er.get("fallback_clean", 10000)
+            inc["clean_money"] = inc.get("clean_money", 0) + fb
+            parts.append(f"+{fb:,} € limpos (sem espaço no esconderijo)")
+    if rw.get("temp_bonus"):
+        tb = rw["temp_bonus"]
+        sets["temp_bonus"] = {"kind": tb["kind"], "pct": tb["pct"],
+                              "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat()}
+        parts.append(f"+{int(tb['pct'] * 100)}% recompensas durante {tb['duration_s'] // 60} min")
+    update = {}
+    if inc:
+        update["$inc"] = inc
+    if sets:
+        update["$set"] = sets
+    if update:
+        await db.players.update_one({"_id": player["_id"]}, update)
+    # Reflete as alterações também no objeto em memória — necessário quando esta
+    # função é chamada a partir do advance() (auto-reclamar missões), que faz um
+    # persist final do estado inteiro do jogador a partir deste dicionário, o que
+    # apagaria silenciosamente o $inc/$set feito diretamente na base de dados.
+    for k, v in inc.items():
+        player[k] = player.get(k, 0) + v
+    player.update(sets)
+    return parts
+
+
+# ---------------- Automatizações ----------------
+
+DEFAULT_SETTINGS = {
+    "auto_repair_enabled": False, "auto_repair_threshold": 30,
+    "auto_refuel_enabled": False, "auto_refuel_threshold": 20,
+    "auto_rest_enabled": False, "auto_rest_threshold": 20,
+    "auto_claim_quests": False,
+}
+
+
+async def _auto_repair_vehicles(db, player, vehicles, teams_by_id, props, bonuses, settings, now):
+    threshold = max(1, min(99, settings.get("auto_repair_threshold", 30)))
+    prop_ranks = property_stack_ranks(props)
+    oficina_pct = PROPERTY_TYPES["oficina"]["repair_discount_pct"]
+    pid = str(player["_id"])
+    for v in vehicles:
+        if v["condition"] >= threshold:
+            continue
+        team = teams_by_id.get(v.get("team_id"))
+        if team and team.get("status") != "idle":
+            continue
+        missing = 100 - v["condition"]
+        if missing < 1:
+            continue
+        discount = min(0.6, sum(
+            oficina_pct * p["level"] * property_condition_factor(p) * property_stack_mult(prop_ranks[p["_id"]])
+            for p in props if p["type_key"] == "oficina" and property_active(p, now)
+        ) + bonuses["repair_discount"])
+        cost = max(50, int(missing * v["price"] * 0.002 * (1 - discount)))
+        if player["clean_money"] < cost:
+            continue
+        player["clean_money"] -= cost
+        player.setdefault("stats", default_stats())["vehicles_repaired"] = \
+            player["stats"].get("vehicles_repaired", 0) + 1
+        await db.vehicles.update_one({"_id": v["_id"]}, {
+            "$set": {"condition": 100.0, "missions_since_repair": 0},
+            "$inc": {"repair_spent_total": cost},
+        })
+        await add_event(db, pid, "vehicle", f"{v['name']} reparado automaticamente por {cost:,} €.")
+        await record_tx(db, pid, "repair", -cost, "clean", player["clean_money"], f"Reparação automática de {v['name']}")
+
+
+async def _auto_refuel_vehicles(db, player, vehicles, teams_by_id, settings, now):
+    threshold = max(1, min(99, settings.get("auto_refuel_threshold", 20)))
+    pid = str(player["_id"])
+    for v in vehicles:
+        if v.get("refueling_until") and parse_dt(v["refueling_until"]) > now:
+            continue
+        fuel_pct = (v["fuel_l"] / v["tank_l"] * 100) if v["tank_l"] > 0 else 100
+        if fuel_pct >= threshold:
+            continue
+        team = teams_by_id.get(v.get("team_id"))
+        if team and team.get("status") != "idle":
+            continue
+        missing = v["tank_l"] - v["fuel_l"]
+        if missing <= 0.1:
+            continue
+        cost = math.ceil(missing * FUEL_PRICES[v["fuel_type"]])
+        if player["clean_money"] < cost:
+            continue
+        duration_s = REFUEL_DURATION_BASE_S + REFUEL_DURATION_PER_L_S * missing
+        until = (now + timedelta(seconds=duration_s)).isoformat()
+        player["clean_money"] -= cost
+        player.setdefault("stats", default_stats())["vehicles_refueled"] = \
+            player["stats"].get("vehicles_refueled", 0) + 1
+        await db.vehicles.update_one({"_id": v["_id"]}, {"$set": {"refueling_until": until}, "$inc": {"fuel_spent_total": cost}})
+        await add_event(db, pid, "vehicle", f"{v['name']} a abastecer automaticamente por {cost:,} € — pronto em {round(duration_s)}s.")
+        await record_tx(db, pid, "refuel", -cost, "clean", player["clean_money"], f"Combustível automático para {v['name']}")
+
+
+async def _auto_rest_employees(db, player, employees, settings, now):
+    threshold = max(1, min(99, settings.get("auto_rest_threshold", 20)))
+    fatigue_floor = 100 - threshold
+    pid = str(player["_id"])
+    for e in employees:
+        if e.get("status") != "idle" or e.get("fatigue", 0) < max(15, fatigue_floor):
+            continue
+        until = (now + timedelta(seconds=REST_DURATION_S)).isoformat()
+        await db.employees.update_one({"_id": e["_id"]}, {"$set": {"status": "resting", "status_until": until}})
+        player.setdefault("stats", default_stats())["employees_rested"] = \
+            player["stats"].get("employees_rested", 0) + 1
+        await add_event(db, pid, "team", f"{e['name']} foi descansar automaticamente.")
+
+
+async def _auto_claim_quests(db, player, now):
+    pid = str(player["_id"])
+    completed = await db.quests.find({"player_id": pid, "status": "completed"}).to_list(50)
+    for q in completed:
+        d = QUEST_DEFS.get(q["quest_key"])
+        if not d:
+            continue
+        parts = await grant_quest_rewards(db, player, d.get("rewards", {}))
+        await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
+        if q["quest_key"] == "c2_front":
+            await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
+            await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
+        msg = f"Recompensa reclamada automaticamente — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada automaticamente."
+        await add_event(db, pid, "success", msg)
+
+
+async def process_automations(db, player, employees, vehicles, props, bonuses, now):
+    settings = {**DEFAULT_SETTINGS, **(player.get("settings") or {})}
+    if not any(settings.get(k) for k in ("auto_repair_enabled", "auto_refuel_enabled", "auto_rest_enabled", "auto_claim_quests")):
+        return
+    teams_by_id = {}
+    if settings.get("auto_repair_enabled") or settings.get("auto_refuel_enabled"):
+        pid = str(player["_id"])
+        teams = await db.teams.find({"player_id": pid}).to_list(50)
+        teams_by_id = {str(t["_id"]): t for t in teams}
+    if settings.get("auto_repair_enabled"):
+        await _auto_repair_vehicles(db, player, vehicles, teams_by_id, props, bonuses, settings, now)
+    if settings.get("auto_refuel_enabled"):
+        await _auto_refuel_vehicles(db, player, vehicles, teams_by_id, settings, now)
+    if settings.get("auto_rest_enabled"):
+        await _auto_rest_employees(db, player, employees, settings, now)
+    if settings.get("auto_claim_quests"):
+        await _auto_claim_quests(db, player, now)
+
+
 # ---------------- Economia passiva / polícia ----------------
 
 def property_active(p, now):
@@ -1290,6 +1483,7 @@ async def advance(db, player):
     await _complete_refuels(db, player, vehicles, now)
     await process_quests(db, player, {"employees": employees, "props": props,
                                       "vehicles": vehicles, "minutes": minutes})
+    await process_automations(db, player, employees, vehicles, props, bonuses, now)
 
     player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 3)
     apply_dirty_money_heat(player, minutes / 60)

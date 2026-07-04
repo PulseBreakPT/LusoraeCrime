@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useAuth } from "./AuthContext";
+import { useSettings } from "./SettingsContext";
 import { formatApiErrorDetail } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
 
@@ -9,12 +10,19 @@ const GameContext = createContext(null);
 
 export function GameProvider({ children }) {
   const { user } = useAuth();
+  const { autoOpenReport, notifications } = useSettings();
   const [state, setState] = useState(null);
   const [catalog, setCatalog] = useState(null);
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
   const prevTeamsRef = useRef(null);
+  const prevEmployeesRef = useRef(null);
+  const prevVehiclesRef = useRef(null);
+  const prevPropertiesRef = useRef(null);
+  const prevOppIdsRef = useRef(null);
+  const payrollWarnedRef = useRef(false);
   const [justReturnedTeamIds, setJustReturnedTeamIds] = useState([]);
+  const [autoOpenReportSignal, setAutoOpenReportSignal] = useState(0);
   const [favoriteTeamIds, setFavoriteTeamIds] = usePersistedState("favTeams", []);
   const [favoriteEmployeeIds, setFavoriteEmployeeIds] = usePersistedState("favEmployees", []);
   const [favoriteVehicleIds, setFavoriteVehicleIds] = usePersistedState("favVehicles", []);
@@ -40,22 +48,87 @@ export function GameProvider({ children }) {
           return prevStatus && prevStatus !== "idle" && t.status === "idle";
         });
         if (returned.length > 0) {
-          returned.forEach((t) => toast.info(`${t.name} regressou e está pronta`));
+          if (notifications?.teamAvailable !== false) {
+            returned.forEach((t) => toast.info(`${t.name} regressou e está pronta`));
+          }
+          if (notifications?.missionCompleted !== false) {
+            returned.forEach((t) => toast.success(`${t.name} concluiu a operação — vê o relatório em Intel.`));
+          }
           setJustReturnedTeamIds((prev) => [...new Set([...prev, ...returned.map((t) => t.id)])]);
           setTimeout(() => {
             const ids = returned.map((t) => t.id);
             setJustReturnedTeamIds((prev) => prev.filter((id) => !ids.includes(id)));
           }, 8000);
+          if (autoOpenReport) setAutoOpenReportSignal((n) => n + 1);
         }
       }
       prevTeamsRef.current = Object.fromEntries(data.teams.map((t) => [t.id, t.status]));
+
+      // Restantes notificações: cada uma deteta a sua própria transição de
+      // estado (comparando com o poll anterior) em vez de partilhar um único
+      // evento genérico — para os interruptores de Definições > Notificações
+      // corresponderem mesmo à coisa que dizem.
+      if (prevEmployeesRef.current) {
+        if (notifications?.employeeExhausted !== false) {
+          data.employees.forEach((e) => {
+            const prevFatigue = prevEmployeesRef.current[e.id];
+            if (prevFatigue != null && prevFatigue < 90 && e.fatigue >= 90) {
+              toast.warning(`${e.name} está exausto — precisa de descansar`);
+            }
+          });
+        }
+      }
+      prevEmployeesRef.current = Object.fromEntries(data.employees.map((e) => [e.id, e.fatigue]));
+
+      if (prevVehiclesRef.current) {
+        data.vehicles.forEach((v) => {
+          const prev = prevVehiclesRef.current[v.id];
+          if (!prev) return;
+          if (notifications?.vehicleBroken !== false && prev.condition >= 20 && v.condition < 20) {
+            toast.warning(`${v.name} está avariado — repara antes de despachar`);
+          }
+          if (notifications?.repairCompleted !== false && prev.condition < 99 && v.condition >= 99.5) {
+            toast.success(`${v.name} foi reparado — condição a 100%`);
+          }
+        });
+      }
+      prevVehiclesRef.current = Object.fromEntries(data.vehicles.map((v) => [v.id, { condition: v.condition }]));
+
+      if (prevPropertiesRef.current && notifications?.constructionCompleted !== false) {
+        data.properties.forEach((p) => {
+          const wasUpgrading = prevPropertiesRef.current[p.id];
+          if (wasUpgrading && !p.upgrading_until) {
+            toast.success(`${p.name} concluiu a melhoria — agora no nível ${p.level}`);
+          }
+        });
+      }
+      prevPropertiesRef.current = Object.fromEntries(data.properties.map((p) => [p.id, !!p.upgrading_until]));
+
+      if (prevOppIdsRef.current && notifications?.rareMissions !== false) {
+        const newRare = data.opportunities.filter((o) => o.rare && !prevOppIdsRef.current.has(o.id));
+        newRare.forEach((o) => toast.success(`Missão rara disponível: ${o.name} em ${o.district}`));
+      }
+      prevOppIdsRef.current = new Set(data.opportunities.map((o) => o.id));
+
+      if (notifications?.payrollDue !== false && data.player.next_payroll_at) {
+        const dueInS = (Date.parse(data.player.next_payroll_at) - Date.parse(data.server_time)) / 1000;
+        if (dueInS <= 300 && (data.salary_total || 0) > 0) {
+          if (!payrollWarnedRef.current) {
+            toast.warning("Salários por pagar em breve — garante que há dinheiro limpo suficiente");
+            payrollWarnedRef.current = true;
+          }
+        } else {
+          payrollWarnedRef.current = false;
+        }
+      }
+
       setState(data);
     } catch (e) {
       // silent poll failure
     } finally {
       fetchingRef.current = false;
     }
-  }, []);
+  }, [notifications, autoOpenReport]);
 
   useEffect(() => {
     if (!user) return;
@@ -156,6 +229,7 @@ export function GameProvider({ children }) {
   const upgradeProperty = (propertyId) => action("properties/upgrade", { property_id: propertyId }, "Melhoria iniciada");
   const renameProperty = (propertyId, name) => action("properties/rename", { property_id: propertyId, name }, "Propriedade renomeada");
   const bribePolice = () => action("police/bribe", {}, "Suborno pago");
+  const updateAutomationSettings = (patch) => action("settings", patch);
   const launder = (amount) => action("launder", { amount }, "Dinheiro lavado");
   const claimQuest = useCallback(async (questId) => {
     const res = await action("quests/claim", { quest_id: questId });
@@ -174,14 +248,14 @@ export function GameProvider({ children }) {
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
         recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity, recommendRepeatForTeam,
-        toggleFavoriteType, justReturnedTeamIds, fetchTransactions,
+        toggleFavoriteType, justReturnedTeamIds, autoOpenReportSignal, fetchTransactions,
         favoriteTeamIds, toggleFavoriteTeam, favoriteEmployeeIds, toggleFavoriteEmployee,
         favoriteVehicleIds, toggleFavoriteVehicle,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
         promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle,
         buyProperty, sellProperty, upgradeProperty, renameProperty, bribePolice, launder,
-        claimQuest, chooseQuest,
+        claimQuest, chooseQuest, updateAutomationSettings,
       }}
     >
       {children}

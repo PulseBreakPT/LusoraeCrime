@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
+import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
@@ -23,9 +24,34 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
     recommendRepeatForTeam, favoriteTeamIds, toggleFavoriteTeam, justReturnedTeamIds,
   } = useGame();
+  const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
   const [repeatRecs, setRepeatRecs] = useState({});
   useTick(open);
+
+  // Equipas sem veículo recebem automaticamente o melhor disponível (o que
+  // combina com a especialização, senão o de melhor condição) — só quando a
+  // definição está ligada, para não lutar contra uma remoção manual do jogador.
+  useEffect(() => {
+    if (!autoSelectBestVehicle || !state) return;
+    const withoutVehicle = state.teams.filter((t) => t.status === "idle" && !t.vehicle_id);
+    if (withoutVehicle.length === 0) return;
+    const assignedIds = new Set(state.teams.map((t) => t.vehicle_id).filter(Boolean));
+    const pool = state.vehicles.filter((v) => !assignedIds.has(v.id));
+    withoutVehicle.forEach((t) => {
+      const candidates = pool.filter((v) => !assignedIds.has(v.id));
+      if (candidates.length === 0) return;
+      const best = [...candidates].sort((a, b) => {
+        const idealA = catalog?.vehicle_models?.[a.model_key]?.best_for?.includes(t.spec) ? 1 : 0;
+        const idealB = catalog?.vehicle_models?.[b.model_key]?.best_for?.includes(t.spec) ? 1 : 0;
+        if (idealA !== idealB) return idealB - idealA;
+        return b.condition - a.condition;
+      })[0];
+      assignedIds.add(best.id);
+      assignVehicle(best.id, t.id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSelectBestVehicle, state?.teams, state?.vehicles, catalog]);
 
   // Para cada equipa pronta, pergunta ao servidor qual é a melhor oportunidade
   // que ela consegue mesmo cumprir (nunca uma abaixo dos requisitos mínimos).
@@ -47,6 +73,22 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recomputeKey, recommendOpportunityForTeam, recommendRepeatForTeam]);
+
+  const { repeatLastConfig } = useSettings();
+  // Repetir automaticamente: assim que uma equipa fica pronta e há uma
+  // sugestão de repetição válida, despacha sem esperar por um clique — a
+  // equipa deixa de estar "idle" assim que despachada, o que naturalmente
+  // impede repetir o mesmo despacho duas vezes.
+  useEffect(() => {
+    if (!repeatLastConfig || !state) return;
+    readyIds.forEach((id) => {
+      const rec = repeatRecs[id];
+      if (!rec?.opportunity_id) return;
+      const opp = state.opportunities.find((o) => o.id === rec.opportunity_id);
+      if (opp) dispatchTeam(opp.id, id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repeatLastConfig, repeatRecs]);
 
   if (!state) return null;
   const money = state.player.clean_money;

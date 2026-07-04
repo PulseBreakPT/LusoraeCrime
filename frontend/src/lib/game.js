@@ -4,6 +4,31 @@ import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMa
 // mesmo laranja já usado no resto do site (heatStatus "Alerta", feridos, etc.).
 export const NOTIFY_COLOR = "#F97316";
 
+// Preferências de exibição (Definições > Interface) — estado global simples em
+// vez de prop-drilling, porque fmtMoney/fmtDuration são chamadas de dezenas de
+// sítios diferentes em toda a interface.
+const DISPLAY_PREFS_KEY = "lusorae.ui.displayPrefs";
+let displayPrefs = { compactNumbers: false, showSeconds: true };
+try {
+  const raw = window.localStorage.getItem(DISPLAY_PREFS_KEY);
+  if (raw) displayPrefs = { ...displayPrefs, ...JSON.parse(raw) };
+} catch (e) {
+  // armazenamento indisponível — usa os valores por omissão
+}
+
+export function getDisplayPrefs() {
+  return displayPrefs;
+}
+
+export function setDisplayPrefs(next) {
+  displayPrefs = { ...displayPrefs, ...next };
+  try {
+    window.localStorage.setItem(DISPLAY_PREFS_KEY, JSON.stringify(displayPrefs));
+  } catch (e) {
+    // ignora silenciosamente
+  }
+}
+
 // Compras acima deste valor pedem confirmação em dois passos antes de gastar.
 export const LARGE_PURCHASE_THRESHOLD = 20000;
 
@@ -262,7 +287,11 @@ export const STATUS_COLORS = {
 };
 
 export function fmtMoney(n) {
-  return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 0 }).format(Math.round(n || 0)) + " €";
+  const val = Math.round(n || 0);
+  if (displayPrefs.compactNumbers) {
+    return new Intl.NumberFormat("pt-PT", { notation: "compact", maximumFractionDigits: 1 }).format(val) + " €";
+  }
+  return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 0 }).format(val) + " €";
 }
 
 export function haversineM(lat1, lng1, lat2, lng2) {
@@ -277,6 +306,10 @@ export function haversineM(lat1, lng1, lat2, lng2) {
 
 export function fmtDuration(seconds) {
   const s = Math.max(0, Math.round(seconds));
+  if (!displayPrefs.showSeconds) {
+    const m = Math.max(1, Math.round(s / 60));
+    return `${m}m`;
+  }
   const m = Math.floor(s / 60);
   const r = s % 60;
   return m > 0 ? `${m}m ${r}s` : `${r}s`;
@@ -360,6 +393,26 @@ export function teamsReadiness(state, now = Date.now()) {
     if (ok) ready += 1;
   });
   return { ready, busy, total: teams.length };
+}
+
+// Existe pelo menos uma equipa capaz de despachar para esta oportunidade agora
+// (membros suficientes para o risco, veículo em condições, compatível se exigir
+// um modelo específico)? Usado por "Ocultar missões impossíveis" (Definições).
+export function opportunityReachable(state, opp) {
+  const teams = state?.teams || [];
+  const now = Date.now();
+  return teams.some((t) => {
+    if (t.status !== "idle") return false;
+    if (t.available_at && Date.parse(t.available_at) > now) return false;
+    const members = (state.employees || []).filter((e) => e.team_id === t.id);
+    const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
+    if (ready.length < (opp.min_members || 1)) return false;
+    const vehicle = (state.vehicles || []).find((v) => v.id === t.vehicle_id);
+    if (!vehicle || vehicle.condition < 20 || vehicle.fuel_l < vehicle.tank_l * 0.05) return false;
+    if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > now) return false;
+    if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) return false;
+    return true;
+  });
 }
 
 export function orgAlerts(state) {

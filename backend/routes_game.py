@@ -14,8 +14,8 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     age_decay_mult, member_split_mult, property_active, property_condition_factor,
                     local_presence_reduction_s, situational_bonus_for, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
-                    gen_attrs, gen_talents, record_tx, property_stack_ranks, property_stack_mult,
-                    dirty_money_cap)
+                    record_tx, property_stack_ranks, property_stack_mult,
+                    dirty_money_cap, grant_quest_rewards)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
 from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest, Transaction
@@ -30,7 +30,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        PROPERTY_UPGRADE_BASE_S, PROPERTY_UPGRADE_PER_LEVEL_S,
                        LAUNDER_PROPERTY_BONUS_PER_LEVEL, LOCAL_PRESENCE_RADIUS_KM,
                        TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, RAIN_CHANCE, RAIN_TRAVEL_MULT,
-                       EMPLOYEE_HEAVY_USE_THRESHOLD, random_employee_name,
+                       EMPLOYEE_HEAVY_USE_THRESHOLD,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
@@ -1212,70 +1212,33 @@ async def get_transactions(user: dict = Depends(get_current_user)):
     return {"transactions": [Transaction.from_mongo(t).model_dump() for t in txs]}
 
 
-# ---------------- Missões ----------------
+# ---------------- Definições ----------------
 
-async def _grant_rewards(player, rw):
-    pid = str(player["_id"])
-    now_iso = now_utc().isoformat()
-    parts, inc, sets = [], {}, {}
-    if rw.get("dirty"):
-        inc["dirty_money"] = rw["dirty"]
-        parts.append(f"+{rw['dirty']:,} € sujos")
-    if rw.get("clean"):
-        inc["clean_money"] = inc.get("clean_money", 0) + rw["clean"]
-        parts.append(f"+{rw['clean']:,} € limpos")
-    if rw.get("respect"):
-        inc["respect"] = rw["respect"]
-        parts.append(f"+{rw['respect']} respeito")
-    if rw.get("heat"):
-        sets["heat"] = max(0.0, min(100.0, player["heat"] + rw["heat"]))
-        parts.append(f"{rw['heat']} calor")
-    if rw.get("vehicle"):
-        m = VEHICLE_MODELS[rw["vehicle"]]
-        caps, _ = await get_caps(db, pid)
-        used = await db.vehicles.count_documents({"player_id": pid})
-        if used < caps["vehicles"]:
-            await db.vehicles.insert_one(vehicle_doc(pid, rw["vehicle"], now_iso))
-            parts.append(f"{m['name']} novo na garagem")
-        else:
-            inc["clean_money"] = inc.get("clean_money", 0) + m["price"]
-            parts.append(f"+{m['price']:,} € limpos (garagem cheia)")
-    if rw.get("employee"):
-        er = rw["employee"]
-        role, rarity = er["role"], er["rarity"]
-        caps, _ = await get_caps(db, pid)
-        used = await db.employees.count_documents({"player_id": pid})
-        if used < caps["employees"]:
-            sp = SPECIALIZATIONS[role]
-            await db.employees.insert_one({
-                "player_id": pid, "name": random_employee_name(), "age": random.randint(20, 50),
-                "role_key": role, "spec": sp["spec"], "rarity": rarity,
-                "rank": "recruta", "level": 1, "xp": 0,
-                "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
-                "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
-                "attrs": gen_attrs(role, rarity), "talents": gen_talents(role, rarity),
-                "status": "idle", "status_until": None, "team_id": None, "training": None,
-                "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
-                "hired_at": now_iso,
-            })
-            parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
-        else:
-            fb = er.get("fallback_clean", 10000)
-            inc["clean_money"] = inc.get("clean_money", 0) + fb
-            parts.append(f"+{fb:,} € limpos (sem espaço no esconderijo)")
-    if rw.get("temp_bonus"):
-        tb = rw["temp_bonus"]
-        sets["temp_bonus"] = {"kind": tb["kind"], "pct": tb["pct"],
-                              "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat()}
-        parts.append(f"+{int(tb['pct'] * 100)}% recompensas durante {tb['duration_s'] // 60} min")
-    update = {}
-    if inc:
-        update["$inc"] = inc
-    if sets:
-        update["$set"] = sets
-    if update:
-        await db.players.update_one({"_id": player["_id"]}, update)
-    return parts
+class SettingsUpdateInput(BaseModel):
+    auto_repair_enabled: Optional[bool] = None
+    auto_repair_threshold: Optional[int] = None
+    auto_refuel_enabled: Optional[bool] = None
+    auto_refuel_threshold: Optional[int] = None
+    auto_rest_enabled: Optional[bool] = None
+    auto_rest_threshold: Optional[int] = None
+    auto_claim_quests: Optional[bool] = None
+
+
+@router.post("/settings")
+async def update_settings(body: SettingsUpdateInput, user: dict = Depends(get_current_user)):
+    """Guarda as preferências de automatização — só estas afetam o servidor
+    (as restantes definições de interface/jogabilidade vivem só no dispositivo)."""
+    player = await get_player(user)
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    for k in ("auto_repair_threshold", "auto_refuel_threshold", "auto_rest_threshold"):
+        if k in updates:
+            updates[k] = max(1, min(99, int(updates[k])))
+    settings = {**(player.get("settings") or {}), **updates}
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"settings": settings}})
+    return {"settings": settings}
+
+
+# ---------------- Missões ----------------
 
 
 @router.post("/quests/claim")
@@ -1290,7 +1253,7 @@ async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_us
     d = QUEST_DEFS.get(q["quest_key"])
     if not d:
         raise HTTPException(status_code=400, detail="Missão desconhecida")
-    parts = await _grant_rewards(player, d.get("rewards", {}))
+    parts = await grant_quest_rewards(db, player, d.get("rewards", {}))
     await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}})
     if q["quest_key"] == "c2_front":
         await db.quests.insert_one(make_instance(pid, "dec_informador", now_utc(), player.get("stats", {}), expires_s=3600))

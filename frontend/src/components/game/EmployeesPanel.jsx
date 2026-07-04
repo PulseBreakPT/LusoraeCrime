@@ -5,7 +5,8 @@ import {
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
   matchesSearch,
 } from "../../lib/game";
-import { usePersistedState } from "../../lib/persist";
+import { usePreferenceState } from "../../lib/persist";
+import { useSettings } from "../../context/SettingsContext";
 import { Tip, Kpi, SummaryStrip, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import {
@@ -421,9 +422,10 @@ const CandidateCard = ({ c }) => {
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, catalog, serverNow, refreshPool, buyProperty, restEmployee, favoriteEmployeeIds } = useGame();
-  const [tab, setTab] = usePersistedState("empTab", "roster");
+  const { rememberFilters, rememberSort } = useSettings();
+  const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
-  const [hideUnavailable, setHideUnavailable] = usePersistedState("empHideUnavailable", true);
+  const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
   useTick(open);
   if (!state || !catalog) return null;
 
