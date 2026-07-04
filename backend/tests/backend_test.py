@@ -451,6 +451,70 @@ class TestDispatchMinMembers:
         assert str(opp["min_members"]) in r.json()["detail"]
 
 
+# ---------------- Equipas: coordenação e prontidão ----------------
+class TestTeamCoordination:
+    def test_team_exposes_coordination_fields(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        assert "roster_stable_since" in team
+        assert "available_at" in team
+        # a equipa inicial já vem com o plantel "estável" desde a criação
+        assert team["roster_stable_since"] is not None
+        assert team["available_at"] is None
+
+    def test_preview_breakdown_includes_coordenacao(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert "coordenacao" in r.json()["breakdown"]
+
+    def test_roster_change_blocks_dispatch_during_reorg(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        emp = next(e for e in st["employees"] if e["team_id"] == team["id"])
+        # Remover um membro dispara o cooldown de reorganização da equipa.
+        r = s.post(f"{BASE_URL}/api/game/employees/assign",
+                   json={"employee_id": emp["id"], "team_id": None}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st2 = get_state(s)
+        team2 = next(t for t in st2["teams"] if t["id"] == team["id"])
+        assert team2["available_at"] is not None
+        opps = [o for o in st2["opportunities"] if o["min_level"] <= st2["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 400
+        assert "reorganizar" in r.json()["detail"]
+
+    def test_solo_member_team_has_no_positive_coordenacao_bonus(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        members = [e for e in st["employees"] if e["team_id"] == team["id"]]
+        assert len(members) >= 2
+        # Remove todos os membros menos um, e espera o cooldown de reorganização passar.
+        for e in members[1:]:
+            r = s.post(f"{BASE_URL}/api/game/employees/assign",
+                       json={"employee_id": e["id"], "team_id": None}, timeout=TIMEOUT)
+            assert r.status_code == 200, r.text
+        time.sleep(16)  # REORG_AFTER_ROSTER_CHANGE_S
+        st2 = get_state(s)
+        opps = [o for o in st2["opportunities"] if o["min_level"] <= st2["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        # Sem líder (recruta) e equipa de 1 membro: penalização, nunca bónus.
+        assert r.json()["breakdown"]["coordenacao"] < 0
+
+
 # ---------------- Fleet regression ----------------
 class TestFleet:
     def test_vehicle_full_flow(self):

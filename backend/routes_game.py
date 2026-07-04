@@ -10,8 +10,8 @@ from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
-                    team_effectiveness, gen_candidate, employee_from_candidate, betrayal_risk_of,
-                    push_history, gen_attrs, gen_talents)
+                    team_effectiveness, team_bonus_breakdown, gen_candidate, employee_from_candidate,
+                    betrayal_risk_of, push_history, gen_attrs, gen_talents)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
 from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest
@@ -20,7 +20,8 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
                        VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
-                       TEAM_MAX_MEMBERS, random_employee_name)
+                       TEAM_MAX_MEMBERS, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
+                       random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -225,6 +226,11 @@ async def _prepare_dispatch(player, opp, team):
     pid = str(player["_id"])
     if team["status"] != "idle":
         raise HTTPException(status_code=400, detail="Equipa está ocupada")
+    now = now_utc()
+    available_at = team.get("available_at")
+    if available_at and parse_dt(available_at) > now:
+        remaining = round((parse_dt(available_at) - now).total_seconds())
+        raise HTTPException(status_code=400, detail=f"Equipa a reorganizar-se — disponível em {remaining}s")
     members = await db.employees.find({
         "player_id": pid, "team_id": str(team["_id"]), "status": "idle", "fatigue": {"$lt": 90},
     }).to_list(50)
@@ -247,6 +253,10 @@ async def _prepare_dispatch(player, opp, team):
 
     speed = effective_speed(vehicle)
     travel_s = max(20, dist / speed)
+    # Equipas incompletas (abaixo da capacidade máxima) demoram mais tempo a
+    # preparar-se antes de partir.
+    missing = max(0, TEAM_MAX_MEMBERS - len(members))
+    travel_s += missing * INCOMPLETE_TEAM_PREP_S
 
     member_talents = sorted({t for e in members for t in e.get("talents", [])})
     if "motorista_fantasma" in member_talents:
@@ -266,7 +276,8 @@ async def _prepare_dispatch(player, opp, team):
 
     team_skill = team_effectiveness(members, opp["category"])
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
-    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match, talent_bonus)
+    team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
+    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match, talent_bonus, team_bonus)
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
@@ -493,9 +504,11 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
     count = await db.teams.count_documents({"player_id": pid})
     name = TEAM_NAMES[count % len(TEAM_NAMES)]
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST, "stats.teams_created": 1}})
+    created = now_utc().isoformat()
     await db.teams.insert_one({
         "player_id": pid, "name": name, "spec": body.spec, "status": "idle",
-        "vehicle_id": None, "missions_done": 0, "created_at": now_utc().isoformat(),
+        "vehicle_id": None, "missions_done": 0, "created_at": created,
+        "available_at": None, "roster_stable_since": created,
     })
     await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €.")
     return {"ok": True}
@@ -574,7 +587,18 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
         current = await db.employees.count_documents({"player_id": pid, "team_id": body.team_id})
         if current >= TEAM_MAX_MEMBERS:
             raise HTTPException(status_code=400, detail=f"A equipa já está no limite de {TEAM_MAX_MEMBERS} membros")
+    old_team_id = emp.get("team_id")
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"team_id": body.team_id}})
+    # Mudar o plantel de uma equipa quebra a coordenação: reinicia a veterania e
+    # aplica um pequeno cooldown de reorganização antes do próximo despacho.
+    affected_ids = {tid for tid in (old_team_id, body.team_id) if tid}
+    if affected_ids:
+        now_iso = now_utc().isoformat()
+        reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
+        await db.teams.update_many(
+            {"_id": {"$in": [ObjectId(tid) for tid in affected_ids]}, "player_id": pid},
+            {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until}},
+        )
     return {"ok": True}
 
 

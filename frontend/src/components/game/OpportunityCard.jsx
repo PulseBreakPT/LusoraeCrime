@@ -74,6 +74,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
   const readiness = (t) => {
     if (t.status !== "idle") return { ok: false, reason: "Em operação" };
+    if (t.available_at && Date.parse(t.available_at) > serverNow()) return { ok: false, reason: "A reorganizar-se" };
     const members = state.employees.filter((e) => e.team_id === t.id);
     if (members.length === 0) return { ok: false, reason: "Sem membros" };
     const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
@@ -309,11 +310,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   {Math.round(preview.chance * 100)}%
                 </p>
               </div>
-              <div className="mt-1 grid grid-cols-4 gap-1">
+              <div className="mt-1 grid grid-cols-5 gap-1">
                 <PreviewFactor label="Risco" value={preview.breakdown.risco} tip="Penalização base do risco da operação." />
                 <PreviewFactor label="Equipa" value={preview.breakdown.equipa} tip="Competência dos membros nos atributos relevantes." />
                 <PreviewFactor label="Match" value={preview.breakdown.match} tip="Compatibilidade entre a especialização da equipa e a categoria da operação." />
                 <PreviewFactor label="Calor" value={preview.breakdown.calor} tip="Pressão policial atual — quanto mais calor, pior." />
+                <PreviewFactor
+                  label="Coord."
+                  value={preview.breakdown.coordenacao}
+                  tip="Coordenação da equipa: penaliza sem líder (patente de chefe de equipa ou acima) ou com um único membro; premeia veterania (tempo desde a última alteração de membros) e homogeneidade de especialização."
+                />
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                 <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>

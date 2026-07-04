@@ -165,6 +165,18 @@ VEHICLE_MODELS = {
 # Nº máximo de membros ativos por equipa (independente do veículo).
 TEAM_MAX_MEMBERS = 4
 
+# ---------------- Coordenação e prontidão das equipas ----------------
+
+TEAM_LEADER_MIN_RANK = "chefe_equipa"   # patente mínima para um membro contar como líder
+NO_LEADER_PENALTY = 0.03                # penalização de chance sem nenhum membro nessa patente
+SOLO_MEMBER_PENALTY = 0.05              # penalização extra para equipas com um único membro
+UNIFORM_SPEC_BONUS = 0.05               # bónus quando todos os membros partilham a especialização da operação
+COORDINATION_BONUS_MAX = 0.05           # bónus máximo por veterania (equipa estável há muito tempo)
+COORDINATION_RAMP_S = 6 * 3600          # tempo (s) de estabilidade para atingir o bónus máximo
+REORG_AFTER_MISSION_S = 25              # cooldown de despacho após a equipa regressar de uma missão
+REORG_AFTER_ROSTER_CHANGE_S = 15        # cooldown de despacho após adicionar/remover um membro
+INCOMPLETE_TEAM_PREP_S = 8              # segundos extra de preparação por membro em falta (vs. TEAM_MAX_MEMBERS)
+
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
 
 # ---------------- Propriedades ----------------
