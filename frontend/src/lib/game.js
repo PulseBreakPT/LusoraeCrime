@@ -147,6 +147,28 @@ export function fatigueColor(f) {
   return "#34D399";
 }
 
+// Banda de estado geral em vez da percentagem nua — mais rápido de ler de relance.
+export function conditionBand(v) {
+  if (v >= 80) return { label: "Excelente", color: "#34D399" };
+  if (v >= 50) return { label: "Bom", color: "#22D3EE" };
+  if (v >= 30) return { label: "Razoável", color: "#F59E0B" };
+  return { label: "Mau", color: "#EF4444" };
+}
+
+// Normaliza para pesquisa: minúsculas e sem acentos, para "carro" encontrar "Carão".
+export function normalizeSearch(s) {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function matchesSearch(query, ...fields) {
+  const q = normalizeSearch(query).trim();
+  if (!q) return true;
+  return fields.some((f) => normalizeSearch(f).includes(q));
+}
+
 export function propertyBenefit(pt, level = 1) {
   const parts = [];
   if (pt.cap_employees) parts.push(`+${pt.cap_employees * level} funcionários`);
@@ -282,21 +304,27 @@ export function orgAlerts(state) {
   const injured = emps.filter((e) => e.status === "injured").length;
   const arrested = emps.filter((e) => e.status === "arrested").length;
   const exhausted = emps.filter((e) => e.status === "idle" && e.fatigue >= 70).length;
+  // "Prestes a ficar exausto" — ainda opera, mas aproxima-se do limiar de 70%.
+  const nearExhausted = emps.filter((e) => e.status === "idle" && e.fatigue >= 55 && e.fatigue < 70).length;
   const betrayal = emps.filter((e) => (e.betrayal_risk || 0) >= 25).length;
   const lowFuel = vehs.filter((v) => v.fuel_l < v.tank_l * 0.25).length;
   const damaged = vehs.filter((v) => v.condition < 30).length;
+  // "Perto de avariar" — ainda opera (≥30%), mas já vale a pena reparar antes que bloqueie.
+  const nearBreakdown = vehs.filter((v) => v.condition >= 30 && v.condition < 45).length;
   const teamsNoVehicle = teams.filter((t) => !t.vehicle_id).length;
   const teamsNoMembers = teams.filter((t) => emps.every((e) => e.team_id !== t.id)).length;
   const raidRisk = (state?.player?.heat || 0) >= 70 && (state?.properties || []).some((p) => p.type_key === "laboratorio");
   const claimable = (state?.quests || []).filter((q) => q.status === "completed").length;
+  const payrollS = state?.player?.next_payroll_at ? (Date.parse(state.player.next_payroll_at) - Date.now()) / 1000 : null;
+  const payrollDueSoon = payrollS != null && payrollS <= 300 && (state?.salary_total || 0) > 0;
   const hr = injured + arrested + exhausted + betrayal;
   const fleet = lowFuel + damaged;
   const teamsIssues = teamsNoVehicle + teamsNoMembers;
   return {
-    injured, arrested, exhausted, betrayal, lowFuel, damaged,
-    teamsNoVehicle, teamsNoMembers, raidRisk, claimable,
+    injured, arrested, exhausted, nearExhausted, betrayal, lowFuel, damaged, nearBreakdown,
+    teamsNoVehicle, teamsNoMembers, raidRisk, claimable, payrollDueSoon,
     hr, fleet, teams: teamsIssues,
-    total: hr + fleet + teamsIssues + (raidRisk ? 1 : 0),
+    total: hr + fleet + teamsIssues + nearExhausted + nearBreakdown + (payrollDueSoon ? 1 : 0) + (raidRisk ? 1 : 0),
   };
 }
 

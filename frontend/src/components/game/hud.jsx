@@ -1,8 +1,8 @@
 // Blocos partilhados do centro de comando — tooltips, mini-barras, chips e células KPI.
 // Mantêm a UI densa em informação mas visualmente leve e consistente.
 
-import { useState } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Pencil, Check, X, Star } from "lucide-react";
 
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
   if (!tip) return children;
@@ -124,4 +124,95 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
       </Tip>
     </span>
   );
+};
+
+// Estrela de favorito — puramente local (não passa pelo servidor). Equipas,
+// funcionários e veículos favoritos ficam sempre fixos no topo da respetiva lista.
+export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
+  <Tip tip={active ? "Remover dos favoritos" : "Marcar como favorito — fica sempre no topo da lista"}>
+    <button
+      data-testid={testId}
+      onClick={(ev) => { ev.stopPropagation(); onToggle(); }}
+      className={`shrink-0 rounded p-0.5 transition-colors ${active ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-white"}`}
+    >
+      <Star size={size} fill={active ? "currentColor" : "none"} />
+    </button>
+  </Tip>
+);
+
+// Botão de confirmação em dois passos para ações irreversíveis (despedir, vender,
+// abater) — sem modais: o primeiro clique arma um curto período de confirmação,
+// o segundo clique dentro desse período executa a ação.
+export const ConfirmButton = ({
+  testId, icon: Icon, label, confirmLabel = "Confirmar?", color = "text-red-400",
+  onConfirm, disabled, className = "", armMs = 3000, tip,
+}) => {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const id = setTimeout(() => setArmed(false), armMs);
+    return () => clearTimeout(id);
+  }, [armed, armMs]);
+  return (
+    <Tip tip={armed ? "Clica outra vez para confirmar — ação irreversível." : tip} block className={className}>
+      <button
+        data-testid={testId}
+        onClick={() => { if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
+        disabled={disabled}
+        className={`flex w-full items-center justify-center gap-1 rounded border px-2 py-1.5 font-mono text-[10px] transition-colors disabled:opacity-40 ${
+          armed ? "border-red-500/60 bg-red-500/20 text-red-300" : `border-white/10 ${color} hover:bg-white/5`
+        }`}
+      >
+        {Icon && <Icon size={11} />} {armed ? confirmLabel : label}
+      </button>
+    </Tip>
+  );
+};
+
+// Pisca brevemente quando um valor observado muda (ex.: uma equipa que acabou
+// de regressar, uma missão que ficou pronta) — chama a atenção sem depender de texto.
+export const useFlash = (value, ms = 2500) => {
+  const [flash, setFlash] = useState(false);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (prev.current === value) return;
+    prev.current = value;
+    setFlash(true);
+    const id = setTimeout(() => setFlash(false), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return flash;
+};
+
+// Número que anima suavemente entre o valor anterior e o novo, em vez de saltar
+// instantaneamente — usado no dinheiro e respeito na barra de recursos.
+export const AnimatedNumber = ({ value, format = (v) => Math.round(v).toString(), duration = 600, className = "" }) => {
+  const [display, setDisplay] = useState(value);
+  const displayRef = useRef(value);
+
+  useEffect(() => {
+    const from = displayRef.current;
+    const to = value;
+    if (Math.abs(to - from) < 0.01) {
+      setDisplay(to);
+      displayRef.current = to;
+      return;
+    }
+    let raf;
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = from + (to - from) * eased;
+      setDisplay(next);
+      displayRef.current = next;
+      if (t < 1) raf = requestAnimationFrame(step);
+      else displayRef.current = to;
+    };
+    raf = requestAnimationFrame(step);
+    return () => raf && cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, duration]);
+
+  return <span className={className}>{format(display)}</span>;
 };

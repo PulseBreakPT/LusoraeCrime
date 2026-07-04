@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
-import { Tip, MiniBar } from "./hud";
+import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
 import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins } from "lucide-react";
 
 const useTick = () => {
@@ -15,6 +15,12 @@ const useTick = () => {
 export const ResourceBar = () => {
   const { state, catalog, serverNow } = useGame();
   useTick();
+  const prevCleanRef = useRef(null);
+  const moneyIn = state && prevCleanRef.current != null && state.player.clean_money > prevCleanRef.current;
+  const moneyFlash = useFlash(moneyIn ? state.player.clean_money : null);
+  useEffect(() => {
+    if (state) prevCleanRef.current = state.player.clean_money;
+  }, [state]);
   if (!state) return null;
   const p = state.player;
   const nextRespect = p.next_level_respect;
@@ -50,17 +56,20 @@ export const ResourceBar = () => {
         </Tip>
 
         <Stat
-          testId="stat-clean-money" icon={Banknote} color="#10B981" label="Limpo" value={fmtMoney(p.clean_money)}
+          testId="stat-clean-money" icon={Banknote} color="#10B981" label="Limpo"
+          value={<AnimatedNumber value={p.clean_money} format={fmtMoney} />}
           sub={launderPerH > 0 ? `+${fmtMoney(launderPerH)}/h` : null} subColor="#34D399"
           tip="Dinheiro limpo — paga compras, reparações, salários e subornos. Cresce com lavagem (taxa 25%) e empresas de fachada."
+          className={moneyFlash ? "lus-flash rounded" : ""}
         />
         <Stat
-          testId="stat-dirty-money" icon={Coins} color="#F59E0B" label="Sujo" value={fmtMoney(p.dirty_money)}
+          testId="stat-dirty-money" icon={Coins} color="#F59E0B" label="Sujo"
+          value={<AnimatedNumber value={p.dirty_money} format={fmtMoney} />}
           sub={dirtyPerH > 0 ? `+${fmtMoney(dirtyPerH)}/h` : null} subColor="#F59E0B"
           tip="Dinheiro sujo vindo do crime — lava-o no Império para o poderes gastar. Montantes altos atraem atenção."
         />
         <Stat
-          testId="stat-respect" icon={Trophy} color="#0A84FF" label="Respeito" value={p.respect}
+          testId="stat-respect" icon={Trophy} color="#0A84FF" label="Respeito" value={<AnimatedNumber value={p.respect} />}
           sub={nextRespect ? `nível ${p.level + 1} aos ${nextRespect}` : "máx."}
           tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."
         />
@@ -97,9 +106,9 @@ export const ResourceBar = () => {
   );
 };
 
-const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "center", testId }) => (
+const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "center", testId, className = "" }) => (
   <Tip tip={tip} side="bottom" align={align} className="min-w-0">
-    <div data-testid={testId} className="flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1">
+    <div data-testid={testId} className={`flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1 ${className}`}>
       <Icon size={14} className="shrink-0" style={{ color }} />
       <div className="min-w-0">
         <p className="hidden text-[8px] uppercase tracking-wider text-zinc-500 md:block">{label}</p>

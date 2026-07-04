@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock } from "lucide-react";
+import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper } from "lucide-react";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
 
@@ -21,7 +21,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, serverNow, createTeam, recallTeam, assignEmployee, assignVehicle,
     refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
-    recommendRepeatForTeam,
+    recommendRepeatForTeam, favoriteTeamIds, toggleFavoriteTeam, justReturnedTeamIds,
   } = useGame();
   const [recommendations, setRecommendations] = useState({});
   const [repeatRecs, setRepeatRecs] = useState({});
@@ -109,7 +109,22 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
         })()}
 
         <div className="mt-4 space-y-3" data-testid="teams-list">
-          {state.teams.map((t) => {
+          {state.teams.length === 0 && (
+            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+              Ainda não tens equipas — forma a primeira abaixo para começares a operar.
+            </p>
+          )}
+          {/* Favoritas sempre no topo; dentro de cada grupo, equipas ocupadas primeiro (o
+              jogador quer ver o que está em ação), depois prontas, e por fim bloqueadas. */}
+          {[...state.teams]
+            .sort((a, b) => {
+              const favA = favoriteTeamIds.includes(a.id) ? 0 : 1;
+              const favB = favoriteTeamIds.includes(b.id) ? 0 : 1;
+              if (favA !== favB) return favA - favB;
+              const rank = (t) => (t.status !== "idle" ? 0 : 1);
+              return rank(a) - rank(b);
+            })
+            .map((t) => {
             const members = membersOf(t.id);
             const vehicle = vehicleOf(t);
             const enRoute = enRouteMissionOf(t);
@@ -136,24 +151,41 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             const fuelPct = vehicle ? (vehicle.fuel_l / vehicle.tank_l) * 100 : 0;
             const refuelCost = vehicle ? Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]) : 0;
             const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
+            const justReturned = justReturnedTeamIds.includes(t.id);
             return (
-              <div key={t.id} data-testid={`team-card-${t.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div
+                key={t.id}
+                data-testid={`team-card-${t.id}`}
+                className={`rounded-lg border border-white/10 bg-white/[0.03] p-3 ${justReturned ? "lus-flash" : ""}`}
+              >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-white">{t.name}</p>
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                      <Tip tip={`Especialização ${SPEC_LABELS[t.spec]} — bónus de sucesso em operações desta categoria.`}>
-                        <span>{SPEC_LABELS[t.spec]}</span>
-                      </Tip>
-                      {" · "}
-                      <Tip tip="Operações concluídas por esta equipa desde a sua formação.">
-                        <span>{t.missions_done} ops</span>
-                      </Tip>
-                    </p>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <FavoriteStar testId={`team-favorite-${t.id}`} active={favoriteTeamIds.includes(t.id)} onToggle={() => toggleFavoriteTeam(t.id)} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-white">
+                        {t.name}
+                        {justReturned && (
+                          <Tip tip="Esta equipa acabou de regressar ao QG e já está pronta a operar.">
+                            <span className="ml-1.5 inline-flex items-center gap-0.5 font-mono text-[9px] uppercase text-emerald-400">
+                              <PartyPopper size={9} /> regressou
+                            </span>
+                          </Tip>
+                        )}
+                      </p>
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                        <Tip tip={`Especialização ${SPEC_LABELS[t.spec]} — bónus de sucesso em operações desta categoria.`}>
+                          <span>{SPEC_LABELS[t.spec]}</span>
+                        </Tip>
+                        {" · "}
+                        <Tip tip="Operações concluídas por esta equipa desde a sua formação.">
+                          <span>{t.missions_done} ops</span>
+                        </Tip>
+                      </p>
+                    </div>
                   </div>
                   <Tip tip={t.status === "idle" ? "Na base — pronta a receber ordens." : "Em operação — volta a estar disponível quando regressar ao QG."} align="end">
                     <span
-                      className="rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
+                      className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
                       style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
                     >
                       {STATUS_LABELS[t.status]}
@@ -256,11 +288,14 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     >
                       <option value="">Sem veículo</option>
                       {vehicle && <option value={vehicle.id}>{vehicle.name}</option>}
-                      {freeVehicles.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name} · {Math.round((v.fuel_l / v.tank_l) * 100)}% comb.
-                        </option>
-                      ))}
+                      {freeVehicles.map((v) => {
+                        const ideal = catalog?.vehicle_models?.[v.model_key]?.best_for?.includes(t.spec);
+                        return (
+                          <option key={v.id} value={v.id}>
+                            {ideal ? "★ " : ""}{v.name} · {Math.round((v.fuel_l / v.tank_l) * 100)}% comb.
+                          </option>
+                        );
+                      })}
                     </select>
                   ) : (
                     <span className="font-mono text-[11px] text-zinc-400">{vehicle ? vehicle.name : "Sem veículo"}</span>
