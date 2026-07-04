@@ -1,17 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { useAuth } from "../../context/AuthContext";
-import { fmtMoney, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
+import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
 import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Building2, Banknote, LogOut, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  Building2, Banknote, LogOut, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown,
+  AlertTriangle, History, ChevronDown, Clock,
+} from "lucide-react";
+
+const TX_LABELS = {
+  mission_reward: "Recompensa de missão", payroll: "Folha salarial", vehicle_buy: "Compra de veículo",
+  vehicle_sell: "Venda de veículo", refuel: "Combustível", repair: "Reparação", recruit: "Recrutamento",
+  pool_refresh: "Atualização de contactos", training: "Formação", promote: "Promoção", bonus: "Bónus",
+  heal: "Clínica", release: "Advogado", fire: "Indemnização", property_buy: "Compra de imóvel",
+  property_sell: "Venda de imóvel", property_upgrade: "Melhoria de imóvel", bribe: "Suborno",
+  launder_out: "Lavagem (saída)", launder_in: "Lavagem (entrada)", team_create: "Nova equipa",
+};
 
 export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, launder, bribePolice } = useGame();
+  const { state, catalog, serverNow, launder, bribePolice, fetchTransactions } = useGame();
   const { logout } = useAuth();
   const [amount, setAmount] = useState("");
+  const [showLedger, setShowLedger] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+  useEffect(() => {
+    if (!open) return;
+    fetchTransactions().then((r) => { if (r.ok) setTransactions(r.data); });
+  }, [open, fetchTransactions]);
   if (!state) return null;
   const p = state.player;
   const nav = (panel) => onNavigate && onNavigate(panel);
@@ -20,6 +38,17 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   const alerts = orgAlerts(state);
   const salaryPerH = (state.salary_total || 0) * 2;
   const netPerH = dirtyPerH + launderPerH - salaryPerH;
+  // Autonomia financeira: quanto tempo aguenta a organização ao ritmo atual de
+  // despesas de dinheiro limpo (salários) vs. entradas passivas (lavagem).
+  const cleanNetPerH = launderPerH - salaryPerH;
+  const runwayHours = cleanNetPerH < 0 ? p.clean_money / Math.abs(cleanNetPerH) : null;
+  const payrollS = p.next_payroll_at ? Math.max(0, (Date.parse(p.next_payroll_at) - serverNow()) / 1000) : null;
+  const liquidity = p.clean_money < (state.salary_total || 0) * 0.5
+    ? "red"
+    : p.clean_money < (state.salary_total || 0)
+    ? "amber"
+    : null;
+  const dirtyCap = state.caps?.dirty_money;
 
   const handleLaunder = async () => {
     const value = parseInt(amount, 10);
@@ -44,6 +73,36 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <StatBox label="€ Limpo" value={fmtMoney(p.clean_money)} accent="#10B981" tip="Pronto a gastar: compras, salários, reparações e subornos." />
           <StatBox label="€ Sujo" value={fmtMoney(p.dirty_money)} accent="#F59E0B" tip="Precisa de ser lavado antes de poder ser gasto. Lava abaixo ou usa empresas de fachada." />
         </div>
+
+        {dirtyCap && (
+          <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de missões são desperdiçadas — lava regularmente para abrir espaço.`}>
+            <div className="mt-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+              <span>Armazenamento sujo</span>
+              <span className={dirtyCap.used >= dirtyCap.max * 0.9 ? "text-red-400" : "text-zinc-400"}>
+                {fmtMoney(dirtyCap.used)} / {fmtMoney(dirtyCap.max)}
+              </span>
+            </div>
+          </Tip>
+        )}
+        {dirtyCap && dirtyCap.used >= dirtyCap.max * 0.9 && (
+          <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-red-400" data-testid="dirty-cap-warning">
+            <AlertTriangle size={10} /> Perto do limite de armazenamento — lava dinheiro antes que a produção seja desperdiçada.
+          </p>
+        )}
+
+        {liquidity && (
+          <p
+            data-testid="liquidity-warning"
+            className={`mt-2 flex items-center gap-1.5 rounded-md border px-2.5 py-2 font-mono text-[10px] ${
+              liquidity === "red" ? "border-red-600/40 bg-red-600/10 text-red-400" : "border-amber-500/30 bg-amber-500/5 text-amber-400"
+            }`}
+          >
+            <AlertTriangle size={12} />
+            {liquidity === "red"
+              ? "Reserva crítica: podes não conseguir pagar a próxima folha salarial."
+              : "Reserva baixa: o dinheiro limpo está abaixo da folha salarial."}
+          </p>
+        )}
 
         <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3" data-testid="empire-cashflow">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
@@ -78,6 +137,21 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
               </span>
             </p>
           </Tip>
+          <div className="mt-1.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+            <Tip tip="Tempo até ao próximo pagamento automático da folha salarial.">
+              <span className="flex items-center gap-1">
+                <Clock size={9} /> Próx. pagamento: <span className="text-zinc-300">{payrollS != null ? fmtDuration(payrollS) : "—"}</span>
+              </span>
+            </Tip>
+            <Tip tip={runwayHours != null ? "Quanto tempo aguentas ao ritmo atual de despesas em dinheiro limpo (salários vs. lavagem passiva), sem contar recompensas de missões." : "As entradas passivas de dinheiro limpo já cobrem os salários — autonomia ilimitada ao ritmo atual."}>
+              <span className="flex items-center gap-1">
+                Autonomia:{" "}
+                <span className={runwayHours != null && runwayHours < 24 ? "text-red-400" : "text-zinc-300"}>
+                  {runwayHours != null ? fmtDuration(runwayHours * 3600) : "estável"}
+                </span>
+              </span>
+            </Tip>
+          </div>
         </div>
 
         {p.next_level_respect && (
@@ -213,6 +287,38 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
               </Button>
             </Tip>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <button
+            data-testid="ledger-toggle"
+            onClick={() => setShowLedger(!showLedger)}
+            className="flex w-full items-center justify-between font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 transition-colors hover:text-white"
+          >
+            <span className="flex items-center gap-1.5"><History size={12} /> Extrato</span>
+            <ChevronDown size={13} className={`transition-transform ${showLedger ? "rotate-180" : ""}`} />
+          </button>
+          {showLedger && (
+            <div className="mt-2 space-y-1" data-testid="ledger-list">
+              {transactions.length === 0 && (
+                <p className="font-mono text-[10px] text-zinc-600">Sem transações registadas ainda.</p>
+              )}
+              {transactions.map((t) => (
+                <div key={t.id} className="flex items-center justify-between rounded border border-white/10 bg-white/[0.03] px-2 py-1.5">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-[10px] text-zinc-300">{t.note || TX_LABELS[t.kind] || t.kind}</p>
+                    <p className="font-mono text-[9px] text-zinc-600">{new Date(t.ts).toLocaleString("pt-PT")}</p>
+                  </div>
+                  <span
+                    className="shrink-0 font-mono text-[10px] font-bold"
+                    style={{ color: t.amount >= 0 ? "#34D399" : "#EF4444" }}
+                  >
+                    {t.amount >= 0 ? "+" : ""}{fmtMoney(t.amount)} {t.currency === "dirty" ? "sujos" : "limpos"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <Button

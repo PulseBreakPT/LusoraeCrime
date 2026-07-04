@@ -1182,3 +1182,125 @@ def haversine_km(lat1, lng1, lat2, lng2):
     dlmb = math.radians(lng2 - lng1)
     a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
+
+
+# ---------------- Economia: limite de dinheiro sujo, extrato e rendimentos decrescentes ----------------
+class TestDirtyMoneyCap:
+    def test_state_exposes_dirty_money_cap(self):
+        s, _ = register_new()
+        st = get_state(s)
+        cap = st["caps"]["dirty_money"]
+        assert cap["max"] >= 80000
+        assert cap["used"] == round(st["player"]["dirty_money"])
+        assert cap["used"] <= cap["max"]
+
+
+class TestTransactionsLedger:
+    def test_fresh_account_has_no_transactions(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/transactions", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["transactions"] == []
+
+    def test_vehicle_purchase_is_recorded(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/vehicles/buy", json={"model_key": "moto"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        r = s.get(f"{BASE_URL}/api/game/transactions", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        txs = r.json()["transactions"]
+        assert any(t["kind"] == "vehicle_buy" and t["amount"] < 0 and t["currency"] == "clean" for t in txs)
+
+    def test_launder_records_two_transactions(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/launder", json={"amount": 1000}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        txs = s.get(f"{BASE_URL}/api/game/transactions", timeout=TIMEOUT).json()["transactions"]
+        assert any(t["kind"] == "launder_out" and t["currency"] == "dirty" and t["amount"] < 0 for t in txs)
+        assert any(t["kind"] == "launder_in" and t["currency"] == "clean" and t["amount"] > 0 for t in txs)
+
+
+class TestPropertyStackingDiminish:
+    def test_second_bonus_property_of_same_type_yields_smaller_marginal_bonus(self):
+        s, _ = register_new()
+        st = get_state(s)
+        # armazém (bónus de recompensa logística) exige nível 2 — indisponível
+        # para uma conta nova (nível 1); o mecanismo de rendimentos decrescentes
+        # só é observável depois de subir de nível o suficiente para comprar
+        # duas unidades do mesmo tipo.
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        catalog = r.json()
+        armazem = catalog["property_types"]["armazem"]
+        if st["player"]["level"] < armazem["min_level"]:
+            pytest.skip("conta nova está abaixo do nível mínimo do armazém — rendimentos decrescentes não são observáveis sem subir de nível")
+        opps = [o for o in st["opportunities"] if o["category"] == "logistica" and o["min_level"] <= st["player"]["level"]]
+        if not opps:
+            pytest.skip("sem oportunidade de logística disponível para medir o bónus de recompensa")
+        team = st["teams"][0]
+
+        def reward_bonus_pct():
+            prev = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                          json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+            return prev.json()["reward_bonus_pct"]
+
+        base = reward_bonus_pct()
+        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "armazem"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        after_first = reward_bonus_pct()
+        first_gain = after_first - base
+        assert first_gain > 0
+        if s.get(f"{BASE_URL}/api/game/state", timeout=TIMEOUT).json()["player"]["clean_money"] < armazem["price"]:
+            pytest.skip("dinheiro insuficiente para o 2º armazém depois do 1º")
+        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "armazem"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        after_second = reward_bonus_pct()
+        second_gain = after_second - after_first
+        # A 2ª unidade do mesmo tipo rende só 70% do que a 1ª rendeu.
+        assert second_gain < first_gain
+
+
+# ---------------- Combustível: abastecer demora tempo, nunca ultrapassa 100% ----------------
+class TestRefuelDuration:
+    @pytest.mark.slow
+    def test_refuel_takes_time_and_blocks_dispatch_meanwhile(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        vehicle = next((v for v in st["vehicles"] if v["team_id"] == team["id"]), None)
+        if not vehicle:
+            pytest.skip("crew Alfa inicial não tem veículo atribuído")
+        opp = _quickest_opportunity(st)
+        assert opp
+        prev = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                      json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT).json()
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        mission_id = r.json()["mission_id"]
+        final_st = _wait_mission_done(s, mission_id, prev["eta_s"], prev["duration_s"])
+        if not final_st:
+            pytest.fail("mission did not complete within the expected window")
+        v2 = next(v for v in final_st["vehicles"] if v["id"] == vehicle["id"])
+        if v2["fuel_l"] >= v2["tank_l"] - 0.1:
+            pytest.skip("veículo regressou com o depósito praticamente cheio — nada para reabastecer")
+        r = s.post(f"{BASE_URL}/api/game/vehicles/refuel", json={"vehicle_id": vehicle["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["refueling_until"]
+        # Um segundo pedido de abastecimento enquanto já está a abastecer é bloqueado.
+        r2 = s.post(f"{BASE_URL}/api/game/vehicles/refuel", json={"vehicle_id": vehicle["id"]}, timeout=TIMEOUT)
+        assert r2.status_code == 400
+        # Nunca ultrapassa 100%: o veículo não pode ser despachado enquanto abastece.
+        opps2 = [o for o in get_state(s)["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        if opps2:
+            r3 = s.post(f"{BASE_URL}/api/game/dispatch",
+                        json={"opportunity_id": opps2[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+            assert r3.status_code == 400
+            assert "abastecer" in r3.json()["detail"].lower()
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            time.sleep(5)
+            v3 = next(v for v in get_state(s)["vehicles"] if v["id"] == vehicle["id"])
+            if not v3["refueling_until"]:
+                assert v3["fuel_l"] == v3["tank_l"]
+                return
+        pytest.fail("refuel did not complete within the expected window")

@@ -84,6 +84,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
     if (!vehicle) return { ok: false, reason: "Sem veículo" };
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
+    if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow()) {
+      return { ok: false, reason: "A abastecer" };
+    }
     const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
     if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
     if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) {

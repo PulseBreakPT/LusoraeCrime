@@ -121,7 +121,18 @@ class Vehicle(BaseDocument):
     missions_done: int = 0
     missions_success: int = 0
     missions_since_repair: int = 0
+    refueling_until: Optional[str] = None
     bought_at: str
+
+
+class Transaction(BaseDocument):
+    player_id: str
+    kind: str
+    amount: float
+    currency: str
+    balance_after: float
+    note: str
+    ts: str
 
 
 class Property(BaseDocument):

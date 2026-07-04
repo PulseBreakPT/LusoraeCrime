@@ -348,3 +348,18 @@ RAIN_CHANCE = 0.10                       # probabilidade de chuva numa viagem
 RAIN_TRAVEL_MULT = 1.10                  # aumento do tempo de viagem com chuva
 NIGHT_STEALTH_HOURS = (0, 6)             # horas (UTC) consideradas noite fechada para o bónus furtivo
 NIGHT_STEALTH_BONUS = 0.04               # bónus de chance em operações discretas durante a noite
+
+# ---------------- Economia: recursos com limites e rendimentos decrescentes ----------------
+
+# Bónus percentuais (recompensa, desconto de reparação) de propriedades do mesmo
+# tipo empilhadas: a 1ª unidade dá o valor cheio, a 2ª 70%, a 3ª+ apenas 50% —
+# em vez de um limite artificial, cada compra extra do mesmo tipo rende menos.
+PROPERTY_STACK_DIMINISH = [1.0, 0.7, 0.5]
+
+DIRTY_MONEY_CAP_BASE = 80000              # limite de armazenamento de dinheiro sujo ao nível 1
+DIRTY_MONEY_CAP_PER_LEVEL = 8000          # +limite por cada nível acima do 1º
+
+REFUEL_DURATION_BASE_S = 15               # tempo mínimo de abastecimento
+REFUEL_DURATION_PER_L_S = 0.5             # +tempo por cada litro atestado
+
+PAYROLL_MORALE_REGEN = 0.4                # moral e lealdade recuperadas por funcionário quando os salários são pagos em dia

@@ -122,6 +122,14 @@ export function GameProvider({ children }) {
     }
   }, []);
   const toggleFavoriteType = (typeKey) => action("opportunities/favorite", { type_key: typeKey });
+  const fetchTransactions = useCallback(async () => {
+    try {
+      const { data } = await api.get("/game/transactions");
+      return { ok: true, data: data.transactions };
+    } catch (e) {
+      return { ok: false };
+    }
+  }, []);
   const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
   const recruitEmployee = (candidateId) => action("employees/recruit", { candidate_id: candidateId }, "Recruta contratado");
   const refreshPool = () => action("recruitment/refresh", {}, "Contactos atualizados");
@@ -166,7 +174,7 @@ export function GameProvider({ children }) {
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
         recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity, recommendRepeatForTeam,
-        toggleFavoriteType, justReturnedTeamIds,
+        toggleFavoriteType, justReturnedTeamIds, fetchTransactions,
         favoriteTeamIds, toggleFavoriteTeam, favoriteEmployeeIds, toggleFavoriteEmployee,
         favoriteVehicleIds, toggleFavoriteVehicle,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,

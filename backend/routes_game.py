@@ -14,10 +14,11 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     age_decay_mult, member_split_mult, property_active, property_condition_factor,
                     local_presence_reduction_s, situational_bonus_for, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
-                    gen_attrs, gen_talents)
+                    gen_attrs, gen_talents, record_tx, property_stack_ranks, property_stack_mult,
+                    dirty_money_cap)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
-from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest
+from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest, Transaction
 from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS, RARITIES,
                        RARITY_MIN_RESPECT, RANKS, RANK_REQ_LEVEL, TALENTS, RECRUIT_SOURCES,
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
@@ -29,7 +30,8 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        PROPERTY_UPGRADE_BASE_S, PROPERTY_UPGRADE_PER_LEVEL_S,
                        LAUNDER_PROPERTY_BONUS_PER_LEVEL, LOCAL_PRESENCE_RADIUS_KM,
                        TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, RAIN_CHANCE, RAIN_TRAVEL_MULT,
-                       EMPLOYEE_HEAVY_USE_THRESHOLD, random_employee_name)
+                       EMPLOYEE_HEAVY_USE_THRESHOLD, random_employee_name,
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -231,6 +233,7 @@ async def get_state(user: dict = Depends(get_current_user)):
             "employees": {"used": len(employees), "max": caps["employees"]},
             "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
             "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
+            "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
         },
         "bonuses": bonuses,
         "salary_total": sum(e.get("salary", 0) for e in employees),
@@ -259,6 +262,8 @@ async def _prepare_dispatch(player, opp, team):
         raise HTTPException(status_code=400, detail="Veículo não encontrado")
     if vehicle["condition"] < 30:
         raise HTTPException(status_code=400, detail="O veículo precisa de reparação")
+    if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
+        raise HTTPException(status_code=400, detail="O veículo está a abastecer")
     seats = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("seats")
     if seats is not None and len(members) > seats:
         raise HTTPException(
@@ -305,12 +310,13 @@ async def _prepare_dispatch(player, opp, team):
     talent_bonus = 0.05 if ("pontaria_letal" in member_talents and opp["category"] == "assalto") else 0.0
 
     mult = 1.0
+    prop_ranks = property_stack_ranks(props)
     for pr in props:
         if not property_active(pr, now):
             continue
         pt = PROPERTY_TYPES[pr["type_key"]]
         if pt.get("bonus_pct") and (pt.get("bonus_category") == "all" or pt.get("bonus_category") == opp["category"]):
-            mult += pt["bonus_pct"] * pr["level"] * property_condition_factor(pr)
+            mult += pt["bonus_pct"] * pr["level"] * property_condition_factor(pr) * property_stack_mult(prop_ranks[pr["_id"]])
     tb = player.get("temp_bonus")
     if tb and tb.get("kind") == "reward_boost" and parse_dt(tb["until"]) > now_utc():
         mult += tb["pct"]
@@ -647,6 +653,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         "available_at": None, "roster_stable_since": created,
     })
     await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €.")
+    await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", player["clean_money"] - TEAM_CREATE_COST, f"Nova equipa: {name}")
     return {"ok": True}
 
 
@@ -683,6 +690,7 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
     await db.candidates.delete_one({"_id": cand["_id"]})
     role_name = SPECIALIZATIONS[cand["role_key"]]["name"]
     await add_event(db, pid, "team", f"{cand['name']} ({role_name}, {RARITIES[cand['rarity']]['name']}) recrutado por {cand['cost']:,} €.")
+    await record_tx(db, pid, "recruit", -cand["cost"], "clean", player["clean_money"] - cand["cost"], f"Recrutamento de {cand['name']}")
     return {"ok": True}
 
 
@@ -706,6 +714,7 @@ async def refresh_recruitment(user: dict = Depends(get_current_user)):
         "$set": {"pool_refresh_at": (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()},
     })
     await add_event(db, pid, "team", f"Contactos de recrutamento atualizados por {POOL_REFRESH_COST:,} €.")
+    await record_tx(db, pid, "pool_refresh", -POOL_REFRESH_COST, "clean", player["clean_money"] - POOL_REFRESH_COST, "Atualização de contactos")
     return {"ok": True}
 
 
@@ -757,6 +766,7 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
         "training": {"course_key": body.course_key, "ends_at": ends.isoformat()},
     }})
     await add_event(db, pid, "team", f"{emp['name']} iniciou a formação {course['name']}.")
+    await record_tx(db, pid, "training", -course["cost"], "clean", player["clean_money"] - course["cost"], f"Formação {course['name']} de {emp['name']}")
     return {"ok": True}
 
 
@@ -805,6 +815,7 @@ async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     }})
     await push_history(db, emp["_id"], f"Promovido a {new_rank.replace('_', ' ')}.")
     await add_event(db, pid, "team", f"{emp['name']} promovido a {new_rank.replace('_', ' ')} por {cost:,} €.")
+    await record_tx(db, pid, "promote", -cost, "clean", player["clean_money"] - cost, f"Promoção de {emp['name']}")
     return {"ok": True}
 
 
@@ -823,6 +834,7 @@ async def bonus_employee(body: EmployeeIdInput, user: dict = Depends(get_current
     }})
     await push_history(db, emp["_id"], f"Recebeu um bónus de {cost:,} €.")
     await add_event(db, pid, "team", f"Bónus de {cost:,} € pago a {emp['name']}. Moral e lealdade subiram.")
+    await record_tx(db, pid, "bonus", -cost, "clean", player["clean_money"] - cost, f"Bónus para {emp['name']}")
     return {"cost": cost}
 
 
@@ -841,6 +853,7 @@ async def heal_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "idle", "status_until": None}})
     await push_history(db, emp["_id"], "Tratado na clínica clandestina.")
     await add_event(db, pid, "team", f"{emp['name']} tratado na clínica clandestina por {cost:,} €.")
+    await record_tx(db, pid, "heal", -cost, "clean", player["clean_money"] - cost, f"Clínica para {emp['name']}")
     return {"cost": cost}
 
 
@@ -862,6 +875,7 @@ async def release_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     }})
     await push_history(db, emp["_id"], "Libertado com ajuda do advogado.")
     await add_event(db, pid, "team", f"{emp['name']} libertado da prisão por {cost:,} € (advogados e subornos).")
+    await record_tx(db, pid, "release", -cost, "clean", player["clean_money"] - cost, f"Advogado para {emp['name']}")
     return {"cost": cost}
 
 
@@ -880,6 +894,7 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": -3}})
     await db.employees.update_many({"player_id": pid, "morale": {"$lt": 0}}, {"$set": {"morale": 0.0}})
     await add_event(db, pid, "team", f"{emp['name']} despedido (indemnização de {severance:,} €). A moral da equipa ressentiu-se.")
+    await record_tx(db, pid, "fire", -severance, "clean", player["clean_money"] - severance, f"Indemnização de {emp['name']}")
     return {"severance": severance}
 
 
@@ -918,6 +933,7 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -model["price"], "stats.vehicles_bought": 1}})
     await db.vehicles.insert_one(vehicle_doc(pid, body.model_key, now_utc().isoformat()))
     await add_event(db, pid, "vehicle", f"{model['name']} adquirido por {model['price']:,} €.")
+    await record_tx(db, pid, "vehicle_buy", -model["price"], "clean", player["clean_money"] - model["price"], f"Compra de {model['name']}")
     return {"ok": True}
 
 
@@ -938,12 +954,15 @@ async def sell_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
         raise HTTPException(status_code=400, detail="O veículo está em missão")
+    if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
+        raise HTTPException(status_code=400, detail="O veículo está a abastecer")
     value = int(vehicle["price"] * 0.4 * vehicle["condition"] / 100)
     if vehicle.get("team_id"):
         await db.teams.update_one({"_id": ObjectId(vehicle["team_id"])}, {"$set": {"vehicle_id": None}})
     await db.vehicles.delete_one({"_id": vehicle["_id"]})
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
     await add_event(db, pid, "vehicle", f"{vehicle['name']} abatido. Recebeste {value:,} €.")
+    await record_tx(db, pid, "vehicle_sell", value, "clean", player["clean_money"] + value, f"Venda de {vehicle['name']}")
     return {"value": value}
 
 
@@ -956,16 +975,21 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
         raise HTTPException(status_code=400, detail="O veículo está em missão")
+    if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
+        raise HTTPException(status_code=400, detail="Já está a abastecer")
     missing = vehicle["tank_l"] - vehicle["fuel_l"]
     if missing <= 0.1:
         raise HTTPException(status_code=400, detail="Depósito já está cheio")
     cost = math.ceil(missing * FUEL_PRICES[vehicle["fuel_type"]])
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    duration_s = REFUEL_DURATION_BASE_S + REFUEL_DURATION_PER_L_S * missing
+    until = (now_utc() + timedelta(seconds=duration_s)).isoformat()
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_refueled": 1}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"fuel_l": vehicle["tank_l"]}, "$inc": {"fuel_spent_total": cost}})
-    await add_event(db, pid, "vehicle", f"{vehicle['name']} abastecido ({vehicle['fuel_type']}) por {cost:,} €.")
-    return {"cost": cost}
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"refueling_until": until}, "$inc": {"fuel_spent_total": cost}})
+    await add_event(db, pid, "vehicle", f"{vehicle['name']} a abastecer ({vehicle['fuel_type']}) por {cost:,} € — pronto em {round(duration_s)}s.")
+    await record_tx(db, pid, "refuel", -cost, "clean", player["clean_money"] - cost, f"Combustível para {vehicle['name']}")
+    return {"cost": cost, "refueling_until": until}
 
 
 @router.post("/vehicles/repair")
@@ -983,8 +1007,9 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     _, props = await get_caps(db, pid)
     bonuses = await get_org_bonuses(db, pid)
     now = now_utc()
+    prop_ranks = property_stack_ranks(props)
     discount = min(0.6, sum(
-        0.15 * p["level"] * property_condition_factor(p)
+        0.15 * p["level"] * property_condition_factor(p) * property_stack_mult(prop_ranks[p["_id"]])
         for p in props if p["type_key"] == "oficina" and property_active(p, now)
     ) + bonuses["repair_discount"])
     cost = max(50, int(missing * vehicle["price"] * 0.002 * (1 - discount)))
@@ -996,6 +1021,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
         "$inc": {"repair_spent_total": cost},
     })
     await add_event(db, pid, "vehicle", f"{vehicle['name']} reparado por {cost:,} €.")
+    await record_tx(db, pid, "repair", -cost, "clean", player["clean_money"] - cost, f"Reparação de {vehicle['name']}")
     return {"cost": cost}
 
 
@@ -1060,6 +1086,7 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         "level": 1, "bought_at": now_utc().isoformat(),
     })
     await add_event(db, pid, "property", f"{pt['name']} comprado em {spot['name']} por {pt['price']:,} €.")
+    await record_tx(db, pid, "property_buy", -pt["price"], "clean", player["clean_money"] - pt["price"], f"Compra de {pt['name']}")
     return {"ok": True}
 
 
@@ -1086,6 +1113,7 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
     await db.properties.delete_one({"_id": prop["_id"]})
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
     await add_event(db, pid, "property", f"{prop['name']} vendido por {value:,} €.")
+    await record_tx(db, pid, "property_sell", value, "clean", player["clean_money"] + value, f"Venda de {prop['name']}")
     return {"value": value}
 
 
@@ -1111,6 +1139,7 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.properties_upgraded": 1}})
     await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"upgrading_until": until}})
     await add_event(db, pid, "property", f"{prop['name']} começou a ser melhorado para nível {target_level} por {cost:,} € — pronto em {round(duration_s / 60, 1)} min.")
+    await record_tx(db, pid, "property_upgrade", -cost, "clean", player["clean_money"] - cost, f"Melhoria de {prop['name']}")
     return {"ok": True, "upgrading_until": until}
 
 
@@ -1143,6 +1172,7 @@ async def bribe_police(user: dict = Depends(get_current_user)):
     new_heat = max(0.0, player["heat"] - 40)
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.bribes_paid": 1}, "$set": {"heat": new_heat}})
     await add_event(db, pid, "police", f"Suborno de {cost:,} € pago. O calor baixou para {round(new_heat)}%.")
+    await record_tx(db, pid, "bribe", -cost, "clean", player["clean_money"] - cost, "Suborno à polícia")
     return {"cost": cost}
 
 
@@ -1167,7 +1197,18 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
         "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,
     }})
     await add_event(db, pid, "launder", f"Lavagem de {body.amount:,} € — recebeste {clean_gain:,} € limpos (taxa {round((1 - rate) * 100)}%).")
+    await record_tx(db, pid, "launder_out", -body.amount, "dirty", player["dirty_money"] - body.amount, "Lavagem de dinheiro")
+    await record_tx(db, pid, "launder_in", clean_gain, "clean", player["clean_money"] + clean_gain, "Lavagem de dinheiro")
     return {"clean_gain": clean_gain}
+
+
+@router.get("/transactions")
+async def get_transactions(user: dict = Depends(get_current_user)):
+    """Extrato: as últimas transações, mais recente primeiro."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    txs = await db.transactions.find({"player_id": pid}).sort("ts", -1).to_list(50)
+    return {"transactions": [Transaction.from_mongo(t).model_dump() for t in txs]}
 
 
 # ---------------- Missões ----------------

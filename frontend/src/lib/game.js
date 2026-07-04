@@ -4,6 +4,9 @@ import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMa
 // mesmo laranja já usado no resto do site (heatStatus "Alerta", feridos, etc.).
 export const NOTIFY_COLOR = "#F97316";
 
+// Compras acima deste valor pedem confirmação em dois passos antes de gastar.
+export const LARGE_PURCHASE_THRESHOLD = 20000;
+
 export const CATEGORY_COLORS = {
   assalto: "#EF4444",
   logistica: "#F59E0B",

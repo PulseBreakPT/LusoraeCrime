@@ -71,6 +71,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
     if (!vehicle) return { ok: false, reason: "Sem veículo" };
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
+    if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow()) {
+      return { ok: false, reason: "A abastecer" };
+    }
     if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
     const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
     if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
