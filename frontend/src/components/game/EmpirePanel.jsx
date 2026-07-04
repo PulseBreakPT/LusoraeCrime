@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { useAuth } from "../../context/AuthContext";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
 import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
-  Building2, Banknote, LogOut, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown,
+  Building2, Banknote, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown,
   AlertTriangle, History, ChevronDown, Clock,
 } from "lucide-react";
 
@@ -22,7 +21,6 @@ const TX_LABELS = {
 
 export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, catalog, serverNow, launder, bribePolice, fetchTransactions } = useGame();
-  const { logout } = useAuth();
   const [amount, setAmount] = useState("");
   const [showLedger, setShowLedger] = useState(false);
   const [transactions, setTransactions] = useState([]);
@@ -320,15 +318,6 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             </div>
           )}
         </div>
-
-        <Button
-          data-testid="logout-button"
-          onClick={logout}
-          variant="outline"
-          className="mt-8 w-full border-white/10 bg-transparent text-xs font-bold uppercase tracking-wider text-zinc-400 hover:bg-white/5 hover:text-white"
-        >
-          <LogOut size={14} className="mr-1.5" /> Sair da rede
-        </Button>
       </SheetContent>
     </Sheet>
   );

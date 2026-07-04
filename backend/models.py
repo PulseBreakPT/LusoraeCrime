@@ -45,6 +45,7 @@ class Player(BaseDocument):
     type_cooldowns: dict = {}
     achievement_bonus_pct: float = 0.0
     favorite_types: List[str] = []
+    settings: dict = {}
 
 
 class Team(BaseDocument):

@@ -27,3 +27,12 @@ export function usePersistedState(key, fallback) {
 
   return [value, setValue];
 }
+
+// Como "Memorizar filtros"/"Memorizar ordenação" (Definições > Interface) podem
+// estar desligados, isto escolhe entre persistir em localStorage ou usar estado
+// efémero — sempre chama os dois hooks (regras dos hooks) e devolve o par certo.
+export function usePreferenceState(key, fallback, remember) {
+  const persisted = usePersistedState(key, fallback);
+  const ephemeral = useState(fallback);
+  return remember ? persisted : ephemeral;
+}

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { GameProvider } from "./context/GameContext";
+import { SettingsProvider } from "./context/SettingsContext";
 import AuthPage from "./pages/AuthPage";
 import GamePage from "./pages/GamePage";
 import { Loader2 } from "lucide-react";
@@ -30,9 +31,11 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <GameProvider>
-                  <GamePage />
-                </GameProvider>
+                <SettingsProvider>
+                  <GameProvider>
+                    <GamePage />
+                  </GameProvider>
+                </SettingsProvider>
               </ProtectedRoute>
             }
           />

@@ -81,6 +81,15 @@ class LoginInput(BaseModel):
     password: str
 
 
+class ChangePasswordInput(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class DeleteAccountInput(BaseModel):
+    password: str
+
+
 def user_public(user: dict) -> dict:
     return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", "")}
 
@@ -170,6 +179,33 @@ async def logout(response: Response):
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
     return user_public({**user, "_id": user["_id"]})
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordInput, user: dict = Depends(get_current_user)):
+    full_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    if not full_user or not verify_password(body.current_password, full_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Palavra-passe atual incorreta")
+    await db.users.update_one({"_id": full_user["_id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
+    return {"ok": True}
+
+
+@router.post("/delete-account")
+async def delete_account(body: DeleteAccountInput, response: Response, user: dict = Depends(get_current_user)):
+    full_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    if not full_user or not verify_password(body.password, full_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Palavra-passe incorreta")
+    player = await db.players.find_one({"user_id": user["_id"]})
+    if player:
+        pid = str(player["_id"])
+        for coll in (db.teams, db.employees, db.vehicles, db.properties, db.opportunities,
+                     db.missions, db.events, db.quests, db.candidates, db.transactions):
+            await coll.delete_many({"player_id": pid})
+        await db.players.delete_one({"_id": player["_id"]})
+    await db.users.delete_one({"_id": ObjectId(user["_id"])})
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"ok": True}
 
 
 @router.post("/refresh")

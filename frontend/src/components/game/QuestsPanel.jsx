@@ -4,7 +4,8 @@ import {
   fmtMoney, fmtDuration, QUEST_STATUS_LABELS, QUEST_STATUS_COLORS,
   DIFFICULTY_LABELS, DIFFICULTY_COLORS, CHAPTER_LABELS, QUEST_TYPE_LABELS,
 } from "../../lib/game";
-import { usePersistedState } from "../../lib/persist";
+import { usePreferenceState } from "../../lib/persist";
+import { useSettings } from "../../context/SettingsContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles, ArrowRight } from "lucide-react";
 
@@ -175,7 +176,8 @@ const TABS = [
 
 export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, serverNow, claimQuest } = useGame();
-  const [tab, setTab] = usePersistedState("questsTab", "historia");
+  const { rememberSort } = useSettings();
+  const [tab, setTab] = usePreferenceState("questsTab", "historia", rememberSort);
   useTick(open);
   if (!state) return null;
 

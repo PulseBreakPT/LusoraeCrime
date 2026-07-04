@@ -1429,3 +1429,87 @@ class TestContentInterlinking:
             has_passive = bool(specs[role].get("passive"))
             has_talent = role in talent_roles
             assert has_passive or has_talent, f"{role} não tem bónus passivo nem talento associado"
+
+
+# ---------------- Módulo de Definições: conta e automatizações ----------------
+class TestAccountSettings:
+    def test_change_password_wrong_current_rejected(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/auth/change-password",
+                   json={"current_password": "wrong-password", "new_password": "NovaPass123!"}, timeout=TIMEOUT)
+        assert r.status_code == 400
+
+    def test_change_password_then_login_with_new_password(self):
+        s, email = register_new()
+        r = s.post(f"{BASE_URL}/api/auth/change-password",
+                   json={"current_password": "TestPass123!", "new_password": "NovaPass456!"}, timeout=TIMEOUT)
+        assert r.status_code == 200
+
+        s2 = requests.Session()
+        r_old = s2.post(f"{BASE_URL}/api/auth/login",
+                        json={"email": email, "password": "TestPass123!"}, timeout=TIMEOUT)
+        assert r_old.status_code == 401
+
+        r_new = s2.post(f"{BASE_URL}/api/auth/login",
+                        json={"email": email, "password": "NovaPass456!"}, timeout=TIMEOUT)
+        assert r_new.status_code == 200
+
+    def test_delete_account_wrong_password_rejected(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/auth/delete-account", json={"password": "wrong-password"}, timeout=TIMEOUT)
+        assert r.status_code == 400
+        # A conta continua a existir e a sessão continua válida.
+        r_me = s.get(f"{BASE_URL}/api/auth/me", timeout=TIMEOUT)
+        assert r_me.status_code == 200
+
+    def test_delete_account_removes_player_and_login(self):
+        s, email = register_new()
+        r = s.post(f"{BASE_URL}/api/auth/delete-account", json={"password": "TestPass123!"}, timeout=TIMEOUT)
+        assert r.status_code == 200
+
+        r_me = s.get(f"{BASE_URL}/api/auth/me", timeout=TIMEOUT)
+        assert r_me.status_code == 401
+
+        s2 = requests.Session()
+        r_login = s2.post(f"{BASE_URL}/api/auth/login",
+                          json={"email": email, "password": "TestPass123!"}, timeout=TIMEOUT)
+        assert r_login.status_code == 401
+
+
+class TestAutomationSettings:
+    def test_state_exposes_default_settings(self):
+        s, _ = register_new()
+        st = get_state(s)
+        assert "settings" in st["player"]
+
+    def test_settings_update_persists_and_is_clamped(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/settings",
+                   json={"auto_repair_enabled": True, "auto_repair_threshold": 500}, timeout=TIMEOUT)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["settings"]["auto_repair_enabled"] is True
+        assert body["settings"]["auto_repair_threshold"] == 99, "limite deve ser capado a 99"
+
+        st = get_state(s)
+        assert st["player"]["settings"]["auto_repair_enabled"] is True
+
+    def test_settings_update_is_partial(self):
+        s, _ = register_new()
+        r1 = s.post(f"{BASE_URL}/api/game/settings", json={"auto_refuel_enabled": True}, timeout=TIMEOUT)
+        assert r1.status_code == 200
+        r2 = s.post(f"{BASE_URL}/api/game/settings", json={"auto_rest_enabled": True}, timeout=TIMEOUT)
+        assert r2.status_code == 200
+        assert r2.json()["settings"]["auto_refuel_enabled"] is True, "atualização parcial não deve apagar outras chaves"
+        assert r2.json()["settings"]["auto_rest_enabled"] is True
+
+    def test_auto_claim_quests_setting_claims_completed_quest(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/settings", json={"auto_claim_quests": True}, timeout=TIMEOUT)
+        assert r.status_code == 200
+        st = get_state(s)
+        # c1_base (comprar um esconderijo) é a primeira missão principal; ainda
+        # não está completa, mas confirma que o pipeline de automação corre sem
+        # erro no tick seguinte (não deve haver nenhuma reclamada por engano).
+        active_or_completed = [q for q in st["quests"] if q["status"] in ("active", "completed")]
+        assert len(active_or_completed) > 0

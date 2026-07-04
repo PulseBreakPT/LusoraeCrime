@@ -3,9 +3,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pencil, Check, X, Star } from "lucide-react";
+import { getDisplayPrefs } from "../../lib/game";
 
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
-  if (!tip) return children;
+  if (!tip || getDisplayPrefs().showTooltips === false) return children;
   return (
     <span
       className={`lus-tip ${block ? "block" : "inline-flex"} ${className}`}
@@ -148,6 +149,7 @@ export const ConfirmButton = ({
   onConfirm, disabled, className = "", armMs = 3000, tip,
 }) => {
   const [armed, setArmed] = useState(false);
+  const skipArm = getDisplayPrefs().confirmIrreversible === false;
   useEffect(() => {
     if (!armed) return;
     const id = setTimeout(() => setArmed(false), armMs);
@@ -157,7 +159,7 @@ export const ConfirmButton = ({
     <Tip tip={armed ? "Clica outra vez para confirmar — ação irreversível." : tip} block className={className}>
       <button
         data-testid={testId}
-        onClick={() => { if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
+        onClick={() => { if (skipArm) { onConfirm(); return; } if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
         disabled={disabled}
         className={`flex w-full items-center justify-center gap-1 rounded border px-2 py-1.5 font-mono text-[10px] transition-colors disabled:opacity-40 ${
           armed ? "border-red-500/60 bg-red-500/20 text-red-300" : `border-white/10 ${color} hover:bg-white/5`
@@ -168,6 +170,28 @@ export const ConfirmButton = ({
     </Tip>
   );
 };
+
+// Interruptor compacto para as Definições — mesma estética escura das restantes
+// células, sem depender do componente Switch genérico (cores diferentes do resto do jogo).
+export const ToggleSwitch = ({ checked, onChange, testId, disabled }) => (
+  <button
+    type="button"
+    data-testid={testId}
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => onChange(!checked)}
+    className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:opacity-40 ${
+      checked ? "border-emerald-500/60 bg-emerald-500/30" : "border-white/15 bg-white/5"
+    }`}
+  >
+    <span
+      className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+        checked ? "translate-x-4" : "translate-x-0.5"
+      }`}
+    />
+  </button>
+);
 
 // Pisca brevemente quando um valor observado muda (ex.: uma equipa que acabou
 // de regressar, uma missão que ficou pronta) — chama a atenção sem depender de texto.

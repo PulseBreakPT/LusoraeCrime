@@ -52,7 +52,31 @@ export function AuthProvider({ children }) {
     }
   };
 
-  return <AuthContext.Provider value={{ user, login, register, logout }}>{children}</AuthContext.Provider>;
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      await api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  };
+
+  const deleteAccount = async (password) => {
+    try {
+      await api.post("/auth/delete-account", { password });
+      clearTokens();
+      setUser(false);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, changePassword, deleteAccount }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);

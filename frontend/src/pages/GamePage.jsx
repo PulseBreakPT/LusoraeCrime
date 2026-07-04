@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../context/GameContext";
+import { useSettings } from "../context/SettingsContext";
 import LiveMap, { MapLegend } from "../components/game/LiveMap";
 import { ResourceBar } from "../components/game/ResourceBar";
 import { OpportunityCard } from "../components/game/OpportunityCard";
@@ -10,13 +11,15 @@ import { FleetPanel } from "../components/game/FleetPanel";
 import { PropertiesPanel } from "../components/game/PropertiesPanel";
 import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
+import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import { Tip } from "../components/game/hud";
-import { fmtMoney, orgAlerts, teamsReadiness, NOTIFY_COLOR } from "../lib/game";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2 } from "lucide-react";
+import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings } from "lucide-react";
 
 export default function GamePage() {
-  const { state, serverNow } = useGame();
+  const { state, serverNow, autoOpenReportSignal } = useGame();
+  const { hideImpossibleMissions } = useSettings();
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
 
@@ -26,6 +29,11 @@ export default function GamePage() {
     if (!still) setSelectedOpp(null);
     else if (still !== selectedOpp) setSelectedOpp(still);
   }, [state, selectedOpp]);
+
+  useEffect(() => {
+    if (autoOpenReportSignal) setOpenPanel((prev) => prev || "intel");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenReportSignal]);
 
   if (!state) {
     return (
@@ -56,11 +64,14 @@ export default function GamePage() {
   if (alerts.nearBreakdown) fleetTipParts.push(`${alerts.nearBreakdown} perto de avariar`);
   const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollDueSoon ? 1 : 0);
   const fleetAlertCount = alerts.fleet + alerts.nearBreakdown;
+  const mapState = hideImpossibleMissions
+    ? { ...state, opportunities: state.opportunities.filter((o) => opportunityReachable(state, o)) }
+    : state;
 
   return (
     <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-[#050505]">
       <LiveMap
-        state={state}
+        state={mapState}
         serverNow={serverNow}
         selectedOppId={selectedOpp?.id}
         onSelectOpp={(opp) => setSelectedOpp(opp)}
@@ -83,6 +94,16 @@ export default function GamePage() {
           {alerts.total > 0 && (
             <span data-testid="intel-alert-badge" className="rounded-full px-1.5 font-mono text-[10px] font-bold" style={{ background: NOTIFY_COLOR }}>{alerts.total}</span>
           )}
+        </button>
+      </Tip>
+      <Tip tip="Definições — conta, interface, automatizações e notificações." side="bottom" align="end" className="pointer-events-auto absolute right-2 top-32 z-20">
+        <button
+          data-testid="open-settings-button"
+          onClick={() => setOpenPanel("settings")}
+          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black md:px-3"
+        >
+          <Settings size={16} className="text-zinc-400" />
+          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
         </button>
       </Tip>
       <ActivityFeed />
@@ -142,6 +163,7 @@ export default function GamePage() {
       <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={setOpenPanel} />
       <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={setOpenPanel} />
       <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={setOpenPanel} />
+      <SettingsPanel open={openPanel === "settings"} onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />
     </div>
   );
 }

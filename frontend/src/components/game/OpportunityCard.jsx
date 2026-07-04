@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
+import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
@@ -10,6 +11,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     state, catalog, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
     recommendTeamForOpportunity, toggleFavoriteType,
   } = useGame();
+  const { autoSelectBestTeam, lowSuccessThreshold } = useSettings();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [recommendedTeamId, setRecommendedTeamId] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -58,11 +60,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       if (cancelled) return;
       if (r.ok && r.data?.team_id) {
         setRecommendedTeamId(r.data.team_id);
-        setSelectedTeamId(r.data.team_id);
+        if (autoSelectBestTeam) setSelectedTeamId(r.data.team_id);
       }
     });
     return () => { cancelled = true; };
-  }, [opp.id, inProgress, recommendTeamForOpportunity]);
+  }, [opp.id, inProgress, recommendTeamForOpportunity, autoSelectBestTeam]);
 
   if (!state) return null;
   const hq = state.player.hq;
@@ -352,6 +354,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   {Math.round(preview.chance * 100)}%
                 </p>
               </div>
+              {preview.chance < lowSuccessThreshold && (
+                <p data-testid="low-success-warning" className="mt-1 flex items-center gap-1 font-mono text-[10px] font-bold text-amber-400">
+                  <AlertTriangle size={11} /> Probabilidade abaixo do limite definido ({Math.round(lowSuccessThreshold * 100)}%)
+                </p>
+              )}
               <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-7">
                 <PreviewFactor label="Risco" value={preview.breakdown.risco} tip="Penalização base do risco da operação." />
                 <PreviewFactor label="Equipa" value={preview.breakdown.equipa} tip="Competência dos membros nos atributos relevantes." />
