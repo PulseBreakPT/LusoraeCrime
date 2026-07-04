@@ -21,7 +21,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
                        TEAM_MAX_MEMBERS, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
-                       random_employee_name)
+                       NEWBIE_RAMP_S, random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -158,6 +158,7 @@ async def catalog():
         "property_max_level": PROPERTY_MAX_LEVEL,
         "base_caps": {"employees": BASE_EMPLOYEE_CAP, "vehicles": BASE_VEHICLE_CAP},
         "team_max_members": TEAM_MAX_MEMBERS,
+        "newbie_ramp_s": NEWBIE_RAMP_S,
         "opportunity_types": {k: {kk: vv for kk, vv in v.items() if kk != "duration_s"} for k, v in OPPORTUNITY_TYPES.items()},
     }
 
@@ -280,7 +281,7 @@ async def _prepare_dispatch(player, opp, team):
         mult += tb["pct"]
     reward = int(opp["reward"] * mult)
 
-    team_skill = team_effectiveness(members, opp["category"])
+    team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
     team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
     vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
@@ -674,6 +675,7 @@ async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
         "rank": new_rank, "salary": int(emp.get("salary", 0) * 1.1),
         "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
         "morale": min(100.0, emp.get("morale", 70) + 8),
+        "fatigue": 0.0,
     }})
     await push_history(db, emp["_id"], f"Promovido a {new_rank.replace('_', ' ')}.")
     await add_event(db, pid, "team", f"{emp['name']} promovido a {new_rank.replace('_', ' ')} por {cost:,} €.")

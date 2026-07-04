@@ -574,6 +574,57 @@ class TestVehicleMechanics:
         assert "lugares" in r.json()["detail"].lower()
 
 
+# ---------------- Funcionários: novatos, moral e energia ----------------
+class TestEmployeeMechanics:
+    def test_employee_exposes_hired_at_and_last_mission_at(self):
+        s, _ = register_new()
+        emp = get_state(s)["employees"][0]
+        assert "hired_at" in emp and emp["hired_at"]
+        assert "last_mission_at" in emp  # None até à primeira missão
+
+    def test_catalog_exposes_newbie_ramp_s(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["newbie_ramp_s"] > 0
+
+    @pytest.mark.slow
+    def test_promote_resets_fatigue(self):
+        s, _ = register_new()
+        st = get_state(s)
+        emp = st["employees"][0]
+        # Sobe de nível 1 para 2 via formação (curso "conducao": 100s, +50 XP;
+        # o limiar de XP para o nível 2 é 100, por isso repete até subir).
+        for _ in range(3):
+            st = get_state(s)
+            e = next(e for e in st["employees"] if e["id"] == emp["id"])
+            if e["level"] >= 2:
+                break
+            if e["status"] != "idle":
+                time.sleep(15)
+                continue
+            r = s.post(f"{BASE_URL}/api/game/employees/train",
+                       json={"employee_id": emp["id"], "course_key": "conducao"}, timeout=TIMEOUT)
+            assert r.status_code == 200, r.text
+            deadline = time.time() + 140
+            while time.time() < deadline:
+                time.sleep(15)
+                e2 = next(e for e in get_state(s)["employees"] if e["id"] == emp["id"])
+                if e2["status"] == "idle":
+                    break
+        st2 = get_state(s)
+        e2 = next(e for e in st2["employees"] if e["id"] == emp["id"])
+        if e2["level"] < 2:
+            pytest.skip("employee did not reach level 2 within retry budget")
+        r = s.post(f"{BASE_URL}/api/game/employees/promote",
+                   json={"employee_id": emp["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st3 = get_state(s)
+        e3 = next(e for e in st3["employees"] if e["id"] == emp["id"])
+        assert e3["rank"] == "membro"
+        assert e3["fatigue"] == 0.0
+
+
 # ---------------- Fleet regression ----------------
 class TestFleet:
     def test_vehicle_full_flow(self):

@@ -47,6 +47,7 @@ export const EMP_STATUS_LABELS = {
   resting: "A descansar",
   injured: "Ferido",
   arrested: "Preso",
+  absent: "Faltou ao trabalho",
 };
 
 export const EMP_STATUS_COLORS = {
@@ -56,6 +57,7 @@ export const EMP_STATUS_COLORS = {
   resting: "#A78BFA",
   injured: "#F97316",
   arrested: "#EF4444",
+  absent: "#F59E0B",
 };
 
 export const RARITY_LABELS = { comum: "Comum", raro: "Raro", elite: "Elite", lendario: "Lendário" };

@@ -193,6 +193,20 @@ LUXURY_HEAT_MULT = 1.4                     # multiplicador de calor ao usar veí
 WEAR_KM_RAMP = 8000                        # km a partir dos quais o desgaste por missão aumenta
 WEAR_KM_MAX_MULT = 1.5                     # multiplicador máximo de desgaste para veículos muito usados
 
+# ---------------- Funcionários: desempenho, novatos e disponibilidade ----------------
+
+NEWBIE_RAMP_S = 3600                  # tempo (s) desde a contratação até deixar de ser "novato"
+NEWBIE_PENALTY_MAX = 0.10             # penalização máxima de desempenho para um recém-contratado
+HIGH_MORALE_THRESHOLD = 90            # moral a partir da qual há um bónus extra de desempenho
+HIGH_MORALE_BONUS = 0.05              # bónus de desempenho para moral muito alta
+LOW_MORALE_ABSENCE_THRESHOLD = 25     # moral abaixo da qual pode faltar ao trabalho
+ABSENCE_CHANCE_PER_MIN = 0.003        # probabilidade de faltar, por minuto real, com moral baixa
+ABSENCE_DURATION_S = 600              # duração da falta ao trabalho
+FULL_ENERGY_FATIGUE_MAX = 10          # fadiga abaixo da qual conta como "energia máxima"
+FULL_ENERGY_XP_BONUS = 0.10           # bónus de XP ao entrar em missão com energia máxima
+XP_DECAY_IDLE_DAYS = 5                # dias sem participar numa missão antes de começar a perder XP
+XP_DECAY_PER_MIN = 0.05               # XP perdido por minuto real de inatividade prolongada
+
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
 
 # ---------------- Propriedades ----------------

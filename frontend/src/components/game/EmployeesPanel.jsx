@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
-  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car,
+  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -19,6 +19,7 @@ const EMP_STATUS_TIPS = {
   resting: "A descansar — recupera 50 de fadiga e +5 de moral.",
   injured: "Ferido — não pode operar. Paga a clínica para o curar.",
   arrested: "Preso — contrata o advogado ou paga suborno para o libertar.",
+  absent: "Faltou ao trabalho por moral demasiado baixa — volta sozinho passado um tempo.",
 };
 
 const useTick = (active) => {
@@ -86,6 +87,9 @@ const EmployeeCard = ({ e }) => {
   const untilIso = e.status === "training" ? e.training?.ends_at : e.status_until;
   const remaining = untilIso ? Math.max(0, (Date.parse(untilIso) - serverNow()) / 1000) : null;
 
+  const newbieRampS = catalog?.newbie_ramp_s || 3600;
+  const isNewbie = e.hired_at ? (serverNow() - Date.parse(e.hired_at)) / 1000 < newbieRampS : false;
+
   const team = e.team_id ? state.teams.find((t) => t.id === e.team_id) : null;
   const vehicle = team?.vehicle_id ? state.vehicles.find((v) => v.id === team.vehicle_id) : null;
   const mission = e.status === "on_mission" && team ? state.missions.find((m) => m.team_id === team.id) : null;
@@ -124,6 +128,13 @@ const EmployeeCard = ({ e }) => {
               <span data-testid={`employee-level-${e.id}`} className="shrink-0 font-mono text-[10px] font-bold text-cyan-400">N{e.level}/{maxLevel}</span>
             </Tip>
             <span className="shrink-0 font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
+            {isNewbie && (
+              <Tip tip="Recém-contratado — ainda se está a adaptar, com um pequeno desempenho reduzido que desaparece na primeira hora ao serviço.">
+                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-lime-400">
+                  <Leaf size={9} /> novato
+                </span>
+              </Tip>
+            )}
           </div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank}
