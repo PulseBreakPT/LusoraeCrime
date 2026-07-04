@@ -25,7 +25,18 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        PROPERTY_MAINTENANCE_PCT_PER_DAY, PROPERTY_CONDITION_RECOVERY_PER_HOUR,
                        PROPERTY_CONDITION_DECAY_PER_HOUR, PROPERTY_UPGRADE_BASE_S,
                        PROPERTY_UPGRADE_PER_LEVEL_S, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
-                       LAUNDER_PROPERTY_BONUS_PER_LEVEL)
+                       LAUNDER_PROPERTY_BONUS_PER_LEVEL,
+                       DIRTY_MONEY_HEAT_THRESHOLD, DIRTY_MONEY_HEAT_PER_10K,
+                       LOW_LEVEL_XP_GAP, LOW_LEVEL_XP_MULT_PER_GAP, LOW_LEVEL_XP_MULT_MIN,
+                       TEAM_COUNT_BASE, TEAM_COUNT_PER_2_LEVELS, ACHIEVEMENT_MILESTONES,
+                       ACHIEVEMENT_BONUS_PCT_PER_MILESTONE, LOCAL_PRESENCE_RADIUS_KM,
+                       LOCAL_PRESENCE_PREP_REDUCTION_S, LOCAL_PRESENCE_PREP_REDUCTION_MAX_S,
+                       TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, UNEXPECTED_REPAIR_CHANCE_PER_RISK,
+                       UNEXPECTED_REPAIR_CONDITION_HIT, EXCEPTIONAL_PERFORMANCE_CHANCE,
+                       EXCEPTIONAL_PERFORMANCE_XP_BONUS_PCT, BONUS_LOOT_CHANCE, BONUS_LOOT_MAX_PCT,
+                       WEAR_PER_MISSION_SINCE_REPAIR, WEAR_MISSIONS_SINCE_REPAIR_CAP,
+                       EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
+                       RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -296,6 +307,18 @@ def min_members_for(risk):
     return max(1, risk - 1)
 
 
+def achievement_bonus_pct(missions_success):
+    """Conquistas permanentes: bónus de recompensa que nunca desaparece,
+    concedido por cada marco de missões bem-sucedidas atingido."""
+    reached = sum(1 for milestone in ACHIEVEMENT_MILESTONES if missions_success >= milestone)
+    return round(reached * ACHIEVEMENT_BONUS_PCT_PER_MILESTONE, 4)
+
+
+def max_teams_for(level):
+    """Nº máximo de equipas que a organização pode ter, crescente com o nível."""
+    return TEAM_COUNT_BASE + ((max(1, level) - 1) // 2) * TEAM_COUNT_PER_2_LEVELS
+
+
 def duration_reward_mult(duration_s):
     """Operações mais longas pagam melhor por minuto do que operações muito
     rápidas — neutro aos 90s, até +15% aos 300s e até -10% aos 30s."""
@@ -330,6 +353,23 @@ def member_split_mult(members_count, min_members):
     redução de recompensa por cada membro extra."""
     extra = max(0, members_count - min_members)
     return 1 - min(MEMBER_SPLIT_PENALTY_MAX, MEMBER_SPLIT_PENALTY_PER_EXTRA * extra)
+
+
+def local_presence_reduction_s(nearby_active_count):
+    """Ter outras equipas já em ação perto do alvo reduz ligeiramente o tempo
+    de preparação/viagem — a organização já conhece a zona."""
+    return min(LOCAL_PRESENCE_PREP_REDUCTION_MAX_S, LOCAL_PRESENCE_PREP_REDUCTION_S * nearby_active_count)
+
+
+def apply_dirty_money_heat(player, hours):
+    """Acumular demasiado dinheiro sujo atrai atenção — gera calor extra."""
+    if hours <= 0:
+        return
+    excess = player.get("dirty_money", 0) - DIRTY_MONEY_HEAT_THRESHOLD
+    if excess <= 0:
+        return
+    extra_heat = (excess / 10000) * DIRTY_MONEY_HEAT_PER_10K * hours
+    player["heat"] = min(100.0, player["heat"] + extra_heat)
 
 
 async def spawn_opportunities(db, player, rare_chance=0.0):
@@ -393,18 +433,29 @@ def effective_speed(vehicle):
     return vehicle["speed"] * (0.6 + 0.4 * c / 50)
 
 
-def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0, vehicle_bonus=0.0):
+def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0,
+                      vehicle_bonus=0.0, situational_bonus=0.0):
     base = 0.92
     risk_pen = -risk * 0.07
     skill_bonus = team_skill * 0.05
     heat_pen = -heat * 0.0015
     match_bonus = 0.12 if spec_match else 0.0
     chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus
-                            + talent_bonus + team_bonus + vehicle_bonus))
+                            + talent_bonus + team_bonus + vehicle_bonus + situational_bonus))
     return chance, {"base": base, "risco": round(risk_pen, 4), "equipa": round(skill_bonus, 4),
                     "calor": round(heat_pen, 4), "match": round(match_bonus, 4),
                     "talentos": round(talent_bonus, 4), "coordenacao": round(team_bonus, 4),
-                    "veiculo": round(vehicle_bonus, 4)}
+                    "veiculo": round(vehicle_bonus, 4), "condicoes": round(situational_bonus, 4)}
+
+
+def situational_bonus_for(category, now):
+    """Operações noturnas dão um pequeno bónus furtivo em categorias discretas."""
+    start, end = NIGHT_STEALTH_HOURS
+    h = now.hour
+    is_night = (start <= h < end) if start <= end else (h >= start or h < end)
+    if is_night and category in DISCREET_CATEGORIES:
+        return NIGHT_STEALTH_BONUS
+    return 0.0
 
 
 def team_effectiveness(members, category, now=None):
@@ -493,7 +544,13 @@ def _apply_outcome(player, m, outcome):
     if outcome == "success":
         # Money is *not* credited here anymore. Store as pending reward — paid on arrival at HQ
         # if the police chase (if any) is escaped.
-        m["pending_reward"] = int(t["reward"])
+        reward = t["reward"]
+        # Pequeno imprevisto: saque adicional aleatório.
+        if random.random() < BONUS_LOOT_CHANCE:
+            bonus_pct = random.uniform(0.02, BONUS_LOOT_MAX_PCT)
+            reward = int(reward * (1 + bonus_pct))
+            m["bonus_loot"] = True
+        m["pending_reward"] = int(reward)
         m["pending_pays"] = t["pays"]
         player["respect"] += t["respect"]
         player["heat"] = min(100, player["heat"] + t["heat"] * heat_mult)
@@ -637,7 +694,7 @@ def _outcome_message(m, outcome):
     return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €."
 
 
-async def _crew_returns(db, m, outcome):
+async def _crew_returns(db, player, m, outcome):
     t = m["opportunity"]
     pid = m["player_id"]
     bonuses = await get_org_bonuses(db, pid)
@@ -646,6 +703,10 @@ async def _crew_returns(db, m, outcome):
         emp = await db.employees.find_one({"_id": ObjectId(emp_id)})
         if emp:
             members.append(emp)
+
+    # Missões muito abaixo do nível da organização rendem menos XP.
+    level_gap = max(0, player.get("level", 1) - t.get("min_level", 1) - LOW_LEVEL_XP_GAP)
+    low_level_mult = max(LOW_LEVEL_XP_MULT_MIN, 1 - LOW_LEVEL_XP_MULT_PER_GAP * level_gap)
 
     for emp in members:
         match = emp.get("spec") == t["category"] or t["category"] == "especial"
@@ -665,17 +726,28 @@ async def _crew_returns(db, m, outcome):
         # incentiva variedade.
         if m.get("repeat_type"):
             xp_gain = int(xp_gain * REPEAT_TYPE_XP_MULT)
+        xp_gain = max(1, int(xp_gain * low_level_mult))
+        exceptional = random.random() < EXCEPTIONAL_PERFORMANCE_CHANCE
+        if exceptional:
+            xp_gain = int(xp_gain * (1 + EXCEPTIONAL_PERFORMANCE_XP_BONUS_PCT))
         xp = emp["xp"] + xp_gain
         rarity = emp.get("rarity", "comum")
         new_level = emp_level_for(xp, rarity)
         fat_mult = 0.8 if "rei_da_noite" in emp.get("talents", []) else 1.0
+        # Funcionários muito utilizados (muitas missões feitas) cansam-se mais
+        # depressa — precisam de descansar com mais frequência.
+        if emp.get("missions_done", 0) >= EMPLOYEE_HEAVY_USE_THRESHOLD:
+            fat_mult *= EMPLOYEE_HEAVY_USE_FATIGUE_MULT
         sets = {
             "xp": xp, "level": new_level,
             "fatigue": min(100.0, emp["fatigue"] + (12 + t["risk"] * 4) * fat_mult),
             "morale": max(0.0, min(100.0, emp.get("morale", 70) + d_morale)),
             "loyalty": max(0.0, min(100.0, emp.get("loyalty", 70) + d_loyal)),
             "last_mission_at": now_utc().isoformat(),
+            "missions_done": emp.get("missions_done", 0) + 1,
         }
+        if exceptional:
+            await push_history(db, emp["_id"], f"Desempenho excecional em {t['name']} — XP extra.")
         if new_level > emp["level"]:
             sp = SPECIALIZATIONS.get(emp["role_key"])
             attrs = emp.get("attrs") or {}
@@ -714,14 +786,22 @@ async def _crew_returns(db, m, outcome):
     if m.get("vehicle_id"):
         veh = await db.vehicles.find_one({"_id": ObjectId(m["vehicle_id"])})
         if veh:
-            # Veículos com muitos quilómetros acumulados desgastam-se mais depressa por operação.
+            # Veículos com muitos quilómetros acumulados, ou muitas missões desde a
+            # última reparação, desgastam-se mais depressa por operação.
             wear_mult = 1 + (WEAR_KM_MAX_MULT - 1) * min(1.0, veh.get("km_total", 0) / WEAR_KM_RAMP)
+            missions_since_repair = veh.get("missions_since_repair", 0)
+            wear_mult += WEAR_PER_MISSION_SINCE_REPAIR * min(missions_since_repair, WEAR_MISSIONS_SINCE_REPAIR_CAP)
             wear = (2 + t["risk"] * 1.5) * wear_mult
-            inc = {"missions_done": 1}
+            # Pequeno imprevisto: avaria inesperada após uma operação arriscada.
+            if random.random() < UNEXPECTED_REPAIR_CHANCE_PER_RISK * t["risk"]:
+                wear += UNEXPECTED_REPAIR_CONDITION_HIT
+                await add_event(db, pid, "vehicle", f"{veh['name']} sofreu uma avaria inesperada durante {t['name']}.")
+            new_condition = max(0.0, veh["condition"] - wear)
+            inc = {"missions_done": 1, "missions_since_repair": 1}
             if outcome == "success":
                 inc["missions_success"] = 1
             await db.vehicles.update_one({"_id": veh["_id"]}, {
-                "$set": {"condition": max(0.0, veh["condition"] - wear)},
+                "$set": {"condition": new_condition},
                 "$inc": inc,
             })
 
@@ -737,17 +817,20 @@ async def _progress_mission(db, player, m, now):
     if phase == "operating" and now >= parse_dt(m["finish_at"]):
         outcome = _roll_outcome(player, m)
         _apply_outcome(player, m, outcome)
-        await _crew_returns(db, m, outcome)
+        await _crew_returns(db, player, m, outcome)
         phase = "returning"
         updates.update({"phase": phase, "outcome": outcome})
         # Persist pending reward and chase state so the front-end can display them.
-        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance", "escape_chance", "fine"):
+        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance", "escape_chance", "fine", "bonus_loot"):
             if k in m:
                 updates[k] = m[k]
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
         if outcome == "success":
             player.setdefault("stats", default_stats())["missions_success"] = \
                 player["stats"].get("missions_success", 0) + 1
+            # Conquistas permanentes: cada marco de missões bem-sucedidas concede
+            # um pequeno bónus passivo de recompensa, para sempre.
+            player["achievement_bonus_pct"] = achievement_bonus_pct(player["stats"]["missions_success"])
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning"}, "$inc": {"missions_done": 1}})
         kind = "success" if outcome == "success" else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))
@@ -1125,6 +1208,7 @@ async def advance(db, player):
                                       "vehicles": vehicles, "minutes": minutes})
 
     player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 3)
+    apply_dirty_money_heat(player, minutes / 60)
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
 
@@ -1142,6 +1226,7 @@ async def advance(db, player):
         "frac_dirty": player.get("frac_dirty", 0.0), "frac_clean": player.get("frac_clean", 0.0),
         "frac_launder": player.get("frac_launder", 0.0),
         "type_cooldowns": player.get("type_cooldowns", {}),
+        "achievement_bonus_pct": player.get("achievement_bonus_pct", 0.0),
     }})
     await spawn_opportunities(db, player, rare_chance=bonuses.get("rare_opp", 0.0))
     return player

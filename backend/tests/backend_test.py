@@ -928,3 +928,257 @@ class TestTrainingCompletion:
                 assert e2["xp"] >= base_xp + 50 - 1
                 return
         pytest.fail("training did not complete within 140s")
+
+
+def _quickest_opportunity(st, min_members_max=2):
+    """Escolhe, de entre as oportunidades ativas exequíveis, a de menor
+    duração — para testes que precisam de esperar uma missão completar."""
+    candidates = [o for o in st["opportunities"]
+                  if o["min_level"] <= st["player"]["level"] and o["min_members"] <= min_members_max]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda o: o["duration_s"])
+
+
+def _wait_mission_done(s, mission_id, eta_s, duration_s, extra_s=60, poll_s=10):
+    """Espera que uma missão saia da lista de missões ativas (fase 'done')."""
+    deadline = time.time() + eta_s * 2 + duration_s + extra_s
+    while time.time() < deadline:
+        time.sleep(poll_s)
+        st = get_state(s)
+        if not any(m["id"] == mission_id for m in st["missions"]):
+            return st
+    return None
+
+
+# ---------------- Progressão: limite de equipas e conquistas ----------------
+class TestProgressionCaps:
+    def test_fresh_player_starts_with_team_cap_two(self):
+        s, _ = register_new()
+        st = get_state(s)
+        assert st["caps"]["teams"] == {"used": 1, "max": 2}
+
+    def test_create_team_blocked_at_cap(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/teams/create", json={"spec": "assalto"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st = get_state(s)
+        assert st["caps"]["teams"] == {"used": 2, "max": 2}
+        r = s.post(f"{BASE_URL}/api/game/teams/create", json={"spec": "assalto"}, timeout=TIMEOUT)
+        assert r.status_code == 400
+        assert "Limite" in r.json()["detail"]
+
+    def test_fresh_player_has_no_achievement_bonus(self):
+        s, _ = register_new()
+        st = get_state(s)
+        assert st["player"]["achievement_bonus_pct"] == 0.0
+
+
+# ---------------- Qualidade de vida: favoritos e repetir missão ----------------
+class TestFavoritesAndRepeat:
+    def test_toggle_favorite_type(self):
+        s, _ = register_new()
+        st = get_state(s)
+        type_key = st["opportunities"][0]["type_key"]
+        r = s.post(f"{BASE_URL}/api/game/opportunities/favorite", json={"type_key": type_key}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert type_key in r.json()["favorite_types"]
+        st2 = get_state(s)
+        assert type_key in st2["player"]["favorite_types"]
+        # alternar de novo remove
+        r = s.post(f"{BASE_URL}/api/game/opportunities/favorite", json={"type_key": type_key}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert type_key not in r.json()["favorite_types"]
+
+    def test_toggle_favorite_type_rejects_invalid_key(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/opportunities/favorite", json={"type_key": "nao_existe"}, timeout=TIMEOUT)
+        assert r.status_code == 400
+
+    def test_recommend_repeat_none_before_first_mission(self):
+        s, _ = register_new()
+        team = get_state(s)["teams"][0]
+        r = s.post(f"{BASE_URL}/api/game/dispatch/recommend_repeat", json={"team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["opportunity_id"] is None
+
+    def test_recommend_repeat_after_dispatch_matches_last_type(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opp = _quickest_opportunity(st)
+        assert opp
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st2 = get_state(s)
+        team2 = next(t for t in st2["teams"] if t["id"] == team["id"])
+        assert team2["last_type_key"] == opp["type_key"]
+        r = s.post(f"{BASE_URL}/api/game/dispatch/recommend_repeat", json={"team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        if d["opportunity_id"] is not None:
+            matched = next(o for o in get_state(s)["opportunities"] if o["id"] == d["opportunity_id"])
+            assert matched["type_key"] == opp["type_key"]
+
+
+# ---------------- Pequenos detalhes: condições situacionais na preview ----------------
+class TestSituationalConditions:
+    def test_preview_breakdown_includes_condicoes(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        d = r.json()["breakdown"]
+        assert "condicoes" in d
+        # bónus furtivo noturno só se aplica a categorias discretas de noite; caso
+        # contrário o valor é neutro (0.0) — ambos os casos são válidos aqui.
+        assert d["condicoes"] in (0.0, 0.04)
+
+
+# ---------------- Manutenção: uso, desgaste e reparação ----------------
+class TestMaintenanceMechanics:
+    def test_vehicle_starts_with_zero_missions_since_repair(self):
+        s, _ = register_new()
+        r = s.post(f"{BASE_URL}/api/game/vehicles/buy", json={"model_key": "moto"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        v = next(v for v in get_state(s)["vehicles"] if v["model_key"] == "moto")
+        assert v["missions_since_repair"] == 0
+
+    def test_repair_resets_missions_since_repair(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/vehicles/buy", json={"model_key": "moto"}, timeout=TIMEOUT)
+        v = next(v for v in get_state(s)["vehicles"] if v["model_key"] == "moto")
+        r = s.post(f"{BASE_URL}/api/game/vehicles/repair", json={"vehicle_id": v["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        v2 = next(v for v in get_state(s)["vehicles"] if v["id"] == v["id"])
+        assert v2["missions_since_repair"] == 0
+
+    @pytest.mark.slow
+    def test_missions_since_repair_increments_after_full_mission(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        vehicle = next((v for v in st["vehicles"] if v["team_id"] == team["id"]), None)
+        if not vehicle:
+            pytest.skip("crew Alfa inicial não tem veículo atribuído")
+        opp = _quickest_opportunity(st)
+        assert opp
+        prev = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                      json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT).json()
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        mission_id = r.json()["mission_id"]
+        final_st = _wait_mission_done(s, mission_id, prev["eta_s"], prev["duration_s"])
+        if not final_st:
+            pytest.fail("mission did not complete within the expected window")
+        v2 = next(v for v in final_st["vehicles"] if v["id"] == vehicle["id"])
+        assert v2["missions_since_repair"] == 1
+
+
+# ---------------- Pequenos imprevistos: eventos aleatórios ao longo de várias missões ----------------
+class TestMinorIncidents:
+    def test_mission_starts_without_bonus_loot(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opp = _quickest_opportunity(st)
+        assert opp
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        m = next(m for m in get_state(s)["missions"] if m["id"] == r.json()["mission_id"])
+        assert m["bonus_loot"] is False
+
+    @pytest.mark.slow
+    def test_incidents_appear_over_several_quick_missions(self):
+        """Trânsito/chuva (evento) e saque adicional/desempenho excecional
+        (histórico do funcionário) são todos aleatórios e de baixa
+        probabilidade por missão — despacha várias missões rápidas seguidas
+        e procura qualquer uma delas a acontecer."""
+        s, _ = register_new()
+        markers = ("trânsito", "chuva", "saque adicional", "desempenho excecional")
+        for _ in range(8):
+            st = get_state(s)
+            team = next((t for t in st["teams"] if t["status"] == "idle"), None)
+            opp = _quickest_opportunity(st) if team else None
+            if not team or not opp:
+                time.sleep(10)
+                continue
+            prev = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                          json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT).json()
+            r = s.post(f"{BASE_URL}/api/game/dispatch",
+                       json={"opportunity_id": opp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+            if r.status_code != 200:
+                continue
+            mission_id = r.json()["mission_id"]
+            final_st = _wait_mission_done(s, mission_id, prev["eta_s"], prev["duration_s"], extra_s=30)
+            if not final_st:
+                continue
+            texts = [e["message"].lower() for e in final_st["events"]]
+            texts += [h["text"].lower() for e in final_st["employees"] for h in (e.get("history") or [])]
+            if any(marker in t for marker in markers for t in texts):
+                return
+        pytest.skip("nenhum imprevisto aleatório ocorreu no orçamento de tentativas deste teste")
+
+
+# ---------------- Economia: dinheiro sujo acumulado gera calor extra ----------------
+class TestEconomyHeat:
+    def test_low_dirty_money_generates_no_extra_heat(self):
+        # Um jogador novo começa com 5.000€ sujos, bem abaixo do limiar de 60.000€ —
+        # o mecanismo de calor extra por excesso de dinheiro sujo não deve disparar
+        # (o calor só deve mover-se pela decadência natural / outras ações).
+        s, _ = register_new()
+        heat_before = get_state(s)["player"]["heat"]
+        time.sleep(5)
+        heat_after = get_state(s)["player"]["heat"]
+        assert heat_after <= heat_before + 0.01
+
+
+# ---------------- Sistema de viagem: presença local reduz tempo de preparação ----------------
+class TestLocalPresence:
+    def test_nearby_active_mission_does_not_increase_travel_time(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team_a = st["teams"][0]
+        opp_a = _quickest_opportunity(st)
+        assert opp_a
+        prev_before = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                             json={"opportunity_id": opp_a["id"], "team_id": team_a["id"]}, timeout=TIMEOUT).json()
+        # Cria uma segunda equipa e despacha-a para uma oportunidade próxima do alvo da primeira,
+        # depois volta a pré-visualizar a primeira: a viagem nunca deve piorar com mais presença local.
+        r = s.post(f"{BASE_URL}/api/game/teams/create", json={"spec": team_a["spec"]}, timeout=TIMEOUT)
+        if r.status_code != 200:
+            pytest.skip("não foi possível criar segunda equipa para testar presença local")
+        st2 = get_state(s)
+        team_b = next(t for t in st2["teams"] if t["id"] != team_a["id"])
+        free_emp = next((e for e in st2["employees"] if not e["team_id"]), None)
+        if not free_emp:
+            pytest.skip("sem funcionário livre para formar a segunda equipa")
+        s.post(f"{BASE_URL}/api/game/employees/assign",
+               json={"employee_id": free_emp["id"], "team_id": team_b["id"]}, timeout=TIMEOUT)
+        nearby = [o for o in st2["opportunities"]
+                  if o["id"] != opp_a["id"] and o["min_level"] <= st2["player"]["level"]
+                  and haversine_km(o["lat"], o["lng"], opp_a["lat"], opp_a["lng"]) <= 1.5]
+        if not nearby:
+            pytest.skip("nenhuma oportunidade próxima disponível para testar presença local")
+        s.post(f"{BASE_URL}/api/game/dispatch",
+               json={"opportunity_id": nearby[0]["id"], "team_id": team_b["id"]}, timeout=TIMEOUT)
+        prev_after = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                            json={"opportunity_id": opp_a["id"], "team_id": team_a["id"]}, timeout=TIMEOUT).json()
+        assert prev_after["eta_s"] <= prev_before["eta_s"] + 1
+
+
+def haversine_km(lat1, lng1, lat2, lng2):
+    import math
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))

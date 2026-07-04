@@ -21,8 +21,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, serverNow, createTeam, recallTeam, assignEmployee, assignVehicle,
     refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
+    recommendRepeatForTeam,
   } = useGame();
   const [recommendations, setRecommendations] = useState({});
+  const [repeatRecs, setRepeatRecs] = useState({});
   useTick(open);
 
   // Para cada equipa pronta, pergunta ao servidor qual é a melhor oportunidade
@@ -38,9 +40,13 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
       .then((pairs) => {
         if (!cancelled) setRecommendations(Object.fromEntries(pairs));
       });
+    Promise.all(readyIds.map((id) => recommendRepeatForTeam(id).then((r) => [id, r.ok ? r.data : null])))
+      .then((pairs) => {
+        if (!cancelled) setRepeatRecs(Object.fromEntries(pairs));
+      });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recomputeKey, recommendOpportunityForTeam]);
+  }, [recomputeKey, recommendOpportunityForTeam, recommendRepeatForTeam]);
 
   if (!state) return null;
   const money = state.player.clean_money;
@@ -110,6 +116,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             const r = readiness(t, members, vehicle);
             const rec = r.ok ? recommendations[t.id] : null;
             const best = rec?.opportunity_id ? state.opportunities.find((o) => o.id === rec.opportunity_id) : null;
+            const repeatRec = r.ok ? repeatRecs[t.id] : null;
+            const repeatOpp = repeatRec?.opportunity_id && repeatRec.opportunity_id !== rec?.opportunity_id
+              ? state.opportunities.find((o) => o.id === repeatRec.opportunity_id)
+              : null;
             const vehicleSeats = vehicle ? catalog?.vehicle_models?.[vehicle.model_key]?.seats : null;
             const mission = t.status !== "idle" ? missionOf(t) : null;
             let missionEtaS = null;
@@ -340,6 +350,22 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   </Tip>
                 )}
 
+                {repeatOpp && repeatRec && (
+                  <Tip
+                    tip={`Repetir o último tipo de missão desta equipa: ${repeatOpp.name}, a ${repeatRec.dist_km}km, ${Math.round(repeatRec.chance * 100)}% de probabilidade de sucesso.`}
+                    block
+                  >
+                    <button
+                      data-testid={`team-repeat-last-${t.id}`}
+                      onClick={() => dispatchTeam(repeatOpp.id, t.id)}
+                      className="mt-1.5 flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-zinc-400 transition-colors hover:bg-white/5"
+                    >
+                      <Undo2 size={11} className="rotate-180" /> Repetir última missão → {repeatOpp.name}
+                      <span className="text-zinc-500">({Math.round(repeatRec.chance * 100)}%)</span>
+                    </button>
+                  </Tip>
+                )}
+
                 {enRoute && (
                   <Tip
                     tip={
@@ -368,25 +394,40 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            Formar nova equipa · {catalog && fmtMoney(catalog.team_create_cost)}
+          <h3 className="mb-2 flex items-center justify-between font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <span>Formar nova equipa · {catalog && fmtMoney(catalog.team_create_cost)}</span>
+            {state.caps?.teams && (
+              <Tip tip="Nº de equipas vs. o limite atual — sobe de nível da organização para desbloquear mais.">
+                <span className={state.caps.teams.used >= state.caps.teams.max ? "text-amber-400" : "text-zinc-500"}>
+                  {state.caps.teams.used}/{state.caps.teams.max}
+                </span>
+              </Tip>
+            )}
           </h3>
+          {state.caps?.teams && state.caps.teams.used >= state.caps.teams.max && (
+            <p className="mb-2 font-mono text-[10px] text-amber-400">
+              Limite de equipas atingido para o nível {state.player.level} — sobe de nível para desbloquear mais.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             {catalog &&
-              Object.entries(catalog.team_specs).map(([key, ts]) => (
-                <Tip key={key} tip={`${ts.desc} Bónus de sucesso em operações da categoria ${SPEC_LABELS[key]}. Custo: ${fmtMoney(catalog.team_create_cost)} limpos.`} block>
-                  <Button
-                    data-testid={`create-team-${key}`}
-                    onClick={() => createTeam(key)}
-                    disabled={state.player.clean_money < catalog.team_create_cost}
-                    variant="outline"
-                    className="h-full w-full flex-col items-start border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40"
-                  >
-                    <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
-                    <span className="whitespace-normal text-[10px] leading-tight text-zinc-500">{ts.desc}</span>
-                  </Button>
-                </Tip>
-              ))}
+              Object.entries(catalog.team_specs).map(([key, ts]) => {
+                const atCap = state.caps?.teams && state.caps.teams.used >= state.caps.teams.max;
+                return (
+                  <Tip key={key} tip={atCap ? `Limite de equipas atingido para o nível ${state.player.level}.` : `${ts.desc} Bónus de sucesso em operações da categoria ${SPEC_LABELS[key]}. Custo: ${fmtMoney(catalog.team_create_cost)} limpos.`} block>
+                    <Button
+                      data-testid={`create-team-${key}`}
+                      onClick={() => createTeam(key)}
+                      disabled={atCap || state.player.clean_money < catalog.team_create_cost}
+                      variant="outline"
+                      className="h-full w-full flex-col items-start border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40"
+                    >
+                      <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
+                      <span className="whitespace-normal text-[10px] leading-tight text-zinc-500">{ts.desc}</span>
+                    </Button>
+                  </Tip>
+                );
+              })}
           </div>
         </div>
       </SheetContent>

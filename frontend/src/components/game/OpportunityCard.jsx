@@ -3,12 +3,12 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const {
     state, catalog, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
-    recommendTeamForOpportunity,
+    recommendTeamForOpportunity, toggleFavoriteType,
   } = useGame();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [recommendedTeamId, setRecommendedTeamId] = useState(null);
@@ -71,6 +71,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const lockedByLevel = state.player.level < opp.min_level;
   const policeAlert = state.player.heat >= 90;
   const distM = haversineM(hq.lat, hq.lng, opp.lat, opp.lng);
+  const isFavorite = (state.player.favorite_types || []).includes(opp.type_key);
 
   const readiness = (t) => {
     if (t.status !== "idle") return { ok: false, reason: "Em operação" };
@@ -142,9 +143,20 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             </p>
           </div>
         </div>
-        <button data-testid="opportunity-card-close" onClick={onClose} className="rounded p-1 text-zinc-500 transition-colors hover:text-white">
-          <X size={16} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <Tip tip={isFavorite ? "Remover dos favoritos." : "Marcar como favorita — este tipo de missão passa a aparecer destacado."}>
+            <button
+              data-testid="opportunity-card-favorite"
+              onClick={() => toggleFavoriteType(opp.type_key)}
+              className={`rounded p-1 transition-colors ${isFavorite ? "text-amber-400 hover:text-amber-300" : "text-zinc-500 hover:text-white"}`}
+            >
+              <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
+            </button>
+          </Tip>
+          <button data-testid="opportunity-card-close" onClick={onClose} className="rounded p-1 text-zinc-500 transition-colors hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1">
@@ -225,6 +237,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 {fmtMoney(activeMission.pending_reward)} {activeMission.pending_pays === "clean" ? "limpos" : "sujos"}
               </span>
             </div>
+          )}
+          {activeMission.bonus_loot && (
+            <p className="mt-1 flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-amber-400">
+              <Sparkles size={10} /> Saque adicional! A equipa encontrou mais do que esperava.
+            </p>
           )}
           <p className="mt-2 font-mono text-[10px] leading-snug text-zinc-500">
             {activeMission.chase_active && activeMission.phase === "returning"
@@ -323,7 +340,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   {Math.round(preview.chance * 100)}%
                 </p>
               </div>
-              <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-6">
+              <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-7">
                 <PreviewFactor label="Risco" value={preview.breakdown.risco} tip="Penalização base do risco da operação." />
                 <PreviewFactor label="Equipa" value={preview.breakdown.equipa} tip="Competência dos membros nos atributos relevantes." />
                 <PreviewFactor label="Match" value={preview.breakdown.match} tip="Compatibilidade entre a especialização da equipa e a categoria da operação." />
@@ -337,6 +354,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   label="Veíc."
                   value={preview.breakdown.veiculo}
                   tip="Veículo: pouca durabilidade penaliza (risco de algo correr mal); um veículo adequado ao tipo de operação ajuda."
+                />
+                <PreviewFactor
+                  label="Condições"
+                  value={preview.breakdown.condicoes}
+                  tip="Condições da operação: missões discretas durante a noite fechada têm um pequeno bónus furtivo."
                 />
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
