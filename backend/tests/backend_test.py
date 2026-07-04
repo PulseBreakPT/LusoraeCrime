@@ -515,6 +515,65 @@ class TestTeamCoordination:
         assert r.json()["breakdown"]["coordenacao"] < 0
 
 
+# ---------------- Frota: adequação, condição e lugares ----------------
+class TestVehicleMechanics:
+    def test_vehicle_models_expose_seats_best_for_luxury(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        models = r.json()["vehicle_models"]
+        assert models
+        for key, m in models.items():
+            assert "seats" in m and m["seats"] >= 1, key
+            assert "best_for" in m and isinstance(m["best_for"], list), key
+            assert "luxury" in m and isinstance(m["luxury"], bool), key
+
+    def test_preview_breakdown_includes_veiculo(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert "veiculo" in r.json()["breakdown"]
+
+    def test_seats_block_when_team_bigger_than_vehicle(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        # Recruta um comum extra e junta-o à equipa (Crew Alfa já tem 2 membros).
+        cands = [c for c in st["candidates"] if c["rarity"] == "comum" and
+                 c["cost"] <= st["player"]["clean_money"]]
+        if not cands:
+            pytest.skip("No affordable comum candidate")
+        r = s.post(f"{BASE_URL}/api/game/employees/recruit",
+                   json={"candidate_id": cands[0]["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st2 = get_state(s)
+        new_emp = next(e for e in st2["employees"] if not e["team_id"])
+        r = s.post(f"{BASE_URL}/api/game/employees/assign",
+                   json={"employee_id": new_emp["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        # Compra uma moto (2 lugares) e atribui-a à equipa (agora com 3 membros).
+        r = s.post(f"{BASE_URL}/api/game/vehicles/buy", json={"model_key": "moto"}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        st3 = get_state(s)
+        moto = next(v for v in st3["vehicles"] if v["model_key"] == "moto")
+        r = s.post(f"{BASE_URL}/api/game/vehicles/assign",
+                   json={"vehicle_id": moto["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        time.sleep(16)  # espera o cooldown de reorganização do roster change
+        st4 = get_state(s)
+        opps = [o for o in st4["opportunities"] if o["min_level"] <= st4["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 400
+        assert "lugares" in r.json()["detail"].lower()
+
+
 # ---------------- Fleet regression ----------------
 class TestFleet:
     def test_vehicle_full_flow(self):

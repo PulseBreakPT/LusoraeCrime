@@ -149,17 +149,23 @@ def random_employee_name():
 
 VEHICLE_MODELS = {
     "usado": {"name": "Sedan Usado", "min_level": 1, "price": 6000, "speed": 9,
-              "fuel_type": "gasolina", "tank_l": 45, "cons": 8.0, "seats": 4},
+              "fuel_type": "gasolina", "tank_l": 45, "cons": 8.0, "seats": 4,
+              "best_for": ["logistica", "influencia"], "luxury": False},
     "moto": {"name": "Moto Rápida", "min_level": 1, "price": 12000, "speed": 15,
-             "fuel_type": "gasolina", "tank_l": 15, "cons": 4.5, "seats": 2},
+             "fuel_type": "gasolina", "tank_l": 15, "cons": 4.5, "seats": 2,
+             "best_for": ["assalto", "tecnica"], "luxury": False},
     "van": {"name": "Van Reforçada", "min_level": 2, "price": 18000, "speed": 12,
-            "fuel_type": "gasoleo", "tank_l": 70, "cons": 10.0, "seats": 6},
+            "fuel_type": "gasoleo", "tank_l": 70, "cons": 10.0, "seats": 6,
+            "best_for": ["logistica"], "luxury": False},
     "desportivo": {"name": "Desportivo", "min_level": 3, "price": 30000, "speed": 19,
-                   "fuel_type": "gasolina", "tank_l": 55, "cons": 12.0, "seats": 2},
+                   "fuel_type": "gasolina", "tank_l": 55, "cons": 12.0, "seats": 2,
+                   "best_for": ["especial"], "luxury": True},
     "suv_blindado": {"name": "SUV Blindado", "min_level": 4, "price": 45000, "speed": 14,
-                     "fuel_type": "gasoleo", "tank_l": 80, "cons": 13.0, "seats": 5},
+                     "fuel_type": "gasoleo", "tank_l": 80, "cons": 13.0, "seats": 5,
+                     "best_for": ["assalto"], "luxury": False},
     "supercarro": {"name": "Supercarro", "min_level": 5, "price": 65000, "speed": 26,
-                   "fuel_type": "gasolina", "tank_l": 60, "cons": 15.0, "seats": 2},
+                   "fuel_type": "gasolina", "tank_l": 60, "cons": 15.0, "seats": 2,
+                   "best_for": ["especial"], "luxury": True},
 }
 
 # Nº máximo de membros ativos por equipa (independente do veículo).
@@ -176,6 +182,16 @@ COORDINATION_RAMP_S = 6 * 3600          # tempo (s) de estabilidade para atingir
 REORG_AFTER_MISSION_S = 25              # cooldown de despacho após a equipa regressar de uma missão
 REORG_AFTER_ROSTER_CHANGE_S = 15        # cooldown de despacho após adicionar/remover um membro
 INCOMPLETE_TEAM_PREP_S = 8              # segundos extra de preparação por membro em falta (vs. TEAM_MAX_MEMBERS)
+
+# ---------------- Frota: adequação, condição e desgaste ----------------
+
+VEHICLE_CONDITION_PENALTY_THRESHOLD = 70  # abaixo deste valor a condição começa a penalizar a chance
+VEHICLE_CONDITION_PENALTY_MAX = 0.08       # penalização máxima de chance (condição a 0%)
+VEHICLE_MATCH_BONUS = 0.05                 # bónus quando o veículo é adequado à categoria da operação
+DISCREET_CATEGORIES = {"tecnica"}          # categorias consideradas operações discretas
+LUXURY_HEAT_MULT = 1.4                     # multiplicador de calor ao usar veículo de luxo em missão discreta
+WEAR_KM_RAMP = 8000                        # km a partir dos quais o desgaste por missão aumenta
+WEAR_KM_MAX_MULT = 1.5                     # multiplicador máximo de desgaste para veículos muito usados
 
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
 
