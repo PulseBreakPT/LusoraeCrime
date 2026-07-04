@@ -1,56 +1,70 @@
 // Blocos partilhados do centro de comando — tooltips, mini-barras, chips e células KPI.
-// Mantêm a UI densa em informação mas visualmente leve e consistente.
+// Construídos sobre os primitivos shadcn/ui (Tooltip, Badge, Progress, Card) para que toda
+// a plataforma partilhe a mesma base visual, mantendo a estética escura/mono do Lusorae.
 
 import { useEffect, useRef, useState } from "react";
 import { Pencil, Check, X, Star } from "lucide-react";
 import { getDisplayPrefs } from "../../lib/game";
+import { cn } from "../../lib/utils";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import { Badge } from "../ui/badge";
+import { Progress } from "../ui/progress";
+import { Card } from "../ui/card";
+import { Input } from "../ui/input";
+
+const SIDE_ALIGN_OFFSET = { top: 6, bottom: 6, left: 6, right: 6 };
 
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
   if (!tip || getDisplayPrefs().showTooltips === false) return children;
   return (
-    <span
-      className={`lus-tip ${block ? "block" : "inline-flex"} ${className}`}
-      data-tip={tip}
-      data-side={side}
-      data-align={align}
-    >
-      {children}
-    </span>
+    <Tooltip delayDuration={250}>
+      <TooltipTrigger asChild>
+        <span className={`${block ? "block" : "inline-flex"} ${className}`}>{children}</span>
+      </TooltipTrigger>
+      <TooltipContent
+        side={side}
+        align={align}
+        sideOffset={SIDE_ALIGN_OFFSET[side] ?? 6}
+        className="max-w-[16rem] border border-white/10 bg-black/95 font-mono text-[11px] leading-snug text-zinc-200 shadow-2xl backdrop-blur-xl"
+      >
+        {tip}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
 export const MiniBar = ({ value, color, className = "", height = "h-1" }) => (
-  <div className={`${height} w-full overflow-hidden rounded-full bg-white/10 ${className}`}>
-    <div
-      className="h-full rounded-full transition-all duration-500"
-      style={{ width: `${Math.min(100, Math.max(0, value || 0))}%`, background: color }}
-    />
-  </div>
+  <Progress
+    value={Math.min(100, Math.max(0, value || 0))}
+    className={cn(height, "w-full bg-white/10", className)}
+    indicatorStyle={{ background: color }}
+  />
 );
 
 export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor = "#FFFFFF", tip, side = "top", testId }) => (
   <Tip tip={tip} side={side}>
-    <span
+    <Badge
       data-testid={testId}
-      className="inline-flex items-center gap-1 rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[9px] text-zinc-400"
+      variant="outline"
+      className="gap-1 rounded border-white/10 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[9px] font-normal text-zinc-400"
     >
       {Icon && <Icon size={9} style={{ color }} />}
       {label && <span className="uppercase tracking-wider text-zinc-500">{label}</span>}
       {value != null && <span className="font-bold" style={{ color: valueColor }}>{value}</span>}
-    </span>
+    </Badge>
   </Tip>
 );
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <div data-testid={testId} className="h-full rounded-lg border border-white/10 bg-white/[0.03] p-2">
+    <Card data-testid={testId} className="h-full rounded-lg border-white/10 bg-card p-2 shadow-none">
       <p className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-zinc-500">
         {Icon && <Icon size={9} style={{ color }} />} <span className="truncate">{label}</span>
       </p>
       <p className="mt-0.5 truncate font-mono text-[11px] font-bold leading-tight" style={{ color }}>{value}</p>
       {sub != null && <p className="truncate font-mono text-[9px] leading-tight" style={{ color: subColor }}>{sub}</p>}
       {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1" height="h-0.5" />}
-    </div>
+    </Card>
   </Tip>
 );
 
@@ -78,7 +92,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
     };
     return (
       <span className="flex min-w-0 flex-1 items-center gap-1">
-        <input
+        <Input
           data-testid={testId && `${testId}-input`}
           autoFocus
           value={draft}
@@ -89,13 +103,13 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
             if (ev.key === "Enter") save();
             if (ev.key === "Escape") setEditing(false);
           }}
-          className="w-full min-w-0 rounded border border-white/10 bg-black/60 px-1.5 py-0.5 font-mono text-xs text-white"
+          className="h-auto w-full min-w-0 border-input bg-black/60 px-1.5 py-0.5 font-mono text-xs text-white"
         />
         <button
           data-testid={testId && `${testId}-save`}
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={save}
-          className="shrink-0 text-emerald-400 transition-colors hover:text-emerald-300"
+          className="shrink-0 text-success transition-colors hover:brightness-125"
         >
           <Check size={14} />
         </button>
@@ -143,7 +157,8 @@ export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
 
 // Botão de confirmação em dois passos para ações irreversíveis (despedir, vender,
 // abater) — sem modais: o primeiro clique arma um curto período de confirmação,
-// o segundo clique dentro desse período executa a ação.
+// o segundo clique dentro desse período executa a ação. Fica sobre bg-destructive
+// quando armado, para deixar claro que o clique seguinte é definitivo.
 export const ConfirmButton = ({
   testId, icon: Icon, label, confirmLabel = "Confirmar?", color = "text-red-400",
   onConfirm, disabled, className = "", armMs = 3000, tip,
@@ -161,37 +176,16 @@ export const ConfirmButton = ({
         data-testid={testId}
         onClick={() => { if (skipArm) { onConfirm(); return; } if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
         disabled={disabled}
-        className={`flex w-full items-center justify-center gap-1 rounded border px-2 py-1.5 font-mono text-[10px] transition-colors disabled:opacity-40 ${
-          armed ? "border-red-500/60 bg-red-500/20 text-red-300" : `border-white/10 ${color} hover:bg-white/5`
-        }`}
+        className={cn(
+          "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] transition-colors disabled:opacity-40",
+          armed ? "border-destructive/60 bg-destructive/20 text-destructive" : `border-input ${color} hover:bg-accent`
+        )}
       >
         {Icon && <Icon size={11} />} {armed ? confirmLabel : label}
       </button>
     </Tip>
   );
 };
-
-// Interruptor compacto para as Definições — mesma estética escura das restantes
-// células, sem depender do componente Switch genérico (cores diferentes do resto do jogo).
-export const ToggleSwitch = ({ checked, onChange, testId, disabled }) => (
-  <button
-    type="button"
-    data-testid={testId}
-    role="switch"
-    aria-checked={checked}
-    disabled={disabled}
-    onClick={() => onChange(!checked)}
-    className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:opacity-40 ${
-      checked ? "border-emerald-500/60 bg-emerald-500/30" : "border-white/15 bg-white/5"
-    }`}
-  >
-    <span
-      className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
-        checked ? "translate-x-4" : "translate-x-0.5"
-      }`}
-    />
-  </button>
-);
 
 // Pisca brevemente quando um valor observado muda (ex.: uma equipa que acabou
 // de regressar, uma missão que ficou pronta) — chama a atenção sem depender de texto.

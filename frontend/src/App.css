@@ -256,62 +256,6 @@
     }
 }
 
-/* ---------- Info tooltips (CSS-only, light) ---------- */
-.lus-tip {
-    position: relative;
-}
-
-.lus-tip::after {
-    content: attr(data-tip);
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: calc(100% + 7px);
-    z-index: 130;
-    width: max-content;
-    max-width: 220px;
-    background: rgba(8, 8, 8, 0.97);
-    color: #d4d4d8;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 7px;
-    padding: 6px 8px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.45;
-    letter-spacing: 0.01em;
-    text-transform: none;
-    white-space: normal;
-    text-align: left;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.15s ease 0.2s, visibility 0.15s ease 0.2s;
-    pointer-events: none;
-}
-
-.lus-tip:hover::after,
-.lus-tip:focus-within::after {
-    opacity: 1;
-    visibility: visible;
-}
-
-.lus-tip[data-side="bottom"]::after {
-    bottom: auto;
-    top: calc(100% + 7px);
-}
-
-.lus-tip[data-align="start"]::after {
-    left: 0;
-    transform: none;
-}
-
-.lus-tip[data-align="end"]::after {
-    left: auto;
-    right: 0;
-    transform: none;
-}
-
 /* ---------- Map hover tooltips ---------- */
 .lus-map-tip {
     background: rgba(8, 8, 8, 0.95) !important;

@@ -4,6 +4,10 @@ import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { ScrollArea } from "../ui/scroll-area";
+import { Alert, AlertDescription } from "../ui/alert";
 import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
@@ -132,9 +136,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   };
 
   return (
-    <div
+    <Card
       data-testid="opportunity-card"
-      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up rounded-lg border border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -148,19 +152,20 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           <Tip tip={isFavorite ? "Remover dos favoritos." : "Marcar como favorita — este tipo de missão passa a aparecer destacado."}>
-            <button
+            <Button
               data-testid="opportunity-card-favorite"
+              variant="ghost" size="icon"
               onClick={() => toggleFavoriteType(opp.type_key)}
-              className={`rounded p-1 transition-colors ${isFavorite ? "text-amber-400 hover:text-amber-300" : "text-zinc-500 hover:text-white"}`}
+              className={`h-7 w-7 ${isFavorite ? "text-amber-400 hover:text-amber-300" : "text-zinc-500 hover:text-white"}`}
             >
               <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
-            </button>
+            </Button>
           </Tip>
-          <button data-testid="opportunity-card-close" onClick={onClose} className="rounded p-1 text-zinc-500 transition-colors hover:text-white">
+          <Button data-testid="opportunity-card-close" variant="ghost" size="icon" onClick={onClose} className="h-7 w-7 text-zinc-500 hover:text-white">
             <X size={16} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -206,7 +211,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       </div>
 
       {inProgress && activeMission ? (
-        <div data-testid="opportunity-in-progress" className={`mt-3 rounded-md border p-3 ${activeMission.chase_active ? "border-red-500/40 bg-red-500/[0.08]" : "border-cyan-500/30 bg-cyan-500/[0.06]"}`}>
+        <Card data-testid="opportunity-in-progress" className={`mt-3 border p-3 shadow-none ${activeMission.chase_active ? "border-red-500/40 bg-red-500/[0.08]" : "border-cyan-500/30 bg-cyan-500/[0.06]"}`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-bold text-white">{activeMission.team_name}</p>
@@ -256,98 +261,102 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           {activeMission.phase === "en_route" && (
             <Button
               data-testid="recall-team-button"
+              variant="secondary"
               onClick={async () => { setBusy(true); await recallTeam(activeMission.id); setBusy(false); onClose(); }}
               disabled={busy}
-              className="mt-2 w-full bg-zinc-800 font-bold uppercase tracking-wider text-white hover:bg-zinc-700"
+              className="mt-2 w-full font-bold uppercase tracking-wider"
             >
               {busy ? "A chamar..." : "Chamar equipa de volta"}
             </Button>
           )}
-        </div>
+        </Card>
       ) : policeAlert ? (
-        <p className="mt-3 flex items-center justify-center gap-1.5 rounded-md border border-red-600/40 bg-red-600/10 py-2 text-center font-mono text-xs text-red-500">
-          <Siren size={13} /> Polícia em alerta máximo — reduz o calor
-        </p>
+        <Alert variant="destructive" className="mt-3 border-red-600/40 bg-red-600/10 py-2 text-center">
+          <AlertDescription className="flex items-center justify-center gap-1.5 font-mono text-xs text-red-500">
+            <Siren size={13} /> Polícia em alerta máximo — reduz o calor
+          </AlertDescription>
+        </Alert>
       ) : lockedByLevel ? (
         <p className="mt-3 text-center font-mono text-xs text-red-500">Requer nível {opp.min_level}</p>
       ) : (
         <>
-          <div className="mt-3 max-h-36 space-y-1 overflow-y-auto">
-            {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
-                jogador não precisa de percorrer bloqueadas para achar a boa. */}
-            {[...state.teams]
-              .sort((a, b) => {
-                if (a.id === recommendedTeamId) return -1;
-                if (b.id === recommendedTeamId) return 1;
-                const rank = (t) => (readiness(t).ok ? 0 : 1);
-                return rank(a) - rank(b);
-              })
-              .map((t) => {
-              const r = readiness(t);
-              const match = t.spec === opp.category || opp.category === "especial";
-              const fix = !r.ok ? fixFor(t, r) : null;
-              return (
-                <div
-                  key={t.id}
-                  data-testid={`select-team-${t.id}`}
-                  onClick={() => r.ok && setSelectedTeamId(t.id)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors ${
-                    selectedTeamId === t.id
-                      ? "border-white/40 bg-white/10"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
-                  } ${r.ok ? "cursor-pointer" : ""}`}
-                >
-                  <div className={r.ok ? "" : "opacity-50"}>
-                    <p className="text-xs font-semibold text-white">
-                      {t.name}
-                      {t.id === recommendedTeamId && (
-                        <Tip tip="Sugestão automática: a equipa com maior probabilidade de sucesso para esta operação. Podes escolher outra clicando nela.">
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 font-mono text-[9px] uppercase text-amber-400">
-                            <Sparkles size={9} /> recomendada
-                          </span>
-                        </Tip>
-                      )}
-                      {match && (
-                        <Tip tip="A especialização da equipa combina com a categoria da operação — bónus de probabilidade de sucesso.">
-                          <span className="ml-1.5 font-mono text-[9px] uppercase text-emerald-400">match</span>
-                        </Tip>
-                      )}
-                    </p>
-                    <p className="font-mono text-[10px] text-zinc-500">
-                      {r.ok ? `${r.members} membros · ${r.vehicle.name}` : SPEC_LABELS[t.spec]}
-                    </p>
-                  </div>
-                  {r.ok ? (
-                    <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
-                      <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
-                    </Tip>
-                  ) : (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
-                      {fix && (
-                        <button
-                          data-testid={`fix-team-${t.id}`}
-                          onClick={(ev) => { ev.stopPropagation(); fix.run(); }}
-                          disabled={!fix.can}
-                          title={r.reason}
-                          className={`flex items-center gap-1 rounded border border-white/15 px-1.5 py-1 font-mono text-[9px] font-bold ${fix.color} transition-colors hover:bg-white/10 disabled:opacity-40`}
-                        >
-                          <fix.icon size={10} /> {fix.label}
-                        </button>
-                      )}
+          <ScrollArea className="mt-3 h-36">
+            <div className="space-y-1 pr-3">
+              {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
+                  jogador não precisa de percorrer bloqueadas para achar a boa. */}
+              {[...state.teams]
+                .sort((a, b) => {
+                  if (a.id === recommendedTeamId) return -1;
+                  if (b.id === recommendedTeamId) return 1;
+                  const rank = (t) => (readiness(t).ok ? 0 : 1);
+                  return rank(a) - rank(b);
+                })
+                .map((t) => {
+                const r = readiness(t);
+                const match = t.spec === opp.category || opp.category === "especial";
+                const fix = !r.ok ? fixFor(t, r) : null;
+                return (
+                  <Card
+                    key={t.id}
+                    data-testid={`select-team-${t.id}`}
+                    onClick={() => r.ok && setSelectedTeamId(t.id)}
+                    className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left shadow-none transition-colors ${
+                      selectedTeamId === t.id
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+                    } ${r.ok ? "cursor-pointer" : ""}`}
+                  >
+                    <div className={r.ok ? "" : "opacity-50"}>
+                      <p className="text-xs font-semibold text-white">
+                        {t.name}
+                        {t.id === recommendedTeamId && (
+                          <Tip tip="Sugestão automática: a equipa com maior probabilidade de sucesso para esta operação. Podes escolher outra clicando nela.">
+                            <Badge variant="outline" className="ml-1.5 gap-0.5 border-amber-500/30 bg-amber-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-amber-400">
+                              <Sparkles size={9} /> recomendada
+                            </Badge>
+                          </Tip>
+                        )}
+                        {match && (
+                          <Badge variant="outline" className="ml-1.5 border-emerald-500/30 bg-emerald-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-emerald-400">match</Badge>
+                        )}
+                      </p>
+                      <p className="font-mono text-[10px] text-zinc-500">
+                        {r.ok ? `${r.members} membros · ${r.vehicle.name}` : SPEC_LABELS[t.spec]}
+                      </p>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    {r.ok ? (
+                      <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
+                        <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
+                      </Tip>
+                    ) : (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
+                        {fix && (
+                          <Button
+                            data-testid={`fix-team-${t.id}`}
+                            variant="outline" size="sm"
+                            onClick={(ev) => { ev.stopPropagation(); fix.run(); }}
+                            disabled={!fix.can}
+                            title={r.reason}
+                            className={`h-auto gap-1 border-white/15 px-1.5 py-1 font-mono text-[9px] font-bold ${fix.color} hover:bg-white/10`}
+                          >
+                            <fix.icon size={10} /> {fix.label}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </ScrollArea>
           {!anyReady && (
             <p className="mt-2 text-center font-mono text-[10px] text-zinc-500">
               Nenhuma equipa operacional — verifica membros, combustível e condição
             </p>
           )}
           {preview && (
-            <div data-testid="dispatch-preview" className="mt-2 animate-slide-up rounded-md border border-white/10 bg-white/[0.03] p-2.5">
+            <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up border-white/10 bg-white/[0.03] p-2.5 shadow-none">
               <div className="flex items-baseline justify-between">
                 <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
                 <p className="font-mono text-lg font-bold" style={{ color: chanceColor(preview.chance) }}>
@@ -396,41 +405,42 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 <span className="text-[#0A84FF]"> · +{opp.respect} resp.</span>
                 {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
               </p>
-            </div>
+            </Card>
           )}
           <Button
             data-testid="dispatch-team-button"
+            variant="success"
             onClick={handleDispatch}
             disabled={!selectedTeamId || busy}
-            className="mt-3 w-full bg-green-600 font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] transition-all duration-300 hover:bg-green-700"
+            className="mt-3 w-full font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.35)]"
           >
             {busy ? "A destacar..." : "Destacar equipa"}
           </Button>
         </>
       )}
-    </div>
+    </Card>
   );
 };
 
 const PreviewFactor = ({ label, value, tip }) => (
   <Tip tip={tip} block>
-    <div className="rounded bg-black/40 px-1 py-0.5 text-center">
+    <Card className="rounded bg-black/40 px-1 py-0.5 text-center shadow-none">
       <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
       <p className="font-mono text-[10px] font-bold" style={{ color: value >= 0 ? "#34D399" : "#EF4444" }}>
         {pctSigned(value)}
       </p>
-    </div>
+    </Card>
   </Tip>
 );
 
 const Metric = ({ icon: Icon, label, value, color, tip }) => (
   <Tip tip={tip} block>
-    <div className="h-full rounded-md border border-white/10 bg-white/[0.03] p-2">
+    <Card className="h-full border-white/10 bg-white/[0.03] p-2 shadow-none">
       <div className="flex items-center gap-1">
         <Icon size={10} style={{ color }} />
         <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
       </div>
       <p className="mt-0.5 font-mono text-xs font-bold text-white">{value}</p>
-    </div>
+    </Card>
   </Tip>
 );

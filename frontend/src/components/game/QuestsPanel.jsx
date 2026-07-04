@@ -6,8 +6,13 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
+import { MiniBar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles, ArrowRight } from "lucide-react";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
+import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -44,12 +49,7 @@ const ProgressBar = ({ q }) => {
         <span>{q.objective_label}</span>
         <span>{label}</span>
       </div>
-      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full transition-all duration-500"
-          style={{ width: `${pct}%`, background: q.status === "completed" ? "#34D399" : "#22D3EE" }}
-        />
-      </div>
+      <MiniBar value={pct} color={q.status === "completed" ? "#34D399" : "#22D3EE"} className="mt-0.5" />
     </div>
   );
 };
@@ -70,9 +70,9 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
   const chips = rewardChips(q.rewards || {}, catalog);
 
   return (
-    <div
+    <Card
       data-testid={`quest-card-${q.id || q.quest_key}`}
-      className={`rounded-lg border p-3 ${
+      className={`p-3 shadow-none ${
         featured
           ? "border-red-500/40 bg-red-500/[0.06]"
           : "border-white/10 bg-white/[0.03]"
@@ -90,12 +90,13 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
             <span style={{ color: DIFFICULTY_COLORS[q.difficulty] }}>{DIFFICULTY_LABELS[q.difficulty]}</span>
           </p>
         </div>
-        <span
-          className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase"
+        <Badge
+          variant="outline"
+          className="shrink-0 rounded-full border-transparent px-2 py-0.5 font-mono text-[9px] font-bold uppercase"
           style={{ color: QUEST_STATUS_COLORS[q.status], background: `${QUEST_STATUS_COLORS[q.status]}1a` }}
         >
           {QUEST_STATUS_LABELS[q.status]}
-        </span>
+        </Badge>
       </div>
 
       <p className="mt-1.5 text-[11px] leading-snug text-zinc-400">{q.desc}</p>
@@ -111,9 +112,9 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
       {chips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {chips.map((c, i) => (
-            <span key={i} className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] text-emerald-300">
+            <Badge key={i} variant="outline" className="gap-0.5 border-transparent bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-normal text-emerald-300">
               <Gift size={9} /> {c}
-            </span>
+            </Badge>
           ))}
         </div>
       )}
@@ -131,39 +132,42 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
       {q.type === "decisao" && q.status === "active" && q.options && (
         <div className="mt-2 grid grid-cols-2 gap-1.5">
           {Object.entries(q.options).map(([key, o]) => (
-            <button
+            <Button
               key={key}
+              variant="outline"
               data-testid={`quest-choice-${q.id}-${key}`}
               onClick={() => chooseQuest(q.id, key)}
-              className="rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-300 transition-colors hover:bg-white/5"
+              className="h-auto border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-300 hover:bg-white/5"
             >
               {o.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
       <div className="mt-2 flex gap-1.5">
         {q.status === "completed" && (
-          <button
+          <Button
             data-testid={`quest-claim-${q.id}`}
+            variant="success"
             onClick={() => claimQuest(q.id)}
-            className="flex-1 rounded bg-emerald-500 px-3 py-1.5 font-mono text-[10px] font-bold uppercase text-black transition-colors hover:bg-emerald-400"
+            className="h-auto flex-1 px-3 py-1.5 font-mono text-[10px] font-bold uppercase"
           >
             Reclamar recompensa
-          </button>
+          </Button>
         )}
         {q.status === "active" && q.category === "operacao" && q.type !== "decisao" && (
-          <button
+          <Button
             data-testid={`quest-map-${q.id || q.quest_key}`}
+            variant="outline"
             onClick={onClose}
-            className="flex items-center justify-center gap-1 rounded border border-white/10 px-3 py-1.5 font-mono text-[10px] text-zinc-300 transition-colors hover:bg-white/5"
+            className="h-auto gap-1 border-white/10 px-3 py-1.5 font-mono text-[10px] text-zinc-300 hover:bg-white/5"
           >
             <MapPin size={10} /> Ver no mapa
-          </button>
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -215,22 +219,24 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-md" data-testid="quests-panel">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="quests-panel">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Target size={18} className="text-red-500" /> Missões
+            <Target size={18} className="text-primary" /> Missões
             {claimable > 0 && (
               <span className="ml-auto flex items-center gap-1.5">
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300" data-testid="claimable-count">
+                <Badge variant="outline" className="border-transparent bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300" data-testid="claimable-count">
                   {claimable} por reclamar
-                </span>
-                <button
+                </Badge>
+                <Button
                   data-testid="quests-claim-all"
+                  variant="success"
+                  size="sm"
                   onClick={claimAll}
-                  className="flex items-center gap-1 rounded bg-emerald-500 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black transition-colors hover:bg-emerald-400"
+                  className="h-auto gap-1 px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
                 >
                   <Gift size={10} /> Tudo
-                </button>
+                </Button>
               </span>
             )}
           </SheetTitle>
@@ -245,28 +251,28 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
           </div>
         )}
 
-        <div className="mt-3 grid grid-cols-4 gap-1 rounded-lg border border-white/10 bg-black/40 p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              data-testid={`quest-tab-${t.key}`}
-              onClick={() => setTab(t.key)}
-              className={`relative rounded px-1 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                tab === t.key ? "bg-white text-black" : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              {t.label}
-              {tabCounts[t.key] > 0 && (
-                <span className={`ml-1 rounded-full px-1 font-mono text-[8px] font-bold ${tab === t.key ? "bg-black/15 text-black" : "bg-white/10 text-zinc-300"}`}>
-                  {tabCounts[t.key]}
-                </span>
-              )}
-              {t.key === "alertas" && alertsBadge > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
-              )}
-            </button>
-          ))}
-        </div>
+        <Tabs value={tab} onValueChange={setTab} className="mt-3">
+          <TabsList className="grid w-full grid-cols-4 bg-black/40">
+            {TABS.map((t) => (
+              <TabsTrigger
+                key={t.key}
+                data-testid={`quest-tab-${t.key}`}
+                value={t.key}
+                className="relative px-1 font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                {t.label}
+                {tabCounts[t.key] > 0 && (
+                  <Badge variant="outline" className="ml-1 border-transparent bg-white/10 px-1 py-0 font-mono text-[8px] font-bold text-zinc-300">
+                    {tabCounts[t.key]}
+                  </Badge>
+                )}
+                {t.key === "alertas" && alertsBadge > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         {tab === "historia" && (
           <div className="mt-3 space-y-4" data-testid="quests-historia">

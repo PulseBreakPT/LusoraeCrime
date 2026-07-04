@@ -5,6 +5,9 @@ import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatig
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper } from "lucide-react";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
@@ -124,10 +127,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Users size={18} className="text-red-500" /> Equipas
+            <Users size={18} className="text-primary" /> Equipas
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
             Centro de comando: membros, veículos e despacho num só lugar.
@@ -198,10 +201,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
             const justReturned = justReturnedTeamIds.includes(t.id);
             return (
-              <div
+              <Card
                 key={t.id}
                 data-testid={`team-card-${t.id}`}
-                className={`rounded-lg border border-white/10 bg-white/[0.03] p-3 ${justReturned ? "lus-flash" : ""}`}
+                className={`border-white/10 bg-white/[0.03] p-3 shadow-none ${justReturned ? "lus-flash" : ""}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -229,12 +232,13 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     </div>
                   </div>
                   <Tip tip={t.status === "idle" ? "Na base — pronta a receber ordens." : "Em operação — volta a estar disponível quando regressar ao QG."} align="end">
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 rounded-full border-transparent px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
                       style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
                     >
                       {STATUS_LABELS[t.status]}
-                    </span>
+                    </Badge>
                   </Tip>
                 </div>
 
@@ -296,19 +300,21 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                           </span>
                         ))}
                         {freeEmployees.length > 0 && members.length < teamMaxMembers && (
-                          <select
-                            data-testid={`team-add-member-${t.id}`}
-                            value=""
-                            onChange={(ev) => ev.target.value && assignEmployee(ev.target.value, t.id)}
-                            className="rounded border border-dashed border-white/20 bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-cyan-400"
-                          >
-                            <option value="">+ membro</option>
-                            {freeEmployees.map((e) => (
-                              <option key={e.id} value={e.id}>
-                                {e.name.split(" ")[0]} · {catalog?.specializations?.[e.role_key]?.name || e.role_key} N{e.level}
-                              </option>
-                            ))}
-                          </select>
+                          <Select value="" onValueChange={(v) => v && assignEmployee(v, t.id)}>
+                            <SelectTrigger
+                              data-testid={`team-add-member-${t.id}`}
+                              className="h-auto w-auto gap-1 rounded border-dashed border-white/20 bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-cyan-400 [&>svg]:h-3 [&>svg]:w-3"
+                            >
+                              <SelectValue placeholder="+ membro" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {freeEmployees.map((e) => (
+                                <SelectItem key={e.id} value={e.id} className="font-mono text-xs">
+                                  {e.name.split(" ")[0]} · {catalog?.specializations?.[e.role_key]?.name || e.role_key} N{e.level}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         )}
                         {freeEmployees.length > 0 && members.length >= teamMaxMembers && (
                           <span className="font-mono text-[9px] text-zinc-600">equipa cheia</span>
@@ -321,27 +327,29 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 <div className="mt-2 flex items-center gap-1.5">
                   <Car size={12} className="shrink-0 text-cyan-400" />
                   {t.status === "idle" ? (
-                    <select
-                      data-testid={`team-vehicle-select-${t.id}`}
-                      value={t.vehicle_id || ""}
-                      onChange={(ev) => {
-                        const vid = ev.target.value;
-                        if (vid) assignVehicle(vid, t.id);
-                        else if (t.vehicle_id) assignVehicle(t.vehicle_id, null);
+                    <Select
+                      value={t.vehicle_id || "__none__"}
+                      onValueChange={(vid) => {
+                        if (vid === "__none__") { if (t.vehicle_id) assignVehicle(t.vehicle_id, null); }
+                        else assignVehicle(vid, t.id);
                       }}
-                      className="flex-1 rounded border border-white/10 bg-black/60 px-2 py-1 font-mono text-[11px] text-white"
                     >
-                      <option value="">Sem veículo</option>
-                      {vehicle && <option value={vehicle.id}>{vehicle.name}</option>}
-                      {freeVehicles.map((v) => {
-                        const ideal = catalog?.vehicle_models?.[v.model_key]?.best_for?.includes(t.spec);
-                        return (
-                          <option key={v.id} value={v.id}>
-                            {ideal ? "★ " : ""}{v.name} · {Math.round((v.fuel_l / v.tank_l) * 100)}% comb.
-                          </option>
-                        );
-                      })}
-                    </select>
+                      <SelectTrigger data-testid={`team-vehicle-select-${t.id}`} className="h-7 flex-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__" className="font-mono text-xs">Sem veículo</SelectItem>
+                        {vehicle && <SelectItem value={vehicle.id} className="font-mono text-xs">{vehicle.name}</SelectItem>}
+                        {freeVehicles.map((v) => {
+                          const ideal = catalog?.vehicle_models?.[v.model_key]?.best_for?.includes(t.spec);
+                          return (
+                            <SelectItem key={v.id} value={v.id} className="font-mono text-xs">
+                              {ideal ? "★ " : ""}{v.name} · {Math.round((v.fuel_l / v.tank_l) * 100)}% comb.
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <span className="font-mono text-[11px] text-zinc-400">{vehicle ? vehicle.name : "Sem veículo"}</span>
                   )}
@@ -387,26 +395,28 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <div className="flex items-center gap-1.5">
                       {fuelPct < 60 && (
                         <Tip tip="Atestar o depósito por completo com dinheiro limpo.">
-                          <button
+                          <Button
                             data-testid={`team-refuel-${t.id}`}
+                            variant="outline" size="sm"
                             onClick={() => refuelVehicle(vehicle.id)}
                             disabled={money < refuelCost}
-                            className="flex items-center gap-0.5 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-400 hover:bg-white/5 disabled:opacity-40"
+                            className="h-auto gap-0.5 border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-400 hover:bg-white/5"
                           >
                             <Fuel size={9} /> {fmtMoney(refuelCost)}
-                          </button>
+                          </Button>
                         </Tip>
                       )}
                       {vehicle.condition < 60 && (
                         <Tip tip="Reparação completa — devolve o veículo a 100% de condição e velocidade máxima.">
-                          <button
+                          <Button
                             data-testid={`team-repair-${t.id}`}
+                            variant="outline" size="sm"
                             onClick={() => repairVehicle(vehicle.id)}
                             disabled={money < repairCost}
-                            className="flex items-center gap-0.5 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-emerald-400 hover:bg-white/5 disabled:opacity-40"
+                            className="h-auto gap-0.5 border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-success hover:bg-white/5"
                           >
                             <Wrench size={9} /> {fmtMoney(repairCost)}
-                          </button>
+                          </Button>
                         </Tip>
                       )}
                     </div>
@@ -418,15 +428,16 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     tip={`Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`}
                     block
                   >
-                    <button
+                    <Button
                       data-testid={`team-dispatch-best-${t.id}`}
+                      variant="outline"
                       onClick={() => dispatchTeam(best.id, t.id)}
-                      className="mt-2 flex w-full items-center justify-center gap-1 rounded border border-green-500/30 bg-green-500/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-green-400 transition-colors hover:bg-green-500/20"
+                      className="mt-2 h-auto w-full gap-1 border-success/30 bg-success/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-success hover:bg-success/20"
                     >
                       <Zap size={11} /> Despachar → {best.name}
                       <span style={{ color: chanceColor(rec.chance) }}>({Math.round(rec.chance * 100)}%)</span>
                       <span className="text-zinc-500">· ETA {fmtDuration(rec.eta_s)} · {fmtMoney(rec.reward)}</span>
-                    </button>
+                    </Button>
                   </Tip>
                 )}
 
@@ -435,14 +446,15 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     tip={`Repetir o último tipo de missão desta equipa: ${repeatOpp.name}, a ${repeatRec.dist_km}km, ${Math.round(repeatRec.chance * 100)}% de probabilidade de sucesso.`}
                     block
                   >
-                    <button
+                    <Button
                       data-testid={`team-repeat-last-${t.id}`}
+                      variant="outline"
                       onClick={() => dispatchTeam(repeatOpp.id, t.id)}
-                      className="mt-1.5 flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-zinc-400 transition-colors hover:bg-white/5"
+                      className="mt-1.5 h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-zinc-400 hover:bg-white/5"
                     >
                       <Undo2 size={11} className="rotate-180" /> Repetir última missão → {repeatOpp.name}
                       <span className="text-zinc-500">({Math.round(repeatRec.chance * 100)}%)</span>
-                    </button>
+                    </Button>
                   </Tip>
                 )}
 
@@ -455,20 +467,21 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     }
                     block
                   >
-                    <button
+                    <Button
                       data-testid={`recall-team-${t.id}`}
+                      variant="outline"
                       onClick={() => recallTeam(enRoute.id)}
-                      className={`mt-2 flex w-full items-center justify-center gap-1 rounded border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors ${
+                      className={`mt-2 h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] font-bold uppercase ${
                         recallLate
                           ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
                           : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                       }`}
                     >
                       <Undo2 size={11} /> Chamar de volta ({enRoute.opportunity.name})
-                    </button>
+                    </Button>
                   </Tip>
                 )}
-              </div>
+              </Card>
             );
           })}
         </div>

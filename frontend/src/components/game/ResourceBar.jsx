@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
 import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
+import { Badge } from "../ui/badge";
 import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins } from "lucide-react";
 
 const useTick = () => {
@@ -33,17 +34,17 @@ export const ResourceBar = () => {
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-lg border border-white/10 bg-black/75 px-2 py-1.5 shadow-2xl backdrop-blur-xl sm:gap-2 sm:px-3">
+      <div className="mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-lg border border-border bg-card/90 px-2 py-1.5 shadow-2xl backdrop-blur-xl sm:gap-2 sm:px-3">
         <Tip
           tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
           side="bottom"
           align="start"
         >
-          <div className="flex shrink-0 items-center gap-1.5 border-r border-white/10 pr-2 sm:gap-2 sm:pr-3">
+          <div className="flex shrink-0 items-center gap-1.5 border-r border-border pr-2 sm:gap-2 sm:pr-3">
             <div className="flex flex-col items-center">
-              <span className="flex h-7 w-7 items-center justify-center rounded bg-red-600/20 font-mono text-xs font-bold text-red-500">
+              <Badge variant="outline" className="flex h-7 w-7 items-center justify-center rounded border-primary/30 bg-primary/15 p-0 font-mono text-xs font-bold text-primary">
                 {p.level}
-              </span>
+              </Badge>
               <MiniBar value={respPct} color="#DC2626" className="mt-0.5 w-7" height="h-0.5" />
             </div>
             <div className="hidden sm:block">
@@ -86,7 +87,7 @@ export const ResourceBar = () => {
           </div>
         </Tip>
 
-        <div className="hidden items-stretch gap-2 border-l border-white/10 pl-2 md:flex">
+        <div className="hidden items-stretch gap-2 border-l border-border pl-2 md:flex">
           <Stat
             testId="stat-teams-ready" icon={Users} color="#22D3EE" label="Prontas" value={`${tr.ready}/${tr.total}`}
             tip={`Equipas prontas a operar: ${tr.ready} de ${tr.total}${tr.busy > 0 ? ` · ${tr.busy} em operação` : ""}. Uma equipa pronta tem membros disponíveis, veículo com combustível e em condições.`}

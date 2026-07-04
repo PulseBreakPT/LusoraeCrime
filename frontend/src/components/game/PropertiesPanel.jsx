@@ -4,6 +4,8 @@ import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_TH
 import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Alert, AlertDescription } from "../ui/alert";
 import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
 
 const useTick = (active) => {
@@ -22,10 +24,10 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-sm">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Warehouse size={18} className="text-red-500" /> Imóveis
+            <Warehouse size={18} className="text-primary" /> Imóveis
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="properties-count">{state.properties.length}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Compra, melhora e vende propriedades do império.</SheetDescription>
@@ -53,9 +55,11 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
         <div className="mt-4 space-y-2" data-testid="properties-list">
           {state.player.heat >= 70 && state.properties.some((p) => p.type_key === "laboratorio") && (
-            <p data-testid="raid-warning" className="flex items-center gap-1.5 rounded-md border border-red-600/40 bg-red-600/10 px-2.5 py-2 font-mono text-[10px] text-red-400">
-              <Siren size={12} /> Calor alto: risco de rusga policial aos laboratórios!
-            </p>
+            <Alert variant="destructive" data-testid="raid-warning" className="border-red-600/40 bg-red-600/10 py-2">
+              <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
+                <Siren size={12} /> Calor alto: risco de rusga policial aos laboratórios!
+              </AlertDescription>
+            </Alert>
           )}
           {state.properties.length === 0 && (
             <p className="rounded-lg border border-dashed border-white/10 p-4 text-center font-mono text-[11px] text-zinc-600">
@@ -74,7 +78,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const upgrading = p.upgrading_until && Date.parse(p.upgrading_until) > serverNow();
             const upgradeRemaining = upgrading ? Math.max(0, (Date.parse(p.upgrading_until) - serverNow()) / 1000) : 0;
             return (
-              <div key={p.id} data-testid={`property-card-${p.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <Card key={p.id} data-testid={`property-card-${p.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -135,14 +139,15 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     block
                     className="flex-1"
                   >
-                    <button
+                    <Button
                       data-testid={`upgrade-property-${p.id}`}
+                      variant="outline"
                       onClick={() => upgradeProperty(p.id)}
                       disabled={maxed || upgrading || state.player.clean_money < upgradeCost}
-                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                      className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-400 hover:bg-white/5"
                     >
                       <ArrowUpCircle size={11} /> {upgrading ? "A melhorar..." : maxed ? "Máx." : fmtMoney(upgradeCost)}
-                    </button>
+                    </Button>
                   </Tip>
                   <ConfirmButton
                     testId={`sell-property-${p.id}`}
@@ -160,7 +165,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     }
                   />
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -181,7 +186,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do bónus (rendimentos decrescentes).` : ""
                     }`;
                 return (
-                  <div key={key} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <Card key={key} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">
                         {pt.name}
@@ -209,7 +214,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                             onClick={() => buyProperty(key)}
                             disabled={locked || state.player.clean_money < pt.price}
                             size="sm"
-                            className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                            className="shrink-0 text-[10px] font-bold uppercase"
                           >
                             {fmtMoney(pt.price)}
                           </Button>
@@ -226,7 +231,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                         Já tens {ownedOfType} — próxima unidade rende {nextStackPct}% do bónus
                       </p>
                     )}
-                  </div>
+                  </Card>
                 );
               })}
           </div>

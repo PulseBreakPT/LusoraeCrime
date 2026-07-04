@@ -52,7 +52,13 @@ module.exports = {
           '3': 'hsl(var(--chart-3))',
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))'
-        }
+        },
+        // Cores semânticas de estado (sucesso/aviso/info) usadas em toda a
+        // plataforma — separadas do par primary/destructive porque representam
+        // dados do jogo (condição, calor, sucesso de missão), não a marca.
+        success: { DEFAULT: '#10B981', foreground: '#F0FDF4' },
+        warning: { DEFAULT: '#F59E0B', foreground: '#451A03' },
+        info: { DEFAULT: '#22D3EE', foreground: '#083344' }
       },
       keyframes: {
         'accordion-down': {

@@ -2,6 +2,10 @@ import { useGame } from "../../context/GameContext";
 import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription } from "../ui/alert";
 import { BrainCircuit, Lightbulb, ArrowRight } from "lucide-react";
 
 const OUTCOME_LABELS = { success: "Sucesso", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
@@ -47,23 +51,26 @@ const RecommendedActions = ({ onNavigate }) => {
         <Lightbulb size={12} className="text-amber-400" /> Ações recomendadas
       </h3>
       {recs.length === 0 ? (
-        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-400">
-          Tudo sob controlo. O império está a funcionar em pleno.
-        </p>
+        <Alert className="border-emerald-500/20 bg-emerald-500/5 py-2">
+          <AlertDescription className="font-mono text-[11px] text-emerald-400">
+            Tudo sob controlo. O império está a funcionar em pleno.
+          </AlertDescription>
+        </Alert>
       ) : (
         <div className="space-y-1.5">
           {recs.map((r) => (
-            <div key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
               <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
-              <button
+              <Button
                 data-testid={`intel-rec-action-${r.id}`}
+                variant="outline" size="sm"
                 onClick={r.run}
                 disabled={!r.can}
-                className="flex shrink-0 items-center gap-1 rounded border border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-cyan-300 transition-colors hover:bg-white/10 disabled:opacity-40"
+                className="h-auto shrink-0 gap-1 border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-cyan-300 hover:bg-white/10"
               >
                 {r.action} <ArrowRight size={10} />
-              </button>
-            </div>
+              </Button>
+            </Card>
           ))}
         </div>
       )}
@@ -96,10 +103,10 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <BrainCircuit size={18} className="text-red-500" /> Central de Inteligência
+            <BrainCircuit size={18} className="text-primary" /> Central de Inteligência
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Todos os dados do teu império num só lugar.</SheetDescription>
         </SheetHeader>
@@ -118,9 +125,9 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           {Object.keys(s.by_category || {}).length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {Object.entries(s.by_category).map(([cat, n]) => (
-                <span key={cat} className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
+                <Badge key={cat} variant="outline" className="border-transparent bg-white/5 px-1.5 py-0.5 font-mono text-[10px] font-normal text-zinc-400">
                   {SPEC_LABELS[cat] || cat}: <span className="text-white">{n}</span>
-                </span>
+                </Badge>
               ))}
             </div>
           )}
@@ -171,7 +178,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
           <div className="space-y-1">
             {state.history.map((m) => (
-              <div key={m.id} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5">
+              <Card key={m.id} className="flex items-center justify-between border-white/10 bg-white/[0.03] px-2.5 py-1.5 shadow-none">
                 <div>
                   <p className="text-xs font-semibold text-white">
                     {m.opportunity.name} <span className="font-mono text-[9px] text-zinc-500">{m.opportunity.district}</span>
@@ -189,7 +196,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
                     <p className="font-mono text-[10px] text-emerald-400">+{fmtMoney(m.opportunity.reward)}</p>
                   )}
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </Section>
@@ -209,9 +216,9 @@ const Grid = ({ children }) => <div className="grid grid-cols-2 gap-2">{children
 
 const Cell = ({ label, value, color = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <div className="h-full rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+    <Card className="h-full border-white/10 bg-white/[0.03] p-2.5 shadow-none">
       <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
-    </div>
+    </Card>
   </Tip>
 );

@@ -3,7 +3,11 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Label } from "../components/ui/label";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Loader2, AlertCircle, ShieldCheck } from "lucide-react";
 
 const BG = "https://images.unsplash.com/photo-1731234361187-4702894e725a?crop=entropy&cs=srgb&fm=jpg&q=85&w=1920";
 
@@ -28,84 +32,109 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#050505]">
+    <div className="relative min-h-screen w-full overflow-hidden bg-background">
       <img src={BG} alt="Lisboa à noite" className="absolute inset-0 h-full w-full object-cover opacity-50" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/70 to-[#050505]/40" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/40" />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 md:justify-start md:px-16 lg:px-24">
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 md:justify-start md:px-16 lg:px-24">
         <div className="w-full max-w-md animate-slide-up">
-          <div className="mb-8">
-            <p className="font-mono text-xs uppercase tracking-[0.35em] text-red-500">Lisboa · Rede Criminosa</p>
-            <h1 className="mt-2 font-display text-5xl font-bold tracking-tight text-white sm:text-6xl">LUSORAE</h1>
-            <p className="mt-3 text-sm text-zinc-400">
-              Não controlas uma personagem. Controlas um império. Gere equipas, veículos e operações num mapa vivo de Lisboa.
-            </p>
+          <div className="mb-6 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.35em] text-primary">
+            <ShieldCheck size={14} /> Lisboa · Rede Criminosa
           </div>
+          <h1 className="font-display text-5xl font-bold tracking-tight text-white sm:text-6xl">LUSORAE</h1>
+          <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+            Não controlas uma personagem. Controlas um império. Gere equipas, veículos e operações num mapa vivo de Lisboa.
+          </p>
 
-          <div className="rounded-lg border border-white/10 bg-black/75 p-6 shadow-2xl backdrop-blur-xl">
-            <div className="mb-5 flex gap-1 rounded-md bg-white/5 p-1">
-              <button
-                data-testid="auth-tab-login"
-                onClick={() => { setMode("login"); setError(""); }}
-                className={`flex-1 rounded px-3 py-2 text-sm font-semibold uppercase tracking-wider transition-colors ${mode === "login" ? "bg-white text-black" : "text-zinc-400 hover:text-white"}`}
-              >
-                Entrar
-              </button>
-              <button
-                data-testid="auth-tab-register"
-                onClick={() => { setMode("register"); setError(""); }}
-                className={`flex-1 rounded px-3 py-2 text-sm font-semibold uppercase tracking-wider transition-colors ${mode === "register" ? "bg-white text-black" : "text-zinc-400 hover:text-white"}`}
-              >
-                Criar Império
-              </button>
-            </div>
+          <Card className="mt-8 border-white/10 bg-black/75 shadow-2xl backdrop-blur-xl">
+            <CardHeader className="pb-3">
+              <Tabs value={mode} onValueChange={(m) => { setMode(m); setError(""); }}>
+                <TabsList className="grid w-full grid-cols-2 bg-white/5">
+                  <TabsTrigger
+                    data-testid="auth-tab-login"
+                    value="login"
+                    className="font-mono text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  >
+                    Entrar
+                  </TabsTrigger>
+                  <TabsTrigger
+                    data-testid="auth-tab-register"
+                    value="register"
+                    className="font-mono text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  >
+                    Criar Império
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <CardTitle className="sr-only">{mode === "login" ? "Entrar" : "Criar organização"}</CardTitle>
+              <CardDescription className="text-zinc-500">
+                {mode === "login" ? "Volta a assumir o controlo da tua organização." : "Funda uma organização de raiz em Lisboa."}
+              </CardDescription>
+            </CardHeader>
 
-            <form onSubmit={submit} className="space-y-3">
-              {mode === "register" && (
-                <Input
-                  data-testid="register-org-name-input"
-                  placeholder="Nome da organização"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  required
-                  minLength={3}
-                  className="border-white/10 bg-white/5 text-white placeholder:text-zinc-500"
-                />
-              )}
-              <Input
-                data-testid="auth-email-input"
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-white/10 bg-white/5 text-white placeholder:text-zinc-500"
-              />
-              <Input
-                data-testid="auth-password-input"
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="border-white/10 bg-white/5 text-white placeholder:text-zinc-500"
-              />
+            <CardContent>
+              <form onSubmit={submit} className="space-y-3">
+                {mode === "register" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="org-name" className="text-xs uppercase tracking-wider text-zinc-400">Organização</Label>
+                    <Input
+                      id="org-name"
+                      data-testid="register-org-name-input"
+                      placeholder="Nome da organização"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      required
+                      minLength={3}
+                      className="border-white/10 bg-white/5 text-white placeholder:text-zinc-500"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="auth-email" className="text-xs uppercase tracking-wider text-zinc-400">Email</Label>
+                  <Input
+                    id="auth-email"
+                    data-testid="auth-email-input"
+                    type="email"
+                    placeholder="nome@exemplo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="border-white/10 bg-white/5 text-white placeholder:text-zinc-500"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="auth-password" className="text-xs uppercase tracking-wider text-zinc-400">Palavra-passe</Label>
+                  <Input
+                    id="auth-password"
+                    data-testid="auth-password-input"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="border-white/10 bg-white/5 text-white placeholder:text-zinc-500"
+                  />
+                </div>
 
-              {error && (
-                <p data-testid="auth-error-message" className="text-sm text-red-500">{error}</p>
-              )}
+                {error && (
+                  <Alert variant="destructive" className="border-destructive/40 bg-destructive/10 py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription data-testid="auth-error-message" className="text-destructive">{error}</AlertDescription>
+                  </Alert>
+                )}
 
-              <Button
-                data-testid="auth-submit-button"
-                type="submit"
-                disabled={loading}
-                className="w-full bg-white font-bold uppercase tracking-wider text-black hover:bg-gray-200"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "login" ? "Entrar na rede" : "Fundar organização"}
-              </Button>
-            </form>
-          </div>
+                <Button
+                  data-testid="auth-submit-button"
+                  type="submit"
+                  disabled={loading}
+                  className="w-full font-bold uppercase tracking-wider shadow-[0_0_20px_rgba(220,38,38,0.35)]"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "login" ? "Entrar na rede" : "Fundar organização"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           <p className="mt-6 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
             Simulador de império criminoso · MVP Temporada 0
