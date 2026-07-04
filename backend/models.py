@@ -52,6 +52,8 @@ class Team(BaseDocument):
     vehicle_id: Optional[str] = None
     missions_done: int = 0
     created_at: str
+    available_at: Optional[str] = None
+    roster_stable_since: Optional[str] = None
 
 
 class Employee(BaseDocument):

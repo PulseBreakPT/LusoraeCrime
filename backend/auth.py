@@ -98,6 +98,7 @@ async def create_player_for_user(user_id: str, org_name: str):
     team_res = await db.teams.insert_one({
         "player_id": pid, "name": "Crew Alfa", "spec": "assalto",
         "status": "idle", "vehicle_id": None, "missions_done": 0, "created_at": now,
+        "available_at": None, "roster_stable_since": now,
     })
     tid = str(team_res.inserted_id)
     veh_res = await db.vehicles.insert_one(vehicle_doc(pid, "usado", now, team_id=tid))

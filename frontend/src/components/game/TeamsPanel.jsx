@@ -56,6 +56,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   const readiness = (t, members, vehicle) => {
     if (t.status !== "idle") return { ok: false, reason: STATUS_LABELS[t.status] || "Ocupada" };
+    if (t.available_at && Date.parse(t.available_at) > serverNow()) {
+      const remaining = Math.max(0, (Date.parse(t.available_at) - serverNow()) / 1000);
+      return { ok: false, reorg: true, reason: `A reorganizar-se (${fmtDuration(remaining)})` };
+    }
     if (members.length === 0) return { ok: false, reason: "Sem membros" };
     const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
     if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
@@ -78,7 +82,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
         </SheetHeader>
 
         {(() => {
-          const tr = teamsReadiness(state);
+          const tr = teamsReadiness(state, serverNow());
           const assigned = state.employees.filter((e) => e.team_id);
           const avgFat = assigned.length ? Math.round(assigned.reduce((a, e) => a + e.fatigue, 0) / assigned.length) : 0;
           const opsDone = state.teams.reduce((a, t) => a + (t.missions_done || 0), 0);
@@ -142,10 +146,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 <p
                   data-testid={`team-readiness-${t.id}`}
                   className={`mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase ${
-                    r.ok ? "text-emerald-400" : mission ? "text-cyan-400" : "text-amber-400"
+                    r.ok ? "text-emerald-400" : mission || r.reorg ? "text-cyan-400" : "text-amber-400"
                   }`}
                 >
-                  {r.ok ? <CheckCircle2 size={11} /> : mission ? <Clock size={11} /> : <AlertTriangle size={11} />}
+                  {r.ok ? <CheckCircle2 size={11} /> : mission || r.reorg ? <Clock size={11} /> : <AlertTriangle size={11} />}
                   {r.ok
                     ? `Pronta para operar (${r.ready} membros)`
                     : mission

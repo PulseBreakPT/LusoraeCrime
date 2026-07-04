@@ -163,12 +163,10 @@ const MissionUnit = ({ mission, serverNow }) => {
     if (lineRef.current) lineRef.current.setLatLngs(arr);
   }, [pos.progress, pos.phase, route]);
 
-  // Imperatively update style (color/dash) only when phase actually changes.
+  // Imperatively update style (dash) only when phase actually changes.
   useEffect(() => {
-    const color = pos.phase === "en_route" ? "#22D3EE" : pos.phase === "operating" ? "#F59E0B" : "#A78BFA";
     const dashArray = pos.phase === "returning" ? "6 6" : null;
-    if (glowRef.current) glowRef.current.setStyle({ color });
-    if (lineRef.current) lineRef.current.setStyle({ color, dashArray });
+    if (lineRef.current) lineRef.current.setStyle({ dashArray });
   }, [pos.phase]);
 
   const chased = pos.phase === "returning" && !!mission.chase_active;
@@ -207,7 +205,7 @@ const MissionUnit = ({ mission, serverNow }) => {
             ref={glowRef}
             positions={[]}
             smoothFactor={2}
-            pathOptions={{ color: "#22D3EE", weight: 6, opacity: 0.18, lineCap: "round", lineJoin: "round" }}
+            pathOptions={{ color: "#FFFFFF", weight: 6, opacity: 0.18, lineCap: "round", lineJoin: "round" }}
             interactive={false}
           />
           {/* Main line */}
@@ -215,7 +213,7 @@ const MissionUnit = ({ mission, serverNow }) => {
             ref={lineRef}
             positions={[]}
             smoothFactor={2}
-            pathOptions={{ color: "#22D3EE", weight: 2.4, opacity: 0.9, lineCap: "round", lineJoin: "round" }}
+            pathOptions={{ color: "#FFFFFF", weight: 2.4, opacity: 0.9, lineCap: "round", lineJoin: "round" }}
             interactive={false}
           />
         </>

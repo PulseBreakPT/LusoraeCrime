@@ -256,11 +256,12 @@ export function passiveRates(state, catalog) {
   return { dirtyPerH, launderPerH, heatPerH };
 }
 
-export function teamsReadiness(state) {
+export function teamsReadiness(state, now = Date.now()) {
   let ready = 0, busy = 0;
   const teams = state?.teams || [];
   teams.forEach((t) => {
     if (t.status !== "idle") { busy += 1; return; }
+    if (t.available_at && Date.parse(t.available_at) > now) return;
     const members = (state.employees || []).filter((e) => e.team_id === t.id);
     const active = members.filter((e) => e.status === "idle" && e.fatigue < 90);
     const vehicle = (state.vehicles || []).find((v) => v.id === t.vehicle_id);

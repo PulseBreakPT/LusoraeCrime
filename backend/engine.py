@@ -7,7 +7,11 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        TRAINING_COURSES, PROPERTY_TYPES, VEHICLE_MODELS, SPECIALIZATIONS,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, CATEGORY_ATTRS, ATTR_KEYS,
                        RARITIES, RARITY_MIN_RESPECT, RANKS, TALENTS, RECRUIT_SOURCES,
-                       POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, random_employee_name)
+                       POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, random_employee_name,
+                       TEAM_LEADER_MIN_RANK, NO_LEADER_PENALTY, SOLO_MEMBER_PENALTY,
+                       UNIFORM_SPEC_BONUS, COORDINATION_BONUS_MAX, COORDINATION_RAMP_S,
+                       REORG_AFTER_MISSION_S, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
+                       TEAM_MAX_MEMBERS)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -330,16 +334,16 @@ def effective_speed(vehicle):
     return vehicle["speed"] * (0.6 + 0.4 * c / 50)
 
 
-def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0):
+def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0):
     base = 0.92
     risk_pen = -risk * 0.07
     skill_bonus = team_skill * 0.05
     heat_pen = -heat * 0.0015
     match_bonus = 0.12 if spec_match else 0.0
-    chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus + talent_bonus))
+    chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus + talent_bonus + team_bonus))
     return chance, {"base": base, "risco": round(risk_pen, 4), "equipa": round(skill_bonus, 4),
                     "calor": round(heat_pen, 4), "match": round(match_bonus, 4),
-                    "talentos": round(talent_bonus, 4)}
+                    "talentos": round(talent_bonus, 4), "coordenacao": round(team_bonus, 4)}
 
 
 def team_effectiveness(members, category):
@@ -358,6 +362,28 @@ def team_effectiveness(members, category):
             rank_f = 1.0
         return (e["level"] * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * (1 - e["fatigue"] / 250) * morale_f * rank_f
     return sum(eff(e) for e in members) / len(members) + 0.3 * (len(members) - 1)
+
+
+def team_bonus_breakdown(members, category, roster_stable_since, now):
+    """Ajustes de chance derivados da coordenação da equipa: falta de líder,
+    equipa demasiado pequena, homogeneidade de especialização e veterania
+    (tempo desde a última alteração de membros)."""
+    total = 0.0
+    try:
+        leader_idx = RANKS.index(TEAM_LEADER_MIN_RANK)
+    except ValueError:
+        leader_idx = len(RANKS) - 1
+    has_leader = any(RANKS.index(e["rank"]) >= leader_idx for e in members if e.get("rank") in RANKS)
+    if not has_leader:
+        total -= NO_LEADER_PENALTY
+    if len(members) == 1:
+        total -= SOLO_MEMBER_PENALTY
+    if len(members) > 1 and all(e.get("spec") == category for e in members):
+        total += UNIFORM_SPEC_BONUS
+    if roster_stable_since:
+        stable_s = max(0.0, (now - parse_dt(roster_stable_since)).total_seconds())
+        total += COORDINATION_BONUS_MAX * min(1.0, stable_s / COORDINATION_RAMP_S)
+    return total
 
 
 def _roll_outcome(player, m):
@@ -634,7 +660,8 @@ async def _progress_mission(db, player, m, now):
                 await _pay_pending_reward(db, player, m)
         phase = "done"
         updates["phase"] = phase
-        await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "idle"}})
+        reorg_until = (now + timedelta(seconds=REORG_AFTER_MISSION_S)).isoformat()
+        await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "idle", "available_at": reorg_until}})
         if m.get("member_ids"):
             await db.employees.update_many(
                 {"_id": {"$in": [ObjectId(i) for i in m["member_ids"]]}, "status": "on_mission"},

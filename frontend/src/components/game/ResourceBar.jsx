@@ -21,7 +21,7 @@ export const ResourceBar = () => {
   const respPct = nextRespect ? Math.min(100, (p.respect / nextRespect) * 100) : 100;
   const hs = heatStatus(p.heat);
   const { dirtyPerH, launderPerH } = passiveRates(state, catalog);
-  const tr = teamsReadiness(state);
+  const tr = teamsReadiness(state, serverNow());
   const activeOps = state.missions.length;
   const payrollS = p.next_payroll_at ? Math.max(0, (Date.parse(p.next_payroll_at) - serverNow()) / 1000) : null;
 
