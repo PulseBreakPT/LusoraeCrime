@@ -131,6 +131,8 @@ class Property(BaseDocument):
     total_dirty_generated: float = 0.0
     total_laundered: float = 0.0
     bought_at: str
+    condition: float = 100.0
+    upgrading_until: Optional[str] = None
 
 
 class Opportunity(BaseDocument):

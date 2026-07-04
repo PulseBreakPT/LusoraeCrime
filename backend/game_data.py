@@ -226,6 +226,16 @@ RECALL_PENALTY_FATIGUE = 8             # fadiga extra da equipa ao chamar de vol
 
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
 
+# ---------------- Imóveis: manutenção, melhorias e sinergias ----------------
+
+PROPERTY_MAINTENANCE_PCT_PER_DAY = 0.0015    # custo diário de manutenção, % do preço × nível
+PROPERTY_CONDITION_RECOVERY_PER_HOUR = 2.0   # recuperação de condição por hora quando a manutenção é paga
+PROPERTY_CONDITION_DECAY_PER_HOUR = 3.0      # degradação de condição por hora quando a manutenção falha
+PROPERTY_UPGRADE_BASE_S = 90                 # tempo base (s) de uma melhoria de imóvel
+PROPERTY_UPGRADE_PER_LEVEL_S = 60            # tempo adicional (s) por nível-alvo da melhoria
+HIDEOUT_PREP_REDUCTION_PER_LEVEL = 0.25      # redução do atraso de preparação de equipas incompletas, por nível de esconderijo
+LAUNDER_PROPERTY_BONUS_PER_LEVEL = 0.03      # bónus de eficiência na lavagem manual por nível de empresa de fachada
+
 # ---------------- Propriedades ----------------
 
 PROPERTY_TYPES = {

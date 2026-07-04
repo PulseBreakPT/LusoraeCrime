@@ -245,15 +245,17 @@ export function sellValueOf(v) {
   return Math.round(v.price * 0.4 * (v.condition / 100));
 }
 
-export function passiveRates(state, catalog) {
+export function passiveRates(state, catalog, now = Date.now()) {
   const pt = catalog?.property_types || {};
   let dirtyPerH = 0, launderPerH = 0, heatPerH = 0;
   (state?.properties || []).forEach((p) => {
     const t = pt[p.type_key];
     if (!t) return;
-    dirtyPerH += (t.dirty_per_h || 0) * p.level;
-    launderPerH += (t.launder_per_h || 0) * p.level;
-    heatPerH += (t.heat_per_h || 0) * p.level;
+    if (p.upgrading_until && Date.parse(p.upgrading_until) > now) return;
+    const factor = (p.condition ?? 100) / 100;
+    dirtyPerH += (t.dirty_per_h || 0) * p.level * factor;
+    launderPerH += (t.launder_per_h || 0) * p.level * factor;
+    heatPerH += (t.heat_per_h || 0) * p.level * factor;
   });
   return { dirtyPerH, launderPerH, heatPerH };
 }

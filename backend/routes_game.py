@@ -11,8 +11,9 @@ from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
                     team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown,
-                    age_decay_mult, member_split_mult, gen_candidate,
-                    employee_from_candidate, betrayal_risk_of, push_history, gen_attrs, gen_talents)
+                    age_decay_mult, member_split_mult, property_active, property_condition_factor,
+                    gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
+                    gen_attrs, gen_talents)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
 from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest
@@ -23,7 +24,9 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
                        TEAM_MAX_MEMBERS, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
                        NEWBIE_RAMP_S, RECALL_PENALTY_FRACTION, RECALL_PENALTY_HEAT,
-                       RECALL_PENALTY_FATIGUE, random_employee_name)
+                       RECALL_PENALTY_FATIGUE, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
+                       PROPERTY_UPGRADE_BASE_S, PROPERTY_UPGRADE_PER_LEVEL_S,
+                       LAUNDER_PROPERTY_BONUS_PER_LEVEL, random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -265,24 +268,32 @@ async def _prepare_dispatch(player, opp, team):
     if vehicle["fuel_l"] < fuel_needed:
         raise HTTPException(status_code=400, detail="Combustível insuficiente para a viagem")
 
+    props = await db.properties.find({"player_id": pid}).to_list(200)
+
     speed = effective_speed(vehicle)
     travel_s = max(20, dist / speed)
     # Equipas incompletas (abaixo da capacidade máxima) demoram mais tempo a
-    # preparar-se antes de partir.
+    # preparar-se antes de partir — esconderijos maiores (mais ativos e em bom
+    # estado) reduzem esse atraso.
     missing = max(0, TEAM_MAX_MEMBERS - len(members))
-    travel_s += missing * INCOMPLETE_TEAM_PREP_S
+    hideout_reduction = sum(
+        HIDEOUT_PREP_REDUCTION_PER_LEVEL * pr["level"] * property_condition_factor(pr)
+        for pr in props if pr["type_key"] == "esconderijo" and property_active(pr, now)
+    )
+    travel_s += missing * INCOMPLETE_TEAM_PREP_S * max(0.0, 1 - min(1.0, hideout_reduction))
 
     member_talents = sorted({t for e in members for t in e.get("talents", [])})
     if "motorista_fantasma" in member_talents:
         travel_s *= 0.9
     talent_bonus = 0.05 if ("pontaria_letal" in member_talents and opp["category"] == "assalto") else 0.0
 
-    props = await db.properties.find({"player_id": pid}).to_list(200)
     mult = 1.0
     for pr in props:
+        if not property_active(pr, now):
+            continue
         pt = PROPERTY_TYPES[pr["type_key"]]
         if pt.get("bonus_pct") and (pt.get("bonus_category") == "all" or pt.get("bonus_category") == opp["category"]):
-            mult += pt["bonus_pct"] * pr["level"]
+            mult += pt["bonus_pct"] * pr["level"] * property_condition_factor(pr)
     tb = player.get("temp_bonus")
     if tb and tb.get("kind") == "reward_boost" and parse_dt(tb["until"]) > now_utc():
         mult += tb["pct"]
@@ -884,7 +895,11 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail="Veículo em perfeitas condições")
     _, props = await get_caps(db, pid)
     bonuses = await get_org_bonuses(db, pid)
-    discount = min(0.6, sum(0.15 * p["level"] for p in props if p["type_key"] == "oficina") + bonuses["repair_discount"])
+    now = now_utc()
+    discount = min(0.6, sum(
+        0.15 * p["level"] * property_condition_factor(p)
+        for p in props if p["type_key"] == "oficina" and property_active(p, now)
+    ) + bonuses["repair_discount"])
     cost = max(50, int(missing * vehicle["price"] * 0.002 * (1 - discount)))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
@@ -965,6 +980,8 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
     prop = await db.properties.find_one({"_id": _oid(body.property_id, "Propriedade inválida"), "player_id": pid})
     if not prop:
         raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+    if prop.get("upgrading_until") and parse_dt(prop["upgrading_until"]) > now_utc():
+        raise HTTPException(status_code=400, detail="Não podes vender: está a ser melhorado")
     pt = PROPERTY_TYPES[prop["type_key"]]
     caps, _ = await get_caps(db, pid)
     if pt.get("cap_employees"):
@@ -991,14 +1008,20 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Propriedade não encontrada")
     if prop["level"] >= PROPERTY_MAX_LEVEL:
         raise HTTPException(status_code=400, detail="Nível máximo atingido")
+    now = now_utc()
+    if prop.get("upgrading_until") and parse_dt(prop["upgrading_until"]) > now:
+        raise HTTPException(status_code=400, detail="Já está a ser melhorado")
     pt = PROPERTY_TYPES[prop["type_key"]]
     cost = int(pt["price"] * 0.6 * (prop["level"] + 1))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    target_level = prop["level"] + 1
+    duration_s = PROPERTY_UPGRADE_BASE_S + PROPERTY_UPGRADE_PER_LEVEL_S * target_level
+    until = (now + timedelta(seconds=duration_s)).isoformat()
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.properties_upgraded": 1}})
-    await db.properties.update_one({"_id": prop["_id"]}, {"$inc": {"level": 1}})
-    await add_event(db, pid, "property", f"{prop['name']} melhorado para nível {prop['level'] + 1} por {cost:,} €.")
-    return {"ok": True}
+    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"upgrading_until": until}})
+    await add_event(db, pid, "property", f"{prop['name']} começou a ser melhorado para nível {target_level} por {cost:,} € — pronto em {round(duration_s / 60, 1)} min.")
+    return {"ok": True, "upgrading_until": until}
 
 
 @router.post("/properties/rename")
@@ -1042,7 +1065,13 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
     if player["dirty_money"] < body.amount:
         raise HTTPException(status_code=400, detail="Dinheiro sujo insuficiente")
     bonuses = await get_org_bonuses(db, pid)
-    rate = min(0.95, 0.75 + bonuses["launder_rate"])
+    now = now_utc()
+    props = await db.properties.find({"player_id": pid, "type_key": "empresa_legal"}).to_list(50)
+    property_bonus = sum(
+        LAUNDER_PROPERTY_BONUS_PER_LEVEL * pr["level"] * property_condition_factor(pr)
+        for pr in props if property_active(pr, now)
+    )
+    rate = min(0.95, 0.75 + bonuses["launder_rate"] + property_bonus)
     clean_gain = int(body.amount * rate)
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {
         "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,

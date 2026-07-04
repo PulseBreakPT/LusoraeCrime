@@ -816,6 +816,73 @@ class TestProperties:
         assert r.status_code == 404
 
 
+# ---------------- Imóveis: manutenção, melhorias e condição ----------------
+class TestPropertyMechanics:
+    def test_property_exposes_condition_and_upgrade_fields(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s)["properties"][0]
+        assert prop["condition"] == 100.0
+        assert prop["upgrading_until"] is None
+
+    def test_upgrade_is_timed_not_instant(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s)["properties"][0]
+        r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
+                   json={"property_id": prop["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["upgrading_until"] is not None
+        st2 = get_state(s)
+        p2 = next(p for p in st2["properties"] if p["id"] == prop["id"])
+        assert p2["level"] == 1, "o nível não deve subir de imediato — a melhoria demora tempo"
+        assert p2["upgrading_until"] is not None
+
+    def test_cannot_upgrade_twice_while_upgrading(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s)["properties"][0]
+        r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
+                   json={"property_id": prop["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
+                   json={"property_id": prop["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 400
+
+    def test_cannot_sell_while_upgrading(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s)["properties"][0]
+        r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
+                   json={"property_id": prop["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        r = s.post(f"{BASE_URL}/api/game/properties/sell",
+                   json={"property_id": prop["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 400
+        assert "melhorado" in r.json()["detail"].lower()
+
+    @pytest.mark.slow
+    def test_upgrade_completes_and_raises_level(self):
+        s, _ = register_new()
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        prop = get_state(s)["properties"][0]
+        r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
+                   json={"property_id": prop["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        until = r.json()["upgrading_until"]
+        import datetime
+        remaining = (datetime.datetime.fromisoformat(until) - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        deadline = time.time() + max(1, remaining) + 30
+        while time.time() < deadline:
+            time.sleep(15)
+            st = get_state(s)
+            p2 = next(p for p in st["properties"] if p["id"] == prop["id"])
+            if p2["level"] == 2:
+                assert p2["upgrading_until"] is None
+                return
+        pytest.fail("property upgrade did not complete within the expected window")
+
+
 # ---------------- Police / Launder regression ----------------
 class TestPoliceLaunder:
     def test_bribe_fails_low_heat(self):
