@@ -379,7 +379,7 @@ export const MapLegend = () => {
   return (
     <div
       className="pointer-events-auto absolute right-2 z-30"
-      style={{ bottom: "calc(3.6rem + env(safe-area-inset-bottom, 0px))" }}
+      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {open && (
         <Card data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up border-white/10 bg-black/85 p-3 shadow-2xl backdrop-blur-xl">
