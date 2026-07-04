@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X } from "lucide-react";
+import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star } from "lucide-react";
 import { useGame } from "../../context/GameContext";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
@@ -21,13 +21,14 @@ const PROP_ICONS = {
 const makeDivIcon = (html, size, className = "") =>
   L.divIcon({ html, className: `lus-marker ${className}`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 
-const oppIcon = (opp, selected) => {
+const oppIcon = (opp, selected, favorite) => {
   const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
   const color = CATEGORY_COLORS[opp.category] || "#fff";
   const taken = opp.status === "taken";
   const html = `
     <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""}" style="--mk:${color}">
       ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
+      ${favorite ? `<span style="position:absolute;top:-4px;right:-4px;color:#FBBF24;filter:drop-shadow(0 0 2px rgba(0,0,0,0.8))">${renderToStaticMarkup(<Star size={11} fill="#FBBF24" />)}</span>` : ""}
     </div>`;
   return makeDivIcon(html, 34);
 };
@@ -323,11 +324,13 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
           missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
           missionPhaseLabel = STATUS_LABELS[activeMission.phase] || activeMission.phase;
         }
+        const isFavorite = (state.player.favorite_types || []).includes(opp.type_key);
         return (
           <Marker
             key={opp.id}
             position={[opp.lat, opp.lng]}
-            icon={oppIcon(opp, opp.id === selectedOppId)}
+            icon={oppIcon(opp, opp.id === selectedOppId, isFavorite)}
+            zIndexOffset={isFavorite ? 400 : 0}
             eventHandlers={{ click: () => onSelectOpp(opp) }}
           >
             <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">

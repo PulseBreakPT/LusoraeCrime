@@ -302,3 +302,49 @@ OPPORTUNITY_TYPES = {
     "ciberataque_bancario": {"name": "Ciberataque Bancário", "category": "tecnica", "min_level": 5, "base_reward": 23000,
                             "respect": 230, "heat": 18, "risk": 5, "duration_s": (190, 300), "weight": 2, "pays": "dirty"},
 }
+
+# ---------------- Economia e recursos ----------------
+
+DIRTY_MONEY_HEAT_THRESHOLD = 60000       # acima deste montante de dinheiro sujo acumulado, gera calor extra
+DIRTY_MONEY_HEAT_PER_10K = 0.15          # calor extra por hora, por cada 10 mil € sujos acima do limiar
+
+# ---------------- Progressão ----------------
+
+LOW_LEVEL_XP_GAP = 2                     # diferença de nível (missão vs. organização) a partir da qual a XP é reduzida
+LOW_LEVEL_XP_MULT_PER_GAP = 0.15         # redução de XP por cada nível de diferença acima do limiar
+LOW_LEVEL_XP_MULT_MIN = 0.3              # redução mínima de XP para missões muito abaixo do nível
+TEAM_COUNT_BASE = 2                      # nº máximo de equipas ao nível 1
+TEAM_COUNT_PER_2_LEVELS = 1              # +1 equipa máxima a cada 2 níveis da organização
+ACHIEVEMENT_MILESTONES = [10, 50, 150, 400]  # missões bem-sucedidas para desbloquear cada bónus permanente
+ACHIEVEMENT_BONUS_PCT_PER_MILESTONE = 0.02   # bónus de recompensa permanente por marco atingido
+
+# ---------------- Sistema de viagem / logística ----------------
+
+LOCAL_PRESENCE_RADIUS_KM = 1.5           # raio para uma missão já em curso contar como "na mesma zona"
+LOCAL_PRESENCE_PREP_REDUCTION_S = 6      # redução do tempo de viagem por cada equipa já ativa perto do alvo
+LOCAL_PRESENCE_PREP_REDUCTION_MAX_S = 18 # redução máxima combinada
+
+# ---------------- Pequenos imprevistos ----------------
+
+TRAFFIC_DELAY_CHANCE = 0.12              # probabilidade de trânsito atrasar ligeiramente a viagem
+TRAFFIC_DELAY_MAX_PCT = 0.15             # atraso máximo (% do tempo de viagem)
+UNEXPECTED_REPAIR_CHANCE_PER_RISK = 0.03 # probabilidade (por ponto de risco) de avaria inesperada após a operação
+UNEXPECTED_REPAIR_CONDITION_HIT = 12     # condição extra perdida numa avaria inesperada
+EXCEPTIONAL_PERFORMANCE_CHANCE = 0.08    # probabilidade de desempenho excecional
+EXCEPTIONAL_PERFORMANCE_XP_BONUS_PCT = 0.5  # XP extra num desempenho excecional
+BONUS_LOOT_CHANCE = 0.06                 # probabilidade de saque adicional aleatório
+BONUS_LOOT_MAX_PCT = 0.15                # saque adicional máximo (% da recompensa)
+
+# ---------------- Manutenção ----------------
+
+WEAR_PER_MISSION_SINCE_REPAIR = 0.08     # desgaste extra por missão acumulada desde a última reparação
+WEAR_MISSIONS_SINCE_REPAIR_CAP = 10      # nº de missões a partir do qual o desgaste extra deixa de aumentar
+EMPLOYEE_HEAVY_USE_THRESHOLD = 30        # nº de missões a partir do qual um funcionário é "muito utilizado"
+EMPLOYEE_HEAVY_USE_FATIGUE_MULT = 1.25   # fadiga extra ganha por missão para funcionários muito utilizados
+
+# ---------------- Pequenos detalhes ----------------
+
+RAIN_CHANCE = 0.10                       # probabilidade de chuva numa viagem
+RAIN_TRAVEL_MULT = 1.10                  # aumento do tempo de viagem com chuva
+NIGHT_STEALTH_HOURS = (0, 6)             # horas (UTC) consideradas noite fechada para o bónus furtivo
+NIGHT_STEALTH_BONUS = 0.04               # bónus de chance em operações discretas durante a noite

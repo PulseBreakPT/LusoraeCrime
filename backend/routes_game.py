@@ -12,6 +12,7 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
                     team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown,
                     age_decay_mult, member_split_mult, property_active, property_condition_factor,
+                    local_presence_reduction_s, situational_bonus_for, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
                     gen_attrs, gen_talents)
 from quests import make_instance, enrich_quest, locked_principals
@@ -26,7 +27,9 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        NEWBIE_RAMP_S, RECALL_PENALTY_FRACTION, RECALL_PENALTY_HEAT,
                        RECALL_PENALTY_FATIGUE, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
                        PROPERTY_UPGRADE_BASE_S, PROPERTY_UPGRADE_PER_LEVEL_S,
-                       LAUNDER_PROPERTY_BONUS_PER_LEVEL, random_employee_name)
+                       LAUNDER_PROPERTY_BONUS_PER_LEVEL, LOCAL_PRESENCE_RADIUS_KM,
+                       TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, RAIN_CHANCE, RAIN_TRAVEL_MULT,
+                       EMPLOYEE_HEAVY_USE_THRESHOLD, random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -55,6 +58,10 @@ class TeamIdInput(BaseModel):
 
 class OpportunityIdInput(BaseModel):
     opportunity_id: str
+
+
+class TypeKeyInput(BaseModel):
+    type_key: str
 
 
 class TeamCreateInput(BaseModel):
@@ -165,6 +172,7 @@ async def catalog():
         "team_max_members": TEAM_MAX_MEMBERS,
         "newbie_ramp_s": NEWBIE_RAMP_S,
         "recall_penalty_fraction": RECALL_PENALTY_FRACTION,
+        "employee_heavy_use_threshold": EMPLOYEE_HEAVY_USE_THRESHOLD,
         "opportunity_types": {k: {kk: vv for kk, vv in v.items() if kk != "duration_s"} for k, v in OPPORTUNITY_TYPES.items()},
     }
 
@@ -222,6 +230,7 @@ async def get_state(user: dict = Depends(get_current_user)):
         "caps": {
             "employees": {"used": len(employees), "max": caps["employees"]},
             "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
+            "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
         },
         "bonuses": bonuses,
         "salary_total": sum(e.get("salary", 0) for e in employees),
@@ -281,6 +290,14 @@ async def _prepare_dispatch(player, opp, team):
         for pr in props if pr["type_key"] == "esconderijo" and property_active(pr, now)
     )
     travel_s += missing * INCOMPLETE_TEAM_PREP_S * max(0.0, 1 - min(1.0, hideout_reduction))
+    # Já ter outras equipas ativas perto do alvo reduz o tempo de preparação —
+    # a organização já conhece a zona.
+    active_missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(50)
+    nearby_active = sum(
+        1 for am in active_missions
+        if haversine_m(am["target"]["lat"], am["target"]["lng"], opp["lat"], opp["lng"]) / 1000 <= LOCAL_PRESENCE_RADIUS_KM
+    )
+    travel_s = max(20, travel_s - local_presence_reduction_s(nearby_active))
 
     member_talents = sorted({t for e in members for t in e.get("talents", [])})
     if "motorista_fantasma" in member_talents:
@@ -297,6 +314,8 @@ async def _prepare_dispatch(player, opp, team):
     tb = player.get("temp_bonus")
     if tb and tb.get("kind") == "reward_boost" and parse_dt(tb["until"]) > now_utc():
         mult += tb["pct"]
+    # Conquistas permanentes (marcos de missões bem-sucedidas) dão um bónus fixo.
+    mult += player.get("achievement_bonus_pct", 0.0)
     # Recompensa diminui quanto mais tempo a oportunidade ficar por reclamar, e
     # levar mais membros do que o exigido divide o saque.
     age_s = (now - parse_dt(opp["created_at"])).total_seconds()
@@ -308,8 +327,9 @@ async def _prepare_dispatch(player, opp, team):
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
     team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
     vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
+    situational_bonus = situational_bonus_for(opp["category"], now)
     chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match,
-                                          talent_bonus, team_bonus, vehicle_bonus)
+                                          talent_bonus, team_bonus, vehicle_bonus, situational_bonus)
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
@@ -375,10 +395,24 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     members = prep["members"]
     repeat_type = team.get("last_type_key") == opp["type_key"]
 
+    # Pequenos imprevistos, decididos só no momento do despacho (não na
+    # pré-visualização, para esta continuar a mostrar sempre o valor de base):
+    # trânsito e chuva podem atrasar ligeiramente a viagem.
+    travel_s = prep["travel_s"]
+    incidents = []
+    if random.random() < TRAFFIC_DELAY_CHANCE:
+        travel_s *= 1 + random.uniform(0.03, TRAFFIC_DELAY_MAX_PCT)
+        incidents.append("trânsito")
+    if random.random() < RAIN_CHANCE:
+        travel_s *= RAIN_TRAVEL_MULT
+        incidents.append("chuva")
+    if incidents:
+        await add_event(db, pid, "team", f"{team['name']} apanhou {' e '.join(incidents)} a caminho de {opp['name']} — viagem mais lenta.")
+
     depart = now
-    arrive = depart + timedelta(seconds=prep["travel_s"])
+    arrive = depart + timedelta(seconds=travel_s)
     finish = arrive + timedelta(seconds=opp["duration_s"])
-    ret = finish + timedelta(seconds=prep["travel_s"])
+    ret = finish + timedelta(seconds=travel_s)
     member_ids = [str(e["_id"]) for e in members]
 
     mission = {
@@ -393,7 +427,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
-            "risk": opp["risk"], "heat": opp["heat"], "pays": opp["pays"],
+            "risk": opp["risk"], "heat": opp["heat"], "pays": opp["pays"], "min_level": opp["min_level"],
         },
         "origin": {"lat": player["hq"]["lat"], "lng": player["hq"]["lng"]},
         "target": {"lat": opp["lat"], "lng": opp["lng"]},
@@ -498,6 +532,56 @@ async def recommend_team(body: OpportunityIdInput, user: dict = Depends(get_curr
     }
 
 
+@router.post("/dispatch/recommend_repeat")
+async def recommend_repeat(body: TeamIdInput, user: dict = Depends(get_current_user)):
+    """Repetir a última missão: sugere uma oportunidade ativa do mesmo tipo da
+    última operação desta equipa, se ainda existir e for exequível."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
+    if not team or not team.get("last_type_key"):
+        return {"opportunity_id": None}
+    if player["heat"] >= 90:
+        return {"opportunity_id": None}
+    now = now_utc()
+    opps = await db.opportunities.find({
+        "player_id": pid, "status": "active", "expires_at": {"$gt": now.isoformat()},
+        "min_level": {"$lte": player["level"]}, "type_key": team["last_type_key"],
+    }).to_list(50)
+    best_opp, best_prep = None, None
+    for opp in opps:
+        prep = await _try_prepare_dispatch(player, opp, team)
+        if not prep or len(prep["members"]) < prep["min_members"]:
+            continue
+        if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+            best_opp, best_prep = opp, prep
+    if not best_opp:
+        return {"opportunity_id": None}
+    return {
+        "opportunity_id": str(best_opp["_id"]),
+        "chance": round(best_prep["chance"], 3),
+        "reward": best_prep["reward"],
+        "eta_s": round(best_prep["travel_s"]),
+        "dist_km": round(best_prep["dist"] / 1000, 2),
+    }
+
+
+@router.post("/opportunities/favorite")
+async def toggle_favorite_type(body: TypeKeyInput, user: dict = Depends(get_current_user)):
+    """Marca/desmarca um tipo de missão como favorito — favoritos aparecem
+    primeiro no mapa e na lista de oportunidades."""
+    if body.type_key not in OPPORTUNITY_TYPES:
+        raise HTTPException(status_code=400, detail="Tipo de missão inválido")
+    player = await get_player(user)
+    favorites = list(player.get("favorite_types", []))
+    if body.type_key in favorites:
+        favorites.remove(body.type_key)
+    else:
+        favorites.append(body.type_key)
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"favorite_types": favorites}})
+    return {"favorite_types": favorites}
+
+
 @router.post("/missions/recall")
 async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
@@ -551,6 +635,9 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
     if player["clean_money"] < TEAM_CREATE_COST:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     count = await db.teams.count_documents({"player_id": pid})
+    max_teams = max_teams_for(player["level"])
+    if count >= max_teams:
+        raise HTTPException(status_code=400, detail=f"Limite de {max_teams} equipas para o nível {player['level']} — sobe de nível para desbloquear mais.")
     name = TEAM_NAMES[count % len(TEAM_NAMES)]
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST, "stats.teams_created": 1}})
     created = now_utc().isoformat()
@@ -904,7 +991,10 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_repaired": 1}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"condition": 100.0}, "$inc": {"repair_spent_total": cost}})
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {
+        "$set": {"condition": 100.0, "missions_since_repair": 0},
+        "$inc": {"repair_spent_total": cost},
+    })
     await add_event(db, pid, "vehicle", f"{vehicle['name']} reparado por {cost:,} €.")
     return {"cost": cost}
 

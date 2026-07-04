@@ -43,6 +43,8 @@ class Player(BaseDocument):
     last_tick: str
     created_at: str
     type_cooldowns: dict = {}
+    achievement_bonus_pct: float = 0.0
+    favorite_types: List[str] = []
 
 
 class Team(BaseDocument):
@@ -81,6 +83,7 @@ class Employee(BaseDocument):
     history: List[dict] = []
     hired_at: str
     last_mission_at: Optional[str] = None
+    missions_done: int = 0
 
 
 class Candidate(BaseDocument):
@@ -117,6 +120,7 @@ class Vehicle(BaseDocument):
     repair_spent_total: float = 0.0
     missions_done: int = 0
     missions_success: int = 0
+    missions_since_repair: int = 0
     bought_at: str
 
 
@@ -184,6 +188,7 @@ class Mission(BaseDocument):
     # Pending payout (credited only when the crew reaches HQ) and police chase state.
     pending_reward: int = 0
     pending_pays: Optional[str] = None
+    bonus_loot: bool = False
     chase_active: bool = False
     chase_chance: float = 0.0
     escape_chance: float = 0.0

@@ -83,6 +83,15 @@ export function GameProvider({ children }) {
       return { ok: false };
     }
   }, []);
+  const recommendRepeatForTeam = useCallback(async (teamId) => {
+    try {
+      const { data } = await api.post("/game/dispatch/recommend_repeat", { team_id: teamId });
+      return { ok: true, data };
+    } catch (e) {
+      return { ok: false };
+    }
+  }, []);
+  const toggleFavoriteType = (typeKey) => action("opportunities/favorite", { type_key: typeKey });
   const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
   const recruitEmployee = (candidateId) => action("employees/recruit", { candidate_id: candidateId }, "Recruta contratado");
   const refreshPool = () => action("recruitment/refresh", {}, "Contactos atualizados");
@@ -126,7 +135,8 @@ export function GameProvider({ children }) {
     <GameContext.Provider
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
-        recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity,
+        recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity, recommendRepeatForTeam,
+        toggleFavoriteType,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
         promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle,

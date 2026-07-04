@@ -89,6 +89,8 @@ const EmployeeCard = ({ e }) => {
 
   const newbieRampS = catalog?.newbie_ramp_s || 3600;
   const isNewbie = e.hired_at ? (serverNow() - Date.parse(e.hired_at)) / 1000 < newbieRampS : false;
+  const heavyUseThreshold = catalog?.employee_heavy_use_threshold || 30;
+  const isHeavyUse = (e.missions_done || 0) >= heavyUseThreshold;
 
   const team = e.team_id ? state.teams.find((t) => t.id === e.team_id) : null;
   const vehicle = team?.vehicle_id ? state.vehicles.find((v) => v.id === team.vehicle_id) : null;
@@ -132,6 +134,13 @@ const EmployeeCard = ({ e }) => {
               <Tip tip="Recém-contratado — ainda se está a adaptar, com um pequeno desempenho reduzido que desaparece na primeira hora ao serviço.">
                 <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-lime-400">
                   <Leaf size={9} /> novato
+                </span>
+              </Tip>
+            )}
+            {isHeavyUse && (
+              <Tip tip={`Muito utilizado (${e.missions_done} missões) — cansa-se mais depressa e precisa de descansar com mais frequência.`}>
+                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-orange-400">
+                  <BatteryMedium size={9} /> veterano
                 </span>
               </Tip>
             )}

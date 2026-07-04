@@ -233,6 +233,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     <VStat label="Comb. gasto" value={fmtMoney(v.fuel_spent_total || 0)} />
                     <VStat label="Reparações" value={fmtMoney(v.repair_spent_total || 0)} />
                     <VStat label="Vel. efetiva" value={`${effSpeed.toFixed(1)} m/s`} />
+                    <VStat label="Desde reparação" value={`${v.missions_since_repair || 0} missões`} />
                   </div>
                 )}
               </div>
