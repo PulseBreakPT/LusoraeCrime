@@ -42,6 +42,7 @@ class Player(BaseDocument):
     hq: dict
     last_tick: str
     created_at: str
+    type_cooldowns: dict = {}
 
 
 class Team(BaseDocument):
@@ -54,6 +55,7 @@ class Team(BaseDocument):
     created_at: str
     available_at: Optional[str] = None
     roster_stable_since: Optional[str] = None
+    last_type_key: Optional[str] = None
 
 
 class Employee(BaseDocument):
@@ -147,6 +149,7 @@ class Opportunity(BaseDocument):
     rare: bool = False
     dist_km: float = 0.0
     min_members: int = 1
+    required_models: List[str] = []
     duration_s: int
     min_level: int
     status: str
@@ -163,6 +166,7 @@ class Mission(BaseDocument):
     member_ids: List[str] = []
     vehicle_id: Optional[str] = None
     vehicle_luxury: bool = False
+    repeat_type: bool = False
     opportunity_id: Optional[str] = None
     talents: List[str] = []
     opportunity: dict

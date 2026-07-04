@@ -625,6 +625,85 @@ class TestEmployeeMechanics:
         assert e3["fatigue"] == 0.0
 
 
+# ---------------- Missões: recompensa, disponibilidade e cancelamento ----------------
+class TestMissionMechanics:
+    def test_catalog_exposes_recall_penalty_fraction(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert 0 < r.json()["recall_penalty_fraction"] <= 1
+
+    def test_opportunity_types_with_required_models(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        types = r.json()["opportunity_types"]
+        assert types["contrabando"]["required_models"] == ["van", "suv_blindado"]
+        assert types["rota_internacional"]["required_models"] == ["van"]
+
+    def test_spawned_opportunities_expose_required_models(self):
+        s, _ = register_new()
+        st = get_state(s)
+        assert st["opportunities"]
+        for o in st["opportunities"]:
+            assert "required_models" in o and isinstance(o["required_models"], list)
+
+    def test_preview_includes_age_and_split_pct(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "age_decay_pct" in d and d["age_decay_pct"] <= 0
+        assert "split_penalty_pct" in d and d["split_penalty_pct"] <= 0
+
+    def test_recall_immediately_has_no_penalty(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        heat_before = st["player"]["heat"]
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        mission_id = r.json()["mission_id"]
+        r = s.post(f"{BASE_URL}/api/game/missions/recall",
+                   json={"mission_id": mission_id}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["late_penalty"] is False
+        st2 = get_state(s)
+        assert st2["player"]["heat"] == heat_before
+
+    @pytest.mark.slow
+    def test_recall_late_has_penalty(self):
+        s, _ = register_new()
+        st = get_state(s)
+        team = st["teams"][0]
+        opps = [o for o in st["opportunities"] if o["min_level"] <= st["player"]["level"]]
+        assert opps
+        r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        eta_s = r.json()["eta_s"]
+        heat_before = st["player"]["heat"]
+        r = s.post(f"{BASE_URL}/api/game/dispatch",
+                   json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        mission_id = r.json()["mission_id"]
+        time.sleep(max(1, eta_s * 0.6))
+        r = s.post(f"{BASE_URL}/api/game/missions/recall",
+                   json={"mission_id": mission_id}, timeout=TIMEOUT)
+        assert r.status_code == 200, r.text
+        assert r.json()["late_penalty"] is True
+        st2 = get_state(s)
+        assert st2["player"]["heat"] > heat_before
+
+
 # ---------------- Fleet regression ----------------
 class TestFleet:
     def test_vehicle_full_flow(self):

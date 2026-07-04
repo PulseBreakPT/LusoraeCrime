@@ -10,7 +10,8 @@ from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
-                    team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown, gen_candidate,
+                    team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown,
+                    age_decay_mult, member_split_mult, gen_candidate,
                     employee_from_candidate, betrayal_risk_of, push_history, gen_attrs, gen_talents)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
@@ -21,7 +22,8 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
                        TEAM_MAX_MEMBERS, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
-                       NEWBIE_RAMP_S, random_employee_name)
+                       NEWBIE_RAMP_S, RECALL_PENALTY_FRACTION, RECALL_PENALTY_HEAT,
+                       RECALL_PENALTY_FATIGUE, random_employee_name)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -159,6 +161,7 @@ async def catalog():
         "base_caps": {"employees": BASE_EMPLOYEE_CAP, "vehicles": BASE_VEHICLE_CAP},
         "team_max_members": TEAM_MAX_MEMBERS,
         "newbie_ramp_s": NEWBIE_RAMP_S,
+        "recall_penalty_fraction": RECALL_PENALTY_FRACTION,
         "opportunity_types": {k: {kk: vv for kk, vv in v.items() if kk != "duration_s"} for k, v in OPPORTUNITY_TYPES.items()},
     }
 
@@ -250,6 +253,10 @@ async def _prepare_dispatch(player, opp, team):
             status_code=400,
             detail=f"O veículo só tem {seats} lugares — tens {len(members)} membros disponíveis. Reduz a equipa ou usa outro veículo.",
         )
+    required_models = opp.get("required_models") or []
+    if required_models and vehicle["model_key"] not in required_models:
+        names = ", ".join(VEHICLE_MODELS.get(m, {}).get("name", m) for m in required_models)
+        raise HTTPException(status_code=400, detail=f"Esta operação exige um destes veículos: {names}")
 
     hq = player["hq"]
     dist = haversine_m(hq["lat"], hq["lng"], opp["lat"], opp["lng"])
@@ -279,7 +286,12 @@ async def _prepare_dispatch(player, opp, team):
     tb = player.get("temp_bonus")
     if tb and tb.get("kind") == "reward_boost" and parse_dt(tb["until"]) > now_utc():
         mult += tb["pct"]
-    reward = int(opp["reward"] * mult)
+    # Recompensa diminui quanto mais tempo a oportunidade ficar por reclamar, e
+    # levar mais membros do que o exigido divide o saque.
+    age_s = (now - parse_dt(opp["created_at"])).total_seconds()
+    age_mult = age_decay_mult(age_s)
+    split_mult = member_split_mult(len(members), opp.get("min_members", 1))
+    reward = int(opp["reward"] * mult * age_mult * split_mult)
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
@@ -290,7 +302,8 @@ async def _prepare_dispatch(player, opp, team):
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
-        "reward": reward, "reward_mult": mult, "team_skill": team_skill,
+        "reward": reward, "reward_mult": mult, "age_mult": age_mult, "split_mult": split_mult,
+        "team_skill": team_skill,
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
         "talents": member_talents, "min_members": opp.get("min_members", 1),
     }
@@ -325,6 +338,8 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "fuel_needed": round(prep["fuel_needed"], 1),
         "reward": prep["reward"],
         "reward_bonus_pct": round((prep["reward_mult"] - 1) * 100, 1),
+        "age_decay_pct": round((prep["age_mult"] - 1) * 100, 1),
+        "split_penalty_pct": round((prep["split_mult"] - 1) * 100, 1),
         "members": len(prep["members"]),
         "effective_speed": round(prep["speed"], 1),
         "spec_match": prep["spec_match"],
@@ -347,6 +362,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         )
     vehicle = prep["vehicle"]
     members = prep["members"]
+    repeat_type = team.get("last_type_key") == opp["type_key"]
 
     depart = now
     arrive = depart + timedelta(seconds=prep["travel_s"])
@@ -360,6 +376,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
         "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
+        "repeat_type": repeat_type,
         "talents": prep["talents"],
         "opportunity_id": str(opp["_id"]),
         "opportunity": {
@@ -375,7 +392,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     }
     result = await db.missions.insert_one(mission)
     await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
-    await db.teams.update_one({"_id": team["_id"]}, {"$set": {"status": "en_route"}})
+    await db.teams.update_one({"_id": team["_id"]}, {"$set": {"status": "en_route", "last_type_key": opp["type_key"]}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
         "fuel_l": round(vehicle["fuel_l"] - prep["fuel_needed"], 2),
         "km_total": round(vehicle["km_total"] + prep["round_km"], 2),
@@ -499,8 +516,19 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
             {"_id": ObjectId(m["opportunity_id"]), "status": "taken", "expires_at": {"$gt": now.isoformat()}},
             {"$set": {"status": "active"}},
         )
-    await add_event(db, pid, "team", f"{m['team_name']} foi chamada de volta à base sem completar {m['opportunity']['name']}.")
-    return {"ok": True, "return_at": ret.isoformat()}
+    late = t >= RECALL_PENALTY_FRACTION
+    msg = f"{m['team_name']} foi chamada de volta à base sem completar {m['opportunity']['name']}."
+    if late:
+        new_heat = min(100.0, player["heat"] + RECALL_PENALTY_HEAT)
+        await db.players.update_one({"_id": player["_id"]}, {"$set": {"heat": new_heat}})
+        if m.get("member_ids"):
+            await db.employees.update_many(
+                {"_id": {"$in": [ObjectId(i) for i in m["member_ids"]]}},
+                {"$inc": {"fatigue": RECALL_PENALTY_FATIGUE}},
+            )
+        msg += f" Chamada tardia (já a {round(t * 100)}% do caminho) — +{RECALL_PENALTY_HEAT} calor e equipa mais cansada."
+    await add_event(db, pid, "team", msg)
+    return {"ok": True, "return_at": ret.isoformat(), "late_penalty": late}
 
 
 @router.post("/teams/create")

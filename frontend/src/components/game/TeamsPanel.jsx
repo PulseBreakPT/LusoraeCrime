@@ -117,6 +117,12 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               const nextAt = mission.phase === "en_route" ? mission.arrive_at : mission.phase === "operating" ? mission.finish_at : mission.return_at;
               missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
             }
+            let recallLate = false;
+            if (enRoute) {
+              const total = Math.max(1, Date.parse(enRoute.arrive_at) - Date.parse(enRoute.depart_at));
+              const elapsed = Math.max(0, serverNow() - Date.parse(enRoute.depart_at));
+              recallLate = elapsed / total >= (catalog?.recall_penalty_fraction ?? 0.5);
+            }
             const fuelPct = vehicle ? (vehicle.fuel_l / vehicle.tank_l) * 100 : 0;
             const refuelCost = vehicle ? Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]) : 0;
             const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
@@ -335,11 +341,22 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 )}
 
                 {enRoute && (
-                  <Tip tip="Cancela a operação — a equipa dá meia-volta e regressa ao QG sem recompensa." block>
+                  <Tip
+                    tip={
+                      recallLate
+                        ? "Cancela a operação — a equipa já vai a mais de metade do caminho: regressa sem recompensa e com uma pequena penalização de calor e fadiga."
+                        : "Cancela a operação — a equipa dá meia-volta e regressa ao QG sem recompensa nem penalização."
+                    }
+                    block
+                  >
                     <button
                       data-testid={`recall-team-${t.id}`}
                       onClick={() => recallTeam(enRoute.id)}
-                      className="mt-2 flex w-full items-center justify-center gap-1 rounded border border-amber-500/30 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-amber-400 transition-colors hover:bg-amber-500/10"
+                      className={`mt-2 flex w-full items-center justify-center gap-1 rounded border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors ${
+                        recallLate
+                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      }`}
                     >
                       <Undo2 size={11} /> Chamar de volta ({enRoute.opportunity.name})
                     </button>

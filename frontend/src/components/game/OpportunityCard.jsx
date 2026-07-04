@@ -85,6 +85,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
     const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
     if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
+    if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) {
+      return { ok: false, reason: "Veículo não adequado" };
+    }
     const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
     if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
     return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle };
@@ -160,6 +163,14 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         {opp.min_members > 1 && (
           <Chip icon={Users} value={`Mín. ${opp.min_members}`} color="#71717A"
             tip={`Esta operação é de risco ${opp.risk}/5 e requer pelo menos ${opp.min_members} membros disponíveis na equipa para poder ser despachada.`} />
+        )}
+        {opp.required_models?.length > 0 && (
+          <Chip
+            icon={Car}
+            value={opp.required_models.map((m) => catalog?.vehicle_models?.[m]?.name || m).join(" ou ")}
+            color="#71717A"
+            tip="Esta operação exige obrigatoriamente um destes veículos — a equipa não pode ser despachada com outro."
+          />
         )}
       </div>
 
@@ -331,6 +342,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                 <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
                 {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
+                {preview.age_decay_pct < 0 && (
+                  <Tip tip="Esta oportunidade está disponível há algum tempo — a recompensa vai encolhendo quanto mais tempo ficar por reclamar.">
+                    <span className="text-amber-400"> ({preview.age_decay_pct}% tempo)</span>
+                  </Tip>
+                )}
+                {preview.split_penalty_pct < 0 && (
+                  <Tip tip="Levar mais membros do que o mínimo exigido divide o saque — cada membro extra reduz ligeiramente a recompensa.">
+                    <span className="text-amber-400"> ({preview.split_penalty_pct}% saque dividido)</span>
+                  </Tip>
+                )}
                 <span className="text-[#0A84FF]"> · +{opp.respect} resp.</span>
                 {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
               </p>
