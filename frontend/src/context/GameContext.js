@@ -106,7 +106,7 @@ export function GameProvider({ children }) {
   const renameVehicle = (vehicleId, name) => action("vehicles/rename", { vehicle_id: vehicleId, name }, "Veículo renomeado");
   const buyProperty = (typeKey) => action("properties/buy", { type_key: typeKey }, "Propriedade comprada");
   const sellProperty = (propertyId) => action("properties/sell", { property_id: propertyId }, "Propriedade vendida");
-  const upgradeProperty = (propertyId) => action("properties/upgrade", { property_id: propertyId }, "Propriedade melhorada");
+  const upgradeProperty = (propertyId) => action("properties/upgrade", { property_id: propertyId }, "Melhoria iniciada");
   const renameProperty = (propertyId, name) => action("properties/rename", { property_id: propertyId, name }, "Propriedade renomeada");
   const bribePolice = () => action("police/bribe", {}, "Suborno pago");
   const launder = (amount) => action("launder", { amount }, "Dinheiro lavado");

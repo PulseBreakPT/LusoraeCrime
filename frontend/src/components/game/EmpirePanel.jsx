@@ -9,13 +9,13 @@ import { Input } from "../ui/input";
 import { Building2, Banknote, LogOut, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 
 export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, launder, bribePolice } = useGame();
+  const { state, catalog, serverNow, launder, bribePolice } = useGame();
   const { logout } = useAuth();
   const [amount, setAmount] = useState("");
   if (!state) return null;
   const p = state.player;
   const nav = (panel) => onNavigate && onNavigate(panel);
-  const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog);
+  const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
   const hs = heatStatus(p.heat);
   const alerts = orgAlerts(state);
   const salaryPerH = (state.salary_total || 0) * 2;

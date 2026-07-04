@@ -1,12 +1,23 @@
+import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, propertyBenefit, passiveRates } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
+import { fmtMoney, fmtDuration, propertyBenefit, passiveRates } from "../../lib/game";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote } from "lucide-react";
+import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
+
+const useTick = (active) => {
+  const [, setT] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setT((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+};
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, buyProperty, sellProperty, upgradeProperty, renameProperty } = useGame();
+  const { state, catalog, serverNow, buyProperty, sellProperty, upgradeProperty, renameProperty } = useGame();
+  useTick(open);
   if (!state) return null;
 
   return (
@@ -21,7 +32,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         {(() => {
-          const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog);
+          const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
           const sellTotal = state.properties.reduce((a, p) => {
             const pt = catalog?.property_types?.[p.type_key];
             return a + (pt ? Math.round(pt.price * 0.7 * p.level) : 0);
@@ -59,6 +70,9 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const sellValue = Math.round(pt.price * 0.7 * p.level);
             const originalName = `${pt.name} — ${p.district}`;
             const renamed = p.name !== originalName;
+            const condition = p.condition ?? 100;
+            const upgrading = p.upgrading_until && Date.parse(p.upgrading_until) > serverNow();
+            const upgradeRemaining = upgrading ? Math.max(0, (Date.parse(p.upgrading_until) - serverNow()) / 1000) : 0;
             return (
               <div key={p.id} data-testid={`property-card-${p.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between">
@@ -81,7 +95,22 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     </p>
                   </div>
                 </div>
-                <p className="mt-1.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>
+                <div className="mt-1.5">
+                  <Tip tip={`Condição: ${Math.round(condition)}% — degrada-se se não conseguires pagar a manutenção diária, e recupera enquanto a pagares. Abaixo de 100% os benefícios passivos rendem proporcionalmente menos.`} block>
+                    <div className="flex items-center gap-1.5">
+                      <Wrench size={9} className="shrink-0" style={{ color: condition < 50 ? "#EF4444" : "#34D399" }} />
+                      <MiniBar value={condition} color={condition < 50 ? "#EF4444" : "#34D399"} height="h-1" />
+                      <span className="shrink-0 font-mono text-[9px]" style={{ color: condition < 50 ? "#EF4444" : "#34D399" }}>{Math.round(condition)}%</span>
+                    </div>
+                  </Tip>
+                </div>
+                {upgrading ? (
+                  <p data-testid={`property-upgrading-${p.id}`} className="mt-1.5 flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-cyan-400">
+                    <Clock size={11} /> A melhorar para nível {p.level + 1} — pronto em {fmtDuration(upgradeRemaining)}
+                  </p>
+                ) : (
+                  <p className="mt-1.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>
+                )}
                 {(p.total_dirty_generated > 0 || p.total_laundered > 0) && (
                   <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
                     {p.total_dirty_generated > 0 && <>Gerado: <span className="text-amber-400">{fmtMoney(p.total_dirty_generated)}</span></>}
@@ -89,27 +118,46 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     {p.total_laundered > 0 && <>Lavado: <span className="text-emerald-400">{fmtMoney(p.total_laundered)}</span></>}
                   </p>
                 )}
-                {!maxed && (
+                {!maxed && !upgrading && (
                   <p className="mt-1 font-mono text-[10px] text-cyan-400/80">
                     Nível {p.level + 1}: {propertyBenefit(pt, p.level + 1)}
                   </p>
                 )}
                 <div className="mt-2 flex gap-1.5">
-                  <Tip tip={maxed ? "Nível máximo atingido." : `Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} — benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`} block className="flex-1">
+                  <Tip
+                    tip={
+                      upgrading
+                        ? `Melhoria em curso — pronto em ${fmtDuration(upgradeRemaining)}.`
+                        : maxed
+                        ? "Nível máximo atingido."
+                        : `Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} (demora um tempo a ficar concluído) — benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`
+                    }
+                    block
+                    className="flex-1"
+                  >
                     <button
                       data-testid={`upgrade-property-${p.id}`}
                       onClick={() => upgradeProperty(p.id)}
-                      disabled={maxed || state.player.clean_money < upgradeCost}
+                      disabled={maxed || upgrading || state.player.clean_money < upgradeCost}
                       className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-400 transition-colors hover:bg-white/5 disabled:opacity-40"
                     >
-                      <ArrowUpCircle size={11} /> {maxed ? "Máx." : fmtMoney(upgradeCost)}
+                      <ArrowUpCircle size={11} /> {upgrading ? "A melhorar..." : maxed ? "Máx." : fmtMoney(upgradeCost)}
                     </button>
                   </Tip>
-                  <Tip tip={`Vender por ${fmtMoney(sellValue)} (70% do investido). Perdes o benefício imediatamente — cuidado com as capacidades.`} block className="flex-1">
+                  <Tip
+                    tip={
+                      upgrading
+                        ? "Não podes vender uma propriedade a meio de uma melhoria."
+                        : `Vender por ${fmtMoney(sellValue)} (70% do investido). Perdes o benefício imediatamente — cuidado com as capacidades.`
+                    }
+                    block
+                    className="flex-1"
+                  >
                     <button
                       data-testid={`sell-property-${p.id}`}
                       onClick={() => sellProperty(p.id)}
-                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5"
+                      disabled={upgrading}
+                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5 disabled:opacity-40"
                     >
                       <Trash2 size={11} /> {fmtMoney(sellValue)}
                     </button>

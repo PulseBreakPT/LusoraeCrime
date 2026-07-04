@@ -21,7 +21,11 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        AGE_DECAY_RAMP_S, REPEAT_TYPE_XP_MULT, DURATION_REWARD_BASELINE_S,
                        DURATION_REWARD_MAX_BONUS, DURATION_REWARD_MAX_MALUS, DURATION_REWARD_FLOOR_S,
                        DURATION_REWARD_CEIL_S, FAILED_TYPE_COOLDOWN_MIN, RECALL_PENALTY_FRACTION,
-                       RECALL_PENALTY_HEAT, RECALL_PENALTY_FATIGUE)
+                       RECALL_PENALTY_HEAT, RECALL_PENALTY_FATIGUE,
+                       PROPERTY_MAINTENANCE_PCT_PER_DAY, PROPERTY_CONDITION_RECOVERY_PER_HOUR,
+                       PROPERTY_CONDITION_DECAY_PER_HOUR, PROPERTY_UPGRADE_BASE_S,
+                       PROPERTY_UPGRADE_PER_LEVEL_S, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
+                       LAUNDER_PROPERTY_BONUS_PER_LEVEL)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -951,22 +955,36 @@ async def _refresh_recruitment_pool(db, player, now):
 
 # ---------------- Economia passiva / polícia ----------------
 
-async def _apply_passive_income(db, player, props, hours, bonuses):
+def property_active(p, now):
+    """Um imóvel em melhoria não presta os seus benefícios passivos até terminar."""
+    upgrading_until = p.get("upgrading_until")
+    return not (upgrading_until and parse_dt(upgrading_until) > now)
+
+
+def property_condition_factor(p):
+    """Imóveis degradados (manutenção em atraso) rendem menos."""
+    return p.get("condition", 100.0) / 100.0
+
+
+async def _apply_passive_income(db, player, props, hours, bonuses, now):
     if hours <= 0:
         return
     dirty_rate = 0
     heat_rate = 0
     launder_rate = 0
     for p in props:
+        if not property_active(p, now):
+            continue
         pt = PROPERTY_TYPES[p["type_key"]]
+        factor = property_condition_factor(p)
         if pt.get("dirty_per_h"):
-            share = pt["dirty_per_h"] * p["level"] * hours
-            dirty_rate += pt["dirty_per_h"] * p["level"]
+            share = pt["dirty_per_h"] * p["level"] * factor * hours
+            dirty_rate += pt["dirty_per_h"] * p["level"] * factor
             await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_dirty_generated": share}})
         if pt.get("heat_per_h"):
-            heat_rate += pt["heat_per_h"] * p["level"]
+            heat_rate += pt["heat_per_h"] * p["level"] * factor
         if pt.get("launder_per_h"):
-            launder_rate += pt["launder_per_h"] * p["level"]
+            launder_rate += pt["launder_per_h"] * p["level"] * factor
     launder_rate *= (1 + bonuses.get("empresa_boost", 0))
 
     if dirty_rate > 0:
@@ -989,10 +1007,45 @@ async def _apply_passive_income(db, player, props, hours, bonuses):
             player["frac_clean"] = fc - gain
             player["clean_money"] += gain
             for p in props:
+                if not property_active(p, now):
+                    continue
                 pt = PROPERTY_TYPES[p["type_key"]]
                 if pt.get("launder_per_h"):
-                    share = conv * (pt["launder_per_h"] * p["level"] * (1 + bonuses.get("empresa_boost", 0)) / launder_rate)
+                    factor = property_condition_factor(p)
+                    share = conv * (pt["launder_per_h"] * p["level"] * factor * (1 + bonuses.get("empresa_boost", 0)) / launder_rate)
                     await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_laundered": share}})
+
+
+async def _process_property_maintenance(db, player, props, minutes, now):
+    """Cada imóvel tem um custo diário de manutenção. Se a organização não
+    conseguir pagá-lo, os imóveis degradam-se lentamente (menos condição, menos
+    benefício); se conseguir, recuperam condição aos poucos."""
+    if minutes <= 0 or not props:
+        return
+    hours = minutes / 60
+    total_cost = sum(
+        PROPERTY_TYPES[p["type_key"]]["price"] * p["level"] * PROPERTY_MAINTENANCE_PCT_PER_DAY / 24 * hours
+        for p in props
+    )
+    can_pay = player["clean_money"] >= total_cost
+    if can_pay and total_cost > 0:
+        player["clean_money"] -= int(total_cost)
+    delta = (PROPERTY_CONDITION_RECOVERY_PER_HOUR if can_pay else -PROPERTY_CONDITION_DECAY_PER_HOUR) * hours
+    for p in props:
+        new_condition = max(0.0, min(100.0, p.get("condition", 100.0) + delta))
+        if new_condition != p.get("condition", 100.0):
+            await db.properties.update_one({"_id": p["_id"]}, {"$set": {"condition": new_condition}})
+
+
+async def _complete_property_upgrades(db, player, props, now):
+    for p in props:
+        upgrading_until = p.get("upgrading_until")
+        if not upgrading_until or parse_dt(upgrading_until) > now:
+            continue
+        new_level = p["level"] + 1
+        await db.properties.update_one({"_id": p["_id"]}, {"$set": {"level": new_level, "upgrading_until": None}})
+        pid = str(player["_id"])
+        await add_event(db, pid, "property", f"{p['name']} concluiu a melhoria — agora no nível {new_level}.")
 
 
 async def _maybe_raid(db, player, props, minutes, now):
@@ -1062,7 +1115,9 @@ async def advance(db, player):
     await _refresh_recruitment_pool(db, player, now)
 
     props = await db.properties.find({"player_id": pid}).to_list(200)
-    await _apply_passive_income(db, player, props, minutes / 60, bonuses)
+    await _apply_passive_income(db, player, props, minutes / 60, bonuses, now)
+    await _process_property_maintenance(db, player, props, minutes, now)
+    await _complete_property_upgrades(db, player, props, now)
     await _maybe_raid(db, player, props, minutes, now)
 
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
