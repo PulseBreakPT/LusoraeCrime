@@ -235,9 +235,9 @@ QUEST_DEFS = {
     },
     "c6_raids3": {
         "name": "À Prova de Bala", "type": "principal", "category": "geral", "chapter": 6, "difficulty": "lendaria",
-        "desc": "Sobrevive a mais 3 rusgas policiais. Nada abala o império.",
+        "desc": "Sobrevive a mais 3 rusgas policiais. Nada abala o império — e sais delas mais discreto que nunca.",
         "objective": {"kind": "counter", "metric": "raids_survived", "target": 3, "label": "Sobreviver a 3 rusgas"},
-        "requires": ["c5_empire2"], "rewards": {"dirty": 34000, "respect": 480},
+        "requires": ["c5_empire2"], "rewards": {"dirty": 20000, "respect": 480, "vehicle": "carro_furtivo"},
     },
     "c6_bribes5": {
         "name": "Amigos na Câmara", "type": "principal", "category": "geral", "chapter": 6, "difficulty": "lendaria",

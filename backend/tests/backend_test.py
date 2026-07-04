@@ -1393,3 +1393,39 @@ class TestNewQuestContent:
         weekly = [q for q in st["quests"] if q["type"] == "semanal" and q["status"] == "active"]
         assert len(daily) == 3
         assert len(weekly) == 2
+
+    def test_c6_raids3_rewards_a_new_vehicle_model(self):
+        s, _ = register_new()
+        st = get_state(s)
+        q = next(q for q in st["quests"] if q["quest_key"] == "c6_raids3")
+        assert q["rewards"]["vehicle"] == "carro_furtivo"
+
+
+# ---------------- Interligação: novas missões, funcionários, veículos e imóveis a cruzarem-se ----------------
+class TestContentInterlinking:
+    def test_every_new_vehicle_is_required_by_at_least_one_mission_type(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        types = r.json()["opportunity_types"]
+        required_anywhere = {m for t in types.values() for m in t.get("required_models", [])}
+        for key in ("carrinha_entrega", "berlina_blindada", "buggy_todo_terreno", "limousine", "carro_furtivo"):
+            assert key in required_anywhere, f"{key} não é exigido por nenhuma missão"
+
+    def test_quimico_has_a_production_passive(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        quimico = r.json()["specializations"]["quimico"]
+        assert quimico.get("passive", {}).get("lab_boost") == 0.20
+
+    def test_every_new_specialization_has_a_talent_or_passive(self):
+        s, _ = register_new()
+        r = s.get(f"{BASE_URL}/api/game/catalog", timeout=TIMEOUT)
+        specs = r.json()["specializations"]
+        talents = r.json()["talents"]
+        talent_roles = {role for t in talents.values() for role in t.get("roles", [])}
+        new_roles = ["franco_atirador", "arrombador", "piloto", "estafeta", "engenheiro_social",
+                     "criptografo", "relacoes_publicas", "chantagista", "quimico", "recrutador"]
+        for role in new_roles:
+            has_passive = bool(specs[role].get("passive"))
+            has_talent = role in talent_roles
+            assert has_passive or has_talent, f"{role} não tem bónus passivo nem talento associado"
