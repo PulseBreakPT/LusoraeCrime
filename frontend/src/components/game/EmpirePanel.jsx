@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
-import { Tip } from "./hud";
+import { Tip, MiniBar } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Card } from "../ui/card";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Table, TableBody, TableCell, TableRow } from "../ui/table";
 import {
   Building2, Banknote, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown,
   AlertTriangle, History, ChevronDown, Clock,
@@ -57,10 +60,10 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-sm">
+      <SheetContent side="left" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Building2 size={18} className="text-red-500" /> {p.org_name}
+            <Building2 size={18} className="text-primary" /> {p.org_name}
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Visão geral do império e economia.</SheetDescription>
         </SheetHeader>
@@ -89,20 +92,21 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
         )}
 
         {liquidity && (
-          <p
+          <Alert
             data-testid="liquidity-warning"
-            className={`mt-2 flex items-center gap-1.5 rounded-md border px-2.5 py-2 font-mono text-[10px] ${
-              liquidity === "red" ? "border-red-600/40 bg-red-600/10 text-red-400" : "border-amber-500/30 bg-amber-500/5 text-amber-400"
-            }`}
+            variant={liquidity === "red" ? "destructive" : "default"}
+            className={`mt-2 py-2 ${liquidity === "red" ? "border-red-600/40 bg-red-600/10" : "border-amber-500/30 bg-amber-500/5"}`}
           >
-            <AlertTriangle size={12} />
-            {liquidity === "red"
-              ? "Reserva crítica: podes não conseguir pagar a próxima folha salarial."
-              : "Reserva baixa: o dinheiro limpo está abaixo da folha salarial."}
-          </p>
+            <AlertTriangle size={12} className={liquidity === "red" ? "text-red-400" : "text-amber-400"} />
+            <AlertDescription className={`font-mono text-[10px] ${liquidity === "red" ? "text-red-400" : "text-amber-400"}`}>
+              {liquidity === "red"
+                ? "Reserva crítica: podes não conseguir pagar a próxima folha salarial."
+                : "Reserva baixa: o dinheiro limpo está abaixo da folha salarial."}
+            </AlertDescription>
+          </Alert>
         )}
 
-        <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3" data-testid="empire-cashflow">
+        <Card className="mt-3 border-white/10 bg-white/[0.03] p-3 shadow-none" data-testid="empire-cashflow">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <TrendingUp size={11} className="text-emerald-400" /> Fluxo de caixa passivo
           </p>
@@ -150,30 +154,25 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
               </span>
             </Tip>
           </div>
-        </div>
+        </Card>
 
         {p.next_level_respect && (
-          <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <Card className="mt-3 border-white/10 bg-white/[0.03] p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <span>Progresso nível {p.level + 1}</span>
               <span>{p.respect}/{p.next_level_respect}</span>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-red-600 transition-all duration-700"
-                style={{ width: `${Math.min(100, (p.respect / p.next_level_respect) * 100)}%` }}
-              />
-            </div>
-          </div>
+            <MiniBar value={(p.respect / p.next_level_respect) * 100} color="#DC2626" className="mt-1.5" height="h-1.5" />
+          </Card>
         )}
 
-        <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <Card className="mt-3 border-white/10 bg-white/[0.03] p-3 shadow-none">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-            <MapPin size={11} className="text-red-500" /> Quartel-general
+            <MapPin size={11} className="text-primary" /> Quartel-general
           </p>
           <p className="mt-1 text-sm font-semibold text-white">{p.hq.name}</p>
           <p className="font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
-        </div>
+        </Card>
 
         <div className="mt-3">
           <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
@@ -207,7 +206,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
             <Banknote size={12} /> Lavagem de dinheiro
           </h3>
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <Card className="border-white/10 bg-white/[0.03] p-3 shadow-none">
             <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Taxa de 25%.</p>
             <div className="mt-2 flex gap-2">
               <Input
@@ -223,22 +222,23 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 data-testid="launder-submit-button"
                 onClick={handleLaunder}
                 disabled={!amount || parseInt(amount, 10) > p.dirty_money}
-                className="shrink-0 bg-white text-xs font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                className="shrink-0 text-xs font-bold uppercase"
               >
                 Lavar
               </Button>
             </div>
             <div className="mt-2 flex gap-1.5">
               {[0.25, 0.5, 1].map((f) => (
-                <button
+                <Button
                   key={f}
+                  variant="outline" size="sm"
                   data-testid={`launder-quick-${f * 100}`}
                   onClick={() => setAmount(String(Math.floor(p.dirty_money * f)))}
                   disabled={p.dirty_money <= 0}
-                  className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-40"
+                  className="h-auto border-white/10 px-2 py-1 font-mono text-[10px] text-zinc-400 hover:bg-white/5 hover:text-white"
                 >
                   {f === 1 ? "MAX" : `${f * 100}%`}
-                </button>
+                </Button>
               ))}
             </div>
             {amount && parseInt(amount, 10) > 0 && (
@@ -246,26 +246,21 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 Recebes {fmtMoney(Math.floor(parseInt(amount, 10) * 0.75))} limpos
               </p>
             )}
-          </div>
+          </Card>
         </div>
 
         <div className="mt-4">
           <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
             <Siren size={12} /> Polícia
           </h3>
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <Card className="border-white/10 bg-white/[0.03] p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <Tip tip={hs.desc}>
                 <span>Calor policial · <span style={{ color: hs.color }}>{hs.label}</span></span>
               </Tip>
               <span>{Math.round(p.heat)}%</span>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${p.heat}%`, background: hs.color }}
-              />
-            </div>
+            <MiniBar value={p.heat} color={hs.color} className="mt-1.5" height="h-1.5" />
             <div className="mt-1.5 flex justify-between font-mono text-[9px] text-zinc-600">
               <Tip tip="Aos 70% há risco de rusgas aos laboratórios."><span className={p.heat >= 70 ? "text-orange-400" : ""}>70% rusgas</span></Tip>
               <Tip tip="Aos 90% todas as operações ficam bloqueadas até o calor baixar."><span className={p.heat >= 90 ? "text-red-500" : ""}>90% bloqueio</span></Tip>
@@ -279,12 +274,12 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 onClick={bribePolice}
                 disabled={p.heat < 10 || p.clean_money < Math.max(1000, Math.round(p.heat * 150))}
                 size="sm"
-                className="mt-2 w-full bg-white text-[10px] font-bold uppercase tracking-wider text-black hover:bg-gray-200 disabled:opacity-40"
+                className="mt-2 w-full text-[10px] font-bold uppercase tracking-wider"
               >
                 Subornar polícia · {fmtMoney(Math.max(1000, Math.round(p.heat * 150)))} (-40 calor)
               </Button>
             </Tip>
-          </div>
+          </Card>
         </div>
 
         <div className="mt-4">
@@ -297,24 +292,31 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             <ChevronDown size={13} className={`transition-transform ${showLedger ? "rotate-180" : ""}`} />
           </button>
           {showLedger && (
-            <div className="mt-2 space-y-1" data-testid="ledger-list">
-              {transactions.length === 0 && (
+            <div className="mt-2" data-testid="ledger-list">
+              {transactions.length === 0 ? (
                 <p className="font-mono text-[10px] text-zinc-600">Sem transações registadas ainda.</p>
+              ) : (
+                <Table>
+                  <TableBody>
+                    {transactions.map((t) => (
+                      <TableRow key={t.id} className="border-white/10 hover:bg-white/[0.03]">
+                        <TableCell className="min-w-0 p-1.5">
+                          <p className="truncate font-mono text-[10px] text-zinc-300">{t.note || TX_LABELS[t.kind] || t.kind}</p>
+                          <p className="font-mono text-[9px] text-zinc-600">{new Date(t.ts).toLocaleString("pt-PT")}</p>
+                        </TableCell>
+                        <TableCell className="p-1.5 text-right">
+                          <span
+                            className="shrink-0 font-mono text-[10px] font-bold"
+                            style={{ color: t.amount >= 0 ? "#34D399" : "#EF4444" }}
+                          >
+                            {t.amount >= 0 ? "+" : ""}{fmtMoney(t.amount)} {t.currency === "dirty" ? "sujos" : "limpos"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
-              {transactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between rounded border border-white/10 bg-white/[0.03] px-2 py-1.5">
-                  <div className="min-w-0">
-                    <p className="truncate font-mono text-[10px] text-zinc-300">{t.note || TX_LABELS[t.kind] || t.kind}</p>
-                    <p className="font-mono text-[9px] text-zinc-600">{new Date(t.ts).toLocaleString("pt-PT")}</p>
-                  </div>
-                  <span
-                    className="shrink-0 font-mono text-[10px] font-bold"
-                    style={{ color: t.amount >= 0 ? "#34D399" : "#EF4444" }}
-                  >
-                    {t.amount >= 0 ? "+" : ""}{fmtMoney(t.amount)} {t.currency === "dirty" ? "sujos" : "limpos"}
-                  </span>
-                </div>
-              ))}
             </div>
           )}
         </div>
@@ -325,10 +327,10 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 
 const StatBox = ({ label, value, accent = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <div className="h-full rounded-lg border border-white/10 bg-white/[0.03] p-3">
+    <Card className="h-full border-white/10 bg-white/[0.03] p-3 shadow-none">
       <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color: accent }}>{value}</p>
-    </div>
+    </Card>
   </Tip>
 );
 
@@ -337,7 +339,7 @@ const QuickNav = ({ testId, label, value, alert, alertText, tip, onClick }) => (
     <button
       data-testid={testId}
       onClick={onClick}
-      className="group relative h-full w-full rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.08]"
+      className="group relative h-full w-full rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.08]"
     >
       <p className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
         {label} <ChevronRight size={11} className="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />

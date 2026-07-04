@@ -2,13 +2,17 @@ import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { useAuth } from "../../context/AuthContext";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
-import { ToggleSwitch, ConfirmButton } from "./hud";
+import { ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Card } from "../ui/card";
+import { Switch } from "../ui/switch";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/collapsible";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import {
   Settings, UserCog, KeyRound, LogOut, Trash2, Monitor, Gamepad2, Cog, Bell, Info,
-  ChevronDown, ChevronUp, Wrench, Fuel, BedDouble, Gift,
+  ChevronDown, Wrench, Fuel, BedDouble, Gift,
 } from "lucide-react";
 
 const GAME_VERSION = "1.0.0";
@@ -22,12 +26,24 @@ const CHANGELOG = [
   { v: "0.5.0", text: "Distância ao QG a afetar risco e recompensa das missões; requisito mínimo de equipa por risco." },
 ];
 
+// Adapta a Switch genérica do shadcn à cor "ligado = verde" já usada no resto
+// do jogo (em vez do vermelho de marca do variant "default").
+const ToggleSwitch = ({ checked, onChange, testId, disabled }) => (
+  <Switch
+    data-testid={testId}
+    checked={checked}
+    onCheckedChange={onChange}
+    disabled={disabled}
+    className="data-[state=checked]:bg-success data-[state=unchecked]:bg-white/10"
+  />
+);
+
 const Section = ({ icon: Icon, title, children, testId }) => (
   <div className="mt-6 first:mt-0" data-testid={testId}>
     <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
       <Icon size={12} /> {title}
     </h3>
-    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">{children}</div>
+    <Card className="space-y-2 border-white/10 bg-white/[0.03] p-3 shadow-none">{children}</Card>
   </div>
 );
 
@@ -43,7 +59,7 @@ const Row = ({ label, hint, children, testId }) => (
 
 const ThresholdInput = ({ value, onChange, disabled, testId }) => (
   <div className="flex items-center gap-1">
-    <input
+    <Input
       data-testid={testId}
       type="number"
       min="1"
@@ -51,7 +67,7 @@ const ThresholdInput = ({ value, onChange, disabled, testId }) => (
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)))}
-      className="w-14 rounded border border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white disabled:opacity-40"
+      className="h-auto w-14 border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white"
     />
     <span className="font-mono text-[10px] text-zinc-500">%</span>
   </div>
@@ -84,48 +100,45 @@ const ChangePasswordForm = () => {
   };
 
   return (
-    <div>
-      <button
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger
         data-testid="settings-change-password-toggle"
-        onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/5"
       >
         <span className="flex items-center gap-1.5"><KeyRound size={12} /> Alterar palavra-passe</span>
-        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-      </button>
-      {open && (
-        <div className="mt-2 space-y-2">
-          <Input
-            data-testid="settings-current-password-input"
-            type="password" placeholder="Palavra-passe atual" value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
-          />
-          <Input
-            data-testid="settings-new-password-input"
-            type="password" placeholder="Nova palavra-passe" value={next}
-            onChange={(e) => setNext(e.target.value)}
-            className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
-          />
-          <Input
-            data-testid="settings-confirm-password-input"
-            type="password" placeholder="Confirmar nova palavra-passe" value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
-          />
-          {error && <p className="text-[10px] text-red-400">{error}</p>}
-          {done && <p className="text-[10px] text-emerald-400">Palavra-passe alterada com sucesso.</p>}
-          <Button
-            data-testid="settings-change-password-submit"
-            onClick={submit}
-            disabled={busy || !current || !next || !confirm}
-            className="w-full bg-white text-xs font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
-          >
-            Guardar nova palavra-passe
-          </Button>
-        </div>
-      )}
-    </div>
+        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 space-y-2">
+        <Input
+          data-testid="settings-current-password-input"
+          type="password" placeholder="Palavra-passe atual" value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
+        />
+        <Input
+          data-testid="settings-new-password-input"
+          type="password" placeholder="Nova palavra-passe" value={next}
+          onChange={(e) => setNext(e.target.value)}
+          className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
+        />
+        <Input
+          data-testid="settings-confirm-password-input"
+          type="password" placeholder="Confirmar nova palavra-passe" value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
+        />
+        {error && <p className="text-[10px] text-red-400">{error}</p>}
+        {done && <p className="text-[10px] text-emerald-400">Palavra-passe alterada com sucesso.</p>}
+        <Button
+          data-testid="settings-change-password-submit"
+          onClick={submit}
+          disabled={busy || !current || !next || !confirm}
+          className="w-full text-xs font-bold uppercase"
+        >
+          Guardar nova palavra-passe
+        </Button>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 
@@ -145,7 +158,7 @@ const DeleteAccountForm = () => {
   };
 
   return (
-    <div className="rounded border border-red-500/20 bg-red-500/5 p-2">
+    <Card className="border-red-500/20 bg-red-500/5 p-2 shadow-none">
       <p className="text-[10px] leading-snug text-red-300">
         Esta ação é irreversível: apaga a organização, o plantel, a frota, os imóveis e todo o progresso. Não há forma de recuperar depois.
       </p>
@@ -166,9 +179,53 @@ const DeleteAccountForm = () => {
         className="mt-2"
         tip="Elimina permanentemente a conta e toda a organização."
       />
-    </div>
+    </Card>
   );
 };
+
+const ABOUT_ITEMS = [
+  {
+    key: "changelog", label: "Changelog",
+    content: (
+      <div className="space-y-1.5">
+        {CHANGELOG.map((c) => (
+          <p key={c.v} className="text-[10px] leading-snug text-zinc-400">
+            <span className="font-mono font-bold text-zinc-300">v{c.v}</span> — {c.text}
+          </p>
+        ))}
+      </div>
+    ),
+  },
+  {
+    key: "terms", label: "Termos e Condições",
+    content: (
+      <p className="text-[10px] leading-snug text-zinc-500">
+        Lusorae é um jogo de simulação fictício, sem qualquer ligação a atividades reais. Ao usares a conta
+        aceitas jogar de boa-fé, não abusar de falhas técnicas para vantagem indevida e que o progresso pode
+        ser perdido em caso de manutenção ou reinício do servidor. A organização pode encerrar contas usadas
+        de forma abusiva ou fraudulenta.
+      </p>
+    ),
+  },
+  {
+    key: "privacy", label: "Política de Privacidade",
+    content: (
+      <p className="text-[10px] leading-snug text-zinc-500">
+        Guardamos apenas o necessário para a conta funcionar: email, palavra-passe encriptada e o progresso do
+        jogo. As preferências de interface ficam só no teu dispositivo. Nada é vendido nem partilhado com
+        terceiros. Podes eliminar a conta e todos os dados associados a qualquer momento em Conta → Eliminar conta.
+      </p>
+    ),
+  },
+  {
+    key: "credits", label: "Créditos",
+    content: (
+      <p className="text-[10px] leading-snug text-zinc-500">
+        Lusorae — criado e mantido por PulseBreakPT. Desenvolvido com FastAPI, MongoDB e React.
+      </p>
+    ),
+  },
+];
 
 export const SettingsPanel = ({ open, onOpenChange }) => {
   const { state, updateAutomationSettings } = useGame();
@@ -182,7 +239,6 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
     autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
     notifications, setNotification,
   } = useSettings();
-  const [showLegal, setShowLegal] = useState(null);
 
   if (!state) return null;
   const settings = state.player.settings || {};
@@ -190,7 +246,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições
@@ -249,12 +305,12 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <ToggleSwitch testId="settings-toggle-auto-report" checked={autoOpenReport} onChange={setAutoOpenReport} />
           </Row>
           <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success">
-            <input
+            <Input
               data-testid="settings-low-success-input"
               type="number" min="10" max="95" step="5"
               value={Math.round(lowSuccessThreshold * 100)}
               onChange={(e) => setLowSuccessThreshold(Math.max(0.10, Math.min(0.95, (parseInt(e.target.value, 10) || 70) / 100)))}
-              className="w-14 rounded border border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white"
+              className="h-auto w-14 border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white"
             />
           </Row>
         </Section>
@@ -334,63 +390,19 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Row label="Versão do jogo" testId="settings-row-version">
             <span className="font-mono text-[11px] text-zinc-400">v{GAME_VERSION}</span>
           </Row>
-          <button
-            data-testid="settings-toggle-changelog"
-            onClick={() => setShowLegal(showLegal === "changelog" ? null : "changelog")}
-            className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/5"
-          >
-            Changelog {showLegal === "changelog" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-          {showLegal === "changelog" && (
-            <div className="space-y-1.5 rounded border border-white/10 p-2">
-              {CHANGELOG.map((c) => (
-                <p key={c.v} className="text-[10px] leading-snug text-zinc-400">
-                  <span className="font-mono font-bold text-zinc-300">v{c.v}</span> — {c.text}
-                </p>
-              ))}
-            </div>
-          )}
-          <button
-            data-testid="settings-toggle-terms"
-            onClick={() => setShowLegal(showLegal === "terms" ? null : "terms")}
-            className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/5"
-          >
-            Termos e Condições {showLegal === "terms" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-          {showLegal === "terms" && (
-            <p className="rounded border border-white/10 p-2 text-[10px] leading-snug text-zinc-500">
-              Lusorae é um jogo de simulação fictício, sem qualquer ligação a atividades reais. Ao usares a conta
-              aceitas jogar de boa-fé, não abusar de falhas técnicas para vantagem indevida e que o progresso pode
-              ser perdido em caso de manutenção ou reinício do servidor. A organização pode encerrar contas usadas
-              de forma abusiva ou fraudulenta.
-            </p>
-          )}
-          <button
-            data-testid="settings-toggle-privacy"
-            onClick={() => setShowLegal(showLegal === "privacy" ? null : "privacy")}
-            className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/5"
-          >
-            Política de Privacidade {showLegal === "privacy" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-          {showLegal === "privacy" && (
-            <p className="rounded border border-white/10 p-2 text-[10px] leading-snug text-zinc-500">
-              Guardamos apenas o necessário para a conta funcionar: email, palavra-passe encriptada e o progresso do
-              jogo. As preferências de interface ficam só no teu dispositivo. Nada é vendido nem partilhado com
-              terceiros. Podes eliminar a conta e todos os dados associados a qualquer momento em Conta {"->"} Eliminar conta.
-            </p>
-          )}
-          <button
-            data-testid="settings-toggle-credits"
-            onClick={() => setShowLegal(showLegal === "credits" ? null : "credits")}
-            className="flex w-full items-center justify-between rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/5"
-          >
-            Créditos {showLegal === "credits" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-          {showLegal === "credits" && (
-            <p className="rounded border border-white/10 p-2 text-[10px] leading-snug text-zinc-500">
-              Lusorae — criado e mantido por PulseBreakPT. Desenvolvido com FastAPI, MongoDB e React.
-            </p>
-          )}
+          <Accordion type="single" collapsible className="space-y-1.5">
+            {ABOUT_ITEMS.map((item) => (
+              <AccordionItem key={item.key} value={item.key} className="rounded border border-white/10 border-b-white/10 px-2">
+                <AccordionTrigger
+                  data-testid={`settings-toggle-${item.key}`}
+                  className="py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:no-underline"
+                >
+                  {item.label}
+                </AccordionTrigger>
+                <AccordionContent className="pb-2">{item.content}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </Section>
       </SheetContent>
     </Sheet>

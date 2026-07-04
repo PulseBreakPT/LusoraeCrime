@@ -7,8 +7,14 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { Tip, Kpi, SummaryStrip, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Input } from "../ui/input";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
@@ -40,33 +46,33 @@ const StatBar = ({ label, value, color }) => (
       <span>{label}</span>
       <span>{Math.round(value)}%</span>
     </div>
-    <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
-      <div className="h-full transition-all duration-500" style={{ width: `${Math.min(100, value)}%`, background: color }} />
-    </div>
+    <MiniBar value={value} color={color} className="mt-0.5" />
   </div>
 );
 
 const RarityBadge = ({ rarity, rar }) => (
   <Tip tip={rar ? `Raridade ${RARITY_LABELS[rarity]}: atributos ×${rar.mult}, nível máx. ${rar.max_level}, ${rar.talent_slots} slot(s) de talento.` : null} align="end">
-    <span
-      className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+    <Badge
+      variant="outline"
+      className="rounded border-transparent px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
       style={{ color: RARITY_COLORS[rarity], background: `${RARITY_COLORS[rarity]}1a` }}
     >
       {RARITY_LABELS[rarity]}
-    </span>
+    </Badge>
   </Tip>
 );
 
 const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => (
   <Tip tip={title} block>
-    <button
+    <Button
       data-testid={testId}
+      variant="outline"
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] transition-colors hover:bg-white/5 disabled:opacity-40 ${color}`}
+      className={`h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5 ${color}`}
     >
       <Icon size={11} /> {label}
-    </button>
+    </Button>
   </Tip>
 );
 
@@ -123,7 +129,7 @@ const EmployeeCard = ({ e }) => {
   const idle = e.status === "idle";
 
   return (
-    <div data-testid={`employee-card-${e.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+    <Card data-testid={`employee-card-${e.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
@@ -168,14 +174,15 @@ const EmployeeCard = ({ e }) => {
             tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · termina em ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
             align="end"
           >
-            <span
+            <Badge
               data-testid={`employee-status-${e.id}`}
-              className="rounded-full px-2 py-0.5 text-right font-mono text-[9px] font-bold uppercase"
+              variant="outline"
+              className="rounded-full border-transparent px-2 py-0.5 text-right font-mono text-[9px] font-bold uppercase"
               style={{ color: EMP_STATUS_COLORS[e.status], background: `${EMP_STATUS_COLORS[e.status]}1a` }}
             >
               {mission ? mission.opportunity?.name || EMP_STATUS_LABELS[e.status] : EMP_STATUS_LABELS[e.status] || e.status}
               {mission ? <> · {fmtDuration(missionEtaS)}</> : remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
-            </span>
+            </Badge>
           </Tip>
         </div>
       </div>
@@ -185,9 +192,7 @@ const EmployeeCard = ({ e }) => {
           <span>XP</span>
           <span>{nextXp ? `${e.xp}/${nextXp}` : "MAX"}</span>
         </div>
-        <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full bg-cyan-400 transition-all duration-500" style={{ width: `${xpPct}%` }} />
-        </div>
+        <MiniBar value={xpPct} color="#22D3EE" className="mt-0.5" />
       </div>
 
       <div className="mt-2 grid grid-cols-3 gap-2">
@@ -232,18 +237,21 @@ const EmployeeCard = ({ e }) => {
       )}
 
       <div className="mt-2 flex items-center gap-2">
-        <select
-          data-testid={`emp-team-select-${e.id}`}
-          value={e.team_id || ""}
+        <Select
+          value={e.team_id || "__none__"}
           disabled={!idle}
-          onChange={(ev) => assignEmployee(e.id, ev.target.value || null)}
-          className="w-full flex-1 rounded border border-white/10 bg-black/60 px-2 py-1 font-mono text-[11px] text-white disabled:opacity-40"
+          onValueChange={(tid) => assignEmployee(e.id, tid === "__none__" ? null : tid)}
         >
-          <option value="">Sem equipa</option>
-          {state.teams.map((t) => (
-            <option key={t.id} value={t.id}>{`${t.name} · ${state.employees.filter((x) => x.team_id === t.id).length} membros`}</option>
-          ))}
-        </select>
+          <SelectTrigger data-testid={`emp-team-select-${e.id}`} className="h-7 w-full flex-1 border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__" className="font-mono text-xs">Sem equipa</SelectItem>
+            {state.teams.map((t) => (
+              <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{`${t.name} · ${state.employees.filter((x) => x.team_id === t.id).length} membros`}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de 30 min, pago com dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
           <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
         </Tip>
@@ -280,17 +288,16 @@ const EmployeeCard = ({ e }) => {
       {manage && (
         <div className="mt-1.5 space-y-2 border-t border-white/10 pt-2">
           <div className="flex gap-1.5">
-            <select
-              data-testid={`emp-train-select-${e.id}`}
-              value={course}
-              onChange={(ev) => setCourse(ev.target.value)}
-              className="flex-1 rounded border border-white/10 bg-black/60 px-2 py-1 font-mono text-[10px] text-white"
-            >
-              <option value="">Escolher formação...</option>
-              {Object.entries(catalog.training_courses).map(([k, c]) => (
-                <option key={k} value={k}>{`${c.name} · ${fmtMoney(c.cost)}${c.spec && c.spec === e.spec ? " ★" : ""}`}</option>
-              ))}
-            </select>
+            <Select value={course} onValueChange={setCourse}>
+              <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="h-7 flex-1 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                <SelectValue placeholder="Escolher formação..." />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(catalog.training_courses).map(([k, c]) => (
+                  <SelectItem key={k} value={k} className="font-mono text-xs">{`${c.name} · ${fmtMoney(c.cost)}${c.spec && c.spec === e.spec ? " ★" : ""}`}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <ActionBtn
               testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar" color="text-cyan-400"
               onClick={() => { trainEmployee(e.id, course); setCourse(""); }}
@@ -345,7 +352,7 @@ const EmployeeCard = ({ e }) => {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 
@@ -364,7 +371,7 @@ const CandidateCard = ({ c }) => {
   if (lackMoney) blockers.push(`faltam ${fmtMoney(c.cost - state.player.clean_money)}`);
 
   return (
-    <div data-testid={`candidate-card-${c.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+    <Card data-testid={`candidate-card-${c.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">
@@ -406,17 +413,18 @@ const CandidateCard = ({ c }) => {
           )}
         </div>
         <Tip tip={blockers.length ? `Não podes contratar: ${blockers.join(" · ")}.` : `Contratar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`} align="end">
-          <button
+          <Button
             data-testid={`hire-candidate-${c.id}`}
+            size="sm"
             onClick={() => recruitEmployee(c.id)}
             disabled={lackRespect || lackMoney || full}
-            className="rounded bg-white px-3 py-1.5 font-mono text-[10px] font-bold uppercase text-black transition-colors hover:bg-gray-200 disabled:opacity-40"
+            className="font-mono text-[10px] font-bold uppercase"
           >
             {fmtMoney(c.cost)}
-          </button>
+          </Button>
         </Tip>
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -463,10 +471,10 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <IdCard size={18} className="text-red-500" /> Recursos Humanos
+            <IdCard size={18} className="text-primary" /> Recursos Humanos
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
@@ -474,7 +482,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+        <Card className="mt-3 flex items-center justify-between border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
           <div>
             <p className="text-[9px] uppercase tracking-wider text-zinc-500">Folha salarial</p>
             <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(state.salary_total)}/ciclo</p>
@@ -485,7 +493,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
               {payrollMs !== null ? fmtDuration(payrollMs / 1000) : "—"}
             </p>
           </div>
-        </div>
+        </Card>
 
         {(() => {
           const emps = state.employees;
@@ -527,16 +535,17 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         })()}
 
         {capFull && (
-          <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2" data-testid="hr-cap-full">
+          <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none" data-testid="hr-cap-full">
             <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
             {canBuyHideout ? (
-              <button
+              <Button
                 data-testid="hr-buy-hideout-inline"
+                variant="outline" size="sm"
                 onClick={() => buyProperty("esconderijo")}
-                className="flex items-center gap-1 rounded border border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 transition-colors hover:bg-white/10"
+                className="h-auto gap-1 border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-white/10"
               >
                 <Warehouse size={10} /> Comprar esconderijo · {fmtMoney(hideout.price)}
-              </button>
+              </Button>
             ) : (
               <button
                 data-testid="hr-nav-properties"
@@ -546,29 +555,19 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                 Ver Imóveis
               </button>
             )}
-          </div>
+          </Card>
         )}
 
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/40 p-1">
-          <button
-            data-testid="tab-roster"
-            onClick={() => setTab("roster")}
-            className={`rounded px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              tab === "roster" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            Plantel ({state.employees.length})
-          </button>
-          <button
-            data-testid="tab-recruit"
-            onClick={() => setTab("recruit")}
-            className={`rounded px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              tab === "recruit" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            Recrutar ({(state.candidates || []).length})
-          </button>
-        </div>
+        <Tabs value={tab} onValueChange={setTab} className="mt-3">
+          <TabsList className="grid w-full grid-cols-2 bg-black/40">
+            <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Plantel ({state.employees.length})
+            </TabsTrigger>
+            <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Recrutar ({(state.candidates || []).length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {tab === "roster" && (
           <div className="mt-3">
@@ -579,33 +578,35 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                 <div className="flex items-center gap-1.5">
                   <div className="relative flex-1">
                     <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
-                    <input
+                    <Input
                       data-testid="employees-search"
                       value={query}
                       onChange={(ev) => setQuery(ev.target.value)}
                       placeholder="Pesquisar funcionário..."
-                      className="w-full rounded border border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+                      className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
                     />
                   </div>
                   <Tip tip={hideUnavailable ? "A mostrar só disponíveis (e favoritos) — clica para ver todos." : "A mostrar todos — clica para esconder indisponíveis."}>
-                    <button
+                    <Button
                       data-testid="employees-toggle-unavailable"
+                      variant="outline"
                       onClick={() => setHideUnavailable(!hideUnavailable)}
-                      className="flex shrink-0 items-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-zinc-400 transition-colors hover:bg-white/5"
+                      className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
                     >
                       {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
                       {hideUnavailable && hiddenCount > 0 ? ` +${hiddenCount}` : ""}
-                    </button>
+                    </Button>
                   </Tip>
                   {restAllIds.length > 0 && (
                     <Tip tip={`Manda descansar todos os funcionários disponíveis com fadiga (${restAllIds.length}).`}>
-                      <button
+                      <Button
                         data-testid="employees-rest-all"
+                        variant="outline"
                         onClick={restAll}
-                        className="flex shrink-0 items-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 transition-colors hover:bg-white/5"
+                        className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 hover:bg-white/5"
                       >
                         <BedDouble size={11} /> Descansar todos
-                      </button>
+                      </Button>
                     </Tip>
                   )}
                 </div>
@@ -628,14 +629,15 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
               <p className="font-mono text-[10px] text-zinc-500">
                 Novos contactos em <span className="text-white">{poolMs !== null ? fmtDuration(Math.max(0, poolMs / 1000)) : "—"}</span>
               </p>
-              <button
+              <Button
                 data-testid="refresh-pool-btn"
+                variant="outline" size="sm"
                 onClick={() => refreshPool()}
                 disabled={state.player.clean_money < catalog.hr_costs.pool_refresh}
-                className="flex items-center gap-1 rounded border border-white/10 px-2 py-1 font-mono text-[10px] text-cyan-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                className="h-auto gap-1 border-white/10 px-2 py-1 font-mono text-[10px] text-cyan-400 hover:bg-white/5"
               >
                 <RefreshCw size={10} /> Atualizar {fmtMoney(catalog.hr_costs.pool_refresh)}
-              </button>
+              </Button>
             </div>
 
             {Object.entries(catalog.recruit_sources).map(([key, src]) => {

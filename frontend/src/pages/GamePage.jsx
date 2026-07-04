@@ -14,6 +14,8 @@ import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import { Tip } from "../components/game/hud";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings } from "lucide-react";
 
@@ -37,9 +39,9 @@ export default function GamePage() {
 
   if (!state) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#050505]">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-red-600" />
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
           <p className="mt-3 font-mono text-xs uppercase tracking-[0.3em] text-zinc-500">A ligar à rede...</p>
         </div>
       </div>
@@ -69,7 +71,7 @@ export default function GamePage() {
     : state;
 
   return (
-    <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-[#050505]">
+    <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-background">
       <LiveMap
         state={mapState}
         serverNow={serverNow}
@@ -84,27 +86,29 @@ export default function GamePage() {
         align="end"
         className="pointer-events-auto absolute right-2 top-16 z-20"
       >
-        <button
+        <Button
           data-testid="open-intel-button"
+          variant="outline"
           onClick={() => setOpenPanel("intel")}
-          className="relative flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black md:px-3"
+          className="relative h-auto gap-1.5 rounded-full border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white md:px-3"
         >
-          <BrainCircuit size={16} className="text-red-500" />
+          <BrainCircuit size={16} className="text-primary" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
           {alerts.total > 0 && (
-            <span data-testid="intel-alert-badge" className="rounded-full px-1.5 font-mono text-[10px] font-bold" style={{ background: NOTIFY_COLOR }}>{alerts.total}</span>
+            <Badge data-testid="intel-alert-badge" className="rounded-full px-1.5 py-0 font-mono text-[10px] font-bold" style={{ background: NOTIFY_COLOR }}>{alerts.total}</Badge>
           )}
-        </button>
+        </Button>
       </Tip>
       <Tip tip="Definições — conta, interface, automatizações e notificações." side="bottom" align="end" className="pointer-events-auto absolute right-2 top-32 z-20">
-        <button
+        <Button
           data-testid="open-settings-button"
+          variant="outline"
           onClick={() => setOpenPanel("settings")}
-          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black md:px-3"
+          className="h-auto gap-1.5 rounded-full border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white md:px-3"
         >
           <Settings size={16} className="text-zinc-400" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
-        </button>
+        </Button>
       </Tip>
       <ActivityFeed />
       <ActivityFeedMobile />
@@ -170,15 +174,16 @@ export default function GamePage() {
 
 const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = NOTIFY_COLOR, alert, tip, onClick }) => (
   <Tip tip={tip} side="top">
-    <button
+    <Button
       data-testid={testId}
+      variant="outline"
       onClick={onClick}
-      className="relative flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-2 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-xl transition-colors hover:bg-black md:px-3 md:py-2.5"
+      className="relative h-auto gap-1.5 rounded-full border-white/10 bg-black/80 px-2 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white md:px-3 md:py-2.5"
     >
       <Icon size={15} className={color} />
       <span className="hidden md:inline">{label}</span>
       {badge > 0 && (
-        <span className="rounded-full px-1.5 font-mono text-[10px] font-bold" style={{ background: badgeColor }}>{badge}</span>
+        <Badge className="rounded-full px-1.5 py-0 font-mono text-[10px] font-bold" style={{ background: badgeColor }}>{badge}</Badge>
       )}
       {alert && (
         <span
@@ -186,6 +191,6 @@ const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = NOTIF
           style={{ background: NOTIFY_COLOR, boxShadow: `0 0 6px ${NOTIFY_COLOR}` }}
         />
       )}
-    </button>
+    </Button>
   </Tip>
 );

@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Input } from "../ui/input";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users, Search, Clock } from "lucide-react";
 
 const VStat = ({ label, value }) => (
-  <div className="rounded bg-black/40 px-1.5 py-1 text-center">
+  <Card className="rounded bg-black/40 px-1.5 py-1 text-center shadow-none">
     <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className="font-mono text-[10px] font-bold text-white">{value}</p>
-  </div>
+  </Card>
 );
 
 const useTick = (active) => {
@@ -67,10 +70,10 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl sm:max-w-sm">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Car size={18} className="text-red-500" /> Frota
+            <Car size={18} className="text-primary" /> Frota
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="vehicle-caps">{caps.used}/{caps.max}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Abastece, repara, atribui e abate veículos.</SheetDescription>
@@ -99,24 +102,25 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
         <div className="mt-3 flex items-center gap-1.5">
           <div className="relative flex-1">
             <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
-            <input
+            <Input
               data-testid="fleet-search"
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
               placeholder="Pesquisar veículo..."
-              className="w-full rounded border border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+              className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
             />
           </div>
           {repairableIds.length > 0 && (
             <Tip tip={`Repara todos os veículos disponíveis abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}>
-              <button
+              <Button
                 data-testid="fleet-repair-all"
+                variant="outline" size="sm"
                 onClick={repairAll}
                 disabled={state.player.clean_money < repairAllCost}
-                className="flex shrink-0 items-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-success hover:bg-white/5"
               >
                 <Wrench size={11} /> Reparar todos
-              </button>
+              </Button>
             </Tip>
           )}
         </div>
@@ -156,7 +160,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
             }
             return (
-              <div key={v.id} data-testid={`vehicle-card-${v.id}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -219,9 +223,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       <span>Combustível</span>
                       <span>{v.fuel_l.toFixed(0)}/{v.tank_l.toFixed(0)}L</span>
                     </div>
-                    <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full bg-amber-400 transition-all duration-500" style={{ width: `${fuelPct}%` }} />
-                    </div>
+                    <MiniBar value={fuelPct} color="#FBBF24" className="mt-0.5" />
                   </div>
                   <div>
                     <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
@@ -230,27 +232,25 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         <span style={{ color: conditionBand(v.condition).color }}>{conditionBand(v.condition).label}</span>
                       </Tip>
                     </div>
-                    <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full transition-all duration-500"
-                        style={{ width: `${v.condition}%`, background: v.condition < 30 ? "#EF4444" : "#34D399" }}
-                      />
-                    </div>
+                    <MiniBar value={v.condition} color={v.condition < 30 ? "#EF4444" : "#34D399"} className="mt-0.5" />
                   </div>
                 </div>
 
-                <select
-                  data-testid={`vehicle-team-select-${v.id}`}
-                  value={v.team_id || ""}
+                <Select
+                  value={v.team_id || "__none__"}
                   disabled={busy}
-                  onChange={(ev) => assignVehicle(v.id, ev.target.value || null)}
-                  className="mt-2 w-full rounded border border-white/10 bg-black/60 px-2 py-1 font-mono text-[11px] text-white disabled:opacity-40"
+                  onValueChange={(tid) => assignVehicle(v.id, tid === "__none__" ? null : tid)}
                 >
-                  <option value="">Na garagem (sem equipa)</option>
-                  {state.teams.map((t) => (
-                    <option key={t.id} value={t.id}>{`${t.name} · ${teamMembers(t.id)} membros`}</option>
-                  ))}
-                </select>
+                  <SelectTrigger data-testid={`vehicle-team-select-${v.id}`} className="mt-2 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__" className="font-mono text-xs">Na garagem (sem equipa)</SelectItem>
+                    {state.teams.map((t) => (
+                      <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{`${t.name} · ${teamMembers(t.id)} membros`}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {v.team_id && teamMembers(v.team_id) === 0 && (
                   <button
                     data-testid={`vehicle-team-empty-${v.id}`}
@@ -271,25 +271,27 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     </span>
                   ) : (
                     <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L) — demora alguns segundos.`} block className="flex-1">
-                      <button
+                      <Button
                         data-testid={`refuel-vehicle-${v.id}`}
+                        variant="outline"
                         onClick={() => refuelVehicle(v.id)}
                         disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
-                        className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                        className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 hover:bg-white/5"
                       >
                         <Fuel size={11} /> {fmtMoney(refuelCost)}
-                      </button>
+                      </Button>
                     </Tip>
                   )}
                   <Tip tip={`Reparar até 100% de condição — recupera velocidade máxima${state.bonuses?.repair_discount ? " (desconto de oficina aplicado)" : ""}.`} block className="flex-1">
-                    <button
+                    <Button
                       data-testid={`repair-vehicle-${v.id}`}
+                      variant="outline"
                       onClick={() => repairVehicle(v.id)}
                       disabled={busy || v.condition > 99 || state.player.clean_money < repairCost}
-                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                      className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-success hover:bg-white/5"
                     >
                       <Wrench size={11} /> {fmtMoney(repairCost)}
-                    </button>
+                    </Button>
                   </Tip>
                   <ConfirmButton
                     testId={`sell-vehicle-${v.id}`}
@@ -323,7 +325,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     <VStat label="Desde reparação" value={`${v.missions_since_repair || 0} missões`} />
                   </div>
                 )}
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -335,7 +337,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               Object.entries(catalog.vehicle_models).map(([key, m]) => {
                 const locked = state.player.level < m.min_level;
                 return (
-                  <div key={key} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <Card key={key} className="flex items-center justify-between border-white/10 bg-white/[0.03] p-3 shadow-none">
                     <div>
                       <p className="text-sm font-semibold text-white">
                         {m.name}
@@ -393,13 +395,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           onClick={() => buyVehicle(key)}
                           disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
                           size="sm"
-                          className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                          className="shrink-0 text-[10px] font-bold uppercase"
                         >
                           {fmtMoney(m.price)}
                         </Button>
                       </Tip>
                     )}
-                  </div>
+                  </Card>
                 );
               })}
           </div>
@@ -407,16 +409,17 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             const garagem = catalog?.property_types?.garagem;
             const canBuy = garagem && state.player.level >= garagem.min_level && state.player.clean_money >= garagem.price;
             return (
-              <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
+              <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none">
                 <p className="font-mono text-[10px] text-amber-400">Garagem cheia</p>
                 {canBuy ? (
-                  <button
+                  <Button
                     data-testid="fleet-buy-garage-inline"
+                    variant="outline" size="sm"
                     onClick={() => buyProperty("garagem")}
-                    className="flex items-center gap-1 rounded border border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 transition-colors hover:bg-white/10"
+                    className="h-auto gap-1 border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-white/10"
                   >
                     <Warehouse size={10} /> Comprar garagem · {fmtMoney(garagem.price)}
-                  </button>
+                  </Button>
                 ) : (
                   <button
                     data-testid="fleet-nav-properties"
@@ -426,7 +429,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     Ver Imóveis
                   </button>
                 )}
-              </div>
+              </Card>
             );
           })()}
         </div>

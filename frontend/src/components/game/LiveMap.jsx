@@ -7,6 +7,8 @@ import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wr
 import { useGame } from "../../context/GameContext";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 
 const PROP_ICONS = {
   esconderijo: Shield,
@@ -380,7 +382,7 @@ export const MapLegend = () => {
       style={{ bottom: "calc(3.6rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {open && (
-        <div data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up rounded-lg border border-white/10 bg-black/85 p-3 shadow-2xl backdrop-blur-xl">
+        <Card data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up border-white/10 bg-black/85 p-3 shadow-2xl backdrop-blur-xl">
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Legenda do mapa</p>
           <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Oportunidades (cor = categoria)</p>
           <div className="mb-2 grid grid-cols-2 gap-x-2 gap-y-1">
@@ -410,16 +412,17 @@ export const MapLegend = () => {
           <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
             Passa o rato sobre qualquer marcador para veres os detalhes. Clica numa oportunidade para despachar uma equipa.
           </p>
-        </div>
+        </Card>
       )}
-      <button
+      <Button
         data-testid="map-legend-toggle"
+        variant="outline" size="icon"
         onClick={() => setOpen(!open)}
         title="Legenda do mapa"
-        className="flex items-center justify-center rounded-full border border-white/10 bg-black/80 p-2 text-zinc-400 shadow-2xl backdrop-blur-xl transition-colors hover:bg-black hover:text-white"
+        className="rounded-full border-white/10 bg-black/80 text-zinc-400 shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white"
       >
         {open ? <X size={15} /> : <MapIcon size={15} />}
-      </button>
+      </Button>
     </div>
   );
 };
