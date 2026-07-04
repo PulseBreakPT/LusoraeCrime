@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
+import { Card } from "../ui/card";
 
 const KIND_COLORS = {
   success: "#10B981",
@@ -32,6 +34,9 @@ const relTime = (ts, nowMs) => {
   return `${Math.floor(s / 3600)}h`;
 };
 
+// Data e hora completas, no mesmo estilo usado no extrato financeiro do Império.
+const absTime = (ts) => new Date(ts).toLocaleString("pt-PT");
+
 export const ActivityFeed = () => {
   const { state, serverNow } = useGame();
   if (!state) return null;
@@ -51,16 +56,19 @@ export const ActivityFeed = () => {
         </Badge>
       </div>
       <ScrollArea className="h-44 p-2">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {state.events.length === 0 && (
             <p className="px-1 font-mono text-[11px] text-zinc-600">Sem atividade registada.</p>
           )}
           {state.events.map((e) => (
-            <p key={e.id} className="flex items-baseline gap-1.5 px-1 font-mono text-[11px] leading-snug text-zinc-400" title={KIND_LABELS[e.kind] || e.kind}>
-              <span className="shrink-0" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
-              <span className="min-w-0 flex-1">{e.message}</span>
-              <span className="shrink-0 text-[9px] text-zinc-600">{relTime(e.ts, serverNow())}</span>
-            </p>
+            <div key={e.id} className="flex items-start gap-1.5 px-1" title={KIND_LABELS[e.kind] || e.kind}>
+              <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[11px] leading-snug text-zinc-400">{e.message}</p>
+                <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
+              </div>
+              <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, serverNow())}</span>
+            </div>
           ))}
         </div>
       </ScrollArea>
@@ -70,17 +78,42 @@ export const ActivityFeed = () => {
 
 export const ActivityFeedMobile = () => {
   const { state, serverNow } = useGame();
+  const [open, setOpen] = useState(false);
   if (!state || state.events.length === 0) return null;
   const latest = state.events[0];
+  const recent = state.events.slice(0, 5);
+
   return (
-    <div
-      data-testid="activity-feed-mobile"
-      className="pointer-events-none absolute bottom-[4.2rem] left-2 right-2 z-20 md:hidden"
-    >
-      <p className="truncate rounded-md border border-border bg-card/90 px-3 py-1.5 font-mono text-[10px] text-zinc-400 backdrop-blur-xl">
-        <span style={{ color: KIND_COLORS[latest.kind] || "#8E8E93" }}>▸</span> {latest.message}{" "}
-        <span className="text-zinc-600">· {relTime(latest.ts, serverNow())}</span>
-      </p>
+    <div data-testid="activity-feed-mobile" className="pointer-events-none absolute bottom-[4.2rem] left-2 right-2 z-20 md:hidden">
+      {open && (
+        <Card
+          data-testid="activity-feed-mobile-list"
+          className="pointer-events-auto absolute inset-x-0 bottom-full mb-2 max-h-64 animate-slide-up overflow-y-auto border-border bg-card/95 p-2 shadow-2xl backdrop-blur-xl"
+        >
+          <p className="mb-1.5 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">Últimos registos</p>
+          <div className="space-y-1.5">
+            {recent.map((e) => (
+              <div key={e.id} className="flex items-start gap-1.5 px-1" title={KIND_LABELS[e.kind] || e.kind}>
+                <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[10px] leading-snug text-zinc-300">{e.message}</p>
+                  <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+      <button
+        data-testid="activity-feed-mobile-toggle"
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-border bg-card/90 px-3 py-1.5 text-left backdrop-blur-xl"
+      >
+        <span className="shrink-0" style={{ color: KIND_COLORS[latest.kind] || "#8E8E93" }}>▸</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">{latest.message}</span>
+        <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, serverNow())}</span>
+      </button>
     </div>
   );
 };
