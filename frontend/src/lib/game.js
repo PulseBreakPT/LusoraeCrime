@@ -341,11 +341,13 @@ export const ATTR_FULL = {
   tiro: "Tiro", hack: "Hacking", negociacao: "Negociação", sangue_frio: "Sangue-frio", resistencia: "Resistência",
 };
 
+// O calor é sempre um indicador de perigo — ícone e texto ficam a vermelho
+// em qualquer nível, em vez de "esconder" o risco com verde/âmbar quando baixo.
 export function heatStatus(h) {
   if (h >= 90) return { label: "Crítico", color: "#EF4444", desc: "Polícia em alerta máximo — operações bloqueadas até subornares ou o calor baixar." };
-  if (h >= 70) return { label: "Alerta", color: "#F97316", desc: "Risco de rusga aos laboratórios e interceções frequentes." };
-  if (h >= 40) return { label: "Vigiado", color: "#F59E0B", desc: "A polícia está atenta — probabilidade de sucesso reduzida." };
-  return { label: "Calmo", color: "#34D399", desc: "Radar limpo — momento ideal para operar." };
+  if (h >= 70) return { label: "Alerta", color: "#EF4444", desc: "Risco de rusga aos laboratórios e interceções frequentes." };
+  if (h >= 40) return { label: "Vigiado", color: "#EF4444", desc: "A polícia está atenta — probabilidade de sucesso reduzida." };
+  return { label: "Calmo", color: "#EF4444", desc: "Radar limpo — momento ideal para operar." };
 }
 
 export function vehicleRangeKm(v) {

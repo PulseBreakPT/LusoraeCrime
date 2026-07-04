@@ -168,7 +168,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             <Cell label="Propriedades" value={state.properties.length} tip="Número de propriedades do império." />
             <Cell label="Produção passiva" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B" tip="Dinheiro sujo gerado automaticamente pelos laboratórios." />
             <Cell label="Lavagem passiva" value={`${fmtMoney(launderPerH)}/h`} color="#34D399" tip="Lavagem automática das empresas de fachada (sem taxa)." />
-            <Cell label="Calor" value={`${Math.round(state.player.heat)}%`} color={state.player.heat >= 70 ? "#EF4444" : undefined} tip="Aos 70% há risco de rusgas; aos 90% as operações ficam bloqueadas." />
+            <Cell label="Calor" value={`${Math.round(state.player.heat)}%`} color="#EF4444" tip="Aos 70% há risco de rusgas; aos 90% as operações ficam bloqueadas." />
           </Grid>
         </Section>
 
