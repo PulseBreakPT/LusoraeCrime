@@ -207,6 +207,23 @@ FULL_ENERGY_XP_BONUS = 0.10           # bónus de XP ao entrar em missão com en
 XP_DECAY_IDLE_DAYS = 5                # dias sem participar numa missão antes de começar a perder XP
 XP_DECAY_PER_MIN = 0.05               # XP perdido por minuto real de inatividade prolongada
 
+# ---------------- Missões: recompensa, disponibilidade e cancelamento ----------------
+
+MEMBER_SPLIT_PENALTY_PER_EXTRA = 0.04  # redução de recompensa por membro acima do mínimo exigido
+MEMBER_SPLIT_PENALTY_MAX = 0.20        # redução máxima de recompensa por divisão do saque
+AGE_DECAY_MAX = 0.20                   # decaimento máximo de recompensa por a missão estar disponível há muito tempo
+AGE_DECAY_RAMP_S = 480                 # tempo (s) até atingir o decaimento máximo
+REPEAT_TYPE_XP_MULT = 0.85             # multiplicador de XP quando a equipa repete o mesmo tipo de missão
+DURATION_REWARD_BASELINE_S = 90        # duração neutra (nem bónus nem penalização) de recompensa por minuto
+DURATION_REWARD_MAX_BONUS = 0.15       # bónus máximo de recompensa para operações longas
+DURATION_REWARD_MAX_MALUS = 0.10       # penalização máxima de recompensa para operações muito rápidas
+DURATION_REWARD_FLOOR_S = 30           # duração a partir da qual a penalização é máxima
+DURATION_REWARD_CEIL_S = 300           # duração a partir da qual o bónus é máximo
+FAILED_TYPE_COOLDOWN_MIN = 8           # minutos em que um tipo de missão falhado deixa de aparecer
+RECALL_PENALTY_FRACTION = 0.5          # fração da viagem a partir da qual chamar a equipa de volta tem custo
+RECALL_PENALTY_HEAT = 3                # calor extra ao chamar de volta tarde
+RECALL_PENALTY_FATIGUE = 8             # fadiga extra da equipa ao chamar de volta tarde
+
 FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
 
 # ---------------- Propriedades ----------------
@@ -241,11 +258,13 @@ OPPORTUNITY_TYPES = {
     "roubo": {"name": "Roubo de Veículo", "category": "assalto", "min_level": 1, "base_reward": 2500,
               "respect": 25, "heat": 4, "risk": 1, "duration_s": (30, 60), "weight": 12, "pays": "dirty"},
     "cobranca": {"name": "Cobrança", "category": "influencia", "min_level": 1, "base_reward": 2000,
-                 "respect": 20, "heat": 2, "risk": 1, "duration_s": (30, 60), "weight": 12, "pays": "dirty"},
+                 "respect": 20, "heat": 2, "risk": 1, "duration_s": (30, 60), "weight": 12, "pays": "dirty",
+                 "hours": (8, 20)},
     "transporte": {"name": "Transporte Ilegal", "category": "logistica", "min_level": 1, "base_reward": 3000,
                    "respect": 30, "heat": 3, "risk": 2, "duration_s": (60, 120), "weight": 10, "pays": "dirty"},
     "contrabando": {"name": "Contrabando", "category": "logistica", "min_level": 2, "base_reward": 6000,
-                    "respect": 60, "heat": 8, "risk": 3, "duration_s": (90, 150), "weight": 8, "pays": "dirty"},
+                    "respect": 60, "heat": 8, "risk": 3, "duration_s": (90, 150), "weight": 8, "pays": "dirty",
+                    "required_models": ["van", "suv_blindado"]},
     "hack": {"name": "Hack", "category": "tecnica", "min_level": 2, "base_reward": 5500,
              "respect": 55, "heat": 5, "risk": 3, "duration_s": (60, 120), "weight": 8, "pays": "dirty"},
     "lavagem": {"name": "Lavagem de Dinheiro", "category": "influencia", "min_level": 2, "base_reward": 4500,
@@ -255,7 +274,8 @@ OPPORTUNITY_TYPES = {
     "ataque_territorio": {"name": "Ataque a Território", "category": "assalto", "min_level": 3, "base_reward": 11000,
                           "respect": 120, "heat": 14, "risk": 4, "duration_s": (120, 220), "weight": 4, "pays": "dirty"},
     "operacao_vip": {"name": "Operação VIP", "category": "influencia", "min_level": 4, "base_reward": 16000,
-                     "respect": 160, "heat": 12, "risk": 4, "duration_s": (150, 260), "weight": 3, "pays": "dirty"},
+                     "respect": 160, "heat": 12, "risk": 4, "duration_s": (150, 260), "weight": 3, "pays": "dirty",
+                     "hours": (22, 5)},
     "missao_especial": {"name": "Missão Especial", "category": "especial", "min_level": 5, "base_reward": 25000,
                         "respect": 260, "heat": 16, "risk": 5, "duration_s": (180, 300), "weight": 2, "pays": "dirty"},
     "entrega_expressa": {"name": "Entrega Expressa", "category": "logistica", "min_level": 1, "base_reward": 2200,
@@ -267,7 +287,8 @@ OPPORTUNITY_TYPES = {
     "suborno_oficial": {"name": "Suborno a Oficial", "category": "influencia", "min_level": 3, "base_reward": 8500,
                         "respect": 80, "heat": 4, "risk": 3, "duration_s": (90, 150), "weight": 6, "pays": "clean"},
     "rota_internacional": {"name": "Rota Internacional", "category": "logistica", "min_level": 4, "base_reward": 13500,
-                           "respect": 125, "heat": 10, "risk": 4, "duration_s": (150, 230), "weight": 3, "pays": "dirty"},
+                           "respect": 125, "heat": 10, "risk": 4, "duration_s": (150, 230), "weight": 3, "pays": "dirty",
+                           "required_models": ["van"]},
     "ciberataque_bancario": {"name": "Ciberataque Bancário", "category": "tecnica", "min_level": 5, "base_reward": 23000,
                             "respect": 230, "heat": 18, "risk": 5, "duration_s": (190, 300), "weight": 2, "pays": "dirty"},
 }

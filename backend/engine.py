@@ -16,7 +16,12 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        LUXURY_HEAT_MULT, WEAR_KM_RAMP, WEAR_KM_MAX_MULT,
                        NEWBIE_RAMP_S, NEWBIE_PENALTY_MAX, HIGH_MORALE_THRESHOLD, HIGH_MORALE_BONUS,
                        LOW_MORALE_ABSENCE_THRESHOLD, ABSENCE_CHANCE_PER_MIN, ABSENCE_DURATION_S,
-                       FULL_ENERGY_FATIGUE_MAX, FULL_ENERGY_XP_BONUS, XP_DECAY_IDLE_DAYS, XP_DECAY_PER_MIN)
+                       FULL_ENERGY_FATIGUE_MAX, FULL_ENERGY_XP_BONUS, XP_DECAY_IDLE_DAYS, XP_DECAY_PER_MIN,
+                       MEMBER_SPLIT_PENALTY_PER_EXTRA, MEMBER_SPLIT_PENALTY_MAX, AGE_DECAY_MAX,
+                       AGE_DECAY_RAMP_S, REPEAT_TYPE_XP_MULT, DURATION_REWARD_BASELINE_S,
+                       DURATION_REWARD_MAX_BONUS, DURATION_REWARD_MAX_MALUS, DURATION_REWARD_FLOOR_S,
+                       DURATION_REWARD_CEIL_S, FAILED_TYPE_COOLDOWN_MIN, RECALL_PENALTY_FRACTION,
+                       RECALL_PENALTY_HEAT, RECALL_PENALTY_FATIGUE)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -287,6 +292,42 @@ def min_members_for(risk):
     return max(1, risk - 1)
 
 
+def duration_reward_mult(duration_s):
+    """Operações mais longas pagam melhor por minuto do que operações muito
+    rápidas — neutro aos 90s, até +15% aos 300s e até -10% aos 30s."""
+    baseline = DURATION_REWARD_BASELINE_S
+    if duration_s >= baseline:
+        span = max(1, DURATION_REWARD_CEIL_S - baseline)
+        return 1 + DURATION_REWARD_MAX_BONUS * min(1.0, (duration_s - baseline) / span)
+    span = max(1, baseline - DURATION_REWARD_FLOOR_S)
+    return 1 - DURATION_REWARD_MAX_MALUS * min(1.0, (baseline - duration_s) / span)
+
+
+def hour_allowed(type_key, now):
+    """Algumas oportunidades só aparecem em certas horas do dia (UTC)."""
+    hours = OPPORTUNITY_TYPES[type_key].get("hours")
+    if not hours:
+        return True
+    start, end = hours
+    h = now.hour
+    if start <= end:
+        return start <= h < end
+    return h >= start or h < end  # intervalo que atravessa a meia-noite
+
+
+def age_decay_mult(age_s):
+    """Quanto mais tempo uma oportunidade fica disponível por reclamar, menor
+    a recompensa — até -20% ao fim de ~8 minutos."""
+    return max(1 - AGE_DECAY_MAX, 1 - AGE_DECAY_MAX * min(1.0, age_s / AGE_DECAY_RAMP_S))
+
+
+def member_split_mult(members_count, min_members):
+    """Levar mais membros do que o mínimo exigido divide o saque — pequena
+    redução de recompensa por cada membro extra."""
+    extra = max(0, members_count - min_members)
+    return 1 - min(MEMBER_SPLIT_PENALTY_MAX, MEMBER_SPLIT_PENALTY_PER_EXTRA * extra)
+
+
 async def spawn_opportunities(db, player, rare_chance=0.0):
     now = now_utc()
     pid = str(player["_id"])
@@ -295,7 +336,14 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
     })
     level = player["level"]
     target = min(5 + level * 2, 14)
-    keys = [k for k, v in OPPORTUNITY_TYPES.items() if v["min_level"] <= level]
+    cooldowns = player.get("type_cooldowns") or {}
+    keys = [
+        k for k, v in OPPORTUNITY_TYPES.items()
+        if v["min_level"] <= level and hour_allowed(k, now)
+        and not (cooldowns.get(k) and parse_dt(cooldowns[k]) > now)
+    ]
+    if not keys:
+        return
     weights = [OPPORTUNITY_TYPES[k]["weight"] for k in keys]
     hq = player["hq"]
     docs = []
@@ -303,7 +351,8 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
         key = random.choices(keys, weights=weights)[0]
         t = OPPORTUNITY_TYPES[key]
         spot = random.choice(LISBON_SPOTS)
-        mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35)
+        duration_s = random.randint(*t["duration_s"])
+        mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s)
         rare = random.random() < rare_chance
         if rare:
             mult *= 2.0
@@ -320,7 +369,8 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
             "reward": int(t["base_reward"] * mult),
             "respect": int(t["respect"] * (1 + 0.15 * (level - 1)) * (1.5 if rare else 1.0)),
             "risk": risk, "heat": t["heat"], "pays": t["pays"], "rare": rare,
-            "duration_s": random.randint(*t["duration_s"]),
+            "required_models": t.get("required_models", []),
+            "duration_s": duration_s,
             "min_level": t["min_level"], "min_members": min_members_for(risk),
             "status": "active",
             "expires_at": (now + timedelta(seconds=random.randint(240, 600))).isoformat(),
@@ -453,6 +503,9 @@ def _apply_outcome(player, m, outcome):
         stats["missions_failure"] += 1
         player["respect"] += max(1, t["respect"] // 4)
         player["heat"] = min(100, player["heat"] + t["heat"] * 1.5 * heat_mult)
+        # Este tipo de missão fica temporariamente mais raro depois de falhar.
+        cooldowns = player.setdefault("type_cooldowns", {})
+        cooldowns[t["type_key"]] = (now_utc() + timedelta(minutes=FAILED_TYPE_COOLDOWN_MIN)).isoformat()
     else:
         stats["missions_police"] += 1
         fine = int(player["dirty_money"] * 0.10)
@@ -604,6 +657,10 @@ async def _crew_returns(db, m, outcome):
         # Foi para a operação com a energia (fadiga) no máximo: pequeno bónus de XP.
         if emp["fatigue"] <= FULL_ENERGY_FATIGUE_MAX:
             xp_gain = int(xp_gain * (1 + FULL_ENERGY_XP_BONUS))
+        # Repetir o mesmo tipo de operação consecutivamente rende menos XP —
+        # incentiva variedade.
+        if m.get("repeat_type"):
+            xp_gain = int(xp_gain * REPEAT_TYPE_XP_MULT)
         xp = emp["xp"] + xp_gain
         rarity = emp.get("rarity", "comum")
         new_level = emp_level_for(xp, rarity)
@@ -1029,6 +1086,7 @@ async def advance(db, player):
         "temp_bonus": player.get("temp_bonus"),
         "frac_dirty": player.get("frac_dirty", 0.0), "frac_clean": player.get("frac_clean", 0.0),
         "frac_launder": player.get("frac_launder", 0.0),
+        "type_cooldowns": player.get("type_cooldowns", {}),
     }})
     await spawn_opportunities(db, player, rare_chance=bonuses.get("rare_opp", 0.0))
     return player
