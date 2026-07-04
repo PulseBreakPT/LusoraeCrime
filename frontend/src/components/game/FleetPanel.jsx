@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch } from "../../lib/game";
+import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users, Search } from "lucide-react";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users, Search, Clock } from "lucide-react";
 
 const VStat = ({ label, value }) => (
   <div className="rounded bg-black/40 px-1.5 py-1 text-center">
@@ -13,6 +13,15 @@ const VStat = ({ label, value }) => (
   </div>
 );
 
+const useTick = (active) => {
+  const [, setT] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setT((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+};
+
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
@@ -20,6 +29,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
+  useTick(open);
   if (!state) return null;
   const caps = state.caps.vehicles;
 
@@ -30,6 +40,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
     const t = teamOf(v);
     return t && t.status !== "idle";
   };
+  const isRefueling = (v) => v.refueling_until && Date.parse(v.refueling_until) > serverNow();
   const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
 
   const repairableIds = state.vehicles.filter((v) => !vehicleBusy(v) && v.condition < 99.5).map((v) => v.id);
@@ -47,7 +58,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
     const favB = favoriteVehicleIds.includes(b.id) ? 0 : 1;
     if (favA !== favB) return favA - favB;
     const rank = (v) => {
-      if (vehicleBusy(v)) return 1;
+      if (vehicleBusy(v) || isRefueling(v)) return 1;
       if (v.condition < 30 || v.fuel_l < v.tank_l * 0.12) return 2;
       return 0;
     };
@@ -126,6 +137,8 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             const members = team ? teamMembersList(team.id) : [];
             const busy = vehicleBusy(v);
             const mission = busy ? missionOf(team) : null;
+            const refueling = isRefueling(v);
+            const refuelRemaining = refueling ? Math.max(0, (Date.parse(v.refueling_until) - serverNow()) / 1000) : 0;
             const seats = catalog?.vehicle_models?.[v.model_key]?.seats;
             const fuelPct = (v.fuel_l / v.tank_l) * 100;
             const refuelCost = Math.ceil((v.tank_l - v.fuel_l) * state.fuel_prices[v.fuel_type]);
@@ -249,16 +262,25 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 )}
 
                 <div className="mt-2 flex gap-1.5">
-                  <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L).`} block className="flex-1">
-                    <button
+                  {refueling ? (
+                    <span
                       data-testid={`refuel-vehicle-${v.id}`}
-                      onClick={() => refuelVehicle(v.id)}
-                      disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
-                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                      className="flex flex-1 items-center justify-center gap-1 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 font-mono text-[10px] text-amber-400"
                     >
-                      <Fuel size={11} /> {fmtMoney(refuelCost)}
-                    </button>
-                  </Tip>
+                      <Clock size={11} /> A abastecer · {fmtDuration(refuelRemaining)}
+                    </span>
+                  ) : (
+                    <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L) — demora alguns segundos.`} block className="flex-1">
+                      <button
+                        data-testid={`refuel-vehicle-${v.id}`}
+                        onClick={() => refuelVehicle(v.id)}
+                        disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
+                        className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+                      >
+                        <Fuel size={11} /> {fmtMoney(refuelCost)}
+                      </button>
+                    </Tip>
+                  )}
                   <Tip tip={`Reparar até 100% de condição — recupera velocidade máxima${state.bonuses?.repair_discount ? " (desconto de oficina aplicado)" : ""}.`} block className="flex-1">
                     <button
                       data-testid={`repair-vehicle-${v.id}`}
@@ -353,17 +375,30 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         )}
                       </p>
                     </div>
-                    <Tip tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`} align="end">
-                      <Button
-                        data-testid={`buy-vehicle-${key}`}
-                        onClick={() => buyVehicle(key)}
+                    {m.price >= LARGE_PURCHASE_THRESHOLD ? (
+                      <ConfirmButton
+                        testId={`buy-vehicle-${key}`}
+                        label={fmtMoney(m.price)}
+                        confirmLabel="Confirmar?"
+                        color="text-cyan-300"
+                        onConfirm={() => buyVehicle(key)}
                         disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
-                        size="sm"
-                        className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
-                      >
-                        {fmtMoney(m.price)}
-                      </Button>
-                    </Tip>
+                        className="shrink-0"
+                        tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Compra grande — pede confirmação. ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`}
+                      />
+                    ) : (
+                      <Tip tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`} align="end">
+                        <Button
+                          data-testid={`buy-vehicle-${key}`}
+                          onClick={() => buyVehicle(key)}
+                          disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
+                          size="sm"
+                          className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                        >
+                          {fmtMoney(m.price)}
+                        </Button>
+                      </Tip>
+                    )}
                   </div>
                 );
               })}

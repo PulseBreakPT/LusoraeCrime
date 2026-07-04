@@ -36,7 +36,9 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        EXCEPTIONAL_PERFORMANCE_XP_BONUS_PCT, BONUS_LOOT_CHANCE, BONUS_LOOT_MAX_PCT,
                        WEAR_PER_MISSION_SINCE_REPAIR, WEAR_MISSIONS_SINCE_REPAIR_CAP,
                        EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
-                       RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS)
+                       RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
+                       PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -223,6 +225,43 @@ async def add_event(db, player_id, kind, message):
         "player_id": player_id, "kind": kind, "message": message,
         "ts": now_utc().isoformat(),
     })
+
+
+async def record_tx(db, player_id, kind, amount, currency, balance_after, note):
+    """Regista uma transação no extrato — todo o dinheiro que entra ou sai
+    fica com um registo consultável, mesmo que o evento em si já exista."""
+    await db.transactions.insert_one({
+        "player_id": player_id, "kind": kind, "amount": amount, "currency": currency,
+        "balance_after": balance_after, "note": note, "ts": now_utc().isoformat(),
+    })
+
+
+def property_stack_ranks(props):
+    """Ordem (0-based) de cada propriedade entre as do mesmo tipo, pela data de
+    compra — a mais antiga de cada tipo é a 1ª (bónus cheio), as seguintes
+    rendem menos. Devolve um dict {id_da_propriedade: ordem}."""
+    by_type = {}
+    for p in props:
+        by_type.setdefault(p["type_key"], []).append(p)
+    ranks = {}
+    for group in by_type.values():
+        for i, p in enumerate(sorted(group, key=lambda p: p.get("bought_at") or "")):
+            ranks[p["_id"]] = i
+    return ranks
+
+
+def property_stack_mult(rank):
+    """Rendimentos decrescentes: a 1ª unidade de um tipo de propriedade dá o
+    bónus percentual cheio, a 2ª menos, a 3ª+ ainda menos — em vez de proibir
+    ter várias, cada uma extra vale menos."""
+    idx = min(rank, len(PROPERTY_STACK_DIMINISH) - 1)
+    return PROPERTY_STACK_DIMINISH[idx]
+
+
+def dirty_money_cap(level):
+    """Limite de armazenamento de dinheiro sujo — acima disto, o excesso
+    produzido é desperdiçado (por isso vale a pena lavar regularmente)."""
+    return DIRTY_MONEY_CAP_BASE + DIRTY_MONEY_CAP_PER_LEVEL * max(0, level - 1)
 
 
 async def push_history(db, emp_id, text):
@@ -658,12 +697,17 @@ async def _pay_pending_reward(db, player, m):
         return
     pays = m.get("pending_pays") or m.get("opportunity", {}).get("pays", "dirty")
     stats = player.setdefault("stats", default_stats())
+    wasted = 0
     if pays == "clean":
         player["clean_money"] += reward
         stats["earned_clean"] = stats.get("earned_clean", 0) + reward
     else:
-        player["dirty_money"] += reward
-        stats["earned_dirty"] = stats.get("earned_dirty", 0) + reward
+        cap = dirty_money_cap(player.get("level", 1))
+        room = max(0, cap - player["dirty_money"])
+        credited = min(reward, room)
+        wasted = reward - credited
+        player["dirty_money"] += credited
+        stats["earned_dirty"] = stats.get("earned_dirty", 0) + credited
     # Persist money & stats immediately.
     await db.players.update_one({"_id": player["_id"]}, {"$set": {
         "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
@@ -673,6 +717,12 @@ async def _pay_pending_reward(db, player, m):
     label = "limpos" if pays == "clean" else "sujos"
     await add_event(db, m["player_id"], kind,
                     f"{m['team_name']} entregou {reward:,} € {label} no QG.")
+    await record_tx(db, m["player_id"], "mission_reward", reward - wasted, pays,
+                     player["clean_money"] if pays == "clean" else player["dirty_money"],
+                     f"Recompensa de {m['team_name']}: {m['opportunity']['name']}")
+    if wasted > 0:
+        await add_event(db, m["player_id"], "police",
+                        f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.")
 
 
 def _outcome_message(m, outcome):
@@ -733,6 +783,11 @@ async def _crew_returns(db, player, m, outcome):
         xp = emp["xp"] + xp_gain
         rarity = emp.get("rarity", "comum")
         new_level = emp_level_for(xp, rarity)
+        # Já no nível máximo para a raridade: XP deixa de acumular acima do
+        # limiar, para não crescer indefinidamente sem efeito nenhum.
+        max_level = RARITIES.get(rarity, RARITIES["comum"])["max_level"]
+        if new_level >= max_level:
+            xp = min(xp, EMP_LEVEL_XP[max_level - 1])
         fat_mult = 0.8 if "rei_da_noite" in emp.get("talents", []) else 1.0
         # Funcionários muito utilizados (muitas missões feitas) cansam-se mais
         # depressa — precisam de descansar com mais frequência.
@@ -933,6 +988,16 @@ async def _process_payroll(db, player, employees, now):
         if player["clean_money"] >= total:
             player["clean_money"] -= total
             await add_event(db, pid, "system", f"Folha salarial paga: -{total:,} €.")
+            await record_tx(db, pid, "payroll", -total, "clean", player["clean_money"], "Folha salarial")
+            # Salários em dia recuperam lentamente a moral e a lealdade do plantel.
+            idle_ids = [e["_id"] for e in employees if e.get("status") == "idle"]
+            if idle_ids:
+                await db.employees.update_many(
+                    {"_id": {"$in": idle_ids}, "morale": {"$lt": 100.0}},
+                    {"$inc": {"morale": PAYROLL_MORALE_REGEN, "loyalty": PAYROLL_MORALE_REGEN}},
+                )
+                await db.employees.update_many({"_id": {"$in": idle_ids}, "morale": {"$gt": 100.0}}, {"$set": {"morale": 100.0}})
+                await db.employees.update_many({"_id": {"$in": idle_ids}, "loyalty": {"$gt": 100.0}}, {"$set": {"loyalty": 100.0}})
         else:
             await add_event(db, pid, "police", f"Sem fundos para os salários ({total:,} €)! Moral e lealdade em queda.")
             survivors = []
@@ -1074,7 +1139,11 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
         fd = player.get("frac_dirty", 0.0) + dirty_rate * hours
         gain = int(fd)
         player["frac_dirty"] = fd - gain
-        player["dirty_money"] += gain
+        # Limite de armazenamento de dinheiro sujo — produção acima da capacidade
+        # é desperdiçada (incentiva lavar regularmente em vez de deixar acumular).
+        cap = dirty_money_cap(player.get("level", 1))
+        room = max(0, cap - player["dirty_money"])
+        player["dirty_money"] += min(gain, room)
     if heat_rate > 0:
         player["heat"] = min(100.0, player["heat"] + heat_rate * hours)
     if launder_rate > 0 and player["dirty_money"] > 0:
@@ -1129,6 +1198,17 @@ async def _complete_property_upgrades(db, player, props, now):
         await db.properties.update_one({"_id": p["_id"]}, {"$set": {"level": new_level, "upgrading_until": None}})
         pid = str(player["_id"])
         await add_event(db, pid, "property", f"{p['name']} concluiu a melhoria — agora no nível {new_level}.")
+
+
+async def _complete_refuels(db, player, vehicles, now):
+    """Abastecer não é instantâneo — enche o depósito só quando o tempo de
+    espera termina (nunca acima de 100%)."""
+    for v in vehicles:
+        until = v.get("refueling_until")
+        if not until or parse_dt(until) > now:
+            continue
+        await db.vehicles.update_one({"_id": v["_id"]}, {"$set": {"fuel_l": v["tank_l"], "refueling_until": None}})
+        await add_event(db, str(player["_id"]), "vehicle", f"{v['name']} terminou de abastecer — depósito cheio.")
 
 
 async def _maybe_raid(db, player, props, minutes, now):
@@ -1204,6 +1284,7 @@ async def advance(db, player):
     await _maybe_raid(db, player, props, minutes, now)
 
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
+    await _complete_refuels(db, player, vehicles, now)
     await process_quests(db, player, {"employees": employees, "props": props,
                                       "vehicles": vehicles, "minutes": minutes})
 

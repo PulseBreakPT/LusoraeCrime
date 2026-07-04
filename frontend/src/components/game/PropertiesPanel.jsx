@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, propertyBenefit, passiveRates } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar } from "./hud";
+import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
@@ -144,24 +144,21 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       <ArrowUpCircle size={11} /> {upgrading ? "A melhorar..." : maxed ? "Máx." : fmtMoney(upgradeCost)}
                     </button>
                   </Tip>
-                  <Tip
+                  <ConfirmButton
+                    testId={`sell-property-${p.id}`}
+                    icon={Trash2}
+                    label={fmtMoney(sellValue)}
+                    confirmLabel="Vender?"
+                    color="text-red-400"
+                    onConfirm={() => sellProperty(p.id)}
+                    disabled={upgrading}
+                    className="flex-1"
                     tip={
                       upgrading
                         ? "Não podes vender uma propriedade a meio de uma melhoria."
-                        : `Vender por ${fmtMoney(sellValue)} (70% do investido). Perdes o benefício imediatamente — cuidado com as capacidades.`
+                        : `Vender por ${fmtMoney(sellValue)} (70% do investido). Perdes o benefício imediatamente — cuidado com as capacidades. Ação irreversível.`
                     }
-                    block
-                    className="flex-1"
-                  >
-                    <button
-                      data-testid={`sell-property-${p.id}`}
-                      onClick={() => sellProperty(p.id)}
-                      disabled={upgrading}
-                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5 disabled:opacity-40"
-                    >
-                      <Trash2 size={11} /> {fmtMoney(sellValue)}
-                    </button>
-                  </Tip>
+                  />
                 </div>
               </div>
             );
@@ -174,6 +171,15 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             {catalog &&
               Object.entries(catalog.property_types).map(([key, pt]) => {
                 const locked = state.player.level < pt.min_level;
+                const ownedOfType = state.properties.filter((pr) => pr.type_key === key).length;
+                const roiDays = pt.dirty_per_h ? Math.ceil(pt.price / (pt.dirty_per_h * 24)) : null;
+                const diminished = ownedOfType > 0 && (pt.bonus_pct || pt.repair_discount_pct);
+                const nextStackPct = ownedOfType >= 2 ? 50 : 70;
+                const buyTip = locked
+                  ? `Desbloqueia ao nível ${pt.min_level} da organização.`
+                  : `Comprar por ${fmtMoney(pt.price)} limpos. Benefício imediato: ${propertyBenefit(pt, 1)}.${
+                      diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do bónus (rendimentos decrescentes).` : ""
+                    }`;
                 return (
                   <div key={key} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                     <div className="flex items-center justify-between">
@@ -185,20 +191,41 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                           </span>
                         )}
                       </p>
-                      <Tip tip={locked ? `Desbloqueia ao nível ${pt.min_level} da organização.` : `Comprar por ${fmtMoney(pt.price)} limpos. Benefício imediato: ${propertyBenefit(pt, 1)}.`} align="end">
-                        <Button
-                          data-testid={`buy-property-${key}`}
-                          onClick={() => buyProperty(key)}
+                      {pt.price >= LARGE_PURCHASE_THRESHOLD ? (
+                        <ConfirmButton
+                          testId={`buy-property-${key}`}
+                          label={fmtMoney(pt.price)}
+                          confirmLabel="Confirmar?"
+                          color="text-cyan-300"
+                          onConfirm={() => buyProperty(key)}
                           disabled={locked || state.player.clean_money < pt.price}
-                          size="sm"
-                          className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
-                        >
-                          {fmtMoney(pt.price)}
-                        </Button>
-                      </Tip>
+                          className="w-auto shrink-0"
+                          tip={buyTip}
+                        />
+                      ) : (
+                        <Tip tip={buyTip} align="end">
+                          <Button
+                            data-testid={`buy-property-${key}`}
+                            onClick={() => buyProperty(key)}
+                            disabled={locked || state.player.clean_money < pt.price}
+                            size="sm"
+                            className="shrink-0 bg-white text-[10px] font-bold uppercase text-black hover:bg-gray-200 disabled:opacity-40"
+                          >
+                            {fmtMoney(pt.price)}
+                          </Button>
+                        </Tip>
+                      )}
                     </div>
                     <p className="mt-1 text-[10px] text-zinc-500">{pt.desc}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, 1)}</p>
+                    {roiDays != null && (
+                      <p className="mt-0.5 font-mono text-[10px] text-cyan-400">Retorno estimado: ~{roiDays} dias de produção</p>
+                    )}
+                    {diminished && (
+                      <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-amber-400">
+                        Já tens {ownedOfType} — próxima unidade rende {nextStackPct}% do bónus
+                      </p>
+                    )}
                   </div>
                 );
               })}
