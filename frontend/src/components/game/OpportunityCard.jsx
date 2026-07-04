@@ -268,7 +268,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       ) : (
         <>
           <div className="mt-3 max-h-36 space-y-1 overflow-y-auto">
-            {state.teams.map((t) => {
+            {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
+                jogador não precisa de percorrer bloqueadas para achar a boa. */}
+            {[...state.teams]
+              .sort((a, b) => {
+                if (a.id === recommendedTeamId) return -1;
+                if (b.id === recommendedTeamId) return 1;
+                const rank = (t) => (readiness(t).ok ? 0 : 1);
+                return rank(a) - rank(b);
+              })
+              .map((t) => {
               const r = readiness(t);
               const match = t.spec === opp.category || opp.category === "especial";
               const fix = !r.ok ? fixFor(t, r) : null;

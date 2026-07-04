@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
+import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch } from "../../lib/game";
+import { Tip, Kpi, SummaryStrip, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users } from "lucide-react";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users, Search } from "lucide-react";
 
 const VStat = ({ label, value }) => (
   <div className="rounded bg-black/40 px-1.5 py-1 text-center">
@@ -14,8 +14,12 @@ const VStat = ({ label, value }) => (
 );
 
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle, buyProperty } = useGame();
+  const {
+    state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
+    renameVehicle, buyProperty, favoriteVehicleIds, toggleFavoriteVehicle,
+  } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
+  const [query, setQuery] = useState("");
   if (!state) return null;
   const caps = state.caps.vehicles;
 
@@ -27,6 +31,28 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
     return t && t.status !== "idle";
   };
   const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
+
+  const repairableIds = state.vehicles.filter((v) => !vehicleBusy(v) && v.condition < 99.5).map((v) => v.id);
+  const repairAllCost = state.vehicles
+    .filter((v) => repairableIds.includes(v.id))
+    .reduce((a, v) => a + Math.max(50, Math.round((100 - v.condition) * v.price * 0.002)), 0);
+  const repairAll = () => repairableIds.forEach((id) => repairVehicle(id));
+
+  const filteredVehicles = state.vehicles.filter((v) =>
+    matchesSearch(query, v.name, catalog?.vehicle_models?.[v.model_key]?.name || v.model_key)
+  );
+  // Disponibilidade primeiro: favoritos, depois operacionais, depois em operação, por fim os que precisam de atenção.
+  const sortedVehicles = [...filteredVehicles].sort((a, b) => {
+    const favA = favoriteVehicleIds.includes(a.id) ? 0 : 1;
+    const favB = favoriteVehicleIds.includes(b.id) ? 0 : 1;
+    if (favA !== favB) return favA - favB;
+    const rank = (v) => {
+      if (vehicleBusy(v)) return 1;
+      if (v.condition < 30 || v.fuel_l < v.tank_l * 0.12) return 2;
+      return 0;
+    };
+    return rank(a) - rank(b);
+  });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -59,8 +85,43 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
           );
         })()}
 
-        <div className="mt-4 space-y-2" data-testid="fleet-list">
-          {state.vehicles.map((v) => {
+        <div className="mt-3 flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
+            <input
+              data-testid="fleet-search"
+              value={query}
+              onChange={(ev) => setQuery(ev.target.value)}
+              placeholder="Pesquisar veículo..."
+              className="w-full rounded border border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+            />
+          </div>
+          {repairableIds.length > 0 && (
+            <Tip tip={`Repara todos os veículos disponíveis abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}>
+              <button
+                data-testid="fleet-repair-all"
+                onClick={repairAll}
+                disabled={state.player.clean_money < repairAllCost}
+                className="flex shrink-0 items-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-white/5 disabled:opacity-40"
+              >
+                <Wrench size={11} /> Reparar todos
+              </button>
+            </Tip>
+          )}
+        </div>
+
+        <div className="mt-3 space-y-2" data-testid="fleet-list">
+          {state.vehicles.length === 0 && (
+            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+              Ainda não tens veículos — compra o primeiro no stand abaixo.
+            </p>
+          )}
+          {state.vehicles.length > 0 && sortedVehicles.length === 0 && (
+            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+              Nenhum veículo corresponde à pesquisa.
+            </p>
+          )}
+          {sortedVehicles.map((v) => {
             const team = teamOf(v);
             const members = team ? teamMembersList(team.id) : [];
             const busy = vehicleBusy(v);
@@ -86,6 +147,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
+                      <FavoriteStar testId={`vehicle-favorite-${v.id}`} active={favoriteVehicleIds.includes(v.id)} onToggle={() => toggleFavoriteVehicle(v.id)} />
                       <InlineRename
                         testId={`vehicle-rename-${v.id}`} value={v.name} onSave={(name) => renameVehicle(v.id, name)}
                         textClassName="text-sm font-bold text-white"
@@ -151,7 +213,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   <div>
                     <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
                       <span>Condição</span>
-                      <span>{Math.round(v.condition)}%</span>
+                      <Tip tip={`${Math.round(v.condition)}% de condição.`}>
+                        <span style={{ color: conditionBand(v.condition).color }}>{conditionBand(v.condition).label}</span>
+                      </Tip>
                     </div>
                     <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
                       <div
@@ -205,16 +269,17 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Wrench size={11} /> {fmtMoney(repairCost)}
                     </button>
                   </Tip>
-                  <Tip tip={`Vender este veículo por ${fmtMoney(sellValue)} (40% do preço × condição). Ação irreversível.`} block className="flex-1">
-                    <button
-                      data-testid={`sell-vehicle-${v.id}`}
-                      onClick={() => sellVehicle(v.id)}
-                      disabled={busy}
-                      className="flex w-full items-center justify-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-red-400 transition-colors hover:bg-white/5 disabled:opacity-40"
-                    >
-                      <Trash2 size={11} /> {fmtMoney(sellValue)}
-                    </button>
-                  </Tip>
+                  <ConfirmButton
+                    testId={`sell-vehicle-${v.id}`}
+                    icon={Trash2}
+                    label={fmtMoney(sellValue)}
+                    confirmLabel="Vender?"
+                    color="text-red-400"
+                    onConfirm={() => sellVehicle(v.id)}
+                    disabled={busy}
+                    className="flex-1"
+                    tip={`Vender este veículo por ${fmtMoney(sellValue)} (40% do preço × condição). Ação irreversível.`}
+                  />
                 </div>
 
                 <button

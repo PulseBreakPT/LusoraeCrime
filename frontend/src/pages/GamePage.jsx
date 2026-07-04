@@ -47,10 +47,15 @@ export default function GamePage() {
   if (alerts.injured) hrTipParts.push(`${alerts.injured} ferido(s)`);
   if (alerts.arrested) hrTipParts.push(`${alerts.arrested} preso(s)`);
   if (alerts.exhausted) hrTipParts.push(`${alerts.exhausted} exausto(s)`);
+  if (alerts.nearExhausted) hrTipParts.push(`${alerts.nearExhausted} perto da exaustão`);
   if (alerts.betrayal) hrTipParts.push(`${alerts.betrayal} risco de traição`);
+  if (alerts.payrollDueSoon) hrTipParts.push("salários por pagar em breve");
   const fleetTipParts = [];
   if (alerts.lowFuel) fleetTipParts.push(`${alerts.lowFuel} sem combustível`);
   if (alerts.damaged) fleetTipParts.push(`${alerts.damaged} avariado(s)`);
+  if (alerts.nearBreakdown) fleetTipParts.push(`${alerts.nearBreakdown} perto de avariar`);
+  const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollDueSoon ? 1 : 0);
+  const fleetAlertCount = alerts.fleet + alerts.nearBreakdown;
 
   return (
     <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-[#050505]">
@@ -112,14 +117,14 @@ export default function GamePage() {
         />
         <HudButton
           testId="open-employees-button" icon={IdCard} label="RH" color="text-emerald-400"
-          badge={alerts.hr} badgeColor={NOTIFY_COLOR}
-          tip={alerts.hr > 0 ? `Plantel precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o plantel leal."}
+          badge={hrAlertCount} badgeColor={NOTIFY_COLOR}
+          tip={hrAlertCount > 0 ? `Plantel precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o plantel leal."}
           onClick={() => setOpenPanel("employees")}
         />
         <HudButton
           testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400"
-          badge={alerts.fleet} badgeColor="#D97706"
-          tip={alerts.fleet > 0 ? `Frota precisa de atenção: ${fleetTipParts.join(" · ")}.` : "Abastecer, reparar, comprar e atribuir veículos às equipas."}
+          badge={fleetAlertCount} badgeColor="#D97706"
+          tip={fleetAlertCount > 0 ? `Frota precisa de atenção: ${fleetTipParts.join(" · ")}.` : "Abastecer, reparar, comprar e atribuir veículos às equipas."}
           onClick={() => setOpenPanel("fleet")}
         />
         <HudButton

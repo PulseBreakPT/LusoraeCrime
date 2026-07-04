@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { formatApiErrorDetail } from "../lib/game";
+import { usePersistedState } from "../lib/persist";
 
 const GameContext = createContext(null);
 
@@ -12,6 +13,17 @@ export function GameProvider({ children }) {
   const [catalog, setCatalog] = useState(null);
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
+  const prevTeamsRef = useRef(null);
+  const [justReturnedTeamIds, setJustReturnedTeamIds] = useState([]);
+  const [favoriteTeamIds, setFavoriteTeamIds] = usePersistedState("favTeams", []);
+  const [favoriteEmployeeIds, setFavoriteEmployeeIds] = usePersistedState("favEmployees", []);
+  const [favoriteVehicleIds, setFavoriteVehicleIds] = usePersistedState("favVehicles", []);
+
+  const toggleInList = (setter) => (id) =>
+    setter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleFavoriteTeam = toggleInList(setFavoriteTeamIds);
+  const toggleFavoriteEmployee = toggleInList(setFavoriteEmployeeIds);
+  const toggleFavoriteVehicle = toggleInList(setFavoriteVehicleIds);
 
   const refresh = useCallback(async () => {
     if (fetchingRef.current) return;
@@ -19,6 +31,24 @@ export function GameProvider({ children }) {
     try {
       const { data } = await api.get("/game/state");
       offsetRef.current = Date.parse(data.server_time) - Date.now();
+      // Deteta equipas que acabaram de regressar (transição de "em operação" para
+      // "na base") para dar um destaque temporário e avisar o jogador — ignora o
+      // primeiro carregamento (sem estado anterior) para não disparar à toa.
+      if (prevTeamsRef.current) {
+        const returned = data.teams.filter((t) => {
+          const prevStatus = prevTeamsRef.current[t.id];
+          return prevStatus && prevStatus !== "idle" && t.status === "idle";
+        });
+        if (returned.length > 0) {
+          returned.forEach((t) => toast.info(`${t.name} regressou e está pronta`));
+          setJustReturnedTeamIds((prev) => [...new Set([...prev, ...returned.map((t) => t.id)])]);
+          setTimeout(() => {
+            const ids = returned.map((t) => t.id);
+            setJustReturnedTeamIds((prev) => prev.filter((id) => !ids.includes(id)));
+          }, 8000);
+        }
+      }
+      prevTeamsRef.current = Object.fromEntries(data.teams.map((t) => [t.id, t.status]));
       setState(data);
     } catch (e) {
       // silent poll failure
@@ -136,7 +166,9 @@ export function GameProvider({ children }) {
       value={{
         state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
         recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity, recommendRepeatForTeam,
-        toggleFavoriteType,
+        toggleFavoriteType, justReturnedTeamIds,
+        favoriteTeamIds, toggleFavoriteTeam, favoriteEmployeeIds, toggleFavoriteEmployee,
+        favoriteVehicleIds, toggleFavoriteVehicle,
         recruitEmployee, refreshPool, assignEmployee, trainEmployee, restEmployee,
         promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
         buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle, renameVehicle,

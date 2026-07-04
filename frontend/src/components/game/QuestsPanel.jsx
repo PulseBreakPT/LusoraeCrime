@@ -4,6 +4,7 @@ import {
   fmtMoney, fmtDuration, QUEST_STATUS_LABELS, QUEST_STATUS_COLORS,
   DIFFICULTY_LABELS, DIFFICULTY_COLORS, CHAPTER_LABELS, QUEST_TYPE_LABELS,
 } from "../../lib/game";
+import { usePersistedState } from "../../lib/persist";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles, ArrowRight } from "lucide-react";
 
@@ -173,13 +174,14 @@ const TABS = [
 ];
 
 export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, serverNow } = useGame();
-  const [tab, setTab] = useState("historia");
+  const { state, serverNow, claimQuest } = useGame();
+  const [tab, setTab] = usePersistedState("questsTab", "historia");
   useTick(open);
   if (!state) return null;
 
   const quests = state.quests || [];
   const close = () => onOpenChange(false);
+  const claimAll = () => quests.filter((q) => q.status === "completed").forEach((q) => claimQuest(q.id));
 
   const principals = quests.filter((q) => q.type === "principal").sort((a, b) => a.order - b.order);
   const featured = principals.find((q) => q.status === "completed") || principals.find((q) => q.status === "active");
@@ -216,8 +218,17 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-red-500" /> Missões
             {claimable > 0 && (
-              <span className="ml-auto rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300" data-testid="claimable-count">
-                {claimable} por reclamar
+              <span className="ml-auto flex items-center gap-1.5">
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300" data-testid="claimable-count">
+                  {claimable} por reclamar
+                </span>
+                <button
+                  data-testid="quests-claim-all"
+                  onClick={claimAll}
+                  className="flex items-center gap-1 rounded bg-emerald-500 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black transition-colors hover:bg-emerald-400"
+                >
+                  <Gift size={10} /> Tudo
+                </button>
               </span>
             )}
           </SheetTitle>

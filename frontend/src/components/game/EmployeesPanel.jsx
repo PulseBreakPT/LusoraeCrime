@@ -3,13 +3,15 @@ import { useGame } from "../../context/GameContext";
 import {
   fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, STATUS_LABELS,
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
+  matchesSearch,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
+import { usePersistedState } from "../../lib/persist";
+import { Tip, Kpi, SummaryStrip, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
-  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf,
+  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -71,6 +73,7 @@ const EmployeeCard = ({ e }) => {
   const {
     state, catalog, serverNow, assignEmployee, trainEmployee, restEmployee,
     promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
+    favoriteEmployeeIds, toggleFavoriteEmployee,
   } = useGame();
   const [manage, setManage] = useState(false);
   const [course, setCourse] = useState("");
@@ -103,6 +106,7 @@ const EmployeeCard = ({ e }) => {
     missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
   }
 
+  const isNearExhausted = e.status === "idle" && e.fatigue >= 55 && e.fatigue < 70;
   const rankIdx = Math.max(0, catalog.ranks.indexOf(e.rank));
   const isTopRank = rankIdx >= catalog.ranks.length - 1;
   const nextRankReq = isTopRank ? null : catalog.rank_req_level[rankIdx + 1];
@@ -122,6 +126,7 @@ const EmployeeCard = ({ e }) => {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
+            <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
             <InlineRename
               testId={`emp-rename-${e.id}`} value={e.name} onSave={(name) => renameEmployee(e.id, name)}
               textClassName="text-sm font-bold text-white"
@@ -141,6 +146,13 @@ const EmployeeCard = ({ e }) => {
               <Tip tip={`Muito utilizado (${e.missions_done} missões) — cansa-se mais depressa e precisa de descansar com mais frequência.`}>
                 <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-orange-400">
                   <BatteryMedium size={9} /> veterano
+                </span>
+              </Tip>
+            )}
+            {isNearExhausted && (
+              <Tip tip="Fadiga a aproximar-se do limiar de exaustão (70%) — manda descansar antes que fique indisponível.">
+                <span data-testid={`emp-near-exhausted-${e.id}`} className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-amber-400">
+                  <BatteryMedium size={9} /> cansado
                 </span>
               </Tip>
             )}
@@ -303,10 +315,10 @@ const EmployeeCard = ({ e }) => {
               onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
               title="+15 moral, +10 lealdade"
             />
-            <ActionBtn
-              testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} color="text-red-400"
-              onClick={() => fireEmployee(e.id)} disabled={e.status === "on_mission" || money < fireCost}
-              title="Indemnização de 3 salários. Baixa a moral dos restantes."
+            <ConfirmButton
+              testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?" color="text-red-400"
+              onConfirm={() => fireEmployee(e.id)} disabled={e.status === "on_mission" || money < fireCost}
+              tip="Indemnização de 3 salários. Baixa a moral dos restantes. Ação irreversível."
             />
           </div>
 
@@ -408,8 +420,10 @@ const CandidateCard = ({ c }) => {
 };
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, refreshPool, buyProperty } = useGame();
-  const [tab, setTab] = useState("roster");
+  const { state, catalog, serverNow, refreshPool, buyProperty, restEmployee, favoriteEmployeeIds } = useGame();
+  const [tab, setTab] = usePersistedState("empTab", "roster");
+  const [query, setQuery] = useState("");
+  const [hideUnavailable, setHideUnavailable] = usePersistedState("empHideUnavailable", true);
   useTick(open);
   if (!state || !catalog) return null;
 
@@ -424,6 +438,26 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   (state.candidates || []).forEach((c) => {
     (grouped[c.source] = grouped[c.source] || []).push(c);
   });
+
+  const restAllIds = state.employees.filter((e) => e.status === "idle" && e.fatigue >= 15).map((e) => e.id);
+  const restAll = () => restAllIds.forEach((id) => restEmployee(id));
+
+  const searched = state.employees.filter((e) =>
+    matchesSearch(query, e.name, catalog.specializations[e.role_key]?.name || e.role_key)
+  );
+  const unavailableHidden = hideUnavailable
+    ? searched.filter((e) => e.status === "idle" || favoriteEmployeeIds.includes(e.id))
+    : searched;
+  // Favoritos sempre no topo; depois disponíveis primeiro (o jogador quer ver
+  // quem pode operar já), indisponíveis por último.
+  const sortedEmployees = [...unavailableHidden].sort((a, b) => {
+    const favA = favoriteEmployeeIds.includes(a.id) ? 0 : 1;
+    const favB = favoriteEmployeeIds.includes(b.id) ? 0 : 1;
+    if (favA !== favB) return favA - favB;
+    const rank = (e) => (e.status === "idle" ? 0 : 1);
+    return rank(a) - rank(b);
+  });
+  const hiddenCount = searched.length - unavailableHidden.length;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -535,13 +569,54 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         </div>
 
         {tab === "roster" && (
-          <div className="mt-3 space-y-2" data-testid="employees-list">
-            {state.employees.length === 0 && (
+          <div className="mt-3">
+            {state.employees.length === 0 ? (
               <p className="font-mono text-[11px] text-zinc-600">Sem funcionários. Vai à aba Recrutar.</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <div className="relative flex-1">
+                    <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
+                    <input
+                      data-testid="employees-search"
+                      value={query}
+                      onChange={(ev) => setQuery(ev.target.value)}
+                      placeholder="Pesquisar funcionário..."
+                      className="w-full rounded border border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+                    />
+                  </div>
+                  <Tip tip={hideUnavailable ? "A mostrar só disponíveis (e favoritos) — clica para ver todos." : "A mostrar todos — clica para esconder indisponíveis."}>
+                    <button
+                      data-testid="employees-toggle-unavailable"
+                      onClick={() => setHideUnavailable(!hideUnavailable)}
+                      className="flex shrink-0 items-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-zinc-400 transition-colors hover:bg-white/5"
+                    >
+                      {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
+                      {hideUnavailable && hiddenCount > 0 ? ` +${hiddenCount}` : ""}
+                    </button>
+                  </Tip>
+                  {restAllIds.length > 0 && (
+                    <Tip tip={`Manda descansar todos os funcionários disponíveis com fadiga (${restAllIds.length}).`}>
+                      <button
+                        data-testid="employees-rest-all"
+                        onClick={restAll}
+                        className="flex shrink-0 items-center gap-1 rounded border border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 transition-colors hover:bg-white/5"
+                      >
+                        <BedDouble size={11} /> Descansar todos
+                      </button>
+                    </Tip>
+                  )}
+                </div>
+                <div className="mt-2 space-y-2" data-testid="employees-list">
+                  {sortedEmployees.length === 0 && (
+                    <p className="font-mono text-[11px] text-zinc-600">Nenhum funcionário corresponde aos filtros.</p>
+                  )}
+                  {sortedEmployees.map((e) => (
+                    <EmployeeCard key={e.id} e={e} />
+                  ))}
+                </div>
+              </>
             )}
-            {state.employees.map((e) => (
-              <EmployeeCard key={e.id} e={e} />
-            ))}
           </div>
         )}
 
@@ -564,6 +639,9 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
             {Object.entries(catalog.recruit_sources).map(([key, src]) => {
               const locked = state.player.level < src.min_level;
               const cands = grouped[key] || [];
+              // Secções desbloqueadas e sem candidatos colapsam-se sozinhas — só as
+              // bloqueadas ficam sempre visíveis (mostram o que falta desbloquear).
+              if (!locked && cands.length === 0) return null;
               return (
                 <div key={key} className="mb-4">
                   <h3 className="mb-1.5 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
@@ -576,8 +654,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                   </h3>
                   {locked ? (
                     <p className="font-mono text-[10px] text-zinc-600">Sobe de nível para desbloquear esta fonte de recrutamento.</p>
-                  ) : cands.length === 0 ? (
-                    <p className="font-mono text-[10px] text-zinc-600">Sem candidatos de momento.</p>
                   ) : (
                     <div className="space-y-2">
                       {cands.map((c) => (
