@@ -95,6 +95,8 @@ async def _state_value(db, player, ctx, metric):
         return sum(1 for p in ctx["props"] if p["type_key"] == t)
     if metric == "vehicle_count":
         return len(ctx["vehicles"])
+    if metric == "property_count":
+        return len(ctx["props"])
     if metric == "active_ops":
         return await db.missions.count_documents({
             "player_id": str(player["_id"]), "phase": {"$in": ["en_route", "operating"]},
