@@ -13,7 +13,10 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        REORG_AFTER_MISSION_S, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
                        TEAM_MAX_MEMBERS, VEHICLE_CONDITION_PENALTY_THRESHOLD,
                        VEHICLE_CONDITION_PENALTY_MAX, VEHICLE_MATCH_BONUS, DISCREET_CATEGORIES,
-                       LUXURY_HEAT_MULT, WEAR_KM_RAMP, WEAR_KM_MAX_MULT)
+                       LUXURY_HEAT_MULT, WEAR_KM_RAMP, WEAR_KM_MAX_MULT,
+                       NEWBIE_RAMP_S, NEWBIE_PENALTY_MAX, HIGH_MORALE_THRESHOLD, HIGH_MORALE_BONUS,
+                       LOW_MORALE_ABSENCE_THRESHOLD, ABSENCE_CHANCE_PER_MIN, ABSENCE_DURATION_S,
+                       FULL_ENERGY_FATIGUE_MAX, FULL_ENERGY_XP_BONUS, XP_DECAY_IDLE_DAYS, XP_DECAY_PER_MIN)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -350,7 +353,9 @@ def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_
                     "veiculo": round(vehicle_bonus, 4)}
 
 
-def team_effectiveness(members, category):
+def team_effectiveness(members, category, now=None):
+    now = now or now_utc()
+
     def eff(e):
         attrs = e.get("attrs") or {}
         aks = CATEGORY_ATTRS.get(category)
@@ -359,12 +364,22 @@ def team_effectiveness(members, category):
         else:
             attr = sum(attrs.values()) / max(1, len(attrs)) if attrs else 2
         match = e.get("spec") == category or category == "especial"
-        morale_f = 0.75 + e.get("morale", 70) / 400
+        morale = e.get("morale", 70)
+        morale_f = 0.75 + morale / 400
+        if morale >= HIGH_MORALE_THRESHOLD:
+            morale_f += HIGH_MORALE_BONUS
         try:
             rank_f = 1 + 0.02 * RANKS.index(e.get("rank", "recruta"))
         except ValueError:
             rank_f = 1.0
-        return (e["level"] * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * (1 - e["fatigue"] / 250) * morale_f * rank_f
+        # Recém-contratados ainda se estão a adaptar — pequena penalização que
+        # desvanece nas primeiras horas ao serviço.
+        newbie_f = 1.0
+        hired_at = e.get("hired_at")
+        if hired_at:
+            elapsed_s = max(0.0, (now - parse_dt(hired_at)).total_seconds())
+            newbie_f -= NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+        return (e["level"] * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * (1 - e["fatigue"] / 250) * morale_f * rank_f * newbie_f
     return sum(eff(e) for e in members) / len(members) + 0.3 * (len(members) - 1)
 
 
@@ -586,6 +601,9 @@ async def _crew_returns(db, m, outcome):
         else:
             xp_gain = max(1, int(t["respect"] * 0.2))
             d_morale, d_loyal = -6, -2
+        # Foi para a operação com a energia (fadiga) no máximo: pequeno bónus de XP.
+        if emp["fatigue"] <= FULL_ENERGY_FATIGUE_MAX:
+            xp_gain = int(xp_gain * (1 + FULL_ENERGY_XP_BONUS))
         xp = emp["xp"] + xp_gain
         rarity = emp.get("rarity", "comum")
         new_level = emp_level_for(xp, rarity)
@@ -595,6 +613,7 @@ async def _crew_returns(db, m, outcome):
             "fatigue": min(100.0, emp["fatigue"] + (12 + t["risk"] * 4) * fat_mult),
             "morale": max(0.0, min(100.0, emp.get("morale", 70) + d_morale)),
             "loyalty": max(0.0, min(100.0, emp.get("loyalty", 70) + d_loyal)),
+            "last_mission_at": now_utc().isoformat(),
         }
         if new_level > emp["level"]:
             sp = SPECIALIZATIONS.get(emp["role_key"])
@@ -733,7 +752,7 @@ async def _complete_trainings(db, player, now):
 
 
 async def _process_statuses(db, pid, now):
-    docs = await db.employees.find({"player_id": pid, "status": {"$in": ["resting", "injured", "arrested"]}}).to_list(300)
+    docs = await db.employees.find({"player_id": pid, "status": {"$in": ["resting", "injured", "arrested", "absent"]}}).to_list(300)
     for e in docs:
         su = e.get("status_until")
         if not su or parse_dt(su) > now:
@@ -745,6 +764,8 @@ async def _process_statuses(db, pid, now):
             msg = f"{e['name']} terminou o descanso."
         elif e["status"] == "injured":
             msg = f"{e['name']} recuperou dos ferimentos."
+        elif e["status"] == "absent":
+            msg = f"{e['name']} voltou ao trabalho."
         else:
             sets["morale"] = max(0.0, e.get("morale", 70) - 5)
             msg = f"{e['name']} cumpriu a pena e saiu da prisão."
@@ -815,6 +836,44 @@ async def _process_betrayals(db, player, employees, minutes):
         await push_history(db, e["_id"], f"Traição: {kind}.")
         await add_event(db, pid, "police", msg)
         break
+
+
+async def _process_absences(db, player, employees, minutes, now):
+    """Moral muito baixa pode levar um funcionário a faltar ao trabalho por um tempo."""
+    if minutes <= 0:
+        return
+    pid = str(player["_id"])
+    for e in employees:
+        if e.get("status") != "idle" or e.get("morale", 70) >= LOW_MORALE_ABSENCE_THRESHOLD:
+            continue
+        prob = min(0.5, minutes * ABSENCE_CHANCE_PER_MIN)
+        if random.random() >= prob:
+            continue
+        until = (now + timedelta(seconds=ABSENCE_DURATION_S)).isoformat()
+        await db.employees.update_one({"_id": e["_id"]}, {"$set": {"status": "absent", "status_until": until}})
+        await push_history(db, e["_id"], "Faltou ao trabalho — moral demasiado baixa.")
+        await add_event(db, pid, "team", f"{e['name']} faltou ao trabalho — moral demasiado baixa.")
+        break
+
+
+async def _process_xp_decay(db, player, employees, minutes, now):
+    """Quem fica muitos dias sem participar numa missão perde alguma experiência
+    prática — nunca abaixo do mínimo exigido para o nível atual."""
+    if minutes <= 0:
+        return
+    for e in employees:
+        last = e.get("last_mission_at") or e.get("hired_at")
+        if not last:
+            continue
+        idle_days = (now - parse_dt(last)).total_seconds() / 86400
+        if idle_days < XP_DECAY_IDLE_DAYS:
+            continue
+        level = max(1, e.get("level", 1))
+        floor_xp = EMP_LEVEL_XP[min(level - 1, len(EMP_LEVEL_XP) - 1)]
+        loss = XP_DECAY_PER_MIN * minutes
+        new_xp = int(max(floor_xp, e["xp"] - loss))
+        if new_xp < e["xp"]:
+            await db.employees.update_one({"_id": e["_id"]}, {"$set": {"xp": new_xp}})
 
 
 async def _refresh_recruitment_pool(db, player, now):
@@ -941,6 +1000,8 @@ async def advance(db, player):
 
     await _process_payroll(db, player, employees, now)
     await _process_betrayals(db, player, employees, minutes)
+    await _process_absences(db, player, employees, minutes, now)
+    await _process_xp_decay(db, player, employees, minutes, now)
     await _refresh_recruitment_pool(db, player, now)
 
     props = await db.properties.find({"player_id": pid}).to_list(200)

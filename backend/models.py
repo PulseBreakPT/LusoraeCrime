@@ -78,6 +78,7 @@ class Employee(BaseDocument):
     training: Optional[dict] = None
     history: List[dict] = []
     hired_at: str
+    last_mission_at: Optional[str] = None
 
 
 class Candidate(BaseDocument):
