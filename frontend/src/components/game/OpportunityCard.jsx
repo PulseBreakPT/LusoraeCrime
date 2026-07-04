@@ -7,7 +7,7 @@ import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, 
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const {
-    state, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
+    state, catalog, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
     recommendTeamForOpportunity,
   } = useGame();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
@@ -83,6 +83,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
     if (!vehicle) return { ok: false, reason: "Sem veículo" };
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
+    const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
+    if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
     const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
     if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
     return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle };
@@ -310,7 +312,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   {Math.round(preview.chance * 100)}%
                 </p>
               </div>
-              <div className="mt-1 grid grid-cols-5 gap-1">
+              <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-6">
                 <PreviewFactor label="Risco" value={preview.breakdown.risco} tip="Penalização base do risco da operação." />
                 <PreviewFactor label="Equipa" value={preview.breakdown.equipa} tip="Competência dos membros nos atributos relevantes." />
                 <PreviewFactor label="Match" value={preview.breakdown.match} tip="Compatibilidade entre a especialização da equipa e a categoria da operação." />
@@ -319,6 +321,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   label="Coord."
                   value={preview.breakdown.coordenacao}
                   tip="Coordenação da equipa: penaliza sem líder (patente de chefe de equipa ou acima) ou com um único membro; premeia veterania (tempo desde a última alteração de membros) e homogeneidade de especialização."
+                />
+                <PreviewFactor
+                  label="Veíc."
+                  value={preview.breakdown.veiculo}
+                  tip="Veículo: pouca durabilidade penaliza (risco de algo correr mal); um veículo adequado ao tipo de operação ajuda."
                 />
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">

@@ -11,7 +11,9 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        TEAM_LEADER_MIN_RANK, NO_LEADER_PENALTY, SOLO_MEMBER_PENALTY,
                        UNIFORM_SPEC_BONUS, COORDINATION_BONUS_MAX, COORDINATION_RAMP_S,
                        REORG_AFTER_MISSION_S, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
-                       TEAM_MAX_MEMBERS)
+                       TEAM_MAX_MEMBERS, VEHICLE_CONDITION_PENALTY_THRESHOLD,
+                       VEHICLE_CONDITION_PENALTY_MAX, VEHICLE_MATCH_BONUS, DISCREET_CATEGORIES,
+                       LUXURY_HEAT_MULT, WEAR_KM_RAMP, WEAR_KM_MAX_MULT)
 from quests import process_quests
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
@@ -334,16 +336,18 @@ def effective_speed(vehicle):
     return vehicle["speed"] * (0.6 + 0.4 * c / 50)
 
 
-def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0):
+def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0, vehicle_bonus=0.0):
     base = 0.92
     risk_pen = -risk * 0.07
     skill_bonus = team_skill * 0.05
     heat_pen = -heat * 0.0015
     match_bonus = 0.12 if spec_match else 0.0
-    chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus + talent_bonus + team_bonus))
+    chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus
+                            + talent_bonus + team_bonus + vehicle_bonus))
     return chance, {"base": base, "risco": round(risk_pen, 4), "equipa": round(skill_bonus, 4),
                     "calor": round(heat_pen, 4), "match": round(match_bonus, 4),
-                    "talentos": round(talent_bonus, 4), "coordenacao": round(team_bonus, 4)}
+                    "talentos": round(talent_bonus, 4), "coordenacao": round(team_bonus, 4),
+                    "veiculo": round(vehicle_bonus, 4)}
 
 
 def team_effectiveness(members, category):
@@ -386,6 +390,20 @@ def team_bonus_breakdown(members, category, roster_stable_since, now):
     return total
 
 
+def vehicle_bonus_breakdown(vehicle, category):
+    """Ajustes de chance derivados do veículo: pouca durabilidade aumenta o
+    risco de algo correr mal; um veículo adequado ao tipo de operação ajuda."""
+    total = 0.0
+    condition = vehicle.get("condition", 100)
+    if condition < VEHICLE_CONDITION_PENALTY_THRESHOLD:
+        frac = (VEHICLE_CONDITION_PENALTY_THRESHOLD - condition) / VEHICLE_CONDITION_PENALTY_THRESHOLD
+        total -= VEHICLE_CONDITION_PENALTY_MAX * min(1.0, frac)
+    model = VEHICLE_MODELS.get(vehicle.get("model_key"), {})
+    if category in model.get("best_for", []):
+        total += VEHICLE_MATCH_BONUS
+    return total
+
+
 def _roll_outcome(player, m):
     chance = m.get("success_chance")
     if chance is None:
@@ -401,6 +419,8 @@ def _apply_outcome(player, m, outcome):
     stats["missions_total"] += 1
     stats["by_category"][t["category"]] = stats["by_category"].get(t["category"], 0) + 1
     heat_mult = 0.5 if ("fantasma_digital" in m.get("talents", []) and t["category"] == "tecnica") else 1.0
+    if m.get("vehicle_luxury") and t["category"] in DISCREET_CATEGORIES:
+        heat_mult *= LUXURY_HEAT_MULT
     if outcome == "success":
         # Money is *not* credited here anymore. Store as pending reward — paid on arrival at HQ
         # if the police chase (if any) is escaped.
@@ -614,7 +634,9 @@ async def _crew_returns(db, m, outcome):
     if m.get("vehicle_id"):
         veh = await db.vehicles.find_one({"_id": ObjectId(m["vehicle_id"])})
         if veh:
-            wear = 2 + t["risk"] * 1.5
+            # Veículos com muitos quilómetros acumulados desgastam-se mais depressa por operação.
+            wear_mult = 1 + (WEAR_KM_MAX_MULT - 1) * min(1.0, veh.get("km_total", 0) / WEAR_KM_RAMP)
+            wear = (2 + t["risk"] * 1.5) * wear_mult
             inc = {"missions_done": 1}
             if outcome == "success":
                 inc["missions_success"] = 1

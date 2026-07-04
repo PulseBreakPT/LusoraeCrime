@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useGame } from "../../context/GameContext";
-import { fmtMoney, fmtDuration, STATUS_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
+import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
-import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote } from "lucide-react";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users } from "lucide-react";
 
 const VStat = ({ label, value }) => (
   <div className="rounded bg-black/40 px-1.5 py-1 text-center">
@@ -106,8 +106,8 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       {seats != null && (
                         <>
                           {" · "}
-                          <Tip tip={`Lugares ocupados pela equipa atribuída vs. capacidade do veículo (${seats}).`}>
-                            <span className={members.length > seats ? "text-amber-400" : "text-zinc-500"}>{members.length}/{seats} lugares</span>
+                          <Tip tip={`Lugares ocupados pela equipa atribuída vs. capacidade do veículo (${seats}). Acima da capacidade, o despacho fica bloqueado.`}>
+                            <span className={members.length > seats ? "text-red-400" : "text-zinc-500"}>{members.length}/{seats} lugares</span>
                           </Tip>
                         </>
                       )}
@@ -256,12 +256,35 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                             <Lock size={9} /> Nível {m.min_level}
                           </span>
                         )}
+                        {m.luxury && (
+                          <Tip tip="Veículo de luxo — chama mais a atenção e aumenta o calor gerado em operações discretas.">
+                            <span className="ml-1.5 inline-flex items-center gap-0.5 font-mono text-[9px] uppercase text-purple-300">
+                              <Gem size={9} /> luxo
+                            </span>
+                          </Tip>
+                        )}
                       </p>
                       <p className="font-mono text-[10px] text-zinc-500">
                         {m.speed} m/s · {m.tank_l}L · {m.cons}L/100km ·{" "}
                         <Tip tip="Autonomia máxima com o depósito cheio.">
                           <span className="text-cyan-400">~{Math.round((m.tank_l / m.cons) * 100)} km</span>
                         </Tip>
+                        {" · "}
+                        <Tip tip="Lugares disponíveis para membros da equipa.">
+                          <span className="inline-flex items-center gap-0.5 text-zinc-400">
+                            <Users size={9} /> {m.seats}
+                          </span>
+                        </Tip>
+                        {m.best_for?.length > 0 && (
+                          <>
+                            {" · "}
+                            <Tip tip="Categorias de operação em que este veículo dá um bónus extra de probabilidade de sucesso.">
+                              <span className="text-emerald-400">
+                                ideal: {m.best_for.map((c) => SPEC_LABELS[c] || c).join(", ")}
+                              </span>
+                            </Tip>
+                          </>
+                        )}
                       </p>
                     </div>
                     <Tip tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`} align="end">

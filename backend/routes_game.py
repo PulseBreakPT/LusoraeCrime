@@ -10,8 +10,8 @@ from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
-                    team_effectiveness, team_bonus_breakdown, gen_candidate, employee_from_candidate,
-                    betrayal_risk_of, push_history, gen_attrs, gen_talents)
+                    team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown, gen_candidate,
+                    employee_from_candidate, betrayal_risk_of, push_history, gen_attrs, gen_talents)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
 from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest
@@ -243,6 +243,12 @@ async def _prepare_dispatch(player, opp, team):
         raise HTTPException(status_code=400, detail="Veículo não encontrado")
     if vehicle["condition"] < 30:
         raise HTTPException(status_code=400, detail="O veículo precisa de reparação")
+    seats = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("seats")
+    if seats is not None and len(members) > seats:
+        raise HTTPException(
+            status_code=400,
+            detail=f"O veículo só tem {seats} lugares — tens {len(members)} membros disponíveis. Reduz a equipa ou usa outro veículo.",
+        )
 
     hq = player["hq"]
     dist = haversine_m(hq["lat"], hq["lng"], opp["lat"], opp["lng"])
@@ -277,7 +283,9 @@ async def _prepare_dispatch(player, opp, team):
     team_skill = team_effectiveness(members, opp["category"])
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
     team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
-    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match, talent_bonus, team_bonus)
+    vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
+    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match,
+                                          talent_bonus, team_bonus, vehicle_bonus)
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
@@ -350,6 +358,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "team_skill": round(prep["team_skill"], 2), "spec_match": prep["spec_match"],
         "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
+        "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
         "talents": prep["talents"],
         "opportunity_id": str(opp["_id"]),
         "opportunity": {

@@ -66,6 +66,8 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     if (!vehicle) return { ok: false, reason: "Sem veículo" };
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
     if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
+    const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
+    if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
     return { ok: true, ready: ready.length };
   };
 
@@ -248,10 +250,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <span className="font-mono text-[11px] text-zinc-400">{vehicle ? vehicle.name : "Sem veículo"}</span>
                   )}
                   {vehicle && vehicleSeats != null && (
-                    <Tip tip={`Lugares ocupados pela equipa vs. capacidade do veículo (${vehicleSeats}). Só informativo — não impede o despacho.`}>
+                    <Tip tip={`Lugares ocupados pela equipa vs. capacidade do veículo (${vehicleSeats}). Se a equipa tiver mais membros disponíveis do que lugares, o despacho fica bloqueado.`}>
                       <span
                         data-testid={`team-vehicle-seats-${t.id}`}
-                        className={`shrink-0 font-mono text-[9px] ${members.length > vehicleSeats ? "text-amber-400" : "text-zinc-500"}`}
+                        className={`shrink-0 font-mono text-[9px] ${members.length > vehicleSeats ? "text-red-400" : "text-zinc-500"}`}
                       >
                         {members.length}/{vehicleSeats} lugares
                       </span>
