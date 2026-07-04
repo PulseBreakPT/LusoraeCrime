@@ -6,30 +6,42 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil, Check, X, Star } from "lucide-react";
 import { getDisplayPrefs } from "../../lib/game";
 import { cn } from "../../lib/utils";
-import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
 const SIDE_ALIGN_OFFSET = { top: 6, bottom: 6, left: 6, right: 6 };
 
+// Radix Tooltip só abre com hover/foco — em ecrãs táteis (sem hover) isso
+// deixa os ícones/textos informativos sem forma de mostrar a explicação.
+// Popover resolve isto: abre ao clicar/tocar (e continua a abrir com hover
+// no ambiente secretário), fecha ao clicar fora — tal como funcionava antes.
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
+  const [open, setOpen] = useState(false);
   if (!tip || getDisplayPrefs().showTooltips === false) return children;
   return (
-    <Tooltip delayDuration={250}>
-      <TooltipTrigger asChild>
-        <span className={`${block ? "block" : "inline-flex"} ${className}`}>{children}</span>
-      </TooltipTrigger>
-      <TooltipContent
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span
+          className={`${block ? "block" : "inline-flex"} ${className}`}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {children}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent
         side={side}
         align={align}
         sideOffset={SIDE_ALIGN_OFFSET[side] ?? 6}
-        className="max-w-[16rem] border border-white/10 bg-black/95 font-mono text-[11px] leading-snug text-zinc-200 shadow-2xl backdrop-blur-xl"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="w-auto max-w-[16rem] border-white/10 bg-black/95 p-2 font-mono text-[11px] leading-snug text-zinc-200 shadow-2xl backdrop-blur-xl"
       >
         {tip}
-      </TooltipContent>
-    </Tooltip>
+      </PopoverContent>
+    </Popover>
   );
 };
 
