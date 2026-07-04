@@ -186,7 +186,7 @@ ACTIVE_FOR_PASSIVE = ("idle", "resting", "training", "on_mission")
 
 def org_bonuses(employees):
     b = {"repair_discount": 0.0, "rare_opp": 0.0, "heal": 0.0, "legal": 0.0,
-         "launder_rate": 0.0, "empresa_boost": 0.0, "bribe_discount": 0.0}
+         "launder_rate": 0.0, "empresa_boost": 0.0, "bribe_discount": 0.0, "lab_boost": 0.0}
     for e in employees:
         if e.get("status") not in ACTIVE_FOR_PASSIVE:
             continue
@@ -204,7 +204,7 @@ def org_bonuses(employees):
             elif t == "lingua_de_prata":
                 b["bribe_discount"] += 0.15
     caps = {"repair_discount": 0.5, "rare_opp": 0.3, "heal": 0.6, "legal": 0.6,
-            "launder_rate": 0.2, "empresa_boost": 0.75, "bribe_discount": 0.4}
+            "launder_rate": 0.2, "empresa_boost": 0.75, "bribe_discount": 0.4, "lab_boost": 0.6}
     return {k: round(min(v, caps[k]), 3) for k, v in b.items()}
 
 
@@ -1120,14 +1120,17 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
     dirty_rate = 0
     heat_rate = 0
     launder_rate = 0
+    # Químicos na equipa tornam os laboratórios mais produtivos.
+    lab_mult = 1 + bonuses.get("lab_boost", 0)
     for p in props:
         if not property_active(p, now):
             continue
         pt = PROPERTY_TYPES[p["type_key"]]
         factor = property_condition_factor(p)
         if pt.get("dirty_per_h"):
-            share = pt["dirty_per_h"] * p["level"] * factor * hours
-            dirty_rate += pt["dirty_per_h"] * p["level"] * factor
+            rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult
+            share = rate * hours
+            dirty_rate += rate
             await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_dirty_generated": share}})
         if pt.get("heat_per_h"):
             heat_rate += pt["heat_per_h"] * p["level"] * factor

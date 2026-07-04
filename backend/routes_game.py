@@ -1008,8 +1008,9 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     bonuses = await get_org_bonuses(db, pid)
     now = now_utc()
     prop_ranks = property_stack_ranks(props)
+    oficina_pct = PROPERTY_TYPES["oficina"]["repair_discount_pct"]
     discount = min(0.6, sum(
-        0.15 * p["level"] * property_condition_factor(p) * property_stack_mult(prop_ranks[p["_id"]])
+        oficina_pct * p["level"] * property_condition_factor(p) * property_stack_mult(prop_ranks[p["_id"]])
         for p in props if p["type_key"] == "oficina" and property_active(p, now)
     ) + bonuses["repair_discount"])
     cost = max(50, int(missing * vehicle["price"] * 0.002 * (1 - discount)))

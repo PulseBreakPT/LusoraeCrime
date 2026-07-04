@@ -93,7 +93,7 @@ SPECIALIZATIONS = {
     "chantagista": {"name": "Chantagista", "spec": "influencia", "attrs": ["negociacao", "discricao"], "salary": 270,
                     "desc": "Encontra e explora os segredos de quem manda."},
     "quimico": {"name": "Químico", "spec": "suporte", "attrs": ["inteligencia", "resistencia"], "salary": 350,
-                "desc": "Especialista em produção e processamento clandestino."},
+                "desc": "Passivo: +20% produção de dinheiro sujo dos laboratórios.", "passive": {"lab_boost": 0.20}},
     "recrutador": {"name": "Recrutador", "spec": "suporte", "attrs": ["negociacao", "discricao"], "salary": 260,
                    "desc": "Passivo: +5% oportunidades raras (bom faro para talento).", "passive": {"rare_opp": 0.05}},
 }
@@ -111,14 +111,18 @@ RANKS = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equi
 RANK_REQ_LEVEL = [1, 2, 3, 4, 6, 8, 10]
 
 TALENTS = {
-    "motorista_fantasma": {"name": "Motorista Fantasma", "desc": "-10% tempo de viagem", "roles": ["motorista", "contrabandista"]},
+    "motorista_fantasma": {"name": "Motorista Fantasma", "desc": "-10% tempo de viagem",
+                          "roles": ["motorista", "contrabandista", "piloto", "estafeta"]},
     "contabilista_sujo": {"name": "Contabilista Sujo", "desc": "+15% lavagem de dinheiro", "roles": ["lavador", "gestor"]},
-    "olhos_na_rua": {"name": "Olhos na Rua", "desc": "+10% oportunidades raras", "roles": ["informador", "espiao"]},
+    "olhos_na_rua": {"name": "Olhos na Rua", "desc": "+10% oportunidades raras", "roles": ["informador", "espiao", "recrutador"]},
     "mecanico_elite": {"name": "Mecânico de Elite", "desc": "-20% custo de reparação", "roles": ["mecanico"]},
-    "pontaria_letal": {"name": "Pontaria Letal", "desc": "+5% sucesso em assaltos", "roles": ["assaltante", "seguranca"]},
+    "pontaria_letal": {"name": "Pontaria Letal", "desc": "+5% sucesso em assaltos",
+                       "roles": ["assaltante", "seguranca", "franco_atirador", "arrombador"]},
     "rei_da_noite": {"name": "Rei da Noite", "desc": "-20% fadiga em missões", "roles": []},
-    "lingua_de_prata": {"name": "Língua de Prata", "desc": "-15% custo de subornos", "roles": ["negociador", "advogado"]},
-    "fantasma_digital": {"name": "Fantasma Digital", "desc": "-50% calor em operações técnicas", "roles": ["hacker", "falsificador", "espiao"]},
+    "lingua_de_prata": {"name": "Língua de Prata", "desc": "-15% custo de subornos",
+                       "roles": ["negociador", "advogado", "relacoes_publicas", "chantagista"]},
+    "fantasma_digital": {"name": "Fantasma Digital", "desc": "-50% calor em operações técnicas",
+                        "roles": ["hacker", "falsificador", "espiao", "engenheiro_social", "criptografo"]},
 }
 
 RECRUIT_SOURCES = {
@@ -333,7 +337,7 @@ OPPORTUNITY_TYPES = {
                           "respect": 120, "heat": 14, "risk": 4, "duration_s": (120, 220), "weight": 4, "pays": "dirty"},
     "operacao_vip": {"name": "Operação VIP", "category": "influencia", "min_level": 4, "base_reward": 16000,
                      "respect": 160, "heat": 12, "risk": 4, "duration_s": (150, 260), "weight": 3, "pays": "dirty",
-                     "hours": (22, 5)},
+                     "hours": (22, 5), "required_models": ["berlina_blindada", "limousine"]},
     "missao_especial": {"name": "Missão Especial", "category": "especial", "min_level": 5, "base_reward": 25000,
                         "respect": 260, "heat": 16, "risk": 5, "duration_s": (180, 300), "weight": 2, "pays": "dirty"},
     "entrega_expressa": {"name": "Entrega Expressa", "category": "logistica", "min_level": 1, "base_reward": 2200,
@@ -363,7 +367,8 @@ OPPORTUNITY_TYPES = {
                          "respect": 95, "heat": 12, "risk": 4, "duration_s": (110, 190), "weight": 4, "pays": "dirty",
                          "required_models": ["suv_blindado"]},
     "emboscada_rival": {"name": "Emboscada a Rival", "category": "assalto", "min_level": 3, "base_reward": 8800,
-                        "respect": 88, "heat": 11, "risk": 3, "duration_s": (90, 160), "weight": 5, "pays": "dirty"},
+                        "respect": 88, "heat": 11, "risk": 3, "duration_s": (90, 160), "weight": 5, "pays": "dirty",
+                        "required_models": ["buggy_todo_terreno"]},
     "assalto_casino": {"name": "Assalto a Casino", "category": "assalto", "min_level": 4, "base_reward": 14000,
                        "respect": 140, "heat": 13, "risk": 4, "duration_s": (140, 240), "weight": 3, "pays": "dirty"},
     "sequestro_relampago": {"name": "Sequestro Relâmpago", "category": "assalto", "min_level": 4, "base_reward": 15500,
@@ -382,7 +387,8 @@ OPPORTUNITY_TYPES = {
                          "respect": 52, "heat": 8, "risk": 3, "duration_s": (80, 140), "weight": 6, "pays": "dirty",
                          "required_models": ["van"]},
     "rota_costeira": {"name": "Rota Costeira", "category": "logistica", "min_level": 2, "base_reward": 4800,
-                      "respect": 48, "heat": 6, "risk": 2, "duration_s": (70, 130), "weight": 7, "pays": "dirty"},
+                      "respect": 48, "heat": 6, "risk": 2, "duration_s": (70, 130), "weight": 7, "pays": "dirty",
+                      "required_models": ["carrinha_entrega", "van"]},
     "contrabando_tabaco": {"name": "Contrabando de Tabaco", "category": "logistica", "min_level": 3, "base_reward": 8200,
                           "respect": 82, "heat": 9, "risk": 3, "duration_s": (100, 170), "weight": 5, "pays": "dirty"},
     "frota_fantasma": {"name": "Frota Fantasma", "category": "logistica", "min_level": 3, "base_reward": 9200,
@@ -439,7 +445,8 @@ OPPORTUNITY_TYPES = {
     "campanha_difamacao": {"name": "Campanha de Difamação", "category": "influencia", "min_level": 4, "base_reward": 14800,
                           "respect": 145, "heat": 9, "risk": 4, "duration_s": (140, 230), "weight": 2, "pays": "dirty"},
     "controlo_imprensa": {"name": "Controlo da Imprensa", "category": "influencia", "min_level": 5, "base_reward": 20500,
-                         "respect": 205, "heat": 10, "risk": 4, "duration_s": (170, 280), "weight": 2, "pays": "clean"},
+                         "respect": 205, "heat": 10, "risk": 4, "duration_s": (170, 280), "weight": 2, "pays": "clean",
+                         "required_models": ["limousine"]},
     "golpe_estado_local": {"name": "Golpe de Estado Local", "category": "influencia", "min_level": 5, "base_reward": 25500,
                           "respect": 255, "heat": 14, "risk": 5, "duration_s": (190, 300), "weight": 1, "pays": "dirty"},
 
@@ -464,7 +471,8 @@ OPPORTUNITY_TYPES = {
                                          "base_reward": 27000, "respect": 270, "heat": 18, "risk": 5,
                                          "duration_s": (200, 300), "weight": 1, "pays": "dirty"},
     "operacao_fantasma": {"name": "Operação Fantasma", "category": "especial", "min_level": 5, "base_reward": 26000,
-                         "respect": 260, "heat": 16, "risk": 5, "duration_s": (190, 300), "weight": 1, "pays": "dirty"},
+                         "respect": 260, "heat": 16, "risk": 5, "duration_s": (190, 300), "weight": 1, "pays": "dirty",
+                         "required_models": ["carro_furtivo"]},
 }
 
 # ---------------- Economia e recursos ----------------
