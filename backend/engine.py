@@ -1,3 +1,4 @@
+import logging
 import math
 import random
 from datetime import datetime, timezone, timedelta
@@ -42,6 +43,8 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        FUEL_PRICES, random_employee_name)
 from quests import process_quests, make_instance
 from quests_data import QUEST_DEFS
+
+logger = logging.getLogger(__name__)
 
 OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
 REST_DURATION_S = 90
@@ -1445,7 +1448,14 @@ async def advance(db, player):
 
     missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(200)
     for m in missions:
-        await _progress_mission(db, player, m, now)
+        try:
+            await _progress_mission(db, player, m, now)
+        except Exception:
+            # Uma missão com dados inesperados nunca deve derrubar o
+            # /game/state inteiro (dinheiro, equipas, tudo) — regista o erro
+            # e avança para a próxima missão; esta fica por resolver neste
+            # tick e tenta-se de novo no próximo.
+            logger.exception("Falha ao processar missão %s (player %s)", m.get("_id"), pid)
 
     await _complete_trainings(db, player, now)
     await _process_statuses(db, pid, now)
