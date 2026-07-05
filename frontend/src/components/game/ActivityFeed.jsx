@@ -3,6 +3,7 @@ import { useGame } from "../../context/GameContext";
 import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
+import { parseActivityMessage } from "../../lib/game";
 
 const KIND_COLORS = {
   success: "#10B981",
@@ -70,7 +71,7 @@ export const ActivityFeed = ({ onNavigate }) => {
             >
               <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[11px] leading-snug text-zinc-400">{e.message}</p>
+                <p className="font-mono text-[11px] leading-snug text-zinc-400">{parseActivityMessage(e.message)}</p>
                 <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
               </div>
               <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, serverNow())}</span>
@@ -108,7 +109,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
               >
                 <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-[10px] leading-snug text-zinc-300">{e.message}</p>
+                  <p className="font-mono text-[10px] leading-snug text-zinc-300">{parseActivityMessage(e.message)}</p>
                   <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
                 </div>
               </button>
@@ -123,7 +124,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
         className="pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-border bg-card/90 px-3 py-1.5 text-left backdrop-blur-xl"
       >
         <span className="shrink-0" style={{ color: KIND_COLORS[latest.kind] || "#8E8E93" }}>▸</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">{latest.message}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">{parseActivityMessage(latest.message)}</span>
         <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, serverNow())}</span>
       </button>
     </div>

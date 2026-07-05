@@ -271,6 +271,77 @@ export function propertyBenefit(pt, level = 1) {
   return parts.join(" · ");
 }
 
+export function parseActivityMessage(message) {
+  const React = require('react');
+  const parts = [];
+  let lastIdx = 0;
+
+  const dirtyMoneyRegex = /(\d+(?:,\d{3})*)\s*€\s*sujos/g;
+  const cleanMoneyRegex = /(\d+(?:,\d{3})*)\s*€\s*limpos/g;
+
+  const resourcePatterns = [
+    { regex: /(?:destacada para|para|em)\s+([^—\n.]+?)(?:\s+em\s+|—|$|\n)/, isResource: true },
+    { regex: /(?:pago a|pagou a|recrutado por|adquirido por|comprado em|vendido por|melhorado para|reparado por|abastecer|desbloqueou|subiu|promovido a|tratado na|libertado|despedido|iniciou|foram desperdiçados|apanhou|recrutado|apanhou|encaminhado para|saiu)\s+([A-Z][^—\n.€]+?)(?=[—.\n€]|$)/, isResource: true },
+  ];
+
+  let matches = [];
+
+  let m;
+  while ((m = dirtyMoneyRegex.exec(message)) !== null) {
+    matches.push({ start: m.index, end: m.index + m[0].length, type: 'dirty', text: m[0] });
+  }
+
+  while ((m = cleanMoneyRegex.exec(message)) !== null) {
+    matches.push({ start: m.index, end: m.index + m[0].length, type: 'clean', text: m[0] });
+  }
+
+  resourcePatterns.forEach(({ regex }) => {
+    while ((m = regex.exec(message)) !== null) {
+      if (m[1] && m[1].length > 1 && m[1].length < 60) {
+        const resourceStart = m.index + m[0].indexOf(m[1]);
+        const resourceEnd = resourceStart + m[1].length;
+        matches.push({ start: resourceStart, end: resourceEnd, type: 'resource', text: m[1].trim() });
+      }
+    }
+  });
+
+  matches.sort((a, b) => a.start - b.start);
+
+  matches = matches.filter((m, i) => {
+    if (i === 0) return true;
+    const prev = matches[i - 1];
+    return m.start >= prev.end;
+  });
+
+  matches.forEach((match) => {
+    if (match.start > lastIdx) {
+      parts.push(message.substring(lastIdx, match.start));
+    }
+
+    if (match.type === 'dirty') {
+      parts.push(
+        React.createElement('span', { key: `dirty-${match.start}`, style: { color: '#EF4444', fontWeight: '600' } }, match.text)
+      );
+    } else if (match.type === 'clean') {
+      parts.push(
+        React.createElement('span', { key: `clean-${match.start}`, style: { color: '#34D399', fontWeight: '600' } }, match.text)
+      );
+    } else if (match.type === 'resource') {
+      parts.push(
+        React.createElement('span', { key: `resource-${match.start}`, style: { textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.3)', textDecorationThickness: '1px', textUnderlineOffset: '2px' } }, match.text)
+      );
+    }
+
+    lastIdx = match.end;
+  });
+
+  if (lastIdx < message.length) {
+    parts.push(message.substring(lastIdx));
+  }
+
+  return parts.length > 0 ? parts : message;
+}
+
 
 export const STATUS_LABELS = {
   idle: "Na base",
