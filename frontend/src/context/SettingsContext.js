@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect } from "react";
 import { usePersistedState } from "../lib/persist";
 import { setDisplayPrefs } from "../lib/game";
+import { haptics } from "../lib/haptics";
 
 // Definições puramente do dispositivo (Interface, Jogabilidade, Notificações) —
 // não passam pelo servidor. As Automatizações (reparar/abastecer/descansar/
@@ -25,6 +26,7 @@ export function SettingsProvider({ children }) {
   const [showSeconds, setShowSeconds] = usePersistedState("set.showSeconds", true);
   const [compactNumbers, setCompactNumbers] = usePersistedState("set.compactNumbers", false);
   const [showTooltips, setShowTooltips] = usePersistedState("set.showTooltips", true);
+  const [hapticFeedback, setHapticFeedback] = usePersistedState("set.hapticFeedback", true);
   const [rememberFilters, setRememberFilters] = usePersistedState("set.rememberFilters", true);
   const [rememberSort, setRememberSort] = usePersistedState("set.rememberSort", true);
   const [confirmIrreversible, setConfirmIrreversible] = usePersistedState("set.confirmIrreversible", true);
@@ -46,12 +48,17 @@ export function SettingsProvider({ children }) {
     setDisplayPrefs({ showSeconds, compactNumbers, showTooltips, confirmIrreversible });
   }, [showSeconds, compactNumbers, showTooltips, confirmIrreversible]);
 
+  useEffect(() => {
+    haptics.setEnabled(hapticFeedback);
+  }, [hapticFeedback]);
+
   return (
     <SettingsContext.Provider
       value={{
         showSeconds, setShowSeconds, compactNumbers, setCompactNumbers,
-        showTooltips, setShowTooltips, rememberFilters, setRememberFilters,
-        rememberSort, setRememberSort, confirmIrreversible, setConfirmIrreversible,
+        showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
+        rememberFilters, setRememberFilters, rememberSort, setRememberSort,
+        confirmIrreversible, setConfirmIrreversible,
         autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
         hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
         autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,

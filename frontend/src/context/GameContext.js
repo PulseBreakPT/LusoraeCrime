@@ -5,6 +5,7 @@ import { useAuth } from "./AuthContext";
 import { useSettings } from "./SettingsContext";
 import { formatApiErrorDetail } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
+import { haptics } from "../lib/haptics";
 
 const GameContext = createContext(null);
 
@@ -48,6 +49,7 @@ export function GameProvider({ children }) {
           return prevStatus && prevStatus !== "idle" && t.status === "idle";
         });
         if (returned.length > 0) {
+          haptics.success();
           if (notifications?.teamAvailable !== false) {
             returned.forEach((t) => toast.info(`${t.name} regressou e está pronta`));
           }
@@ -73,6 +75,7 @@ export function GameProvider({ children }) {
           data.employees.forEach((e) => {
             const prevFatigue = prevEmployeesRef.current[e.id];
             if (prevFatigue != null && prevFatigue < 90 && e.fatigue >= 90) {
+              haptics.warning();
               toast.warning(`${e.name} está exausto — precisa de descansar`);
             }
           });
@@ -85,9 +88,11 @@ export function GameProvider({ children }) {
           const prev = prevVehiclesRef.current[v.id];
           if (!prev) return;
           if (notifications?.vehicleBroken !== false && prev.condition >= 20 && v.condition < 20) {
+            haptics.warning();
             toast.warning(`${v.name} está avariado — repara antes de despachar`);
           }
           if (notifications?.repairCompleted !== false && prev.condition < 99 && v.condition >= 99.5) {
+            haptics.success();
             toast.success(`${v.name} foi reparado — condição a 100%`);
           }
         });
@@ -98,6 +103,7 @@ export function GameProvider({ children }) {
         data.properties.forEach((p) => {
           const wasUpgrading = prevPropertiesRef.current[p.id];
           if (wasUpgrading && !p.upgrading_until) {
+            haptics.success();
             toast.success(`${p.name} concluiu a melhoria — agora no nível ${p.level}`);
           }
         });
@@ -106,7 +112,10 @@ export function GameProvider({ children }) {
 
       if (prevOppIdsRef.current && notifications?.rareMissions !== false) {
         const newRare = data.opportunities.filter((o) => o.rare && !prevOppIdsRef.current.has(o.id));
-        newRare.forEach((o) => toast.success(`Missão rara disponível: ${o.name} em ${o.district}`));
+        newRare.forEach((o) => {
+          haptics.heavy();
+          toast.success(`Missão rara disponível: ${o.name} em ${o.district}`);
+        });
       }
       prevOppIdsRef.current = new Set(data.opportunities.map((o) => o.id));
 
@@ -114,6 +123,7 @@ export function GameProvider({ children }) {
         const dueInS = (Date.parse(data.player.next_payroll_at) - Date.parse(data.server_time)) / 1000;
         if (dueInS <= 300 && (data.salary_total || 0) > 0) {
           if (!payrollWarnedRef.current) {
+            haptics.warning();
             toast.warning("Salários por pagar em breve — garante que há dinheiro limpo suficiente");
             payrollWarnedRef.current = true;
           }
@@ -144,7 +154,12 @@ export function GameProvider({ children }) {
     async (path, payload, successMsg) => {
       try {
         const { data } = await api.post(`/game/${path}`, payload);
-        if (successMsg) toast.success(successMsg);
+        if (successMsg) {
+          toast.success(successMsg);
+          haptics.success();
+        } else {
+          haptics.light();
+        }
         // Não esperamos pelo refresh completo do estado para responder ao
         // utilizador — isso fazia os botões parecerem lentos (dois pedidos
         // de rede em série). O polling de 4s e este refresh em segundo plano
@@ -153,6 +168,7 @@ export function GameProvider({ children }) {
         return { ok: true, data };
       } catch (e) {
         toast.error(formatApiErrorDetail(e.response?.data?.detail) || e.message);
+        haptics.error();
         return { ok: false };
       }
     },
