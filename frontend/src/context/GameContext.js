@@ -13,9 +13,11 @@ export function GameProvider({ children }) {
   const { user } = useAuth();
   const { autoOpenReport, notifications } = useSettings();
   const [state, setState] = useState(null);
+  const [stateError, setStateError] = useState(null);
   const [catalog, setCatalog] = useState(null);
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
   const prevTeamsRef = useRef(null);
   const prevEmployeesRef = useRef(null);
   const prevVehiclesRef = useRef(null);
@@ -133,8 +135,18 @@ export function GameProvider({ children }) {
       }
 
       setState(data);
+      setStateError(null);
+      hasLoadedRef.current = true;
     } catch (e) {
-      // silent poll failure
+      // Uma falha de poll depois de já termos carregado com sucesso fica
+      // silenciosa (rede oscila, o próximo poll de 4s resolve sozinho) — mas
+      // se isto acontece na primeira carga, o ecrã ficaria preso em "A ligar
+      // à rede..." para sempre sem qualquer pista do porquê. Torna-se visível
+      // e dá para tentar de novo manualmente.
+      console.error("Falha ao carregar /game/state:", e);
+      if (!hasLoadedRef.current) {
+        setStateError(formatApiErrorDetail(e.response?.data?.detail) || e.message || "Falha de rede");
+      }
     } finally {
       fetchingRef.current = false;
     }
@@ -262,7 +274,7 @@ export function GameProvider({ children }) {
   return (
     <GameContext.Provider
       value={{
-        state, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
+        state, stateError, catalog, refresh, serverNow, dispatchTeam, previewDispatch, createTeam,
         recallTeam, recommendOpportunityForTeam, recommendTeamForOpportunity, recommendRepeatForTeam,
         toggleFavoriteType, justReturnedTeamIds, autoOpenReportSignal, fetchTransactions,
         favoriteTeamIds, toggleFavoriteTeam, favoriteEmployeeIds, toggleFavoriteEmployee,

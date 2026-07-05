@@ -17,10 +17,10 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle } from "lucide-react";
 
 export default function GamePage() {
-  const { state, serverNow, autoOpenReportSignal } = useGame();
+  const { state, stateError, refresh, serverNow, autoOpenReportSignal } = useGame();
   const { hideImpossibleMissions } = useSettings();
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
@@ -38,6 +38,20 @@ export default function GamePage() {
   }, [autoOpenReportSignal]);
 
   if (!state) {
+    if (stateError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background px-4">
+          <div className="max-w-sm text-center">
+            <AlertTriangle className="mx-auto h-8 w-8 text-destructive" />
+            <p className="mt-3 font-mono text-xs uppercase tracking-[0.3em] text-zinc-500">Não foi possível ligar à rede</p>
+            <p className="mt-2 text-sm text-zinc-400">{stateError}</p>
+            <Button onClick={refresh} className="mt-4" data-testid="game-state-retry-button">
+              Tentar novamente
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
