@@ -181,9 +181,10 @@ async def catalog():
 
 
 @router.get("/state")
-async def get_state(user: dict = Depends(get_current_user)):
+async def get_state(user: dict = Depends(get_current_user), skip_advance: bool = False):
     player = await get_player(user)
-    player = await advance(db, player)
+    if not skip_advance:
+        player = await advance(db, player)
     pid = str(player["_id"])
     now_iso = now_utc().isoformat()
 
