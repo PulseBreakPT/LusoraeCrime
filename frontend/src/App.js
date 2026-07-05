@@ -7,6 +7,7 @@ import { BootProvider, useBoot } from "./context/BootContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { LoadingProvider } from "./context/LoadingContext";
 import { BootScreen } from "./components/BootScreen";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
 import GamePage from "./pages/GamePage";
 import AdminPanel from "./pages/AdminPanel";
@@ -84,12 +85,14 @@ function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <SettingsProvider>
-                      <GameProvider>
-                        <LoadingScreen />
-                        <GamePage />
-                      </GameProvider>
-                    </SettingsProvider>
+                    <ErrorBoundary>
+                      <SettingsProvider>
+                        <GameProvider>
+                          <LoadingScreen />
+                          <GamePage />
+                        </GameProvider>
+                      </SettingsProvider>
+                    </ErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -97,7 +100,9 @@ function App() {
                 path="/painel"
                 element={
                   <AdminRoute>
-                    <AdminPanel />
+                    <ErrorBoundary>
+                      <AdminPanel />
+                    </ErrorBoundary>
                   </AdminRoute>
                 }
               />
