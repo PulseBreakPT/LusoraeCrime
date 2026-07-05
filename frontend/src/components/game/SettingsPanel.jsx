@@ -13,8 +13,9 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/colla
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import {
   Settings, UserCog, KeyRound, LogOut, Trash2, Monitor, Gamepad2, Cog, Bell, Info,
-  ChevronDown, Wrench, Fuel, BedDouble, Gift,
+  ChevronDown, Wrench, Fuel, BedDouble, Gift, ShieldCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 
 const GAME_VERSION = "1.0.0";
 
@@ -143,6 +144,48 @@ const ChangePasswordForm = () => {
   );
 };
 
+// Só visível para a conta única autorizada a auto-promover-se — o backend
+// (/auth/claim-admin) reforça a mesma restrição, isto é só para não mostrar
+// um botão irrelevante a todos os outros jogadores.
+const CLAIM_ADMIN_EMAIL = "geral@lusorae.pt";
+
+const ClaimAdminForm = () => {
+  const { user, claimAdmin } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!user || user.email !== CLAIM_ADMIN_EMAIL || user.role === "admin") return null;
+
+  const run = async () => {
+    setBusy(true);
+    setError("");
+    const res = await claimAdmin();
+    setBusy(false);
+    if (res.ok) {
+      toast.success(res.message || "Acesso de administrador concedido!");
+    } else {
+      setError(res.error || "Não foi possível conceder acesso de administrador.");
+    }
+  };
+
+  return (
+    <Card className="border-amber-500/20 bg-amber-500/5 p-2 shadow-none">
+      <p className="text-[10px] leading-snug text-amber-300">
+        Esta conta pode aceder ao Painel Administrativo (/painel).
+      </p>
+      {error && <p className="mt-1 text-[10px] text-red-400">{error}</p>}
+      <Button
+        data-testid="settings-claim-admin-button"
+        onClick={run}
+        disabled={busy}
+        className="mt-2 w-full bg-amber-600 text-xs font-bold uppercase tracking-wider text-white hover:bg-amber-700"
+      >
+        <ShieldCheck size={14} className="mr-1.5" /> Tornar-me Administrador
+      </Button>
+    </Card>
+  );
+};
+
 const DeleteAccountForm = () => {
   const { deleteAccount } = useAuth();
   const [password, setPassword] = useState("");
@@ -258,6 +301,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
         <Section icon={UserCog} title="Conta" testId="settings-section-account">
           <ChangePasswordForm />
+          <ClaimAdminForm />
           <Button
             data-testid="logout-button"
             onClick={logout}

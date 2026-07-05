@@ -15,6 +15,9 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 JWT_ALGORITHM = "HS256"
 MAX_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+# Única conta autorizada a auto-promover-se a administrador pelo botão do
+# frontend — qualquer outra conta recebe 403 ao chamar /claim-admin.
+SELF_CLAIM_ADMIN_EMAIL = "geral@lusorae.pt"
 
 
 def hash_password(password: str) -> str:
@@ -91,7 +94,8 @@ class DeleteAccountInput(BaseModel):
 
 
 def user_public(user: dict) -> dict:
-    return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", "")}
+    return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", ""),
+            "role": user.get("role", "player")}
 
 
 async def create_player_for_user(user_id: str, org_name: str):
@@ -140,7 +144,7 @@ async def register(body: RegisterInput, response: Response):
     access = create_access_token(user_id, email)
     refresh_tok = create_refresh_token(user_id)
     set_auth_cookies(response, access, refresh_tok)
-    return {"id": user_id, "email": email, "name": body.org_name,
+    return {"id": user_id, "email": email, "name": body.org_name, "role": "player",
             "access_token": access, "refresh_token": refresh_tok}
 
 
@@ -194,6 +198,22 @@ async def logout(response: Response):
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
     return user_public({**user, "_id": user["_id"]})
+
+
+@router.post("/claim-admin")
+async def claim_admin(user: dict = Depends(get_current_user)):
+    """Auto-promoção a administrador — restrita a uma única conta autorizada."""
+    if user["email"] != SELF_CLAIM_ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Esta conta não tem permissão para se tornar administradora")
+    if user.get("role") == "admin":
+        return {"ok": True, "role": "admin", "message": "Esta conta já é administradora"}
+    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"role": "admin"}})
+    await db.admin_logs.insert_one({
+        "admin_id": user["_id"], "admin_email": user["email"],
+        "action": "self_claim_admin", "target_user_id": user["_id"],
+        "ts": now_utc().isoformat(),
+    })
+    return {"ok": True, "role": "admin", "message": "Acesso de administrador concedido"}
 
 
 @router.post("/change-password")
