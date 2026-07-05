@@ -25,7 +25,7 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       if (data.access_token) setTokens(data.access_token, data.refresh_token);
-      setUser({ id: data.id, email: data.email, name: data.name });
+      setUser({ id: data.id, email: data.email, name: data.name, role: data.role });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.post("/auth/register", { org_name: orgName, email, password });
       if (data.access_token) setTokens(data.access_token, data.refresh_token);
-      setUser({ id: data.id, email: data.email, name: data.name });
+      setUser({ id: data.id, email: data.email, name: data.name, role: data.role });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
@@ -72,8 +72,18 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const claimAdmin = async () => {
+    try {
+      const { data } = await api.post("/auth/claim-admin", {});
+      setUser((u) => (u ? { ...u, role: data.role } : u));
+      return { ok: true, message: data.message };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, changePassword, deleteAccount }}>
+    <AuthContext.Provider value={{ user, login, register, logout, changePassword, deleteAccount, claimAdmin }}>
       {children}
     </AuthContext.Provider>
   );
