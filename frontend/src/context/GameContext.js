@@ -20,6 +20,8 @@ export function GameProvider({ children }) {
   const hasLoadedRef = useRef(false);
   const consecutiveFailuresRef = useRef(0);
   const connectionLostWarnedRef = useRef(false);
+  const initialLoadAttemptsRef = useRef(0);
+  const abortControllerRef = useRef(new AbortController());
   const prevTeamsRef = useRef(null);
   const prevEmployeesRef = useRef(null);
   const prevVehiclesRef = useRef(null);
@@ -41,8 +43,9 @@ export function GameProvider({ children }) {
   const refresh = useCallback(async () => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
+    const startTime = Date.now();
     try {
-      const { data } = await api.get("/game/state");
+      const { data } = await api.get("/game/state", { timeout: 8000 });
       offsetRef.current = Date.parse(data.server_time) - Date.now();
       // Deteta equipas que acabaram de regressar (transição de "em operação" para
       // "na base") para dar um destaque temporário e avisar o jogador — ignora o
@@ -170,10 +173,39 @@ export function GameProvider({ children }) {
 
   useEffect(() => {
     if (!user) return;
-    refresh();
+    let pollTimeout = null;
+    let isRunning = true;
+
+    const schedulePoll = async () => {
+      if (!isRunning) return;
+      const startTime = Date.now();
+      await refresh();
+      const elapsed = Date.now() - startTime;
+      const delay = Math.max(2000, 4000 - elapsed);
+      pollTimeout = setTimeout(schedulePoll, delay);
+    };
+
+    const scheduleInitialLoad = async () => {
+      if (!isRunning || hasLoadedRef.current) return;
+      const startTime = Date.now();
+      await refresh();
+      const elapsed = Date.now() - startTime;
+      if (!hasLoadedRef.current && isRunning) {
+        initialLoadAttemptsRef.current += 1;
+        const backoffDelay = Math.min(8000, 500 * Math.pow(1.5, initialLoadAttemptsRef.current - 1));
+        pollTimeout = setTimeout(scheduleInitialLoad, backoffDelay);
+      } else if (hasLoadedRef.current && isRunning) {
+        pollTimeout = setTimeout(schedulePoll, Math.max(2000, 4000 - elapsed));
+      }
+    };
+
     api.get("/game/catalog").then((r) => setCatalog(r.data)).catch(() => {});
-    const id = setInterval(refresh, 4000);
-    return () => clearInterval(id);
+    scheduleInitialLoad();
+
+    return () => {
+      isRunning = false;
+      if (pollTimeout) clearTimeout(pollTimeout);
+    };
   }, [user, refresh]);
 
   const serverNow = useCallback(() => Date.now() + offsetRef.current, []);
