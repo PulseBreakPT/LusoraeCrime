@@ -18,6 +18,8 @@ export function GameProvider({ children }) {
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
   const hasLoadedRef = useRef(false);
+  const consecutiveFailuresRef = useRef(0);
+  const connectionLostWarnedRef = useRef(false);
   const prevTeamsRef = useRef(null);
   const prevEmployeesRef = useRef(null);
   const prevVehiclesRef = useRef(null);
@@ -137,15 +139,29 @@ export function GameProvider({ children }) {
       setState(data);
       setStateError(null);
       hasLoadedRef.current = true;
+      if (consecutiveFailuresRef.current > 0 && connectionLostWarnedRef.current) {
+        toast.success("Ligação ao jogo restabelecida");
+      }
+      consecutiveFailuresRef.current = 0;
+      connectionLostWarnedRef.current = false;
     } catch (e) {
-      // Uma falha de poll depois de já termos carregado com sucesso fica
-      // silenciosa (rede oscila, o próximo poll de 4s resolve sozinho) — mas
-      // se isto acontece na primeira carga, o ecrã ficaria preso em "A ligar
-      // à rede..." para sempre sem qualquer pista do porquê. Torna-se visível
-      // e dá para tentar de novo manualmente.
+      // Uma falha de poll isolada depois de já termos carregado com sucesso
+      // fica silenciosa (rede oscila, o próximo poll de 4s resolve sozinho) —
+      // mas se isto acontece na primeira carga, o ecrã ficaria preso em "A
+      // ligar à rede..." para sempre sem qualquer pista do porquê. Torna-se
+      // visível e dá para tentar de novo manualmente.
       console.error("Falha ao carregar /game/state:", e);
       if (!hasLoadedRef.current) {
         setStateError(formatApiErrorDetail(e.response?.data?.detail) || e.message || "Falha de rede");
+      } else {
+        // Já estávamos a jogar: falhas isoladas não interrompem a sessão,
+        // mas falhas repetidas (3+ seguidas, ~12s) deixavam o jogo "parado"
+        // sem qualquer aviso — agora avisa uma vez, sem bloquear o ecrã.
+        consecutiveFailuresRef.current += 1;
+        if (consecutiveFailuresRef.current >= 3 && !connectionLostWarnedRef.current) {
+          toast.error("A ligação ao jogo está a falhar — a tentar restabelecer...");
+          connectionLostWarnedRef.current = true;
+        }
       }
     } finally {
       fetchingRef.current = false;
