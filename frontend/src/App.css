@@ -121,6 +121,26 @@
     transform: scale(1.1);
 }
 
+/* Emblema com a inicial da categoria (A/L/T/I/E) — sempre visível, mesmo sem
+   favorito, para identificar o tipo de missão sem precisar de abrir o cartão. */
+.opp-pin-type {
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    color: #050505;
+    border: 1.5px solid rgba(5, 5, 5, 0.85);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+}
+
 /* ---------- HQ pin ---------- */
 .hq-pin {
     display: flex;

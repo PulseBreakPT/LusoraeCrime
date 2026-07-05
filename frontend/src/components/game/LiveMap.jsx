@@ -26,10 +26,12 @@ const makeDivIcon = (html, size, className = "") =>
 const oppIcon = (opp, selected, favorite) => {
   const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
   const color = CATEGORY_COLORS[opp.category] || "#fff";
+  const initial = (SPEC_LABELS[opp.category] || "?").charAt(0);
   const taken = opp.status === "taken";
   const html = `
     <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""}" style="--mk:${color}">
       ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
+      <span class="opp-pin-type" style="background:${color}">${initial}</span>
       ${favorite ? `<span style="position:absolute;top:-4px;right:-4px;color:#FBBF24;filter:drop-shadow(0 0 2px rgba(0,0,0,0.8))">${renderToStaticMarkup(<Star size={11} fill="#FBBF24" />)}</span>` : ""}
     </div>`;
   return makeDivIcon(html, 34);
@@ -384,11 +386,17 @@ export const MapLegend = () => {
       {open && (
         <Card data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up border-white/10 bg-black/85 p-3 shadow-2xl backdrop-blur-xl">
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Legenda do mapa</p>
-          <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Oportunidades (cor = categoria)</p>
+          <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Oportunidades (cor + inicial = categoria)</p>
           <div className="mb-2 grid grid-cols-2 gap-x-2 gap-y-1">
             {Object.entries(SPEC_LABELS).map(([k, label]) => (
               <span key={k} className="flex items-center gap-1.5 font-mono text-[10px] text-zinc-300">
-                <span className="h-2 w-2 rounded-full" style={{ background: CATEGORY_COLORS[k] }} /> {label}
+                <span
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-extrabold text-black"
+                  style={{ background: CATEGORY_COLORS[k] }}
+                >
+                  {label.charAt(0)}
+                </span>
+                {label}
               </span>
             ))}
           </div>
