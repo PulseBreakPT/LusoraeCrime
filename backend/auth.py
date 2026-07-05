@@ -95,6 +95,11 @@ def user_public(user: dict) -> dict:
 
 
 async def create_player_for_user(user_id: str, org_name: str):
+    # SAFEGUARD: never overwrite existing player data on restart/redeploy
+    existing = await db.players.find_one({"user_id": user_id})
+    if existing:
+        return str(existing["_id"])
+
     now = now_utc().isoformat()
     result = await db.players.insert_one({
         "user_id": user_id, "org_name": org_name,
@@ -163,6 +168,12 @@ async def login(body: LoginInput, request: Request, response: Response):
 
     await db.login_attempts.delete_one({"identifier": identifier})
     user_id = str(user["_id"])
+
+    # SAFEGUARD: ensure player exists (recovery from database loss on restart/redeploy)
+    player = await db.players.find_one({"user_id": user_id})
+    if not player:
+        await create_player_for_user(user_id, user.get("name", "Organização Recuperada"))
+
     access = create_access_token(user_id, email)
     refresh_tok = create_refresh_token(user_id)
     set_auth_cookies(response, access, refresh_tok)
