@@ -37,7 +37,7 @@ const relTime = (ts, nowMs) => {
 // Data e hora completas, no mesmo estilo usado no extrato financeiro do Império.
 const absTime = (ts) => new Date(ts).toLocaleString("pt-PT");
 
-export const ActivityFeed = () => {
+export const ActivityFeed = ({ onNavigate }) => {
   const { state, serverNow } = useGame();
   if (!state) return null;
 
@@ -61,14 +61,20 @@ export const ActivityFeed = () => {
             <p className="px-1 font-mono text-[11px] text-zinc-600">Sem atividade registada.</p>
           )}
           {state.events.map((e) => (
-            <div key={e.id} className="flex items-start gap-1.5 px-1" title={KIND_LABELS[e.kind] || e.kind}>
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => onNavigate && onNavigate("intel")}
+              title={`${KIND_LABELS[e.kind] || e.kind} — clica para veres ações recomendadas`}
+              className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
+            >
               <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-[11px] leading-snug text-zinc-400">{e.message}</p>
                 <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
               </div>
               <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, serverNow())}</span>
-            </div>
+            </button>
           ))}
         </div>
       </ScrollArea>
@@ -76,7 +82,7 @@ export const ActivityFeed = () => {
   );
 };
 
-export const ActivityFeedMobile = () => {
+export const ActivityFeedMobile = ({ onNavigate }) => {
   const { state, serverNow } = useGame();
   const [open, setOpen] = useState(false);
   if (!state || state.events.length === 0) return null;
@@ -93,13 +99,19 @@ export const ActivityFeedMobile = () => {
           <p className="mb-1.5 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">Últimos registos</p>
           <div className="space-y-1.5">
             {recent.map((e) => (
-              <div key={e.id} className="flex items-start gap-1.5 px-1" title={KIND_LABELS[e.kind] || e.kind}>
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => { setOpen(false); onNavigate && onNavigate("intel"); }}
+                title={`${KIND_LABELS[e.kind] || e.kind} — toca para veres ações recomendadas`}
+                className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
+              >
                 <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-[10px] leading-snug text-zinc-300">{e.message}</p>
                   <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </Card>

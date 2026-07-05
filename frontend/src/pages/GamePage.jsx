@@ -110,8 +110,8 @@ export default function GamePage() {
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
         </Button>
       </Tip>
-      <ActivityFeed />
-      <ActivityFeedMobile />
+      <ActivityFeed onNavigate={setOpenPanel} />
+      <ActivityFeedMobile onNavigate={setOpenPanel} />
       {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={setOpenPanel} />}
 
       <MapLegend />
