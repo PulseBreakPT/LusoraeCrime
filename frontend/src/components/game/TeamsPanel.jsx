@@ -432,11 +432,16 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`team-dispatch-best-${t.id}`}
                       variant="outline"
                       onClick={() => dispatchTeam(best.id, t.id)}
-                      className="mt-2 h-auto w-full gap-1 border-success/30 bg-success/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-success hover:bg-success/20"
+                      className="mt-2 h-auto w-full flex-col items-start gap-1 border-success/30 bg-success/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-success hover:bg-success/20 md:flex-row md:items-center md:text-[10px]"
                     >
-                      <Zap size={11} /> Despachar → {best.name}
-                      <span style={{ color: chanceColor(rec.chance) }}>({Math.round(rec.chance * 100)}%)</span>
-                      <span className="text-zinc-500">· ETA {fmtDuration(rec.eta_s)} · {fmtMoney(rec.reward)}</span>
+                      <div className="flex items-center gap-1 truncate">
+                        <Zap size={11} className="shrink-0" /> Despachar → {best.name}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span style={{ color: chanceColor(rec.chance) }}>({Math.round(rec.chance * 100)}%)</span>
+                        <span className="text-zinc-500">ETA {fmtDuration(rec.eta_s)}</span>
+                        <span className="text-zinc-500">{fmtMoney(rec.reward)}</span>
+                      </div>
                     </Button>
                   </Tip>
                 )}
@@ -450,9 +455,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`team-repeat-last-${t.id}`}
                       variant="outline"
                       onClick={() => dispatchTeam(repeatOpp.id, t.id)}
-                      className="mt-1.5 h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-zinc-400 hover:bg-white/5"
+                      className="mt-1.5 h-auto w-full flex-col items-start gap-1 border-white/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-zinc-400 hover:bg-white/5 md:flex-row md:items-center md:text-[10px]"
                     >
-                      <Undo2 size={11} className="rotate-180" /> Repetir última missão → {repeatOpp.name}
+                      <div className="flex items-center gap-1 truncate">
+                        <Undo2 size={11} className="shrink-0 rotate-180" /> Repetir última → {repeatOpp.name}
+                      </div>
                       <span className="text-zinc-500">({Math.round(repeatRec.chance * 100)}%)</span>
                     </Button>
                   </Tip>
@@ -471,13 +478,16 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`recall-team-${t.id}`}
                       variant="outline"
                       onClick={() => recallTeam(enRoute.id)}
-                      className={`mt-2 h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] font-bold uppercase ${
+                      className={`mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
                         recallLate
                           ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
                           : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                       }`}
                     >
-                      <Undo2 size={11} /> Chamar de volta ({enRoute.opportunity.name})
+                      <div className="flex items-center gap-1 truncate">
+                        <Undo2 size={11} className="shrink-0" /> Chamar de volta
+                      </div>
+                      <span className="text-zinc-500 md:text-inherit">({enRoute.opportunity.name})</span>
                     </Button>
                   </Tip>
                 )}
