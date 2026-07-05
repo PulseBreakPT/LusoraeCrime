@@ -1,3 +1,4 @@
+import asyncio
 import math
 import random
 from bson import ObjectId
@@ -186,24 +187,26 @@ async def get_state(user: dict = Depends(get_current_user)):
     pid = str(player["_id"])
     now_iso = now_utc().isoformat()
 
-    teams = await db.teams.find({"player_id": pid}).to_list(100)
-    employees = await db.employees.find({"player_id": pid}).to_list(300)
-    candidates = await db.candidates.find({"player_id": pid}).to_list(50)
-    vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
-    properties = await db.properties.find({"player_id": pid}).to_list(100)
-    opportunities = await db.opportunities.find(
-        {"player_id": pid, "$or": [
-            {"status": "active", "expires_at": {"$gt": now_iso}},
-            {"status": "taken"},
-        ]}
-    ).to_list(50)
-    missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(100)
-    history = await db.missions.find({"player_id": pid, "phase": "done"}).sort("return_at", -1).to_list(20)
-    events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(30)
-    quest_docs = await db.quests.find({"player_id": pid}).to_list(400)
-
-    caps, _ = await get_caps(db, pid)
-    bonuses = await get_org_bonuses(db, pid)
+    (teams, employees, candidates, vehicles, properties, opportunities, missions, history, events, quest_docs, caps, bonuses) = await asyncio.gather(
+        db.teams.find({"player_id": pid}).to_list(100),
+        db.employees.find({"player_id": pid}).to_list(300),
+        db.candidates.find({"player_id": pid}).to_list(50),
+        db.vehicles.find({"player_id": pid}).to_list(100),
+        db.properties.find({"player_id": pid}).to_list(100),
+        db.opportunities.find(
+            {"player_id": pid, "$or": [
+                {"status": "active", "expires_at": {"$gt": now_iso}},
+                {"status": "taken"},
+            ]}
+        ).to_list(50),
+        db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(100),
+        db.missions.find({"player_id": pid, "phase": "done"}).sort("return_at", -1).to_list(20),
+        db.events.find({"player_id": pid}).sort("ts", -1).to_list(30),
+        db.quests.find({"player_id": pid}).to_list(400),
+        get_caps(db, pid),
+        get_org_bonuses(db, pid),
+    )
+    caps = caps[0]
     p = Player.from_mongo(player).model_dump()
     p["next_level_respect"] = next_threshold(player["level"])
 
