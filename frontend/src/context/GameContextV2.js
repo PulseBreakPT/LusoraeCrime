@@ -35,10 +35,10 @@ export function GameProvider({ children }) {
   const [favoriteEmployeeIds, setFavoriteEmployeeIds] = usePersistedState("favEmployees", []);
   const [favoriteVehicleIds, setFavoriteVehicleIds] = usePersistedState("favVehicles", []);
 
-  // Update state when initial game state arrives
+  // Update state when initial game state arrives (may arrive after mount)
   useEffect(() => {
-    if (initialGameState && !hasLoadedRef.current) {
-      setState(initialGameState);
+    if (initialGameState) {
+      setState((prev) => prev || initialGameState);
       hasLoadedRef.current = true;
       if (initialGameState.server_time) {
         offsetRef.current = Date.parse(initialGameState.server_time) - Date.now();
@@ -55,11 +55,11 @@ export function GameProvider({ children }) {
 
   const refresh = useCallback(async () => {
     if (fetchingRef.current || !user) return;
-    if (!hasLoadedRef.current) return; // Don't refresh until initial load done
 
     fetchingRef.current = true;
     try {
       const { data } = await api.get("/game/state", { timeout: 8000 });
+      hasLoadedRef.current = true;
 
       if (data.server_time) {
         offsetRef.current = Date.parse(data.server_time) - Date.now();
@@ -180,6 +180,11 @@ export function GameProvider({ children }) {
     } catch (e) {
       console.error("Falha ao carregar /game/state:", e);
       consecutiveFailuresRef.current += 1;
+      // Sem estado inicial e a falhar repetidamente → mostra erro com retry
+      // em vez de spinner infinito no GamePage
+      if (!hasLoadedRef.current && consecutiveFailuresRef.current >= 2) {
+        setStateError(formatApiErrorDetail(e.response?.data?.detail) || e.message || "Falha ao ligar à rede");
+      }
       if (consecutiveFailuresRef.current >= 3 && !connectionLostWarnedRef.current) {
         toast.error("A ligação ao jogo está a falhar — a tentar restabelecer...");
         connectionLostWarnedRef.current = true;
@@ -189,9 +194,11 @@ export function GameProvider({ children }) {
     }
   }, [user, notifications, autoOpenReport]);
 
-  // Polling
+  // Polling — arranca sempre que há utilizador. Se o boot não entregou
+  // estado inicial (fallback/timeout), o primeiro fetch é imediato para
+  // nunca deixar o GamePage preso em "A ligar à rede...".
   useEffect(() => {
-    if (!user || !hasLoadedRef.current) return;
+    if (!user) return;
 
     let pollTimeout = null;
     let isRunning = true;
@@ -205,8 +212,7 @@ export function GameProvider({ children }) {
       pollTimeout = setTimeout(schedulePoll, delay);
     };
 
-    // Start polling
-    pollTimeout = setTimeout(schedulePoll, 4000);
+    pollTimeout = setTimeout(schedulePoll, hasLoadedRef.current ? 4000 : 0);
 
     return () => {
       isRunning = false;

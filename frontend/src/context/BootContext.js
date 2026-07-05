@@ -110,20 +110,12 @@ export function BootProvider({ children }) {
 
     logEntry("BOOT", "info", "Boot iniciado");
 
-    // Aggressive timeout — 10 segundos máximo
+    // Timeout global — 15 segundos máximo. Se estourar, entra na mesma
+    // (o GameContext carrega os dados em background via polling).
     bootTimeoutRef.current = setTimeout(() => {
-      console.error("⚠️ Boot timeout após 10 segundos - Permitindo entrada em modo fallback");
-      // Fallback: permite entrada mesmo que boot não tenha completado
+      console.error("⚠️ Boot timeout após 15 segundos - a entrar em modo fallback");
       setBootReady();
-    }, 10000);
-
-    // Watchdog: se nenhum progresso em 5s, fallback também
-    const watchdogTimeout = setTimeout(() => {
-      if (stateRef.current === BOOT_STATES.VALIDATING) {
-        console.warn("⚠️ Boot sem progresso - tentando fallback");
-        setBootReady();
-      }
-    }, 5000);
+    }, 15000);
 
     try {
       const result = await bootFn({
@@ -132,6 +124,7 @@ export function BootProvider({ children }) {
           if (!PHASES[phase]) return;
           setCurrentPhase(phase);
           setProgress(PHASES[phase].min);
+          stateRef.current = BOOT_STATES[phase] || stateRef.current;
           logEntry("BOOT", "info", `Fase: ${PHASES[phase].label}`);
         },
         advanceProgress: (phase, percentage = null) => {
@@ -142,13 +135,12 @@ export function BootProvider({ children }) {
         log: logEntry,
       });
 
-      clearTimeout(watchdogTimeout);
       setBootReady();
       return result;
     } catch (err) {
-      clearTimeout(watchdogTimeout);
       console.error("Boot error:", err);
-      // Fallback: permite entrada mesmo com erro, para debug
+      // Fallback: permite entrada mesmo com erro — o GameContext
+      // encarrega-se de carregar/retentar os dados em background.
       logEntry("BOOT", "warn", `Erro no boot - permitindo fallback: ${err?.message}`);
       setBootReady();
       return { user: null, gameState: null, catalog: null };
