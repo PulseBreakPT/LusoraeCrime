@@ -15,8 +15,9 @@ import { Loader2 } from "lucide-react";
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
-  const { isBootReady } = useBoot();
+  const { isBootReady, isBootLoading, isBootError } = useBoot();
 
+  // User not yet determined
   if (user === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#050505]">
@@ -24,15 +25,36 @@ const ProtectedRoute = ({ children }) => {
       </div>
     );
   }
+
+  // Not logged in
   if (user === false) return <Navigate to="/auth" replace />;
-  if (!isBootReady) {
+
+  // Wait for boot to complete
+  if (isBootLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#050505]">
         <Loader2 className="h-8 w-8 animate-spin text-red-600" />
       </div>
     );
   }
-  return children;
+
+  // Boot failed, show error (BootScreen will display)
+  if (isBootError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#050505]">
+        <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+      </div>
+    );
+  }
+
+  // Boot completed successfully
+  if (isBootReady) return children;
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#050505]">
+      <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+    </div>
+  );
 };
 
 const AdminRoute = ({ children }) => {
@@ -55,6 +77,7 @@ function App() {
       <AuthProvider>
         <LoadingProvider>
           <BrowserRouter>
+            <BootScreen />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
               <Route
@@ -63,7 +86,6 @@ function App() {
                   <ProtectedRoute>
                     <SettingsProvider>
                       <GameProvider>
-                        <BootScreen />
                         <LoadingScreen />
                         <GamePage />
                       </GameProvider>
