@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
 import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
 import { Badge } from "../ui/badge";

@@ -4,7 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star } from "lucide-react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 import { Button } from "../ui/button";

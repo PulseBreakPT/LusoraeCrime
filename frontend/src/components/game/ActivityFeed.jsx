@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../context/GameContextV2";
 import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";

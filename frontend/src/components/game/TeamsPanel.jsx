@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar } from "./hud";

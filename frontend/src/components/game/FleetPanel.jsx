@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";

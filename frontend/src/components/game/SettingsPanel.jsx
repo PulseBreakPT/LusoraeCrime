@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useGame } from "../../context/GameContext";
-import { useAuth } from "../../context/AuthContext";
+import { useGame } from "../../context/GameContextV2";
+import { useAuth } from "../../context/AuthContextV2";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
 import { ConfirmButton } from "./hud";
 import { haptics } from "../../lib/haptics";

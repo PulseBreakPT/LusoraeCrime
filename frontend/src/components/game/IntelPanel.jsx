@@ -1,4 +1,4 @@
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";

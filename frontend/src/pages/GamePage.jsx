@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useGame } from "../context/GameContext";
+import { useGame } from "../context/GameContextV2";
 import { useSettings } from "../context/SettingsContext";
 import LiveMap, { MapLegend } from "../components/game/LiveMap";
 import { ResourceBar } from "../components/game/ResourceBar";
