@@ -3,6 +3,7 @@ import { useGame } from "../../context/GameContext";
 import { useAuth } from "../../context/AuthContext";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
 import { ConfirmButton } from "./hud";
+import { haptics } from "../../lib/haptics";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -232,8 +233,9 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
   const { logout } = useAuth();
   const {
     showSeconds, setShowSeconds, compactNumbers, setCompactNumbers,
-    showTooltips, setShowTooltips, rememberFilters, setRememberFilters,
-    rememberSort, setRememberSort, confirmIrreversible, setConfirmIrreversible,
+    showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
+    rememberFilters, setRememberFilters, rememberSort, setRememberSort,
+    confirmIrreversible, setConfirmIrreversible,
     autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
     hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
     autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
@@ -276,6 +278,16 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           </Row>
           <Row label="Tooltips de ajuda" testId="settings-row-show-tooltips">
             <ToggleSwitch testId="settings-toggle-show-tooltips" checked={showTooltips} onChange={setShowTooltips} />
+          </Row>
+          <Row label="Feedback háptico" hint="Vibração ao executar ações" testId="settings-row-haptic-feedback">
+            <ToggleSwitch
+              testId="settings-toggle-haptic-feedback"
+              checked={hapticFeedback}
+              onChange={(v) => {
+                setHapticFeedback(v);
+                if (v) haptics.success();
+              }}
+            />
           </Row>
           <Row label="Memorizar filtros" testId="settings-row-remember-filters">
             <ToggleSwitch testId="settings-toggle-remember-filters" checked={rememberFilters} onChange={setRememberFilters} />
