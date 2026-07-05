@@ -166,6 +166,10 @@ async def login(body: LoginInput, request: Request, response: Response):
         )
         raise HTTPException(status_code=401, detail="Email ou password incorretos")
 
+    # Verificar se o utilizador está banido
+    if user.get("banned"):
+        raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'Motivo não especificado')}")
+
     await db.login_attempts.delete_one({"identifier": identifier})
     user_id = str(user["_id"])
 

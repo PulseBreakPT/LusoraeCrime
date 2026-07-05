@@ -6,6 +6,7 @@ import { GameProvider } from "./context/GameContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import AuthPage from "./pages/AuthPage";
 import GamePage from "./pages/GamePage";
+import AdminPanel from "./pages/AdminPanel";
 import { Loader2 } from "lucide-react";
 
 const ProtectedRoute = ({ children }) => {
@@ -18,6 +19,20 @@ const ProtectedRoute = ({ children }) => {
     );
   }
   if (user === false) return <Navigate to="/auth" replace />;
+  return children;
+};
+
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (user === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#050505]">
+        <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+      </div>
+    );
+  }
+  if (user === false) return <Navigate to="/auth" replace />;
+  if (user.role !== "admin") return <Navigate to="/" replace />;
   return children;
 };
 
@@ -37,6 +52,14 @@ function App() {
                   </GameProvider>
                 </SettingsProvider>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/painel"
+            element={
+              <AdminRoute>
+                <AdminPanel />
+              </AdminRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
