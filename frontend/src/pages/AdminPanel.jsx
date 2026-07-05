@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContextV2";
 import { api } from "../lib/api";
 import { fmtMoney } from "../lib/game";
 import { Card } from "../components/ui/card";
