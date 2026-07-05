@@ -423,28 +423,44 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   </div>
                 )}
 
-                {best && rec && (
-                  <Tip
-                    tip={`Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`}
-                    block
+                <Tip
+                  tip={
+                    best && rec
+                      ? `Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`
+                      : r.ok
+                      ? "Equipa pronta, mas sem missões disponíveis ou elegíveis neste momento."
+                      : r.reason
+                  }
+                  block
+                >
+                  <Button
+                    data-testid={`team-dispatch-best-${t.id}`}
+                    variant="outline"
+                    onClick={() => best && rec && dispatchTeam(best.id, t.id)}
+                    disabled={!best || !rec}
+                    className={`mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
+                      best && rec
+                        ? "border-success/30 bg-success/10 text-success hover:bg-success/20 disabled:opacity-50"
+                        : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                    }`}
                   >
-                    <Button
-                      data-testid={`team-dispatch-best-${t.id}`}
-                      variant="outline"
-                      onClick={() => dispatchTeam(best.id, t.id)}
-                      className="mt-2 h-auto w-full flex-col items-start gap-1 border-success/30 bg-success/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-success hover:bg-success/20 md:flex-row md:items-center md:text-[10px]"
-                    >
-                      <div className="flex items-center gap-1 truncate">
-                        <Zap size={11} className="shrink-0" /> Despachar → {best.name}
-                      </div>
+                    <div className="flex items-center gap-1 truncate">
+                      <Zap size={11} className="shrink-0" />
+                      {best && rec ? (
+                        <>Despachar → {best.name}</>
+                      ) : (
+                        <>Sem missões elegíveis</>
+                      )}
+                    </div>
+                    {best && rec && (
                       <div className="flex flex-wrap items-center gap-1">
                         <span style={{ color: chanceColor(rec.chance) }}>({Math.round(rec.chance * 100)}%)</span>
                         <span className="text-zinc-500">ETA {fmtDuration(rec.eta_s)}</span>
                         <span className="text-zinc-500">{fmtMoney(rec.reward)}</span>
                       </div>
-                    </Button>
-                  </Tip>
-                )}
+                    )}
+                  </Button>
+                </Tip>
 
                 {repeatOpp && repeatRec && (
                   <Tip
