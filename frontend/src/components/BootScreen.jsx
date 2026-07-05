@@ -69,6 +69,9 @@ export function BootScreen() {
     );
   }
 
+  // Show skip button if loading takes too long (>8 seconds)
+  const showSkip = elapsedTime > 8;
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/95 z-50 backdrop-blur-sm">
       <div className="max-w-md w-full mx-4 space-y-6">
@@ -79,7 +82,9 @@ export function BootScreen() {
           </div>
           <p className="text-xs text-zinc-400 mt-1">
             {phaseLabels[currentPhase] || "Inicializando…"}
+            {currentPhase && <span className="ml-2 text-[10px] text-zinc-600">({currentPhase})</span>}
           </p>
+          <p className="text-[10px] text-zinc-600 mt-1">Tempo: {elapsedTime}s</p>
         </div>
 
         <div className="space-y-3">
@@ -124,6 +129,17 @@ export function BootScreen() {
             );
           })}
         </div>
+
+        {showSkip && (
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            className="w-full text-xs"
+            size="sm"
+          >
+            ⚠️ Carregamento lento - Recarregar
+          </Button>
+        )}
       </div>
     </div>
   );
