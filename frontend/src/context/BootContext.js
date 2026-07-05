@@ -110,10 +110,20 @@ export function BootProvider({ children }) {
 
     logEntry("BOOT", "info", "Boot iniciado");
 
-    // Global boot timeout — máximo 30 segundos
+    // Aggressive timeout — 10 segundos máximo
     bootTimeoutRef.current = setTimeout(() => {
-      setBootError(new Error("Boot timeout após 30 segundos"));
-    }, 30000);
+      console.error("⚠️ Boot timeout após 10 segundos - Permitindo entrada em modo fallback");
+      // Fallback: permite entrada mesmo que boot não tenha completado
+      setBootReady();
+    }, 10000);
+
+    // Watchdog: se nenhum progresso em 5s, fallback também
+    const watchdogTimeout = setTimeout(() => {
+      if (stateRef.current === BOOT_STATES.VALIDATING) {
+        console.warn("⚠️ Boot sem progresso - tentando fallback");
+        setBootReady();
+      }
+    }, 5000);
 
     try {
       const result = await bootFn({
@@ -132,11 +142,16 @@ export function BootProvider({ children }) {
         log: logEntry,
       });
 
+      clearTimeout(watchdogTimeout);
       setBootReady();
       return result;
     } catch (err) {
-      setBootError(err);
-      throw err;
+      clearTimeout(watchdogTimeout);
+      console.error("Boot error:", err);
+      // Fallback: permite entrada mesmo com erro, para debug
+      logEntry("BOOT", "warn", `Erro no boot - permitindo fallback: ${err?.message}`);
+      setBootReady();
+      return { user: null, gameState: null, catalog: null };
     }
   };
 
