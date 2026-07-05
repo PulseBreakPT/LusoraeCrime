@@ -188,14 +188,23 @@ export function GameProvider({ children }) {
     const scheduleInitialLoad = async () => {
       if (!isRunning || hasLoadedRef.current) return;
       const startTime = Date.now();
-      await refresh();
-      const elapsed = Date.now() - startTime;
-      if (!hasLoadedRef.current && isRunning) {
+      try {
+        const { data } = await api.get("/game/state", { timeout: 8000, params: { skip_advance: true } });
+        offsetRef.current = Date.parse(data.server_time) - Date.now();
+        setState(data);
+        setStateError(null);
+        hasLoadedRef.current = true;
+        initialLoadAttemptsRef.current = 0;
+        if (isRunning) {
+          pollTimeout = setTimeout(schedulePoll, 4000);
+        }
+      } catch (e) {
+        console.error("Falha ao carregar estado inicial:", e);
+        setStateError("Falha ao ligar ao servidor — a tentar de novo...");
+        if (!isRunning) return;
         initialLoadAttemptsRef.current += 1;
         const backoffDelay = Math.min(8000, 500 * Math.pow(1.5, initialLoadAttemptsRef.current - 1));
         pollTimeout = setTimeout(scheduleInitialLoad, backoffDelay);
-      } else if (hasLoadedRef.current && isRunning) {
-        pollTimeout = setTimeout(schedulePoll, Math.max(2000, 4000 - elapsed));
       }
     };
 
