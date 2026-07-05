@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { useSettings } from "./SettingsContext";
+import { useLoading } from "./LoadingContext";
 import { formatApiErrorDetail } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
 import { haptics } from "../lib/haptics";
@@ -12,6 +13,7 @@ const GameContext = createContext(null);
 export function GameProvider({ children }) {
   const { user } = useAuth();
   const { autoOpenReport, notifications } = useSettings();
+  const { startLoading, updateStage, completeStage, failStage, finishLoading } = useLoading();
   const [state, setState] = useState(null);
   const [stateError, setStateError] = useState(null);
   const [catalog, setCatalog] = useState(null);
@@ -187,20 +189,68 @@ export function GameProvider({ children }) {
 
     const scheduleInitialLoad = async () => {
       if (!isRunning || hasLoadedRef.current) return;
-      const startTime = Date.now();
+
+      const stages = [
+        { key: "auth", status: "pending" },
+        { key: "teams", status: "pending" },
+        { key: "employees", status: "pending" },
+        { key: "vehicles", status: "pending" },
+        { key: "properties", status: "pending" },
+        { key: "opportunities", status: "pending" },
+        { key: "missions", status: "pending" },
+        { key: "events", status: "pending" },
+        { key: "quests", status: "pending" },
+        { key: "catalogo", status: "pending" },
+      ];
+
+      startLoading(stages);
+
       try {
-        const { data } = await api.get("/game/state", { timeout: 8000, params: { skip_advance: true } });
+        updateStage("auth", "in_progress");
+        const { data } = await api.get("/game/state", {
+          timeout: 8000,
+          params: { skip_advance: true }
+        });
+        completeStage("auth");
+
         offsetRef.current = Date.parse(data.server_time) - Date.now();
+
+        updateStage("teams", "in_progress");
+        setTimeout(() => completeStage("teams"), 50);
+        updateStage("employees", "in_progress");
+        setTimeout(() => completeStage("employees"), 100);
+        updateStage("vehicles", "in_progress");
+        setTimeout(() => completeStage("vehicles"), 150);
+        updateStage("properties", "in_progress");
+        setTimeout(() => completeStage("properties"), 200);
+        updateStage("opportunities", "in_progress");
+        setTimeout(() => completeStage("opportunities"), 250);
+        updateStage("missions", "in_progress");
+        setTimeout(() => completeStage("missions"), 300);
+        updateStage("events", "in_progress");
+        setTimeout(() => completeStage("events"), 350);
+        updateStage("quests", "in_progress");
+        setTimeout(() => completeStage("quests"), 400);
+        updateStage("catalogo", "in_progress");
+
         setState(data);
         setStateError(null);
         hasLoadedRef.current = true;
         initialLoadAttemptsRef.current = 0;
-        if (isRunning) {
-          pollTimeout = setTimeout(schedulePoll, 4000);
-        }
+
+        setTimeout(() => {
+          completeStage("catalogo");
+          finishLoading();
+          if (isRunning) {
+            pollTimeout = setTimeout(schedulePoll, 4000);
+          }
+        }, 450);
       } catch (e) {
         console.error("Falha ao carregar estado inicial:", e);
-        setStateError("Falha ao ligar ao servidor — a tentar de novo...");
+        const errorMsg = formatApiErrorDetail(e.response?.data?.detail) || e.message || "Erro de conexão";
+        failStage("auth", errorMsg);
+        setStateError(errorMsg);
+
         if (!isRunning) return;
         initialLoadAttemptsRef.current += 1;
         const backoffDelay = Math.min(8000, 500 * Math.pow(1.5, initialLoadAttemptsRef.current - 1));
