@@ -349,6 +349,66 @@ async def unban_user(user_id: str, admin: dict = Depends(require_admin)):
     return {"ok": True, "message": "Utilizador desbanido com sucesso"}
 
 
+@router.post("/user/{user_id}/grant-admin")
+async def grant_admin(user_id: str, admin: dict = Depends(require_admin)):
+    """Promover um utilizador a administrador."""
+    try:
+        user_oid = ObjectId(user_id)
+    except:
+        raise HTTPException(status_code=400, detail="ID de utilizador inválido")
+
+    user = await db.users.find_one({"_id": user_oid})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+
+    if user.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="Utilizador já é administrador")
+
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "admin"}})
+
+    # Log da ação
+    await db.admin_logs.insert_one({
+        "admin_id": admin["_id"],
+        "admin_email": admin["email"],
+        "action": "grant_admin",
+        "target_user_id": str(user_oid),
+        "target_user_email": user.get("email", ""),
+        "ts": now_utc().isoformat(),
+    })
+
+    return {"ok": True, "message": f"Utilizador {user.get('email', '')} é agora administrador"}
+
+
+@router.post("/user/{user_id}/revoke-admin")
+async def revoke_admin(user_id: str, admin: dict = Depends(require_admin)):
+    """Remover acesso de administrador de um utilizador."""
+    try:
+        user_oid = ObjectId(user_id)
+    except:
+        raise HTTPException(status_code=400, detail="ID de utilizador inválido")
+
+    user = await db.users.find_one({"_id": user_oid})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=400, detail="Utilizador não é administrador")
+
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "player"}})
+
+    # Log da ação
+    await db.admin_logs.insert_one({
+        "admin_id": admin["_id"],
+        "admin_email": admin["email"],
+        "action": "revoke_admin",
+        "target_user_id": str(user_oid),
+        "target_user_email": user.get("email", ""),
+        "ts": now_utc().isoformat(),
+    })
+
+    return {"ok": True, "message": f"Acesso de administrador removido de {user.get('email', '')}"}
+
+
 @router.get("/logs")
 async def get_admin_logs(admin: dict = Depends(require_admin), limit: int = 100):
     """Últimas ações administrativas."""

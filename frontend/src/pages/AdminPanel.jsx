@@ -142,6 +142,27 @@ export default function AdminPanel() {
     }
   };
 
+  const handleGrantAdmin = async () => {
+    try {
+      await api.post(`/admin/user/${selectedUser}/grant-admin`, {});
+      toast.success("Utilizador promovido a administrador!");
+      handleSelectUser(selectedUser);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro ao promover utilizador");
+    }
+  };
+
+  const handleRevokeAdmin = async () => {
+    if (!window.confirm("Tem certeza? Este utilizador perderá acesso ao painel administrativo.")) return;
+    try {
+      await api.post(`/admin/user/${selectedUser}/revoke-admin`, {});
+      toast.success("Acesso de administrador removido!");
+      handleSelectUser(selectedUser);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro ao remover acesso de administrador");
+    }
+  };
+
   if (user?.role !== "admin") {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -427,8 +448,32 @@ export default function AdminPanel() {
                   </div>
                 </Card>
 
+                {/* Admin/Acesso */}
+                <Card className="border-white/10 bg-zinc-900/50 p-6">
+                  <h3 className="text-lg font-bold text-white mb-4">👑 Admin/Acesso</h3>
+                  <div className="space-y-3">
+                    {userDetails.user.role === "admin" ? (
+                      <>
+                        <p className="text-green-400 text-sm font-semibold">✓ Utilizador é administrador</p>
+                        <Button onClick={handleRevokeAdmin} className="w-full bg-amber-600 hover:bg-amber-700">
+                          <Lock size={16} className="mr-2" />
+                          Remover Admin
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-zinc-400 text-sm">Utilizador é jogador normal</p>
+                        <Button onClick={handleGrantAdmin} className="w-full bg-green-600 hover:bg-green-700">
+                          <Unlock size={16} className="mr-2" />
+                          Tornar Admin
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </Card>
+
                 {/* Ban/Unban */}
-                <Card className="border-white/10 bg-zinc-900/50 p-6 lg:col-span-2">
+                <Card className="border-white/10 bg-zinc-900/50 p-6">
                   <h3 className="text-lg font-bold text-white mb-4">⛔ Ban/Unban</h3>
                   {userDetails.user.role !== "admin" ? (
                     <div className="space-y-3">
