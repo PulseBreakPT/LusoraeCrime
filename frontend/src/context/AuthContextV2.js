@@ -36,10 +36,14 @@ export function AuthProvider({ children }) {
   // Boot sequence — carregamento pós-login
   const performBoot = useCallback(
     async ({ signal, setPhase, advanceProgress, log }) => {
+      let meResponse = null;
+      let stateResponse = null;
+      let catalogResponse = null;
+
       // VALIDAR SESSÃO (0-15%)
       setPhase("VALIDATING");
       try {
-        const meResponse = await api.get("/auth/me", { timeout: 5000, signal });
+        meResponse = await api.get("/auth/me", { timeout: 5000, signal });
         setUser(meResponse.data);
         advanceProgress("VALIDATING", 15);
         log("AUTH", "success", "Sessão validada", { userId: meResponse.data.id });
@@ -60,7 +64,7 @@ export function AuthProvider({ children }) {
       setPhase("LOADING_ORG");
       advanceProgress("LOADING_ORG", 35);
       try {
-        const stateResponse = await api.get("/game/state", {
+        stateResponse = await api.get("/game/state", {
           timeout: 8000,
           params: { skip_advance: true },
           signal,
@@ -77,7 +81,7 @@ export function AuthProvider({ children }) {
       setPhase("LOADING_RESOURCES");
       advanceProgress("LOADING_RESOURCES", 50);
       try {
-        const catalogResponse = await api.get("/game/catalog", {
+        catalogResponse = await api.get("/game/catalog", {
           timeout: 5000,
           signal,
         });
@@ -87,6 +91,7 @@ export function AuthProvider({ children }) {
       } catch (err) {
         // Catálogo é não-crítico, continuamos
         log("AUTH", "warn", "Falha ao carregar catálogo (não-crítico)", { error: err.message });
+        catalogResponse = { data: null };
         advanceProgress("LOADING_RESOURCES", 60);
       }
 
@@ -113,7 +118,11 @@ export function AuthProvider({ children }) {
       advanceProgress("PREPARING_UI", 100);
       log("AUTH", "success", "Interface pronta");
 
-      return { user: meResponse.data, gameState: stateResponse.data, catalog: catalogResponse.data };
+      return {
+        user: meResponse.data,
+        gameState: stateResponse.data,
+        catalog: catalogResponse?.data || null,
+      };
     },
     []
   );
