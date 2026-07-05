@@ -279,30 +279,38 @@ export function parseActivityMessage(message) {
   const dirtyMoneyRegex = /(\d+(?:,\d{3})*)\s*€\s*sujos/g;
   const cleanMoneyRegex = /(\d+(?:,\d{3})*)\s*€\s*limpos/g;
 
+  // NOTA: todas as regexes usadas com exec() em while TÊM de ter a flag /g —
+  // sem ela o lastIndex nunca avança e o while bloqueia a página para sempre.
   const resourcePatterns = [
-    { regex: /(?:destacada para|para|em)\s+([^—\n.]+?)(?:\s+em\s+|—|$|\n)/, isResource: true },
-    { regex: /(?:pago a|pagou a|recrutado por|adquirido por|comprado em|vendido por|melhorado para|reparado por|abastecer|desbloqueou|subiu|promovido a|tratado na|libertado|despedido|iniciou|foram desperdiçados|apanhou|recrutado|apanhou|encaminhado para|saiu)\s+([A-Z][^—\n.€]+?)(?=[—.\n€]|$)/, isResource: true },
+    { regex: /(?:destacada para|para|em)\s+([^—\n.]+?)(?:\s+em\s+|—|$|\n)/g, isResource: true },
+    { regex: /(?:pago a|pagou a|recrutado por|adquirido por|comprado em|vendido por|melhorado para|reparado por|abastecer|desbloqueou|subiu|promovido a|tratado na|libertado|despedido|iniciou|foram desperdiçados|apanhou|recrutado|apanhou|encaminhado para|saiu)\s+([A-Z][^—\n.€]+?)(?=[—.\n€]|$)/g, isResource: true },
   ];
 
   let matches = [];
 
-  let m;
-  while ((m = dirtyMoneyRegex.exec(message)) !== null) {
-    matches.push({ start: m.index, end: m.index + m[0].length, type: 'dirty', text: m[0] });
-  }
-
-  while ((m = cleanMoneyRegex.exec(message)) !== null) {
-    matches.push({ start: m.index, end: m.index + m[0].length, type: 'clean', text: m[0] });
-  }
-
-  resourcePatterns.forEach(({ regex }) => {
+  const execAll = (regex, onMatch) => {
+    let m;
     while ((m = regex.exec(message)) !== null) {
+      onMatch(m);
+      // Guarda contra matches vazios (e regexes sem /g): avança sempre
+      if (m.index === regex.lastIndex) regex.lastIndex++;
+    }
+  };
+
+  execAll(dirtyMoneyRegex, (m) =>
+    matches.push({ start: m.index, end: m.index + m[0].length, type: 'dirty', text: m[0] })
+  );
+  execAll(cleanMoneyRegex, (m) =>
+    matches.push({ start: m.index, end: m.index + m[0].length, type: 'clean', text: m[0] })
+  );
+  resourcePatterns.forEach(({ regex }) => {
+    execAll(regex, (m) => {
       if (m[1] && m[1].length > 1 && m[1].length < 60) {
         const resourceStart = m.index + m[0].indexOf(m[1]);
         const resourceEnd = resourceStart + m[1].length;
         matches.push({ start: resourceStart, end: resourceEnd, type: 'resource', text: m[1].trim() });
       }
-    }
+    });
   });
 
   matches.sort((a, b) => a.start - b.start);
