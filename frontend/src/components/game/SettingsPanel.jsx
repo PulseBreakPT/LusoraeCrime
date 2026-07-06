@@ -13,8 +13,9 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/colla
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import {
   Settings, UserCog, KeyRound, LogOut, Trash2, Monitor, Gamepad2, Cog, Bell, Info,
-  ChevronDown, Wrench, Fuel, BedDouble, Gift, ShieldCheck,
+  ChevronDown, Wrench, Fuel, BedDouble, Gift, ShieldCheck, Volume2,
 } from "lucide-react";
+import { audio } from "../../lib/audio";
 import { toast } from "sonner";
 
 const GAME_VERSION = "1.0.0";
@@ -56,6 +57,23 @@ const Row = ({ label, hint, children, testId }) => (
       {hint && <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{hint}</p>}
     </div>
     <div className="shrink-0">{children}</div>
+  </div>
+);
+
+// Slider de volume compacto (0–100%), coerente com o resto do painel.
+const VolumeSlider = ({ value, onChange, disabled, testId }) => (
+  <div className="flex items-center gap-1.5">
+    <input
+      data-testid={testId}
+      type="range"
+      min="0"
+      max="100"
+      value={Math.round(value * 100)}
+      disabled={disabled}
+      onChange={(e) => onChange(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) / 100)}
+      className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/10 accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+    />
+    <span className="w-8 text-right font-mono text-[10px] text-zinc-500">{Math.round(value * 100)}%</span>
   </div>
 );
 
@@ -283,6 +301,8 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
     hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
     autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
     notifications, setNotification,
+    soundEnabled, setSoundEnabled, musicEnabled, setMusicEnabled,
+    sfxEnabled, setSfxEnabled, musicVolume, setMusicVolume, sfxVolume, setSfxVolume,
   } = useSettings();
 
   if (!state) return null;
@@ -428,6 +448,48 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <Wrench size={9} /> <Fuel size={9} /> <BedDouble size={9} /> <Gift size={9} />
             Corre mesmo com a app fechada — os custos são os mesmos das ações manuais.
           </p>
+        </Section>
+
+        <Section icon={Volume2} title="Áudio" testId="settings-section-audio">
+          <Row label="Som" hint="Interruptor geral — silencia tudo" testId="settings-row-sound">
+            <ToggleSwitch
+              testId="settings-toggle-sound"
+              checked={soundEnabled}
+              onChange={(v) => { setSoundEnabled(v); if (v) audio.sfx.notify(); }}
+            />
+          </Row>
+          <Row label="Música ambiente" hint="Banda sonora noir gerada em tempo real" testId="settings-row-music">
+            <div className="flex items-center gap-2">
+              <VolumeSlider
+                testId="settings-music-volume"
+                value={musicVolume}
+                disabled={!soundEnabled || !musicEnabled}
+                onChange={setMusicVolume}
+              />
+              <ToggleSwitch
+                testId="settings-toggle-music"
+                checked={musicEnabled}
+                onChange={setMusicEnabled}
+                disabled={!soundEnabled}
+              />
+            </div>
+          </Row>
+          <Row label="Efeitos sonoros" hint="Despachos, dinheiro, sirenes, notificações" testId="settings-row-sfx">
+            <div className="flex items-center gap-2">
+              <VolumeSlider
+                testId="settings-sfx-volume"
+                value={sfxVolume}
+                disabled={!soundEnabled || !sfxEnabled}
+                onChange={setSfxVolume}
+              />
+              <ToggleSwitch
+                testId="settings-toggle-sfx"
+                checked={sfxEnabled}
+                onChange={(v) => { setSfxEnabled(v); if (v && soundEnabled) setTimeout(() => audio.sfx.cash(), 50); }}
+                disabled={!soundEnabled}
+              />
+            </div>
+          </Row>
         </Section>
 
         <Section icon={Bell} title="Notificações" testId="settings-section-notifications">

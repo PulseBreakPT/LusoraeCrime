@@ -6,6 +6,39 @@ import { useSettings } from "./SettingsContext";
 import { formatApiErrorDetail, fmtMoney } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
 import { haptics } from "../lib/haptics";
+import { audio } from "../lib/audio";
+
+// Som temático por ação — o prefixo mais específico ganha. Ações fora desta
+// lista ficam em silêncio (o toast e o toque de interface já dão feedback).
+const ACTION_SOUNDS = [
+  ["dispatch", "dispatch"],
+  ["missions/recall", "recall"],
+  ["launder", "cash"],
+  ["police/bribe", "cash"],
+  ["employees/recruit", "hire"],
+  ["vehicles/repair", "repair"],
+  ["vehicles/refuel", "refuel"],
+  ["vehicles/buy", "cash"],
+  ["vehicles/sell", "cash"],
+  ["properties/buy", "cash"],
+  ["properties/sell", "cash"],
+  ["properties/upgrade", "repair"],
+  ["teams/create", "success"],
+  ["employees/promote", "levelup"],
+  ["employees/bonus", "cash"],
+  ["employees/heal", "notify"],
+  ["employees/release", "notify"],
+  ["quests/claim", "cash"],
+  ["quests/choose", "notify"],
+];
+
+function soundForAction(path) {
+  let best = null;
+  for (const [prefix, sound] of ACTION_SOUNDS) {
+    if (path.startsWith(prefix) && (!best || prefix.length > best[0].length)) best = [prefix, sound];
+  }
+  return best ? best[1] : null;
+}
 
 const GameContext = createContext(null);
 
@@ -28,6 +61,8 @@ export function GameProvider({ children }) {
   const prevPropertiesRef = useRef(null);
   const prevOppIdsRef = useRef(null);
   const payrollWarnedRef = useRef(false);
+  const prevLevelRef = useRef(null);
+  const prevChaseIdsRef = useRef(new Set());
 
   const [justReturnedTeamIds, setJustReturnedTeamIds] = useState([]);
   const [autoOpenReportSignal, setAutoOpenReportSignal] = useState(0);
@@ -85,6 +120,7 @@ export function GameProvider({ children }) {
               const oppName = rec.opportunity?.name || "a operação";
               if (rec.outcome === "success" && rec.chase_outcome === "caught") {
                 toast.error(`${t.name}: a polícia apanhou a equipa no regresso — carga de ${oppName} perdida.`);
+                audio.sfx.police();
               } else if (rec.outcome === "success") {
                 const credited = Number(rec.pending_reward || 0);
                 toast.success(
@@ -92,15 +128,21 @@ export function GameProvider({ children }) {
                     ? `${t.name}: sucesso em ${oppName} — +${fmtMoney(credited)} ${rec.pending_pays === "clean" ? "limpos" : "sujos"}.`
                     : `${t.name}: sucesso em ${oppName}.`
                 );
+                if (credited > 0) audio.sfx.cash();
+                else audio.sfx.success();
               } else if (rec.outcome === "police") {
                 toast.error(`${t.name}: intercetada pela polícia em ${oppName}.`);
+                audio.sfx.police();
               } else if (rec.outcome === "recalled") {
                 toast.info(`${t.name} regressou sem completar ${oppName}.`);
+                audio.sfx.notify();
               } else {
                 toast.warning(`${t.name}: falhou ${oppName} — sem recompensa.`);
+                audio.sfx.failure();
               }
             } else if (notifications?.teamAvailable !== false) {
               toast.info(`${t.name} regressou e está pronta`);
+              audio.sfx.notify();
             }
           });
           setJustReturnedTeamIds((prev) => [
@@ -122,6 +164,7 @@ export function GameProvider({ children }) {
             const prevFatigue = prevEmployeesRef.current[e.id];
             if (prevFatigue != null && prevFatigue < 90 && e.fatigue >= 90) {
               haptics.warning();
+              audio.sfx.warning();
               toast.warning(`${e.name} está exausto — precisa de descansar`);
             }
           });
@@ -138,6 +181,7 @@ export function GameProvider({ children }) {
           if (!prev) return;
           if (notifications?.vehicleBroken !== false && prev.condition >= 20 && v.condition < 20) {
             haptics.warning();
+            audio.sfx.warning();
             toast.warning(`${v.name} está avariado — repara antes de despachar`);
           }
           if (
@@ -146,6 +190,7 @@ export function GameProvider({ children }) {
             v.condition >= 99.5
           ) {
             haptics.success();
+            audio.sfx.repair();
             toast.success(`${v.name} foi reparado — condição a 100%`);
           }
         });
@@ -160,6 +205,7 @@ export function GameProvider({ children }) {
           const wasUpgrading = prevPropertiesRef.current[p.id];
           if (wasUpgrading && !p.upgrading_until) {
             haptics.success();
+            audio.sfx.success();
             toast.success(`${p.name} concluiu a melhoria — agora no nível ${p.level}`);
           }
         });
@@ -175,6 +221,7 @@ export function GameProvider({ children }) {
         );
         newRare.forEach((o) => {
           haptics.heavy();
+          audio.sfx.notify();
           toast.success(`Missão rara disponível: ${o.name} em ${o.district}`);
         });
       }
@@ -187,6 +234,7 @@ export function GameProvider({ children }) {
         if (dueInS <= 300 && (data.salary_total || 0) > 0) {
           if (!payrollWarnedRef.current) {
             haptics.warning();
+            audio.sfx.warning();
             toast.warning("Salários por pagar em breve — garante que há dinheiro limpo suficiente");
             payrollWarnedRef.current = true;
           }
@@ -194,6 +242,31 @@ export function GameProvider({ children }) {
           payrollWarnedRef.current = false;
         }
       }
+
+      // Sirene de perseguição: toca em contínuo (baixinho) enquanto alguma
+      // equipa estiver a ser perseguida pela polícia no regresso, com um
+      // alerta forte no momento em que a perseguição começa.
+      const chaseIds = new Set(
+        data.missions.filter((m) => m.chase_active && m.phase === "returning").map((m) => m.id)
+      );
+      const newChase = [...chaseIds].some((id) => !prevChaseIdsRef.current.has(id));
+      if (newChase) {
+        haptics.error();
+        audio.sfx.police();
+        const chased = data.missions.find((m) => m.chase_active && m.phase === "returning" && !prevChaseIdsRef.current.has(m.id));
+        if (chased) toast.error(`PERSEGUIÇÃO: um carro-patrulha segue ${chased.team_name} — se apanhados, perdem a carga!`);
+      }
+      if (chaseIds.size > 0) audio.sirenStart();
+      else audio.sirenStop();
+      prevChaseIdsRef.current = chaseIds;
+
+      // Subida de nível da organização — momento de glória com fanfarra.
+      if (prevLevelRef.current != null && data.player.level > prevLevelRef.current) {
+        haptics.heavy();
+        audio.sfx.levelup();
+        toast.success(`A organização subiu para o nível ${data.player.level} — novo conteúdo desbloqueado!`);
+      }
+      prevLevelRef.current = data.player.level;
 
       setState(data);
       setStateError(null);
@@ -254,12 +327,15 @@ export function GameProvider({ children }) {
         } else {
           haptics.light();
         }
+        const sound = soundForAction(path);
+        if (sound) audio.sfx[sound]();
         // Refresh in background
         refresh();
         return { ok: true, data };
       } catch (e) {
         toast.error(formatApiErrorDetail(e.response?.data?.detail) || e.message);
         haptics.error();
+        audio.sfx.error();
         return { ok: false };
       }
     },
