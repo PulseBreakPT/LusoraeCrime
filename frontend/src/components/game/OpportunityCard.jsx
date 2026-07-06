@@ -118,11 +118,13 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
     if (r.reason === "Sem combustível" && vehicle) {
       const cost = Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]);
-      return { icon: Fuel, label: fmtMoney(cost), color: "text-amber-400", can: money >= cost, run: () => refuelVehicle(vehicle.id) };
+      const can = money >= cost;
+      return { icon: Fuel, label: fmtMoney(cost), color: can ? "text-amber-400" : "text-red-400", can, run: () => refuelVehicle(vehicle.id) };
     }
     if (r.reason === "Veículo avariado" && vehicle) {
       const cost = Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002));
-      return { icon: Wrench, label: fmtMoney(cost), color: "text-emerald-400", can: money >= cost, run: () => repairVehicle(vehicle.id) };
+      const can = money >= cost;
+      return { icon: Wrench, label: fmtMoney(cost), color: can ? "text-emerald-400" : "text-red-400", can, run: () => repairVehicle(vehicle.id) };
     }
     if (r.reason === "Sem veículo") {
       const free = state.vehicles.filter((v) => !v.team_id);
@@ -409,10 +411,13 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           )}
           <Button
             data-testid="dispatch-team-button"
-            variant="success"
             onClick={handleDispatch}
             disabled={!selectedTeamId || busy}
-            className="mt-3 w-full font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+            className={`mt-3 w-full font-bold uppercase tracking-wider ${
+              !selectedTeamId || busy
+                ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                : "bg-success text-success-foreground shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-success/90"
+            }`}
           >
             {busy ? "A destacar..." : "Destacar equipa"}
           </Button>

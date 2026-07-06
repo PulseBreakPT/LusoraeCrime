@@ -222,7 +222,11 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 data-testid="launder-submit-button"
                 onClick={handleLaunder}
                 disabled={!amount || parseInt(amount, 10) > p.dirty_money}
-                className="shrink-0 text-xs font-bold uppercase"
+                className={`shrink-0 text-xs font-bold uppercase ${
+                  !amount || parseInt(amount, 10) > p.dirty_money
+                    ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                }`}
               >
                 Lavar
               </Button>
@@ -235,7 +239,11 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                   data-testid={`launder-quick-${f * 100}`}
                   onClick={() => setAmount(String(Math.floor(p.dirty_money * f)))}
                   disabled={p.dirty_money <= 0}
-                  className="h-auto border-white/10 px-2 py-1 font-mono text-[10px] text-zinc-400 hover:bg-white/5 hover:text-white"
+                  className={`h-auto px-2 py-1 font-mono text-[10px] ${
+                    p.dirty_money <= 0
+                      ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      : "border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white"
+                  }`}
                 >
                   {f === 1 ? "MAX" : `${f * 100}%`}
                 </Button>
@@ -274,7 +282,11 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 onClick={bribePolice}
                 disabled={p.heat < 10 || p.clean_money < Math.max(1000, Math.round(p.heat * 150))}
                 size="sm"
-                className="mt-2 w-full text-[10px] font-bold uppercase tracking-wider"
+                className={`mt-2 w-full text-[10px] font-bold uppercase tracking-wider ${
+                  p.heat < 10 || p.clean_money < Math.max(1000, Math.round(p.heat * 150))
+                    ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                }`}
               >
                 Subornar polícia · {fmtMoney(Math.max(1000, Math.round(p.heat * 150)))} (-40 calor)
               </Button>
