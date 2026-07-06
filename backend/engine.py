@@ -42,7 +42,12 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN,
                        FUEL_PRICES, random_employee_name,
-                       HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS)
+                       HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS,
+                       WEAPON_MODELS, WEAPON_CATEGORY_WEIGHTS,
+                       WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX,
+                       WEAPON_COMPATIBILITY_MIN_FACTOR, WEAPON_PROFICIENCY_MAX,
+                       WEAPON_PROFICIENCY_BONUS_MAX_PCT, WEAPON_PROFICIENCY_GAIN_PER_MISSION,
+                       WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT, WEAPON_LOUD_HEAT_MULT)
 from quests import process_quests, make_instance
 from quests_data import QUEST_DEFS
 
@@ -249,6 +254,16 @@ async def record_tx(db, player_id, kind, amount, currency, balance_after, note):
         "player_id": player_id, "kind": kind, "amount": amount, "currency": currency,
         "balance_after": balance_after, "note": note, "ts": now_utc().isoformat(),
     })
+
+
+async def _unlink_employee_weapon(db, emp_id):
+    """Ao contrário do veículo (só ligado a Team, nunca a Employee), a arma
+    tem uma ligação bidireccional directa com o funcionário. Chamado em todos
+    os sítios que apagam um Employee (despedimento, deserção, traição) para
+    nunca deixar `weapon.employee_id` a apontar para um funcionário já
+    inexistente — nenhum destes sítios exige o funcionário `idle`, e um
+    funcionário `idle` pode perfeitamente ter uma arma equipada."""
+    await db.weapons.update_many({"employee_id": str(emp_id)}, {"$set": {"employee_id": None}})
 
 
 def property_stack_ranks(props):
@@ -488,18 +503,19 @@ def effective_speed(vehicle):
 
 
 def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0,
-                      vehicle_bonus=0.0, situational_bonus=0.0):
+                      vehicle_bonus=0.0, situational_bonus=0.0, weapon_bonus=0.0):
     base = 0.92
     risk_pen = -risk * 0.07
     skill_bonus = team_skill * 0.05
     heat_pen = -heat * 0.0015
     match_bonus = 0.12 if spec_match else 0.0
     chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus
-                            + talent_bonus + team_bonus + vehicle_bonus + situational_bonus))
+                            + talent_bonus + team_bonus + vehicle_bonus + situational_bonus + weapon_bonus))
     return chance, {"base": base, "risco": round(risk_pen, 4), "equipa": round(skill_bonus, 4),
                     "calor": round(heat_pen, 4), "match": round(match_bonus, 4),
                     "talentos": round(talent_bonus, 4), "coordenacao": round(team_bonus, 4),
-                    "veiculo": round(vehicle_bonus, 4), "condicoes": round(situational_bonus, 4)}
+                    "veiculo": round(vehicle_bonus, 4), "condicoes": round(situational_bonus, 4),
+                    "armamento": round(weapon_bonus, 4)}
 
 
 def situational_bonus_for(category, now):
@@ -578,6 +594,77 @@ def vehicle_bonus_breakdown(vehicle, category):
     return total
 
 
+def weapon_combat_score(model, category):
+    """Combina potência/precisão/alcance/leveza/velocidade/carregador num
+    único score (0-1) ponderado pela categoria da missão (WEAPON_CATEGORY_WEIGHTS,
+    game_data.py) — cada categoria valoriza atributos diferentes, por isso
+    cada modelo tem vantagens/desvantagens reais consoante a operação, em vez
+    de um único "melhor" universal."""
+    weights = WEAPON_CATEGORY_WEIGHTS.get(category, WEAPON_CATEGORY_WEIGHTS.get("logistica", {}))
+    if not weights:
+        return 0.0
+    power = model.get("power", 0) / 100
+    accuracy = model.get("accuracy", 0) / 100
+    rng = model.get("range", 0) / 100
+    lightness = 1 - min(1.0, model.get("weight", 0) / 100)
+    speed = model.get("use_speed", 0) / 100
+    magazine = min(1.0, model.get("magazine_capacity", 0) / 30)
+    return (
+        power * weights.get("power", 0) + accuracy * weights.get("accuracy", 0)
+        + rng * weights.get("range", 0) + lightness * weights.get("lightness", 0)
+        + speed * weights.get("speed", 0) + magazine * weights.get("magazine", 0)
+    )
+
+
+def weapon_compatibility_factor(emp, model):
+    """Sinal suave (nunca um bloqueio): funcionários que não cumprem os
+    requisitos mínimos de atributo da arma (requires_attr) usam-na com menos
+    eficácia, mas continuam a poder equipá-la."""
+    reqs = model.get("requires_attr") or {}
+    if not reqs:
+        return 1.0
+    attrs = emp.get("attrs") or {}
+    shortfall = 0.0
+    for attr, min_val in reqs.items():
+        val = attrs.get(attr, 0)
+        if val < min_val:
+            shortfall += (min_val - val) / max(1, min_val)
+    if shortfall <= 0:
+        return 1.0
+    return max(WEAPON_COMPATIBILITY_MIN_FACTOR, 1.0 - shortfall * 0.3)
+
+
+def weapon_bonus_breakdown(members, weapons_by_employee_id, category):
+    """Ajustes de chance derivados do armamento da equipa: combina o score de
+    combate do modelo equipado por cada membro (ponderado pela categoria da
+    missão), o estado de conservação e a fiabilidade da arma, a compatibilidade
+    de atributos do funcionário, e a proficiência acumulada — tudo em conjunto,
+    sem depender de nenhum evento aleatório de encravamento à parte. A média é
+    feita sobre toda a equipa (não só os membros equipados), para que uma
+    equipa parcialmente equipada não receba o crédito de uma equipa completa."""
+    if not members:
+        return 0.0
+    total = 0.0
+    for e in members:
+        weapon = weapons_by_employee_id.get(str(e["_id"]))
+        if not weapon:
+            continue
+        model = WEAPON_MODELS.get(weapon.get("model_key"))
+        if not model:
+            continue
+        score = weapon_combat_score(model, category)
+        best_for_mult = 1.3 if category in model.get("best_for", []) else 0.7
+        condition_factor = weapon.get("condition", 100) / 100
+        reliability_factor = model.get("reliability", 100) / 100
+        compat = weapon_compatibility_factor(e, model)
+        proficiency = e.get("weapon_proficiency", {}).get(model["category"], 0)
+        proficiency_bonus = (proficiency / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
+        total += score * best_for_mult * condition_factor * reliability_factor * compat * WEAPON_COMBAT_SCORE_SCALE
+        total += proficiency_bonus
+    avg = total / len(members)
+    return max(WEAPON_BONUS_MIN, min(WEAPON_BONUS_MAX, avg))
+
+
 def _roll_outcome(player, m):
     chance = m.get("success_chance")
     if chance is None:
@@ -599,6 +686,8 @@ def _apply_outcome(player, m, outcome):
     heat_mult = 0.5 if ("fantasma_digital" in m.get("talents", []) and t["category"] == "tecnica") else 1.0
     if m.get("vehicle_luxury") and t["category"] in DISCREET_CATEGORIES:
         heat_mult *= LUXURY_HEAT_MULT
+    if m.get("weapon_loud") and t["category"] in DISCREET_CATEGORIES:
+        heat_mult *= WEAPON_LOUD_HEAT_MULT
     if outcome == "success":
         # Money is *not* credited here anymore. Store as pending reward — paid on arrival at HQ
         # if the police chase (if any) is escaped.
@@ -828,6 +917,20 @@ async def _crew_returns(db, player, m, outcome):
             "last_mission_at": now_utc().isoformat(),
             "missions_done": emp.get("missions_done", 0) + 1,
         }
+        # Arma equipada: desgasta-se por missão (mirror do desgaste de
+        # veículo mais abaixo) e o funcionário ganha proficiência na
+        # categoria dessa arma (não na arma específica — sobrevive à troca
+        # de arma dentro da mesma categoria).
+        weapon = None
+        if emp.get("weapon_id"):
+            weapon = await db.weapons.find_one({"_id": ObjectId(emp["weapon_id"])})
+        if weapon:
+            model = WEAPON_MODELS.get(weapon["model_key"])
+            if model:
+                wcat = model["category"]
+                proficiency = dict(emp.get("weapon_proficiency") or {})
+                proficiency[wcat] = min(WEAPON_PROFICIENCY_MAX, proficiency.get(wcat, 0) + WEAPON_PROFICIENCY_GAIN_PER_MISSION)
+                sets["weapon_proficiency"] = proficiency
         if exceptional:
             await push_history(db, emp["_id"], f"Desempenho excecional em {t['name']} — XP extra.")
         if new_level > emp["level"]:
@@ -848,6 +951,13 @@ async def _crew_returns(db, player, m, outcome):
             await add_event(db, pid, "team", f"{emp['name']} subiu para o nível {new_level}.")
         await db.employees.update_one({"_id": emp["_id"]}, {"$set": sets})
         await push_history(db, emp["_id"], f"{t['name']} em {t['district']}: {OUTCOME_PT[outcome]}.")
+        if weapon:
+            wear = WEAPON_WEAR_PER_MISSION + t["risk"] * WEAPON_WEAR_RISK_MULT
+            new_w_condition = max(0.0, weapon.get("condition", 100.0) - wear)
+            await db.weapons.update_one({"_id": weapon["_id"]}, {
+                "$set": {"condition": new_w_condition},
+                "$inc": {"missions_done": 1, "missions_since_repair": 1},
+            })
 
     if members:
         if outcome == "failure":
@@ -1075,6 +1185,7 @@ async def _process_payroll(db, player, employees, now):
             survivors = []
             for e in employees:
                 if e in would_leave and e["_id"] != spare_id:
+                    await _unlink_employee_weapon(db, e["_id"])
                     await db.employees.delete_one({"_id": e["_id"]})
                     await add_event(db, pid, "police", f"{e['name']} abandonou a organização por salários em atraso!")
                 else:
@@ -1109,6 +1220,7 @@ async def _process_betrayals(db, player, employees, minutes):
                 await db.vehicles.update_one({"_id": veh["_id"]}, {"$set": {"condition": max(0.0, veh["condition"] - 20)}})
             msg = f"{e['name']} sabotou um veículo da frota!"
         else:
+            await _unlink_employee_weapon(db, e["_id"])
             await db.employees.delete_one({"_id": e["_id"]})
             await add_event(db, pid, "police", f"{e['name']} abandonou a organização!")
             break

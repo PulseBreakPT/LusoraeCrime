@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, STATUS_LABELS,
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
-  matchesSearch,
+  matchesSearch, conditionBand, weaponCompatibility,
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
@@ -20,6 +20,7 @@ import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
+  Swords, ShieldAlert,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -80,11 +81,11 @@ const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title 
   );
 };
 
-const EmployeeCard = ({ e }) => {
+const EmployeeCard = ({ e, onNavigate }) => {
   const {
     state, catalog, serverNow, assignEmployee, trainEmployee, restEmployee,
     promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
-    favoriteEmployeeIds, toggleFavoriteEmployee,
+    favoriteEmployeeIds, toggleFavoriteEmployee, unassignWeapon,
   } = useGame();
   const [manage, setManage] = useState(false);
   const [course, setCourse] = useState("");
@@ -108,6 +109,10 @@ const EmployeeCard = ({ e }) => {
 
   const team = e.team_id ? state.teams.find((t) => t.id === e.team_id) : null;
   const vehicle = team?.vehicle_id ? state.vehicles.find((v) => v.id === team.vehicle_id) : null;
+  const weapon = e.weapon_id ? (state.weapons || []).find((w) => w.id === e.weapon_id) : null;
+  const weaponModel = weapon ? catalog?.weapon_models?.[weapon.model_key] : null;
+  const weaponCompat = weapon && weaponModel ? weaponCompatibility(e, weaponModel) : null;
+  const weaponProficiency = weaponModel ? (e.weapon_proficiency || {})[weaponModel.category] || 0 : 0;
   const mission = e.status === "on_mission" && team ? state.missions.find((m) => m.team_id === team.id) : null;
   let missionEtaS = null;
   let missionPhaseLabel = "";
@@ -268,6 +273,44 @@ const EmployeeCard = ({ e }) => {
             <Car size={10} className="shrink-0 text-cyan-400" /> {vehicle.name}
           </p>
         </Tip>
+      )}
+
+      {weapon && weaponModel ? (
+        <div className="mt-1.5 rounded-md border border-white/5 bg-black/20 px-2 py-1.5">
+          <div className="flex items-center justify-between gap-1">
+            <Tip tip={`Arma equipada: ${weaponModel.name} (${Math.round(weapon.condition)}% condição).`}>
+              <p className="flex min-w-0 items-center gap-1 font-mono text-[10px] text-zinc-400">
+                <Swords size={10} className="shrink-0 text-cyan-400" />
+                <span className="truncate">{weaponModel.name}</span>
+                <span style={{ color: conditionBand(weapon.condition).color }}>{Math.round(weapon.condition)}%</span>
+              </p>
+            </Tip>
+            <button
+              data-testid={`emp-unassign-weapon-${e.id}`}
+              onClick={() => unassignWeapon(e.id)}
+              disabled={!idle}
+              className="shrink-0 font-mono text-[9px] text-red-400 underline-offset-2 hover:underline disabled:opacity-40 disabled:no-underline"
+            >
+              desatribuir
+            </button>
+          </div>
+          {weaponProficiency > 0 && (
+            <p className="mt-0.5 font-mono text-[9px] text-zinc-500">Proficiência: {Math.round(weaponProficiency)}%</p>
+          )}
+          {weaponCompat && !weaponCompat.compatible && (
+            <p className="mt-0.5 flex items-center gap-1 font-mono text-[9px] text-amber-400">
+              <ShieldAlert size={9} /> pouco compatível ({weaponCompat.missing.join(", ")})
+            </p>
+          )}
+        </div>
+      ) : (
+        <button
+          data-testid={`emp-nav-weapons-${e.id}`}
+          onClick={() => onNavigate && onNavigate("weapons")}
+          className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-white hover:underline"
+        >
+          <Swords size={10} /> Sem arma equipada — atribuir em Armamento
+        </button>
       )}
 
       {e.status === "injured" && (
@@ -635,7 +678,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     <p className="font-mono text-[11px] text-zinc-600">Nenhum operacional corresponde aos filtros.</p>
                   )}
                   {sortedEmployees.map((e) => (
-                    <EmployeeCard key={e.id} e={e} />
+                    <EmployeeCard key={e.id} e={e} onNavigate={onNavigate} />
                   ))}
                 </div>
               </>

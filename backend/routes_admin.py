@@ -223,7 +223,7 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
     now = now_utc().isoformat()
 
     # Deletar tudo relacionado ao jogador
-    for coll in (db.teams, db.employees, db.vehicles, db.properties, db.opportunities,
+    for coll in (db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
                  db.missions, db.events, db.quests, db.candidates, db.transactions):
         await coll.delete_many({"player_id": pid})
 

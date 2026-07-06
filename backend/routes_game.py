@@ -16,10 +16,12 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     local_presence_reduction_s, situational_bonus_for, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
                     record_tx, property_stack_ranks, property_stack_mult,
-                    dirty_money_cap, grant_quest_rewards)
+                    dirty_money_cap, grant_quest_rewards,
+                    weapon_bonus_breakdown, weapon_combat_score, weapon_compatibility_factor,
+                    _unlink_employee_weapon)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
-from models import Player, Team, Employee, Candidate, Vehicle, Property, Opportunity, Mission, Event, Quest, Transaction
+from models import Player, Team, Employee, Candidate, Vehicle, Weapon, Property, Opportunity, Mission, Event, Quest, Transaction
 from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS, RARITIES,
                        RARITY_MIN_RESPECT, RANKS, RANK_REQ_LEVEL, TALENTS, RECRUIT_SOURCES,
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
@@ -35,7 +37,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
                        ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
-                       HQ_DEPARTMENTS)
+                       HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER)
 from reward_engine import calculate_full_reward
 
 router = APIRouter(prefix="/api/game", tags=["game"])
@@ -124,6 +126,23 @@ class VehicleAssignInput(BaseModel):
     team_id: Optional[str] = None
 
 
+class WeaponBuyInput(BaseModel):
+    model_key: str
+
+
+class WeaponIdInput(BaseModel):
+    weapon_id: str
+
+
+class WeaponAssignInput(BaseModel):
+    weapon_id: str
+    employee_id: str
+
+
+class WeaponUnassignInput(BaseModel):
+    employee_id: str
+
+
 class PropertyBuyInput(BaseModel):
     type_key: str
 
@@ -196,6 +215,8 @@ async def catalog():
         "hq_priorities": HQ_PRIORITIES,
         "hq_default_priority": HQ_DEFAULT_PRIORITY,
         "hq_departments": HQ_DEPARTMENTS,
+        "weapon_models": WEAPON_MODELS,
+        "weapon_categories": WEAPON_CATEGORIES,
     }
 
 
@@ -207,11 +228,12 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
     pid = str(player["_id"])
     now_iso = now_utc().isoformat()
 
-    (teams, employees, candidates, vehicles, properties, opportunities, missions, history, events, quest_docs, caps, bonuses) = await asyncio.gather(
+    (teams, employees, candidates, vehicles, weapons, properties, opportunities, missions, history, events, quest_docs, caps, bonuses) = await asyncio.gather(
         db.teams.find({"player_id": pid}).to_list(100),
         db.employees.find({"player_id": pid}).to_list(300),
         db.candidates.find({"player_id": pid}).to_list(50),
         db.vehicles.find({"player_id": pid}).to_list(100),
+        db.weapons.find({"player_id": pid}).to_list(300),
         db.properties.find({"player_id": pid}).to_list(100),
         db.opportunities.find(
             {"player_id": pid, "$or": [
@@ -246,6 +268,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         "employees": emp_dumps,
         "candidates": [Candidate.from_mongo(c).model_dump() for c in candidates],
         "vehicles": [Vehicle.from_mongo(v).model_dump() for v in vehicles],
+        "weapons": [Weapon.from_mongo(w).model_dump() for w in weapons],
         "properties": [Property.from_mongo(pr).model_dump() for pr in properties],
         "opportunities": [Opportunity.from_mongo(o).model_dump() for o in opportunities],
         "missions": [Mission.from_mongo(m).model_dump() for m in missions],
@@ -278,6 +301,10 @@ async def _prepare_dispatch(player, opp, team):
     }).to_list(50)
     if not members:
         raise HTTPException(status_code=400, detail="A equipa não tem membros disponíveis (sem operacionais ou demasiado fatigados)")
+    weapon_docs = await db.weapons.find({
+        "player_id": pid, "employee_id": {"$in": [str(e["_id"]) for e in members]},
+    }).to_list(50)
+    weapons_by_employee_id = {w["employee_id"]: w for w in weapon_docs}
     if not team.get("vehicle_id"):
         raise HTTPException(status_code=400, detail="A equipa não tem veículo atribuído")
     vehicle = await db.vehicles.find_one({"_id": ObjectId(team["vehicle_id"]), "player_id": pid})
@@ -356,8 +383,14 @@ async def _prepare_dispatch(player, opp, team):
     team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
     vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
     situational_bonus = situational_bonus_for(opp["category"], now)
+    weapon_bonus = weapon_bonus_breakdown(members, weapons_by_employee_id, opp["category"])
     chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match,
-                                          talent_bonus, team_bonus, vehicle_bonus, situational_bonus)
+                                          talent_bonus, team_bonus, vehicle_bonus, situational_bonus,
+                                          weapon_bonus=weapon_bonus)
+    weapon_loud = any(
+        WEAPON_MODELS.get(w.get("model_key"), {}).get("loud", False)
+        for w in weapons_by_employee_id.values()
+    )
 
     # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
     # opp["duration_s"] é sempre um único int (gerado em spawn_opportunities), não um intervalo.
@@ -396,6 +429,7 @@ async def _prepare_dispatch(player, opp, team):
         "team_skill": team_skill,
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
         "talents": member_talents, "min_members": opp.get("min_members", 1),
+        "weapon_loud": weapon_loud,
     }
 
 
@@ -480,6 +514,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
         "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
+        "weapon_loud": prep.get("weapon_loud", False),
         "repeat_type": repeat_type,
         "talents": prep["talents"],
         "opportunity_id": str(opp["_id"]),
@@ -962,6 +997,7 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     if player["clean_money"] < severance:
         raise HTTPException(status_code=400, detail=f"Indemnização de {severance:,} € — dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -severance}})
+    await _unlink_employee_weapon(db, emp["_id"])
     await db.employees.delete_one({"_id": emp["_id"]})
     await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": -3}})
     await db.employees.update_many({"player_id": pid, "morale": {"$lt": 0}}, {"$set": {"morale": 0.0}})
@@ -1134,6 +1170,166 @@ async def rename_vehicle(body: VehicleRenameInput, user: dict = Depends(get_curr
         raise HTTPException(status_code=400, detail="Nome não pode estar vazio")
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"name": name}})
     return {"ok": True}
+
+
+# ---------------- Armamento ----------------
+# Equipamento operacional pessoal: uma arma por funcionário (ao contrário do
+# veículo, partilhado pela equipa). Mesma família de endpoints (compra,
+# venda, reparação, atribuição) que veículos, mas a ligação bidireccional é
+# Employee↔Weapon em vez de Team↔Vehicle.
+
+async def _weapon_free(pid, weapon):
+    """Mirror de _vehicle_free, mas do lado do funcionário: uma arma
+    atribuída a um funcionário em operação não pode ser vendida/reatribuída."""
+    if weapon.get("employee_id"):
+        emp = await db.employees.find_one({"_id": ObjectId(weapon["employee_id"]), "player_id": pid})
+        if emp and emp["status"] != "idle":
+            return False
+    return True
+
+
+@router.post("/weapons/buy")
+async def buy_weapon(body: WeaponBuyInput, user: dict = Depends(get_current_user)):
+    if body.model_key not in WEAPON_MODELS:
+        raise HTTPException(status_code=400, detail="Modelo inválido")
+    player = await get_player(user)
+    pid = str(player["_id"])
+    model = WEAPON_MODELS[body.model_key]
+    if player["level"] < model["min_level"]:
+        raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {model['min_level']}")
+    if player["clean_money"] < model["price"]:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -model["price"]}})
+    await db.weapons.insert_one({
+        "player_id": pid, "model_key": body.model_key, "name": model["name"],
+        "condition": 100.0, "employee_id": None, "missions_since_repair": 0,
+        "missions_done": 0, "upgrades": [], "bought_at": now_utc().isoformat(),
+    })
+    await add_event(db, pid, "weapon", f"{model['name']} adquirida por {model['price']:,} €.")
+    await record_tx(db, pid, "weapon_buy", -model["price"], "clean", player["clean_money"] - model["price"], f"Compra de {model['name']}")
+    return {"ok": True}
+
+
+@router.post("/weapons/sell")
+async def sell_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    weapon = await db.weapons.find_one({"_id": _oid(body.weapon_id, "Arma inválida"), "player_id": pid})
+    if not weapon:
+        raise HTTPException(status_code=404, detail="Arma não encontrada")
+    if not await _weapon_free(pid, weapon):
+        raise HTTPException(status_code=400, detail="O funcionário equipado está em operação")
+    model = WEAPON_MODELS.get(weapon["model_key"], {})
+    value = int(model.get("price", 0) * 0.4 * weapon.get("condition", 100) / 100)
+    if weapon.get("employee_id"):
+        await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
+    await db.weapons.delete_one({"_id": weapon["_id"]})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
+    await add_event(db, pid, "weapon", f"{weapon['name']} vendida. Recebeste {value:,} €.")
+    await record_tx(db, pid, "weapon_sell", value, "clean", player["clean_money"] + value, f"Venda de {weapon['name']}")
+    return {"value": value}
+
+
+@router.post("/weapons/repair")
+async def repair_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    weapon = await db.weapons.find_one({"_id": _oid(body.weapon_id, "Arma inválida"), "player_id": pid})
+    if not weapon:
+        raise HTTPException(status_code=404, detail="Arma não encontrada")
+    if not await _weapon_free(pid, weapon):
+        raise HTTPException(status_code=400, detail="O funcionário equipado está em operação")
+    missing = 100 - weapon.get("condition", 100)
+    if missing < 1:
+        raise HTTPException(status_code=400, detail="Arma em perfeitas condições")
+    model = WEAPON_MODELS.get(weapon["model_key"], {})
+    cost = max(20, int(missing * model.get("maintenance_cost", 100) * WEAPON_REPAIR_COST_MULTIPLIER / 100))
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"condition": 100.0, "missions_since_repair": 0}})
+    await add_event(db, pid, "weapon", f"{weapon['name']} reparada por {cost:,} €.")
+    await record_tx(db, pid, "weapon_repair", -cost, "clean", player["clean_money"] - cost, f"Reparação de {weapon['name']}")
+    return {"cost": cost}
+
+
+@router.post("/weapons/assign")
+async def assign_weapon(body: WeaponAssignInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    weapon = await db.weapons.find_one({"_id": _oid(body.weapon_id, "Arma inválida"), "player_id": pid})
+    if not weapon:
+        raise HTTPException(status_code=404, detail="Arma não encontrada")
+    emp = await _get_employee(pid, body.employee_id)
+    if emp["status"] != "idle":
+        raise HTTPException(status_code=400, detail="Operacional está ocupado")
+    if not await _weapon_free(pid, weapon):
+        raise HTTPException(status_code=400, detail="O funcionário atualmente equipado está em operação")
+    # Desatribuir a arma anterior do funcionário (de volta ao inventário) e
+    # esta arma de outro funcionário, se aplicável — mirror do padrão de
+    # vehicles/assign, mas do lado do funcionário.
+    if emp.get("weapon_id") and emp["weapon_id"] != str(weapon["_id"]):
+        await db.weapons.update_one({"_id": ObjectId(emp["weapon_id"])}, {"$set": {"employee_id": None}})
+    if weapon.get("employee_id") and weapon["employee_id"] != body.employee_id:
+        await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"weapon_id": str(weapon["_id"])}})
+    await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"employee_id": body.employee_id}})
+    return {"ok": True}
+
+
+@router.post("/weapons/unassign")
+async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    emp = await _get_employee(pid, body.employee_id)
+    if not emp.get("weapon_id"):
+        raise HTTPException(status_code=400, detail="Operacional não tem arma equipada")
+    if emp["status"] != "idle":
+        raise HTTPException(status_code=400, detail="Operacional está ocupado")
+    await db.weapons.update_one({"_id": ObjectId(emp["weapon_id"])}, {"$set": {"employee_id": None}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"weapon_id": None}})
+    return {"ok": True}
+
+
+@router.post("/weapons/auto_assign")
+async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
+    """Sugere e atribui automaticamente a arma ao funcionário mais adequado:
+    idle, compatível (especialização própria ou da equipa actual corresponde
+    à categoria da arma), mais experiente, e com pior equipamento actual —
+    mirror do padrão de ordenação por tuplo já usado em recommend_team."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    weapon = await db.weapons.find_one({"_id": _oid(body.weapon_id, "Arma inválida"), "player_id": pid})
+    if not weapon:
+        raise HTTPException(status_code=404, detail="Arma não encontrada")
+    if not await _weapon_free(pid, weapon):
+        raise HTTPException(status_code=400, detail="O funcionário atualmente equipado está em operação")
+    model = WEAPON_MODELS.get(weapon["model_key"], {})
+    candidates = await db.employees.find({"player_id": pid, "status": "idle"}).to_list(300)
+    if not candidates:
+        raise HTTPException(status_code=400, detail="Não há operacionais disponíveis para equipar")
+    teams_by_id = {str(t["_id"]): t for t in await db.teams.find({"player_id": pid}).to_list(100)}
+    current_weapons = {w["employee_id"]: w for w in await db.weapons.find({"player_id": pid, "employee_id": {"$ne": None}}).to_list(300)}
+
+    def rank_key(emp):
+        team = teams_by_id.get(emp.get("team_id"))
+        spec_match = emp.get("spec") in model.get("best_for", [])
+        team_match = bool(team) and team.get("spec") in model.get("best_for", [])
+        current = current_weapons.get(str(emp["_id"]))
+        current_score = 0.0
+        if current:
+            current_model = WEAPON_MODELS.get(current["model_key"], {})
+            current_score = weapon_combat_score(current_model, emp.get("spec", "")) if current_model else 0.0
+        return (-int(spec_match), -int(team_match), -emp.get("level", 1), current_score)
+
+    best = min(candidates, key=rank_key)
+    if best.get("weapon_id"):
+        await db.weapons.update_one({"_id": ObjectId(best["weapon_id"])}, {"$set": {"employee_id": None}})
+    if weapon.get("employee_id"):
+        await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
+    await db.employees.update_one({"_id": best["_id"]}, {"$set": {"weapon_id": str(weapon["_id"])}})
+    await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"employee_id": str(best["_id"])}})
+    return {"ok": True, "employee_id": str(best["_id"]), "employee_name": best["name"]}
 
 
 # ---------------- Propriedades ----------------

@@ -274,6 +274,30 @@ export function propertyBenefit(pt, level = 1) {
   return parts.join(" · ");
 }
 
+// Resumo legível das estatísticas de um modelo de arma (mirror de propertyBenefit).
+export function weaponBenefit(wm) {
+  if (!wm) return "";
+  const parts = [];
+  if (wm.power) parts.push(`Potência ${wm.power}`);
+  if (wm.accuracy) parts.push(`Precisão ${wm.accuracy}`);
+  if (wm.range) parts.push(`Alcance ${wm.range}`);
+  if (wm.use_speed) parts.push(`Velocidade ${wm.use_speed}`);
+  if (wm.magazine_capacity) parts.push(`Carregador ${wm.magazine_capacity}`);
+  return parts.join(" · ");
+}
+
+// Compatibilidade suave: um funcionário que não cumpra requires_attr continua
+// a poder equipar a arma, mas com menos eficácia — usado só para o aviso na
+// interface, nunca para bloquear a atribuição.
+export function weaponCompatibility(emp, wm) {
+  const reqs = wm?.requires_attr || {};
+  const keys = Object.keys(reqs);
+  if (keys.length === 0) return { compatible: true, missing: [] };
+  const attrs = emp?.attrs || {};
+  const missing = keys.filter((k) => (attrs[k] || 0) < reqs[k]);
+  return { compatible: missing.length === 0, missing };
+}
+
 export function parseActivityMessage(message) {
   const React = require('react');
   const parts = [];
@@ -712,6 +736,8 @@ export function classifyEvent(kind, message) {
       if (/abastecer|depósito cheio/i.test(msg)) return { panel: "fleet", color: "#22D3EE" };
       return { panel: "fleet", color: "#34D399" };
     }
+    case "weapon":
+      return { panel: "weapons", color: "#34D399" };
     case "property":
       return { panel: "properties", color: "#A78BFA" };
     case "launder":
