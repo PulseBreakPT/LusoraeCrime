@@ -1027,9 +1027,9 @@ async def _process_payroll(db, player, employees, now):
             continue
         if player["clean_money"] >= total:
             player["clean_money"] -= total
-            await add_event(db, pid, "system", f"Folha salarial paga: -{total:,} €.")
-            await record_tx(db, pid, "payroll", -total, "clean", player["clean_money"], "Folha salarial")
-            # Salários em dia recuperam lentamente a moral e a lealdade do plantel.
+            await add_event(db, pid, "system", f"Ciclo salarial pago: -{total:,} €.")
+            await record_tx(db, pid, "payroll", -total, "clean", player["clean_money"], "Ciclo salarial")
+            # Salários em dia recuperam lentamente a moral e a lealdade do efetivo.
             idle_ids = [e["_id"] for e in employees if e.get("status") == "idle"]
             if idle_ids:
                 await db.employees.update_many(

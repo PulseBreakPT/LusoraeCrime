@@ -669,7 +669,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
 # ---------------- Funcionários ----------------
 
 async def _get_employee(pid, employee_id):
-    emp = await db.employees.find_one({"_id": _oid(employee_id, "Funcionário inválido"), "player_id": pid})
+    emp = await db.employees.find_one({"_id": _oid(employee_id, "Operacional inválido"), "player_id": pid})
     if not emp:
         raise HTTPException(status_code=404, detail="Operacional não encontrado")
     return emp
@@ -810,7 +810,7 @@ async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
         raise HTTPException(status_code=400, detail="Já está no topo da hierarquia")
     new_idx = idx + 1
     if emp["level"] < RANK_REQ_LEVEL[new_idx]:
-        raise HTTPException(status_code=400, detail=f"Requer nível {RANK_REQ_LEVEL[new_idx]} do funcionário")
+        raise HTTPException(status_code=400, detail=f"Requer nível {RANK_REQ_LEVEL[new_idx]} do operacional")
     cost = PROMOTE_BASE_COST * new_idx
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")

@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 
 const TX_LABELS = {
-  mission_reward: "Recompensa de missão", payroll: "Folha salarial", vehicle_buy: "Compra de veículo",
+  mission_reward: "Recompensa de operação", payroll: "Ciclo salarial", vehicle_buy: "Compra de veículo",
   vehicle_sell: "Venda de veículo", refuel: "Combustível", repair: "Reparação", recruit: "Recrutamento",
-  pool_refresh: "Atualização de contactos", training: "Formação", promote: "Promoção", bonus: "Bónus",
+  pool_refresh: "Novos contactos", training: "Formação", promote: "Promoção", bonus: "Bónus",
   heal: "Clínica", release: "Advogado", fire: "Indemnização", property_buy: "Compra de imóvel",
   property_sell: "Venda de imóvel", property_upgrade: "Melhoria de imóvel", bribe: "Suborno",
   launder_out: "Lavagem (saída)", launder_in: "Lavagem (entrada)", team_create: "Nova equipa",
@@ -76,7 +76,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
         </div>
 
         {dirtyCap && (
-          <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de missões são desperdiçadas — lava regularmente para abrir espaço.`}>
+          <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de operações são desperdiçadas — lava regularmente para abrir espaço.`}>
             <div className="mt-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
               <span>Armazenamento sujo</span>
               <span className={dirtyCap.used >= dirtyCap.max * 0.9 ? "text-red-400" : "text-zinc-400"}>
@@ -100,8 +100,8 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             <AlertTriangle size={12} className={liquidity === "red" ? "text-red-400" : "text-amber-400"} />
             <AlertDescription className={`font-mono text-[10px] ${liquidity === "red" ? "text-red-400" : "text-amber-400"}`}>
               {liquidity === "red"
-                ? "Reserva crítica: podes não conseguir pagar a próxima folha salarial."
-                : "Reserva baixa: o dinheiro limpo está abaixo da folha salarial."}
+                ? "Reserva crítica: podes não conseguir pagar o próximo ciclo salarial."
+                : "Reserva baixa: o dinheiro limpo está abaixo do ciclo salarial."}
             </AlertDescription>
           </Alert>
         )}
@@ -123,7 +123,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 <p className="font-mono text-[11px] font-bold text-emerald-400">+{fmtMoney(launderPerH)}/h</p>
               </div>
             </Tip>
-            <Tip tip={`Folha salarial: ${fmtMoney(state.salary_total || 0)} a cada 30 min (${fmtMoney(salaryPerH)}/h).`} block>
+            <Tip tip={`Ciclo salarial: ${fmtMoney(state.salary_total || 0)} a cada 30 min (${fmtMoney(salaryPerH)}/h).`} block>
               <div>
                 <p className="text-[8px] uppercase tracking-wider text-zinc-600">Salários</p>
                 <p className="font-mono text-[11px] font-bold text-red-400">-{fmtMoney(salaryPerH)}/h</p>
@@ -140,12 +140,12 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             </p>
           </Tip>
           <div className="mt-1.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
-            <Tip tip="Tempo até ao próximo pagamento automático da folha salarial.">
+            <Tip tip="Tempo até ao próximo pagamento automático do ciclo salarial.">
               <span className="flex items-center gap-1">
                 <Clock size={9} /> Próx. pagamento: <span className="text-zinc-300">{payrollS != null ? fmtDuration(payrollS) : "—"}</span>
               </span>
             </Tip>
-            <Tip tip={runwayHours != null ? "Quanto tempo aguentas ao ritmo atual de despesas em dinheiro limpo (salários vs. lavagem passiva), sem contar recompensas de missões." : "As entradas passivas de dinheiro limpo já cobrem os salários — autonomia ilimitada ao ritmo atual."}>
+            <Tip tip={runwayHours != null ? "Quanto tempo aguentas ao ritmo atual de despesas em dinheiro limpo (salários vs. lavagem passiva), sem contar recompensas de operações." : "As entradas passivas de dinheiro limpo já cobrem os salários — autonomia ilimitada ao ritmo atual."}>
               <span className="flex items-center gap-1">
                 Autonomia:{" "}
                 <span className={runwayHours != null && runwayHours < 24 ? "text-red-400" : "text-zinc-300"}>

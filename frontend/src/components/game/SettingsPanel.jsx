@@ -223,7 +223,7 @@ const DeleteAccountForm = () => {
   return (
     <Card className="border-red-500/20 bg-red-500/5 p-2 shadow-none">
       <p className="text-[10px] leading-snug text-red-300">
-        Esta ação é irreversível: apaga a organização, o plantel, a frota, os imóveis e todo o progresso. Não há forma de recuperar depois.
+        Esta ação é irreversível: apaga a organização, o efetivo, a frota, os imóveis e todo o progresso. Não há forma de recuperar depois.
       </p>
       <Input
         data-testid="settings-delete-password-input"

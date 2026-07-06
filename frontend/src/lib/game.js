@@ -531,7 +531,7 @@ export function orgAlerts(state) {
   const payrollDueSoon = payrollS != null && payrollS <= 300 && (state?.salary_total || 0) > 0;
   // Distinto de "payrollDueSoon" (lembrete de tempo): isto sinaliza que o
   // dinheiro não chega mesmo, independentemente de quando o ciclo acontece —
-  // é a condição que faz o plantel perder lealdade e abandonar a organização.
+  // é a condição que faz o efetivo perder lealdade e abandonar a organização.
   const payrollShort = (state?.salary_total || 0) > 0 && (state?.player?.clean_money || 0) < state.salary_total;
   // Cofre de dinheiro sujo quase cheio: a produção passiva dos laboratórios
   // acima do limite é desperdiçada — o jogador está a perder dinheiro real
@@ -582,7 +582,7 @@ export function panelForEvent(kind, message) {
       if (/despistou/i.test(msg)) return { panel: "teams" };
       return { panel: "quests" };
     case "system":
-      if (/folha salarial paga|sem pessoal e sem fundos/i.test(msg)) return { panel: "employees" };
+      if (/ciclo salarial pago|sem pessoal e sem fundos/i.test(msg)) return { panel: "employees" };
       return { panel: "intel" };
     case "intel":
     default:
