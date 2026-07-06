@@ -190,7 +190,11 @@ export const ConfirmButton = ({
         disabled={disabled}
         className={cn(
           "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] transition-colors disabled:opacity-40",
-          armed ? "border-destructive/60 bg-destructive/20 text-destructive" : `border-input ${color} hover:bg-accent`
+          armed
+            ? "border-destructive/60 bg-destructive/20 text-destructive"
+            : disabled
+            ? "border-red-500/30 bg-red-500/10 text-red-400"
+            : `border-input ${color} hover:bg-accent`
         )}
       >
         {Icon && <Icon size={11} />} {armed ? confirmLabel : label}

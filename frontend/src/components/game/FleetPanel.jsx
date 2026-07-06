@@ -408,7 +408,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           onClick={() => buyVehicle(key)}
                           disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
                           size="sm"
-                          className="shrink-0 text-[10px] font-bold uppercase"
+                          className={`shrink-0 text-[10px] font-bold uppercase ${
+                            locked || state.player.clean_money < m.price || caps.used >= caps.max
+                              ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                              : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                          }`}
                         >
                           {fmtMoney(m.price)}
                         </Button>

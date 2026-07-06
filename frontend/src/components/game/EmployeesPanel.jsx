@@ -425,7 +425,11 @@ const CandidateCard = ({ c }) => {
             size="sm"
             onClick={() => recruitEmployee(c.id)}
             disabled={lackRespect || lackMoney || full}
-            className="font-mono text-[10px] font-bold uppercase"
+            className={`font-mono text-[10px] font-bold uppercase ${
+              lackRespect || lackMoney || full
+                ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+            }`}
           >
             {fmtMoney(c.cost)}
           </Button>
