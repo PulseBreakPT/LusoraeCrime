@@ -409,10 +409,13 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           )}
           <Button
             data-testid="dispatch-team-button"
-            variant="success"
             onClick={handleDispatch}
             disabled={!selectedTeamId || busy}
-            className="mt-3 w-full font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+            className={`mt-3 w-full font-bold uppercase tracking-wider ${
+              !selectedTeamId || busy
+                ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                : "bg-success text-success-foreground shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-success/90"
+            }`}
           >
             {busy ? "A destacar..." : "Destacar equipa"}
           </Button>
