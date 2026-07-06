@@ -44,6 +44,14 @@ const RecommendedActions = ({ onNavigate }) => {
   if (teamsNoMembers) recs.push({ id: "nomembers", text: `${teamsNoMembers} equipa(s) sem membros`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
   const claimable = (state.quests || []).filter((q) => q.status === "completed").length;
   if (claimable) recs.push({ id: "quests", text: `${claimable} recompensa(s) de missão por reclamar`, action: "Abrir Missões", run: () => onNavigate && onNavigate("quests"), can: true });
+  if (state.salary_total > 0 && p.clean_money < state.salary_total) {
+    recs.push({
+      id: "payroll", text: `Fundos insuficientes para a folha salarial (${fmtMoney(state.salary_total)})`,
+      action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true,
+    });
+  }
+  const degraded = (state.properties || []).filter((pr) => (pr.condition ?? 100) < 50).length;
+  if (degraded) recs.push({ id: "properties", text: `${degraded} imóvel(is) degradado(s) — manutenção em atraso`, action: "Abrir Imóveis", run: () => onNavigate && onNavigate("properties"), can: true });
 
   return (
     <div className="mt-4" data-testid="intel-recommendations">

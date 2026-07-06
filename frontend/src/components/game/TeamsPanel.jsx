@@ -547,7 +547,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       onClick={() => createTeam(key)}
                       disabled={atCap || state.player.clean_money < catalog.team_create_cost}
                       variant="outline"
-                      className="h-full w-full flex-col items-start border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40"
+                      className={`h-full w-full flex-col items-start bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40 ${
+                        atCap || state.player.clean_money < catalog.team_create_cost
+                          ? "border-red-500/30"
+                          : "border-emerald-500/30"
+                      }`}
                     >
                       <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
                       <span className="whitespace-normal text-[10px] leading-tight text-zinc-500">{ts.desc}</span>

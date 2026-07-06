@@ -654,7 +654,11 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                 variant="outline" size="sm"
                 onClick={() => refreshPool()}
                 disabled={state.player.clean_money < catalog.hr_costs.pool_refresh}
-                className="h-auto gap-1 border-white/10 px-2 py-1 font-mono text-[10px] text-cyan-400 hover:bg-white/5"
+                className={`h-auto gap-1 px-2 py-1 font-mono text-[10px] ${
+                  state.player.clean_money < catalog.hr_costs.pool_refresh
+                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    : "border-white/10 text-cyan-400 hover:bg-white/5"
+                }`}
               >
                 <RefreshCw size={10} /> Atualizar {fmtMoney(catalog.hr_costs.pool_refresh)}
               </Button>

@@ -526,14 +526,18 @@ export function orgAlerts(state) {
   const claimable = (state?.quests || []).filter((q) => q.status === "completed").length;
   const payrollS = state?.player?.next_payroll_at ? (Date.parse(state.player.next_payroll_at) - Date.now()) / 1000 : null;
   const payrollDueSoon = payrollS != null && payrollS <= 300 && (state?.salary_total || 0) > 0;
+  // Distinto de "payrollDueSoon" (lembrete de tempo): isto sinaliza que o
+  // dinheiro não chega mesmo, independentemente de quando o ciclo acontece —
+  // é a condição que faz o plantel perder lealdade e abandonar a organização.
+  const payrollShort = (state?.salary_total || 0) > 0 && (state?.player?.clean_money || 0) < state.salary_total;
   const hr = injured + arrested + exhausted + betrayal;
   const fleet = lowFuel + damaged;
   const teamsIssues = teamsNoVehicle + teamsNoMembers;
   return {
     injured, arrested, exhausted, nearExhausted, betrayal, lowFuel, damaged, nearBreakdown,
-    teamsNoVehicle, teamsNoMembers, raidRisk, claimable, payrollDueSoon,
+    teamsNoVehicle, teamsNoMembers, raidRisk, claimable, payrollDueSoon, payrollShort,
     hr, fleet, teams: teamsIssues,
-    total: hr + fleet + teamsIssues + nearExhausted + nearBreakdown + (payrollDueSoon ? 1 : 0) + (raidRisk ? 1 : 0),
+    total: hr + fleet + teamsIssues + nearExhausted + nearBreakdown + (payrollDueSoon ? 1 : 0) + (payrollShort ? 1 : 0) + (raidRisk ? 1 : 0),
   };
 }
 
