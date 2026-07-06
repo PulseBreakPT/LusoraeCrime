@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
-import { parseActivityMessage } from "../../lib/game";
+import { parseActivityMessage, panelForEvent } from "../../lib/game";
 
 const KIND_COLORS = {
   success: "#10B981",
@@ -42,6 +42,11 @@ const relTime = (ts, nowMs) => {
 // Data e hora completas, no mesmo estilo usado no extrato financeiro do Império.
 const absTime = (ts) => new Date(ts).toLocaleString("pt-PT");
 
+const PANEL_LABELS = {
+  teams: "Equipas", fleet: "Frota", properties: "Imóveis", empire: "Império",
+  employees: "RH", quests: "Missões", intel: "Central de Inteligência",
+};
+
 export const ActivityFeed = ({ onNavigate }) => {
   const { state, serverNow } = useGame();
   if (!state) return null;
@@ -65,22 +70,25 @@ export const ActivityFeed = ({ onNavigate }) => {
           {state.events.length === 0 && (
             <p className="px-1 font-mono text-[11px] text-zinc-600">Sem atividade registada.</p>
           )}
-          {state.events.map((e) => (
-            <button
-              key={e.id}
-              type="button"
-              onClick={() => onNavigate && onNavigate("intel")}
-              title={`${KIND_LABELS[e.kind] || e.kind} — clica para veres ações recomendadas`}
-              className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
-            >
-              <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
-              <div className="min-w-0 flex-1">
-                <p className="font-mono text-[11px] leading-snug text-zinc-400">{parseActivityMessage(e.message)}</p>
-                <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
-              </div>
-              <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, serverNow())}</span>
-            </button>
-          ))}
+          {state.events.map((e) => {
+            const dest = panelForEvent(e.kind, e.message);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => onNavigate && onNavigate(dest.panel, dest)}
+                title={`${KIND_LABELS[e.kind] || e.kind} — clica para abrir ${PANEL_LABELS[dest.panel] || dest.panel}`}
+                className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
+              >
+                <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[11px] leading-snug text-zinc-400">{parseActivityMessage(e.message)}</p>
+                  <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
+                </div>
+                <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, serverNow())}</span>
+              </button>
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
@@ -90,12 +98,30 @@ export const ActivityFeed = ({ onNavigate }) => {
 export const ActivityFeedMobile = ({ onNavigate }) => {
   const { state, serverNow } = useGame();
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  // Clicar fora fecha a lista, tal como um popover/dropdown normal — e Escape
+  // também, para consistência com o resto da interface (desktop).
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (ev) => {
+      if (containerRef.current && !containerRef.current.contains(ev.target)) setOpen(false);
+    };
+    const onKeyDown = (ev) => { if (ev.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   if (!state || state.events.length === 0) return null;
   const latest = state.events[0];
   const recent = state.events.slice(0, 5);
 
   return (
-    <div data-testid="activity-feed-mobile" className="pointer-events-none absolute bottom-[4.2rem] left-2 right-2 z-20 md:hidden">
+    <div ref={containerRef} data-testid="activity-feed-mobile" className="pointer-events-none absolute bottom-[4.2rem] left-2 right-2 z-20 md:hidden">
       {open && (
         <Card
           data-testid="activity-feed-mobile-list"
@@ -103,21 +129,24 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
         >
           <p className="mb-1.5 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">Últimos registos</p>
           <div className="space-y-1.5">
-            {recent.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => { setOpen(false); onNavigate && onNavigate("intel"); }}
-                title={`${KIND_LABELS[e.kind] || e.kind} — toca para veres ações recomendadas`}
-                className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
-              >
-                <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-[10px] leading-snug text-zinc-300">{parseActivityMessage(e.message)}</p>
-                  <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
-                </div>
-              </button>
-            ))}
+            {recent.map((e) => {
+              const dest = panelForEvent(e.kind, e.message);
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => { setOpen(false); onNavigate && onNavigate(dest.panel, dest); }}
+                  title={`${KIND_LABELS[e.kind] || e.kind} — toca para abrir ${PANEL_LABELS[dest.panel] || dest.panel}`}
+                  className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
+                >
+                  <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-[10px] leading-snug text-zinc-300">{parseActivityMessage(e.message)}</p>
+                    <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </Card>
       )}

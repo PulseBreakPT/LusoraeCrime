@@ -108,7 +108,13 @@ function App() {
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-            <Toaster position="top-center" theme="dark" toastOptions={{ style: { background: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", backdropFilter: "blur(12px)" } }} />
+            <Toaster
+              position="top-center"
+              theme="dark"
+              closeButton
+              swipeDirections={["up", "left", "right"]}
+              toastOptions={{ style: { background: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", backdropFilter: "blur(12px)" } }}
+            />
           </BrowserRouter>
         </LoadingProvider>
       </AuthProvider>

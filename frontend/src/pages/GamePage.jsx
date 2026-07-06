@@ -24,6 +24,15 @@ export default function GamePage() {
   const { hideImpossibleMissions } = useSettings();
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
+  const [questsFocusTab, setQuestsFocusTab] = useState(null);
+
+  // Ponto único de navegação a partir de eventos/registos — decide o painel a
+  // abrir e, se o evento apontar para uma aba específica (ex.: uma decisão
+  // pendente nas Missões), abre já nessa aba em vez da última usada.
+  const navigateTo = (panel, opts) => {
+    if (opts?.tab && panel === "quests") setQuestsFocusTab(opts.tab);
+    setOpenPanel(panel);
+  };
 
   useEffect(() => {
     if (!selectedOpp || !state) return;
@@ -36,6 +45,18 @@ export default function GamePage() {
     if (autoOpenReportSignal) setOpenPanel((prev) => prev || "intel");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenReportSignal]);
+
+  // Escape fecha o último painel/modal aberto. Os Sheets (radix-ui/react-dialog)
+  // já se fecham sozinhos com Escape — falta apenas cobrir o cartão de
+  // oportunidade selecionada, que não é um Dialog.
+  useEffect(() => {
+    const onKeyDown = (ev) => {
+      if (ev.key !== "Escape") return;
+      if (selectedOpp) setSelectedOpp(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedOpp]);
 
   if (!state) {
     if (stateError) {
@@ -125,9 +146,9 @@ export default function GamePage() {
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
         </Button>
       </Tip>
-      <ActivityFeed onNavigate={setOpenPanel} />
-      <ActivityFeedMobile onNavigate={setOpenPanel} />
-      {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={setOpenPanel} />}
+      <ActivityFeed onNavigate={navigateTo} />
+      <ActivityFeedMobile onNavigate={navigateTo} />
+      {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
 
       <MapLegend />
 
@@ -175,13 +196,19 @@ export default function GamePage() {
         />
       </div>
 
-      <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={setOpenPanel} />
-      <QuestsPanel open={openPanel === "quests"} onOpenChange={(o) => setOpenPanel(o ? "quests" : null)} onNavigate={setOpenPanel} />
-      <EmpirePanel open={openPanel === "empire"} onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} onNavigate={setOpenPanel} />
-      <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={setOpenPanel} />
-      <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={setOpenPanel} />
-      <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={setOpenPanel} />
-      <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={setOpenPanel} />
+      <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} />
+      <QuestsPanel
+        open={openPanel === "quests"}
+        onOpenChange={(o) => setOpenPanel(o ? "quests" : null)}
+        onNavigate={navigateTo}
+        focusTab={questsFocusTab}
+        onFocusTabConsumed={() => setQuestsFocusTab(null)}
+      />
+      <EmpirePanel open={openPanel === "empire"} onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} onNavigate={navigateTo} />
+      <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={navigateTo} />
+      <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={navigateTo} />
+      <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={navigateTo} />
+      <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={navigateTo} />
       <SettingsPanel open={openPanel === "settings"} onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />
     </div>
   );

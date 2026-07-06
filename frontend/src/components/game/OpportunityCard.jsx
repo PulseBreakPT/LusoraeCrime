@@ -8,6 +8,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Alert, AlertDescription } from "../ui/alert";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star } from "lucide-react";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
@@ -234,7 +235,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               <p className="font-mono text-sm font-bold" style={{
                 color: activeMission.chase_active && activeMission.phase === "returning"
                   ? "#EF4444"
-                  : chanceColor(activeMission.success_chance || 0.5)
+                  : chanceColor(activeMission.success_chance ?? 0.5)
               }}>
                 {activeMission.chase_active && activeMission.phase === "returning"
                   ? `${Math.round((activeMission.escape_chance || 0.5) * 100)}%`
@@ -302,49 +303,72 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                     key={t.id}
                     data-testid={`select-team-${t.id}`}
                     onClick={() => r.ok && setSelectedTeamId(t.id)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left shadow-none transition-colors ${
+                    className={`flex w-full flex-col gap-1 rounded-md border px-2.5 py-1.5 text-left shadow-none transition-colors ${
                       selectedTeamId === t.id
                         ? "border-primary/50 bg-primary/10"
                         : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
                     } ${r.ok ? "cursor-pointer" : ""}`}
                   >
-                    <div className={r.ok ? "" : "opacity-50"}>
-                      <p className="text-xs font-semibold text-white">
-                        {t.name}
-                        {t.id === recommendedTeamId && (
-                          <Tip tip="Sugestão automática: a equipa com maior probabilidade de sucesso para esta operação. Podes escolher outra clicando nela.">
-                            <Badge variant="outline" className="ml-1.5 gap-0.5 border-amber-500/30 bg-amber-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-amber-400">
-                              <Sparkles size={9} /> recomendada
-                            </Badge>
-                          </Tip>
-                        )}
-                        {match && (
-                          <Badge variant="outline" className="ml-1.5 border-emerald-500/30 bg-emerald-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-emerald-400">match</Badge>
-                        )}
-                      </p>
-                      <p className="font-mono text-[10px] text-zinc-500">
-                        {r.ok ? `${r.members} membros · ${r.vehicle.name}` : SPEC_LABELS[t.spec]}
-                      </p>
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <div className={r.ok ? "" : "opacity-50"}>
+                        <p className="text-xs font-semibold text-white">
+                          {t.name}
+                          {t.id === recommendedTeamId && (
+                            <Tip tip="Sugestão automática: a equipa com maior probabilidade de sucesso para esta operação. Podes escolher outra clicando nela.">
+                              <Badge variant="outline" className="ml-1.5 gap-0.5 border-amber-500/30 bg-amber-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-amber-400">
+                                <Sparkles size={9} /> recomendada
+                              </Badge>
+                            </Tip>
+                          )}
+                          {match && (
+                            <Badge variant="outline" className="ml-1.5 border-emerald-500/30 bg-emerald-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-emerald-400">match</Badge>
+                          )}
+                        </p>
+                        <p className="font-mono text-[10px] text-zinc-500">
+                          {r.ok ? `${r.members} membros · ${r.vehicle.name}` : SPEC_LABELS[t.spec]}
+                        </p>
+                      </div>
+                      {r.ok ? (
+                        <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
+                          <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
+                        </Tip>
+                      ) : (
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
+                          {fix && (
+                            <Button
+                              data-testid={`fix-team-${t.id}`}
+                              variant="outline" size="sm"
+                              onClick={(ev) => { ev.stopPropagation(); fix.run(); }}
+                              disabled={!fix.can}
+                              title={r.reason}
+                              className={`h-auto gap-1 border-white/15 px-1.5 py-1 font-mono text-[9px] font-bold ${fix.color} hover:bg-white/10`}
+                            >
+                              <fix.icon size={10} /> {fix.label}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {r.ok ? (
-                      <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
-                        <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
-                      </Tip>
-                    ) : (
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
-                        {fix && (
-                          <Button
-                            data-testid={`fix-team-${t.id}`}
-                            variant="outline" size="sm"
-                            onClick={(ev) => { ev.stopPropagation(); fix.run(); }}
-                            disabled={!fix.can}
-                            title={r.reason}
-                            className={`h-auto gap-1 border-white/15 px-1.5 py-1 font-mono text-[9px] font-bold ${fix.color} hover:bg-white/10`}
-                          >
-                            <fix.icon size={10} /> {fix.label}
-                          </Button>
-                        )}
+                    {selectedTeamId === t.id && r.ok && (
+                      <div
+                        className="mt-1.5 flex w-full items-center gap-1.5 border-t border-white/10 pt-1.5"
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        <Car size={11} className="shrink-0 text-cyan-400" />
+                        <Select value={r.vehicle.id} onValueChange={(vid) => vid !== r.vehicle.id && assignVehicle(vid, t.id)}>
+                          <SelectTrigger data-testid={`opp-vehicle-select-${t.id}`} className="h-6 flex-1 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={r.vehicle.id} className="font-mono text-xs">{r.vehicle.name} (atual)</SelectItem>
+                            {state.vehicles
+                              .filter((v) => !v.team_id && v.id !== r.vehicle.id)
+                              .map((v) => (
+                                <SelectItem key={v.id} value={v.id} className="font-mono text-xs">{v.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </Card>

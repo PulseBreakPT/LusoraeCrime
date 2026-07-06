@@ -378,8 +378,26 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
 
 export const MapLegend = () => {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  // Popover: clicar fora ou Escape fecha, tal como qualquer dropdown/menu.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (ev) => {
+      if (containerRef.current && !containerRef.current.contains(ev.target)) setOpen(false);
+    };
+    const onKeyDown = (ev) => { if (ev.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
     <div
+      ref={containerRef}
       className="pointer-events-auto absolute right-2 z-30"
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
