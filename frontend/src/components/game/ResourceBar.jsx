@@ -31,6 +31,7 @@ export const ResourceBar = () => {
   const tr = teamsReadiness(state, serverNow());
   const activeOps = state.missions.length;
   const payrollS = p.next_payroll_at ? Math.max(0, (Date.parse(p.next_payroll_at) - serverNow()) / 1000) : null;
+  const payrollShort = (state.salary_total || 0) > 0 && p.clean_money < state.salary_total;
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
@@ -88,7 +89,7 @@ export const ResourceBar = () => {
 
         <div className="hidden items-stretch gap-2 border-l border-border pl-2 md:flex">
           <Stat
-            testId="stat-teams-ready" icon={Users} color="#22D3EE" label="Prontas" value={`${tr.ready}/${tr.total}`}
+            testId="stat-teams-ready" icon={Users} color={tr.ready === 0 && tr.total > 0 ? "#EF4444" : "#22D3EE"} label="Prontas" value={`${tr.ready}/${tr.total}`}
             tip={`Equipas prontas a operar: ${tr.ready} de ${tr.total}${tr.busy > 0 ? ` · ${tr.busy} em operação` : ""}. Uma equipa pronta tem membros disponíveis, veículo com combustível e em condições.`}
           />
           <Stat
@@ -96,9 +97,11 @@ export const ResourceBar = () => {
             tip={activeOps > 0 ? `${activeOps} operação(ões) em curso — acompanha as unidades no mapa.` : "Sem operações em curso — seleciona uma oportunidade no mapa e despacha uma equipa."}
           />
           <Stat
-            testId="stat-payroll" icon={HandCoins} color="#F59E0B" label="Salários" value={fmtMoney(state.salary_total || 0)}
-            sub={payrollS != null ? `em ${fmtDuration(payrollS)}` : null} subColor="#F59E0B" align="end"
-            tip="Folha salarial paga a cada 30 min com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia."
+            testId="stat-payroll" icon={HandCoins} color={payrollShort ? "#EF4444" : "#F59E0B"} label="Salários" value={fmtMoney(state.salary_total || 0)}
+            sub={payrollShort ? "fundos insuficientes!" : payrollS != null ? `em ${fmtDuration(payrollS)}` : null} subColor={payrollShort ? "#EF4444" : "#F59E0B"} align="end"
+            tip={payrollShort
+              ? `Não tens dinheiro limpo suficiente para a próxima folha salarial (${fmtMoney(state.salary_total)}) — o plantel vai perder moral e lealdade, e quem estiver disponível pode abandonar a organização.`
+              : "Folha salarial paga a cada 30 min com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia."}
           />
         </div>
       </div>
