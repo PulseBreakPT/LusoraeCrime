@@ -10,6 +10,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star } from "lucide-react";
+import { audio } from "../../lib/audio";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const {
@@ -56,6 +57,12 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   // Ao abrir uma oportunidade, pré-seleciona automaticamente a equipa com maior
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
   // sempre escolher outra equipa manualmente clicando numa linha diferente.
+  // Toque de abertura ao selecionar uma missão no mapa — os marcadores do
+  // Leaflet não são <button>, por isso o som global de interface não os cobre.
+  useEffect(() => {
+    audio.sfx.notify();
+  }, [opp.id]);
+
   useEffect(() => {
     setSelectedTeamId(null);
     setRecommendedTeamId(null);
