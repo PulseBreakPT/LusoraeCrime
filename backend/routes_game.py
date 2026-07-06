@@ -32,7 +32,8 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        LAUNDER_PROPERTY_BONUS_PER_LEVEL, LOCAL_PRESENCE_RADIUS_KM,
                        TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, RAIN_CHANCE, RAIN_TRAVEL_MULT,
                        EMPLOYEE_HEAVY_USE_THRESHOLD,
-                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S)
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
+                       ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -177,6 +178,8 @@ async def catalog():
         "recall_penalty_fraction": RECALL_PENALTY_FRACTION,
         "employee_heavy_use_threshold": EMPLOYEE_HEAVY_USE_THRESHOLD,
         "opportunity_types": {k: {kk: vv for kk, vv in v.items() if kk != "duration_s"} for k, v in OPPORTUNITY_TYPES.items()},
+        "achievement_milestones": ACHIEVEMENT_MILESTONES,
+        "achievement_bonus_pct_per_milestone": ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
     }
 
 

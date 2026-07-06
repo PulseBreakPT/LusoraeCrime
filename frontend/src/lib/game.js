@@ -533,14 +533,19 @@ export function orgAlerts(state) {
   // dinheiro não chega mesmo, independentemente de quando o ciclo acontece —
   // é a condição que faz o plantel perder lealdade e abandonar a organização.
   const payrollShort = (state?.salary_total || 0) > 0 && (state?.player?.clean_money || 0) < state.salary_total;
+  // Cofre de dinheiro sujo quase cheio: a produção passiva dos laboratórios
+  // acima do limite é desperdiçada — o jogador está a perder dinheiro real
+  // sem nenhum aviso visível a não ser este.
+  const dirtyCap = state?.caps?.dirty_money?.max || 0;
+  const dirtyNearCap = dirtyCap > 0 && (state?.player?.dirty_money || 0) >= dirtyCap * 0.9;
   const hr = injured + arrested + exhausted + betrayal;
   const fleet = lowFuel + damaged;
   const teamsIssues = teamsNoVehicle + teamsNoMembers;
   return {
     injured, arrested, exhausted, nearExhausted, betrayal, lowFuel, damaged, nearBreakdown,
-    teamsNoVehicle, teamsNoMembers, raidRisk, claimable, payrollDueSoon, payrollShort,
+    teamsNoVehicle, teamsNoMembers, raidRisk, claimable, payrollDueSoon, payrollShort, dirtyNearCap,
     hr, fleet, teams: teamsIssues,
-    total: hr + fleet + teamsIssues + nearExhausted + nearBreakdown + (payrollDueSoon ? 1 : 0) + (payrollShort ? 1 : 0) + (raidRisk ? 1 : 0),
+    total: hr + fleet + teamsIssues + nearExhausted + nearBreakdown + (payrollDueSoon ? 1 : 0) + (payrollShort ? 1 : 0) + (raidRisk ? 1 : 0) + (dirtyNearCap ? 1 : 0),
   };
 }
 

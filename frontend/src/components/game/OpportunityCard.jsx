@@ -132,6 +132,23 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       if (free.length) return { icon: Car, label: free[0].name, color: "text-cyan-400", can: true, run: () => assignVehicle(free[0].id, t.id) };
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
     }
+    if (r.reason.startsWith("Poucos lugares")) {
+      // Sugere um veículo livre com lugares suficientes para os membros prontos.
+      const ready = state.employees.filter((e) => e.team_id === t.id && e.status === "idle" && e.fatigue < 90).length;
+      const fit = state.vehicles.find(
+        (v) => !v.team_id && v.condition >= 30 && (catalog?.vehicle_models?.[v.model_key]?.seats ?? 99) >= ready
+      );
+      if (fit) return { icon: Car, label: fit.name, color: "text-cyan-400", can: true, run: () => assignVehicle(fit.id, t.id) };
+      return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
+    }
+    if (r.reason === "Veículo não adequado") {
+      // Esta operação exige modelos específicos — sugere um da garagem se houver.
+      const fit = state.vehicles.find(
+        (v) => !v.team_id && v.condition >= 30 && opp.required_models?.includes(v.model_key)
+      );
+      if (fit) return { icon: Car, label: fit.name, color: "text-cyan-400", can: true, run: () => assignVehicle(fit.id, t.id) };
+      return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
+    }
     if (r.reason === "Sem membros" || r.reason === "Membros indisponíveis" || r.reason.startsWith("Mín. ")) {
       return { icon: IdCard, label: "RH", color: "text-emerald-400", can: true, run: () => { onClose(); onNavigate && onNavigate("employees"); } };
     }

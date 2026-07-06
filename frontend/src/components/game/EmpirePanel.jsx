@@ -207,7 +207,20 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             <Banknote size={12} /> Lavagem de dinheiro
           </h3>
           <Card className="border-white/10 bg-white/[0.03] p-3 shadow-none">
-            <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Taxa de 25%.</p>
+            <div className="flex items-baseline justify-between">
+              <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Taxa de 25%.</p>
+              {state.caps?.dirty_money?.max > 0 && (
+                <Tip tip={`Capacidade do cofre de dinheiro sujo: ${fmtMoney(p.dirty_money)} de ${fmtMoney(state.caps.dirty_money.max)}. Produção dos laboratórios acima deste limite é desperdiçada — sobe de nível para aumentar, ou lava regularmente.`} align="end">
+                  <span
+                    data-testid="dirty-cap-indicator"
+                    className="shrink-0 font-mono text-[10px]"
+                    style={{ color: p.dirty_money >= state.caps.dirty_money.max * 0.9 ? "#EF4444" : "#71717A" }}
+                  >
+                    cofre {Math.round((p.dirty_money / state.caps.dirty_money.max) * 100)}%
+                  </span>
+                </Tip>
+              )}
+            </div>
             <div className="mt-2 flex gap-2">
               <Input
                 data-testid="launder-amount-input"
