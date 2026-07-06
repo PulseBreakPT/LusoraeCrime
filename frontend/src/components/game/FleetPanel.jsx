@@ -246,9 +246,10 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__" className="font-mono text-xs">Na garagem (sem equipa)</SelectItem>
-                    {state.teams.map((t) => (
-                      <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{`${t.name} · ${teamMembers(t.id)} membros`}</SelectItem>
-                    ))}
+                    {state.teams.map((t) => {
+                      const label = t.name + " · " + teamMembers(t.id) + " membros";
+                      return <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{label}</SelectItem>;
+                    })}
                   </SelectContent>
                 </Select>
                 {v.team_id && teamMembers(v.team_id) === 0 && (
