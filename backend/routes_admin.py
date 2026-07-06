@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from bson import ObjectId
+from bson.errors import InvalidId
 from datetime import datetime, timezone
 
 from db import db
@@ -121,7 +122,7 @@ async def get_user_details(user_id: str, admin: dict = Depends(require_admin)):
     """Detalhes completos de um utilizador específico."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     user = await db.users.find_one({"_id": user_oid})
@@ -175,7 +176,7 @@ async def grant_resources(user_id: str, body: GrantResourcesInput, admin: dict =
     """Dar recursos a um jogador."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     player = await db.players.find_one({"user_id": str(user_oid)})
@@ -211,7 +212,7 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
     """Resetar o progresso de um jogador (limpa tudo, volta ao estado inicial)."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     player = await db.players.find_one({"user_id": str(user_oid)})
@@ -290,7 +291,7 @@ async def ban_user(user_id: str, body: BanUserInput, admin: dict = Depends(requi
     """Banir um utilizador (impede login)."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     user = await db.users.find_one({"_id": user_oid})
@@ -323,7 +324,7 @@ async def unban_user(user_id: str, admin: dict = Depends(require_admin)):
     """Desbanir um utilizador."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     user = await db.users.find_one({"_id": user_oid})
@@ -354,7 +355,7 @@ async def grant_admin(user_id: str, admin: dict = Depends(require_admin)):
     """Promover um utilizador a administrador."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     user = await db.users.find_one({"_id": user_oid})
@@ -384,7 +385,7 @@ async def revoke_admin(user_id: str, admin: dict = Depends(require_admin)):
     """Remover acesso de administrador de um utilizador."""
     try:
         user_oid = ObjectId(user_id)
-    except:
+    except (InvalidId, ValueError):
         raise HTTPException(status_code=400, detail="ID de utilizador inválido")
 
     user = await db.users.find_one({"_id": user_oid})

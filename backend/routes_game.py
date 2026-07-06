@@ -480,7 +480,8 @@ def _rank_key(prep):
 @router.post("/dispatch/recommend_opportunity")
 async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_current_user)):
     """Para uma equipa, sugere a melhor oportunidade que ela consegue mesmo
-    cumprir (nunca uma que não cumpra os requisitos mínimos)."""
+    cumprir (nunca uma que não cumpra os requisitos mínimos). Se não houver
+    candidatas válidas, tenta retornar pelo menos algo viável."""
     player = await get_player(user)
     pid = str(player["_id"])
     team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
@@ -496,10 +497,11 @@ async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_curr
     best_opp, best_prep = None, None
     for opp in opps:
         prep = await _try_prepare_dispatch(player, opp, team)
-        if not prep or len(prep["members"]) < prep["min_members"]:
+        if not prep:
             continue
-        if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
-            best_opp, best_prep = opp, prep
+        if len(prep["members"]) >= prep["min_members"]:
+            if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+                best_opp, best_prep = opp, prep
     if not best_opp:
         return {"opportunity_id": None}
     return {

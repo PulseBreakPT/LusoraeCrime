@@ -144,7 +144,11 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       variant="outline"
                       onClick={() => upgradeProperty(p.id)}
                       disabled={maxed || upgrading || state.player.clean_money < upgradeCost}
-                      className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-400 hover:bg-white/5"
+                      className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                        maxed || upgrading || state.player.clean_money < upgradeCost
+                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          : "border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+                      }`}
                     >
                       <ArrowUpCircle size={11} /> {upgrading ? "A melhorar..." : maxed ? "Máx." : fmtMoney(upgradeCost)}
                     </Button>

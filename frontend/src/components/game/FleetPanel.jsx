@@ -117,7 +117,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 variant="outline" size="sm"
                 onClick={repairAll}
                 disabled={state.player.clean_money < repairAllCost}
-                className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-success hover:bg-white/5"
+                className={`h-auto shrink-0 gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                  state.player.clean_money < repairAllCost
+                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                }`}
               >
                 <Wrench size={11} /> Reparar todos
               </Button>
@@ -145,7 +149,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             const refuelRemaining = refueling ? Math.max(0, (Date.parse(v.refueling_until) - serverNow()) / 1000) : 0;
             const seats = catalog?.vehicle_models?.[v.model_key]?.seats;
             const fuelPct = (v.fuel_l / v.tank_l) * 100;
-            const refuelCost = Math.ceil((v.tank_l - v.fuel_l) * state.fuel_prices[v.fuel_type]);
+            const refuelCost = Math.ceil((v.tank_l - v.fuel_l) * (state.fuel_prices?.[v.fuel_type] || 0));
             const repairCost = Math.max(50, Math.round((100 - v.condition) * v.price * 0.002));
             const sellValue = Math.round(v.price * 0.4 * (v.condition / 100));
             const effSpeed = effectiveSpeed(v);
@@ -246,9 +250,10 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__" className="font-mono text-xs">Na garagem (sem equipa)</SelectItem>
-                    {state.teams.map((t) => (
-                      <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{`${t.name} · ${teamMembers(t.id)} membros`}</SelectItem>
-                    ))}
+                    {state.teams.map((t) => {
+                      const label = t.name + " · " + teamMembers(t.id) + " membros";
+                      return <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{label}</SelectItem>;
+                    })}
                   </SelectContent>
                 </Select>
                 {v.team_id && teamMembers(v.team_id) === 0 && (
@@ -270,13 +275,17 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Clock size={11} /> A abastecer · {fmtDuration(refuelRemaining)}
                     </span>
                   ) : (
-                    <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${state.fuel_prices[v.fuel_type].toFixed(2)} €/L) — demora alguns segundos.`} block className="flex-1">
+                    <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${(state.fuel_prices?.[v.fuel_type] || 0).toFixed(2)} €/L) — demora alguns segundos.`} block className="flex-1">
                       <Button
                         data-testid={`refuel-vehicle-${v.id}`}
                         variant="outline"
                         onClick={() => refuelVehicle(v.id)}
                         disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
-                        className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 hover:bg-white/5"
+                        className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                          busy || fuelPct > 99 || state.player.clean_money < refuelCost
+                            ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                        }`}
                       >
                         <Fuel size={11} /> {fmtMoney(refuelCost)}
                       </Button>
@@ -288,7 +297,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       variant="outline"
                       onClick={() => repairVehicle(v.id)}
                       disabled={busy || v.condition > 99 || state.player.clean_money < repairCost}
-                      className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-success hover:bg-white/5"
+                      className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                        busy || v.condition > 99 || state.player.clean_money < repairCost
+                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                      }`}
                     >
                       <Wrench size={11} /> {fmtMoney(repairCost)}
                     </Button>

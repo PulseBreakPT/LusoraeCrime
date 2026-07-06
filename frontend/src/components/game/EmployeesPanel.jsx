@@ -62,19 +62,22 @@ const RarityBadge = ({ rarity, rar }) => (
   </Tip>
 );
 
-const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => (
-  <Tip tip={title} block>
-    <Button
-      data-testid={testId}
-      variant="outline"
-      onClick={onClick}
-      disabled={disabled}
-      className={`h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5 ${color}`}
-    >
-      <Icon size={11} /> {label}
-    </Button>
-  </Tip>
-);
+const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => {
+  const btnColor = disabled ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20";
+  return (
+    <Tip tip={title} block>
+      <Button
+        data-testid={testId}
+        variant="outline"
+        onClick={onClick}
+        disabled={disabled}
+        className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${btnColor}`}
+      >
+        <Icon size={11} /> {label}
+      </Button>
+    </Tip>
+  );
+};
 
 const EmployeeCard = ({ e }) => {
   const {
@@ -247,9 +250,11 @@ const EmployeeCard = ({ e }) => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__" className="font-mono text-xs">Sem equipa</SelectItem>
-            {state.teams.map((t) => (
-              <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{`${t.name} · ${state.employees.filter((x) => x.team_id === t.id).length} membros`}</SelectItem>
-            ))}
+            {state.teams.map((t) => {
+              const memberCount = state.employees.filter((x) => x.team_id === t.id).length;
+              const label = t.name + " · " + memberCount + " membros";
+              return <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{label}</SelectItem>;
+            })}
           </SelectContent>
         </Select>
         <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de 30 min, pago com dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
@@ -293,9 +298,10 @@ const EmployeeCard = ({ e }) => {
                 <SelectValue placeholder="Escolher formação..." />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(catalog.training_courses).map(([k, c]) => (
-                  <SelectItem key={k} value={k} className="font-mono text-xs">{`${c.name} · ${fmtMoney(c.cost)}${c.spec && c.spec === e.spec ? " ★" : ""}`}</SelectItem>
-                ))}
+                {Object.entries(catalog.training_courses).map(([k, c]) => {
+                  const label = c.name + " · " + fmtMoney(c.cost) + (c.spec && c.spec === e.spec ? " ★" : "");
+                  return <SelectItem key={k} value={k} className="font-mono text-xs">{label}</SelectItem>;
+                })}
               </SelectContent>
             </Select>
             <ActionBtn
