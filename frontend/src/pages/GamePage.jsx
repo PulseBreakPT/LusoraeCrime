@@ -8,6 +8,7 @@ import { TeamsPanel } from "../components/game/TeamsPanel";
 import { EmpirePanel } from "../components/game/EmpirePanel";
 import { EmployeesPanel } from "../components/game/EmployeesPanel";
 import { FleetPanel } from "../components/game/FleetPanel";
+import { WeaponsPanel } from "../components/game/WeaponsPanel";
 import { PropertiesPanel } from "../components/game/PropertiesPanel";
 import { HQPanel } from "../components/game/HQPanel";
 import { IntelPanel } from "../components/game/IntelPanel";
@@ -18,7 +19,7 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, refresh, serverNow, autoOpenReportSignal } = useGame();
@@ -101,6 +102,8 @@ export default function GamePage() {
   if (alerts.lowFuel) fleetTipParts.push(`${alerts.lowFuel} sem combustível`);
   if (alerts.damaged) fleetTipParts.push(`${alerts.damaged} avariado(s)`);
   if (alerts.nearBreakdown) fleetTipParts.push(`${alerts.nearBreakdown} perto de avariar`);
+  const weaponsDamaged = (state.weapons || []).filter((w) => w.condition < 30).length;
+  const weaponsUnequipped = (state.weapons || []).filter((w) => !w.employee_id).length;
   const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollShort ? 1 : alerts.payrollDueSoon ? 1 : 0);
   const fleetAlertCount = alerts.fleet + alerts.nearBreakdown;
   const mapState = hideImpossibleMissions
@@ -192,6 +195,18 @@ export default function GamePage() {
           tip={alerts.raidRisk ? "Risco de rusga policial aos laboratórios (calor ≥ 70%) — suborna a polícia ou aguenta o risco." : "Propriedades: capacidade, rendimento passivo e lavagem automática."}
           onClick={() => setOpenPanel("properties")}
         />
+        <HudButton
+          testId="open-weapons-button" icon={Swords} label="Armamento" color="text-red-400"
+          alert={weaponsDamaged > 0}
+          tip={
+            weaponsDamaged > 0
+              ? `${weaponsDamaged} arma(s) avariada(s)${weaponsUnequipped > 0 ? ` · ${weaponsUnequipped} por atribuir` : ""}.`
+              : weaponsUnequipped > 0
+              ? `${weaponsUnequipped} arma(s) por atribuir.`
+              : "Compra, repara, atribui e vende equipamento operacional."
+          }
+          onClick={() => setOpenPanel("weapons")}
+        />
       </div>
 
       <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} />
@@ -206,6 +221,7 @@ export default function GamePage() {
       <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={navigateTo} />
       <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={navigateTo} />
       <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={navigateTo} />
+      <WeaponsPanel open={openPanel === "weapons"} onOpenChange={(o) => setOpenPanel(o ? "weapons" : null)} onNavigate={navigateTo} />
       <HQPanel open={openPanel === "hq"} onOpenChange={(o) => setOpenPanel(o ? "hq" : null)} onNavigate={navigateTo} />
       <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={navigateTo} />
       <SettingsPanel open={openPanel === "settings"} onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />

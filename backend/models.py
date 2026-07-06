@@ -86,6 +86,8 @@ class Employee(BaseDocument):
     hired_at: str
     last_mission_at: Optional[str] = None
     missions_done: int = 0
+    weapon_id: Optional[str] = None
+    weapon_proficiency: dict = {}
 
 
 class Candidate(BaseDocument):
@@ -124,6 +126,18 @@ class Vehicle(BaseDocument):
     missions_success: int = 0
     missions_since_repair: int = 0
     refueling_until: Optional[str] = None
+    bought_at: str
+
+
+class Weapon(BaseDocument):
+    player_id: str
+    model_key: str
+    name: str
+    condition: float = 100.0
+    employee_id: Optional[str] = None
+    missions_since_repair: int = 0
+    missions_done: int = 0
+    upgrades: List[dict] = []
     bought_at: str
 
 
@@ -185,6 +199,7 @@ class Mission(BaseDocument):
     member_ids: List[str] = []
     vehicle_id: Optional[str] = None
     vehicle_luxury: bool = False
+    weapon_loud: bool = False
     repeat_type: bool = False
     opportunity_id: Optional[str] = None
     talents: List[str] = []

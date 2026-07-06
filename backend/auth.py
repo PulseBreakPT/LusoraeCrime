@@ -235,7 +235,7 @@ async def delete_account(body: DeleteAccountInput, response: Response, user: dic
     player = await db.players.find_one({"user_id": user["_id"]})
     if player:
         pid = str(player["_id"])
-        for coll in (db.teams, db.employees, db.vehicles, db.properties, db.opportunities,
+        for coll in (db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
                      db.missions, db.events, db.quests, db.candidates, db.transactions):
             await coll.delete_many({"player_id": pid})
         await db.players.delete_one({"_id": player["_id"]})

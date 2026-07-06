@@ -439,6 +439,18 @@ export function GameProvider({ children }) {
     );
   const renameVehicle = (vehicleId, name) =>
     action("vehicles/rename", { vehicle_id: vehicleId, name }, "Veículo renomeado");
+  const buyWeapon = (modelKey) =>
+    action("weapons/buy", { model_key: modelKey }, "Arma adquirida");
+  const sellWeapon = (weaponId) =>
+    action("weapons/sell", { weapon_id: weaponId }, "Arma vendida");
+  const repairWeapon = (weaponId) =>
+    action("weapons/repair", { weapon_id: weaponId }, "Arma reparada");
+  const assignWeapon = (weaponId, employeeId) =>
+    action("weapons/assign", { weapon_id: weaponId, employee_id: employeeId }, "Arma atribuída");
+  const unassignWeapon = (employeeId) =>
+    action("weapons/unassign", { employee_id: employeeId }, "Arma desatribuída");
+  const autoAssignWeapon = (weaponId) =>
+    action("weapons/auto_assign", { weapon_id: weaponId }, "Arma atribuída automaticamente");
   const buyProperty = (typeKey) =>
     action("properties/buy", { type_key: typeKey }, "Propriedade comprada");
   const sellProperty = (propertyId) =>
@@ -506,6 +518,12 @@ export function GameProvider({ children }) {
         repairVehicle,
         assignVehicle,
         renameVehicle,
+        buyWeapon,
+        sellWeapon,
+        repairWeapon,
+        assignWeapon,
+        unassignWeapon,
+        autoAssignWeapon,
         buyProperty,
         sellProperty,
         upgradeProperty,

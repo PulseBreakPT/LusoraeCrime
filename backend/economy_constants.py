@@ -602,6 +602,26 @@ EMPLOYEE_HEAVY_USE_THRESHOLD = 30
 EMPLOYEE_HEAVY_USE_FATIGUE_MULT = 1.25
 
 # ============================================================================
+# WEAPON PERFORMANCE & WEAR
+# ============================================================================
+# NOTE: engine.py imports these transitively through game_data.py (not
+# directly from this file) — see the WEAPON_* re-export in game_data.py's
+# `from economy_constants import (...)` block. Adding a constant only here
+# without also re-exporting it there means engine.py will never see it.
+
+WEAPON_WEAR_PER_MISSION = 3.0          # desgaste base de condição por missão
+WEAPON_WEAR_RISK_MULT = 1.5            # desgaste extra por ponto de risco da missão
+WEAPON_PROFICIENCY_MAX = 100.0
+WEAPON_PROFICIENCY_GAIN_PER_MISSION = 4.0
+WEAPON_PROFICIENCY_BONUS_MAX_PCT = 0.08   # bónus de chance máximo à proficiência máxima
+WEAPON_REPAIR_COST_MULTIPLIER = 0.5       # custo de reparação = maintenance_cost * multiplicador * (% em falta)
+WEAPON_LOUD_HEAT_MULT = 1.3               # mirror de LUXURY_HEAT_MULT, mas para armas "loud"
+WEAPON_COMBAT_SCORE_SCALE = 0.15          # escala o score de combate (0-1) para um bónus de chance
+WEAPON_BONUS_MIN = -0.05                  # limite inferior do bónus total de armamento
+WEAPON_BONUS_MAX = 0.12                   # limite superior do bónus total de armamento
+WEAPON_COMPATIBILITY_MIN_FACTOR = 0.4     # factor mínimo quando os requisitos de atributo não são cumpridos
+
+# ============================================================================
 # TRAVEL & LOGISTICS
 # ============================================================================
 

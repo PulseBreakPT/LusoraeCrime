@@ -13,7 +13,11 @@ from economy_constants import (
     DIRTY_MONEY_HEAT_THRESHOLD, DIRTY_MONEY_HEAT_PER_10K,
     LEVEL_THRESHOLDS, EMP_LEVEL_XP, PROPERTY_STACK_DIMINISH,
     FUEL_PRICES, REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
-    HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY, HQ_DEPARTMENTS
+    HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY, HQ_DEPARTMENTS,
+    WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT, WEAPON_PROFICIENCY_MAX,
+    WEAPON_PROFICIENCY_GAIN_PER_MISSION, WEAPON_PROFICIENCY_BONUS_MAX_PCT,
+    WEAPON_REPAIR_COST_MULTIPLIER, WEAPON_LOUD_HEAT_MULT,
+    WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX, WEAPON_COMPATIBILITY_MIN_FACTOR
 )
 
 LISBON_SPOTS = [
@@ -220,6 +224,80 @@ VEHICLE_MODELS = {
     "carro_furtivo": {"name": "Carro Furtivo", "min_level": 5, "price": 55000, "speed": 20,
                      "fuel_type": "gasolina", "tank_l": 50, "cons": 10.0, "seats": 2,
                      "best_for": ["tecnica", "especial"], "luxury": False},
+}
+
+
+# ---------------- Armamento ----------------
+# Equipamento operacional pessoal — uma arma por funcionário (ao contrário do
+# veículo, partilhado por toda a equipa). Preços por isso deliberadamente bem
+# abaixo de veículos: equipar uma equipa inteira custa até 4x o preço unitário.
+# Cada modelo tem vantagens/desvantagens reais por categoria de missão via
+# "best_for" + WEAPON_CATEGORY_WEIGHTS — "mais cara" não implica "sempre
+# melhor em tudo".
+
+WEAPON_MODELS = {
+    "faca_taser": {
+        "name": "Faca/Taser", "category": "silenciosa", "min_level": 1, "price": 1200,
+        "power": 15, "accuracy": 65, "range": 3, "weight": 5, "use_speed": 95,
+        "durability": 90, "reliability": 95, "magazine_capacity": 1, "maintenance_cost": 50,
+        "best_for": ["tecnica", "influencia"], "requires_attr": {}, "loud": False,
+        "desc": "Sem munições, silenciosa — ideal para operações discretas, mas quase sem poder de fogo.",
+    },
+    "pistola": {
+        "name": "Pistola", "category": "equilibrada", "min_level": 1, "price": 2800,
+        "power": 40, "accuracy": 60, "range": 25, "weight": 20, "use_speed": 75,
+        "durability": 70, "reliability": 85, "magazine_capacity": 15, "maintenance_cost": 180,
+        "best_for": ["assalto", "tecnica", "influencia"], "requires_attr": {}, "loud": True,
+        "desc": "Equilibrada e sem requisitos — funciona em qualquer categoria, sem se destacar em nenhuma.",
+    },
+    "espingarda": {
+        "name": "Espingarda", "category": "assalto", "min_level": 2, "price": 5000,
+        "power": 85, "accuracy": 45, "range": 12, "weight": 55, "use_speed": 55,
+        "durability": 65, "reliability": 80, "magazine_capacity": 6, "maintenance_cost": 280,
+        "best_for": ["assalto"], "requires_attr": {"forca": 4}, "loud": True,
+        "desc": "Potência elevada a curta distância — péssima em operações discretas ou de longo alcance.",
+    },
+    "submetralhadora": {
+        "name": "Submetralhadora", "category": "assalto", "min_level": 3, "price": 10000,
+        "power": 60, "accuracy": 50, "range": 30, "weight": 45, "use_speed": 90,
+        "durability": 60, "reliability": 75, "magazine_capacity": 30, "maintenance_cost": 450,
+        "best_for": ["assalto", "especial"], "requires_attr": {"forca": 3, "tiro": 4}, "loud": True,
+        "desc": "Cadência e carregador elevados — precisão baixa, exige manutenção frequente.",
+    },
+    "rifle_assalto": {
+        "name": "Rifle de Assalto", "category": "assalto_especial", "min_level": 4, "price": 18000,
+        "power": 75, "accuracy": 70, "range": 55, "weight": 60, "use_speed": 70,
+        "durability": 75, "reliability": 85, "magazine_capacity": 25, "maintenance_cost": 650,
+        "best_for": ["assalto", "especial"], "requires_attr": {"tiro": 5, "forca": 4}, "loud": True,
+        "desc": "Alta gama equilibrada — sem fraquezas graves, mas cara e exigente.",
+    },
+    "rifle_precisao": {
+        "name": "Rifle de Precisão", "category": "tecnica_especial", "min_level": 5, "price": 32000,
+        "power": 90, "accuracy": 95, "range": 95, "weight": 70, "use_speed": 25,
+        "durability": 80, "reliability": 80, "magazine_capacity": 5, "maintenance_cost": 900,
+        "best_for": ["tecnica", "especial"], "requires_attr": {"tiro": 7, "inteligencia": 4}, "loud": False,
+        "desc": "Precisão e alcance máximos, carregador e velocidade mínimos — investimento para 1-2 especialistas, não para toda a equipa.",
+    },
+}
+
+WEAPON_CATEGORIES = {
+    "silenciosa": {"name": "Silenciosa", "desc": "Sem munições, ideal para discrição."},
+    "equilibrada": {"name": "Equilibrada", "desc": "Sem requisitos, funciona em qualquer lado."},
+    "assalto": {"name": "Assalto", "desc": "Potência e cadência para operações de força."},
+    "assalto_especial": {"name": "Assalto/Especial", "desc": "Alta gama equilibrada."},
+    "tecnica_especial": {"name": "Técnica/Especial", "desc": "Precisão e alcance para operações de alto risco."},
+}
+
+# Peso de cada estatística (potência/precisão/alcance/leveza/velocidade/
+# carregador) no score de combate, por categoria de missão — soma ~1.0 por
+# categoria. É esta ponderação que faz cada modelo ter vantagens/desvantagens
+# reais consoante a operação, em vez de um único "melhor" universal.
+WEAPON_CATEGORY_WEIGHTS = {
+    "assalto": {"power": 0.35, "accuracy": 0.15, "range": 0.0, "lightness": 0.0, "speed": 0.30, "magazine": 0.20},
+    "tecnica": {"power": 0.05, "accuracy": 0.35, "range": 0.25, "lightness": 0.25, "speed": 0.10, "magazine": 0.0},
+    "especial": {"power": 0.25, "accuracy": 0.25, "range": 0.25, "lightness": 0.0, "speed": 0.15, "magazine": 0.10},
+    "influencia": {"power": 0.0, "accuracy": 0.40, "range": 0.0, "lightness": 0.35, "speed": 0.25, "magazine": 0.0},
+    "logistica": {"power": 0.20, "accuracy": 0.20, "range": 0.0, "lightness": 0.20, "speed": 0.20, "magazine": 0.20},
 }
 
 # TEAM_MAX_MEMBERS is imported from economy_constants.py
