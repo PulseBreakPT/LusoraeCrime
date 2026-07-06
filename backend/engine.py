@@ -27,7 +27,8 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        PROPERTY_CONDITION_DECAY_PER_HOUR, PROPERTY_UPGRADE_BASE_S,
                        PROPERTY_UPGRADE_PER_LEVEL_S, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
                        LAUNDER_PROPERTY_BONUS_PER_LEVEL,
-                       DIRTY_MONEY_HEAT_THRESHOLD, DIRTY_MONEY_HEAT_PER_10K,
+                       DIRTY_MONEY_HEAT_THRESHOLD, DIRTY_MONEY_HEAT_PER_10K, TEAM_COST_SCALING_BASE,
+                       PAYROLL_MORALE_REGEN,
                        LOW_LEVEL_XP_GAP, LOW_LEVEL_XP_MULT_PER_GAP, LOW_LEVEL_XP_MULT_MIN,
                        TEAM_COUNT_BASE, TEAM_COUNT_PER_2_LEVELS, ACHIEVEMENT_MILESTONES,
                        ACHIEVEMENT_BONUS_PCT_PER_MILESTONE, LOCAL_PRESENCE_RADIUS_KM,
@@ -1034,7 +1035,12 @@ async def _process_payroll(db, player, employees, now):
     while parse_dt(player["next_payroll_at"]) <= now and cycles < 4:
         cycles += 1
         player["next_payroll_at"] = (parse_dt(player["next_payroll_at"]) + timedelta(minutes=PAYROLL_CYCLE_MIN)).isoformat()
-        total = sum(e.get("salary", 0) for e in employees)
+        base_total = sum(e.get("salary", 0) for e in employees)
+        # Team cost scaling: larger teams pay more per cycle (multiplicative, not linear)
+        # Formula: (num_employees / 2) ^ 0.5
+        # At 2 employees: 1.0x, at 4: 1.41x, at 8: 2.0x, at 16: 2.83x
+        team_scaling = (max(1, len(employees)) / 2) ** TEAM_COST_SCALING_BASE
+        total = int(base_total * team_scaling)
         if total <= 0:
             continue
         if player["clean_money"] >= total:

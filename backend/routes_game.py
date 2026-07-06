@@ -1056,7 +1056,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
         oficina_pct * p["level"] * property_condition_factor(p) * property_stack_mult(prop_ranks[p["_id"]])
         for p in props if p["type_key"] == "oficina" and property_active(p, now)
     ) + bonuses["repair_discount"])
-    cost = max(50, int(missing * vehicle["price"] * 0.002 * (1 - discount)))
+    cost = max(50, int(missing * vehicle["price"] * 0.012 * (1 - discount)))  # 0.012 = 1.2% (redesigned, 6x increase)
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_repaired": 1}})
