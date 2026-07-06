@@ -153,6 +153,13 @@
     color: #050505;
     border: 2px solid #050505;
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.hq-pin:hover {
+    box-shadow: 0 0 26px rgba(255, 255, 255, 0.6);
+    transform: scale(1.06);
 }
 
 /* ---------- Property pin ---------- */

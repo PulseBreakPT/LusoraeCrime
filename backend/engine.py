@@ -41,7 +41,8 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
                        PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN,
-                       FUEL_PRICES, random_employee_name)
+                       FUEL_PRICES, random_employee_name,
+                       HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS)
 from quests import process_quests, make_instance
 from quests_data import QUEST_DEFS
 
@@ -224,10 +225,13 @@ async def get_org_bonuses(db, pid):
     return org_bonuses(employees)
 
 
-async def get_caps(db, pid):
+async def get_caps(db, pid, hq_level=1):
     props = await db.properties.find({"player_id": pid}).to_list(200)
-    emp_cap = BASE_EMPLOYEE_CAP + sum(PROPERTY_TYPES[p["type_key"]].get("cap_employees", 0) * p["level"] for p in props)
-    veh_cap = BASE_VEHICLE_CAP + sum(PROPERTY_TYPES[p["type_key"]].get("cap_vehicles", 0) * p["level"] for p in props)
+    hq_tier = HQ_LEVEL_BENEFITS[min(hq_level, HQ_MAX_LEVEL) - 1]
+    emp_cap = (BASE_EMPLOYEE_CAP + hq_tier["cap_employees"]
+               + sum(PROPERTY_TYPES[p["type_key"]].get("cap_employees", 0) * p["level"] for p in props))
+    veh_cap = (BASE_VEHICLE_CAP + hq_tier["cap_vehicles"]
+               + sum(PROPERTY_TYPES[p["type_key"]].get("cap_vehicles", 0) * p["level"] for p in props))
     return {"employees": emp_cap, "vehicles": veh_cap}, props
 
 
@@ -1186,7 +1190,7 @@ async def grant_quest_rewards(db, player, rw):
         parts.append(f"{rw['heat']} calor")
     if rw.get("vehicle"):
         m = VEHICLE_MODELS[rw["vehicle"]]
-        caps, _ = await get_caps(db, pid)
+        caps, _ = await get_caps(db, pid, player["hq"]["level"])
         used = await db.vehicles.count_documents({"player_id": pid})
         if used < caps["vehicles"]:
             await db.vehicles.insert_one(vehicle_doc(pid, rw["vehicle"], now_iso))
@@ -1197,7 +1201,7 @@ async def grant_quest_rewards(db, player, rw):
     if rw.get("employee"):
         er = rw["employee"]
         role, rarity = er["role"], er["rarity"]
-        caps, _ = await get_caps(db, pid)
+        caps, _ = await get_caps(db, pid, player["hq"]["level"])
         used = await db.employees.count_documents({"player_id": pid})
         if used < caps["employees"]:
             sp = SPECIALIZATIONS[role]
@@ -1379,21 +1383,26 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
     launder_rate = 0
     # Químicos na equipa tornam os laboratórios mais produtivos.
     lab_mult = 1 + bonuses.get("lab_boost", 0)
+    # O Quartel-General melhora a eficiência de todas as propriedades: mais
+    # produção/lavagem passiva e menos calor gerado pelas ilegais.
+    hq_tier = HQ_LEVEL_BENEFITS[min(player["hq"]["level"], HQ_MAX_LEVEL) - 1]
+    hq_income_mult = 1 + hq_tier["passive_income_pct"]
+    hq_heat_mult = 1 - hq_tier["heat_reduction_pct"]
     for p in props:
         if not property_active(p, now):
             continue
         pt = PROPERTY_TYPES[p["type_key"]]
         factor = property_condition_factor(p)
         if pt.get("dirty_per_h"):
-            rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult
+            rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult * hq_income_mult
             share = rate * hours
             dirty_rate += rate
             await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_dirty_generated": share}})
         if pt.get("heat_per_h"):
-            heat_rate += pt["heat_per_h"] * p["level"] * factor
+            heat_rate += pt["heat_per_h"] * p["level"] * factor * hq_heat_mult
         if pt.get("launder_per_h"):
             launder_rate += pt["launder_per_h"] * p["level"] * factor
-    launder_rate *= (1 + bonuses.get("empresa_boost", 0))
+    launder_rate *= (1 + bonuses.get("empresa_boost", 0)) * hq_income_mult
 
     if dirty_rate > 0:
         fd = player.get("frac_dirty", 0.0) + dirty_rate * hours
@@ -1424,7 +1433,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
                 pt = PROPERTY_TYPES[p["type_key"]]
                 if pt.get("launder_per_h"):
                     factor = property_condition_factor(p)
-                    share = conv * (pt["launder_per_h"] * p["level"] * factor * (1 + bonuses.get("empresa_boost", 0)) / launder_rate)
+                    share = conv * (pt["launder_per_h"] * p["level"] * factor * (1 + bonuses.get("empresa_boost", 0)) * hq_income_mult / launder_rate)
                     await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_laundered": share}})
 
 
@@ -1458,6 +1467,31 @@ async def _complete_property_upgrades(db, player, props, now):
         await db.properties.update_one({"_id": p["_id"]}, {"$set": {"level": new_level, "upgrading_until": None}})
         pid = str(player["_id"])
         await add_event(db, pid, "property", f"{p['name']} concluiu a melhoria — agora no nível {new_level}.")
+
+
+async def _complete_hq_upgrade(db, player, now):
+    """Como _complete_property_upgrades, mas para o Quartel-General: o campo
+    `hq` vive dentro do documento do jogador, não numa coleção própria, e o
+    `advance()` só persiste um subconjunto fixo de campos do jogador no fim
+    (ver o `$set` explícito no fundo desta função) — por isso escrevemos aqui
+    diretamente na base de dados, e atualizamos também `player["hq"]` em
+    memória, já que o mesmo dict é devolvido por `advance()` e serializado
+    logo a seguir em GET /state."""
+    hq = player["hq"]
+    upgrading_until = hq.get("upgrading_until")
+    if not upgrading_until or parse_dt(upgrading_until) > now:
+        return
+    new_level = hq["level"] + 1
+    now_iso = now.isoformat()
+    history_entry = {"level": new_level, "completed_at": now_iso}
+    await db.players.update_one({"_id": player["_id"]}, {
+        "$set": {"hq.level": new_level, "hq.upgrading_until": None},
+        "$push": {"hq.upgrade_history": history_entry},
+    })
+    hq["level"] = new_level
+    hq["upgrading_until"] = None
+    hq.setdefault("upgrade_history", []).append(history_entry)
+    await add_event(db, str(player["_id"]), "property", f"Quartel-General concluiu a melhoria — agora no nível {new_level}.")
 
 
 async def _complete_refuels(db, player, vehicles, now):
@@ -1549,6 +1583,7 @@ async def advance(db, player):
     await _apply_passive_income(db, player, props, minutes / 60, bonuses, now)
     await _process_property_maintenance(db, player, props, minutes, now)
     await _complete_property_upgrades(db, player, props, now)
+    await _complete_hq_upgrade(db, player, now)
     await _maybe_raid(db, player, props, minutes, now)
 
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)

@@ -18,7 +18,8 @@ const TX_LABELS = {
   vehicle_sell: "Venda de veículo", refuel: "Combustível", repair: "Reparação", recruit: "Recrutamento",
   pool_refresh: "Novos contactos", training: "Formação", promote: "Promoção", bonus: "Bónus",
   heal: "Clínica", release: "Advogado", fire: "Indemnização", property_buy: "Compra de imóvel",
-  property_sell: "Venda de imóvel", property_upgrade: "Melhoria de imóvel", bribe: "Suborno",
+  property_sell: "Venda de imóvel", property_upgrade: "Melhoria de imóvel", hq_upgrade: "Melhoria do Quartel-General",
+  bribe: "Suborno",
   launder_out: "Lavagem (saída)", launder_in: "Lavagem (entrada)", team_create: "Nova equipa",
 };
 

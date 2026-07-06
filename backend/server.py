@@ -15,7 +15,7 @@ from auth import router as auth_router, seed_admin
 from routes_game import router as game_router
 from routes_admin import router as admin_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
-from game_data import SPECIALIZATIONS
+from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
 
 app = FastAPI(title="Lusorae API")
 
@@ -65,6 +65,12 @@ async def migrate_v2():
             "v2": True, "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0,
         }})
     await db.players.update_many({"stats": {"$exists": False}}, {"$set": {"stats": default_stats()}})
+    await db.players.update_many({"hq.level": {"$exists": False}}, {"$set": {
+        "hq.level": 1, "hq.upgrading_until": None, "hq.upgrade_history": [],
+    }})
+    await db.players.update_many({"priorities": {"$exists": False}}, {"$set": {
+        "priorities": {"active": HQ_DEFAULT_PRIORITY},
+    }})
 
 
 ROLE_MAP_V4 = {"musculo": "assaltante", "condutor": "motorista", "hacker": "hacker", "negociador": "negociador"}

@@ -46,6 +46,7 @@ class Player(BaseDocument):
     achievement_bonus_pct: float = 0.0
     favorite_types: List[str] = []
     settings: dict = {}
+    priorities: dict = {}
 
 
 class Team(BaseDocument):

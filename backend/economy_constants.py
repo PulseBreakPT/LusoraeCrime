@@ -212,6 +212,71 @@ FUEL_PRICES = {
 REFUEL_DURATION_BASE_S = 15
 REFUEL_DURATION_PER_L_S = 0.5
 
+# ============================================================================
+# QUARTEL-GENERAL (HQ) — CENTRO ESTRATÉGICO
+# ============================================================================
+
+HQ_MAX_LEVEL = 8
+
+# Benefícios cumulativos por nível de HQ (o nível 1 é a base, sem bónus nem
+# custo — já vem com a organização). upgrade_cost/upgrade_duration_s/
+# min_org_level dizem respeito à melhoria PARA esse nível (por isso o nível 1
+# não tem nenhum dos três). cap_employees/cap_vehicles somam-se aos caps base
+# e aos das propriedades; passive_income_pct multiplica a produção/lavagem
+# passiva das propriedades; heat_reduction_pct reduz o calor gerado por hora
+# pelas propriedades ilegais (aplicado em _apply_passive_income, não na
+# dissipação global de calor). Custos calibrados para ficarem por baixo do
+# custo combinado de todas as propriedades do jogo (~590k€) mesmo no total —
+# o HQ é o "capstone" da progressão, não deve eclipsar o sistema de imóveis.
+HQ_LEVEL_BENEFITS = [
+    {'level': 1, 'upgrade_cost': None, 'upgrade_duration_s': None, 'min_org_level': 1,
+     'cap_employees': 0, 'cap_vehicles': 0, 'passive_income_pct': 0.0, 'heat_reduction_pct': 0.0,
+     'unlocks': [], 'name': 'Armazém de Operações', 'desc': 'A base da organização.'},
+    {'level': 2, 'upgrade_cost': 12000, 'upgrade_duration_s': 480, 'min_org_level': 2,
+     'cap_employees': 2, 'cap_vehicles': 1, 'passive_income_pct': 0.0, 'heat_reduction_pct': 0.0,
+     'unlocks': [], 'name': 'Escritório Reforçado', 'desc': 'Mais postos de trabalho e uma vaga de garagem.'},
+    {'level': 3, 'upgrade_cost': 20000, 'upgrade_duration_s': 1200, 'min_org_level': 3,
+     'cap_employees': 2, 'cap_vehicles': 1, 'passive_income_pct': 0.05, 'heat_reduction_pct': 0.0,
+     'unlocks': ['financeiro'], 'name': 'Sala de Operações', 'desc': 'Desbloqueia o Gabinete Financeiro (em breve).'},
+    {'level': 4, 'upgrade_cost': 34000, 'upgrade_duration_s': 2400, 'min_org_level': 4,
+     'cap_employees': 3, 'cap_vehicles': 2, 'passive_income_pct': 0.05, 'heat_reduction_pct': 0.0,
+     'unlocks': ['rh'], 'name': 'Central de Recrutamento', 'desc': 'Desbloqueia Recursos Humanos (em breve).'},
+    {'level': 5, 'upgrade_cost': 55000, 'upgrade_duration_s': 4200, 'min_org_level': 5,
+     'cap_employees': 3, 'cap_vehicles': 2, 'passive_income_pct': 0.10, 'heat_reduction_pct': 0.05,
+     'unlocks': ['logistica'], 'name': 'Rede de Comunicações Segura', 'desc': 'Desbloqueia Logística e reduz o calor acumulado.'},
+    {'level': 6, 'upgrade_cost': 88000, 'upgrade_duration_s': 6600, 'min_org_level': 6,
+     'cap_employees': 4, 'cap_vehicles': 2, 'passive_income_pct': 0.10, 'heat_reduction_pct': 0.10,
+     'unlocks': [], 'name': 'Centro Logístico Avançado', 'desc': 'Mais capacidade e menos calor operacional.'},
+    {'level': 7, 'upgrade_cost': 140000, 'upgrade_duration_s': 9600, 'min_org_level': 7,
+     'cap_employees': 4, 'cap_vehicles': 3, 'passive_income_pct': 0.15, 'heat_reduction_pct': 0.10,
+     'unlocks': ['investigacao'], 'name': 'Laboratório de Análise', 'desc': 'Desbloqueia Investigação (em breve).'},
+    {'level': 8, 'upgrade_cost': 220000, 'upgrade_duration_s': 14400, 'min_org_level': 8,
+     'cap_employees': 5, 'cap_vehicles': 3, 'passive_income_pct': 0.20, 'heat_reduction_pct': 0.15,
+     'unlocks': ['comunicacoes'], 'name': 'Quartel-General Completo', 'desc': 'O centro de comando completo da organização.'},
+]
+
+# Prioridades globais — influenciam o desempate das recomendações de
+# despacho (dispatch/recommend_*) e as dicas do consultor no frontend.
+HQ_PRIORITIES = {
+    'equilibrio': 'Crescimento equilibrado',
+    'lucro': 'Maximizar lucro',
+    'custos': 'Reduzir custos',
+    'velocidade': 'Responder mais rapidamente',
+    'reputacao': 'Aumentar reputação',
+    'complexidade': 'Privilegiar missões complexas',
+}
+HQ_DEFAULT_PRIORITY = 'equilibrio'
+
+# Departamentos futuros (arquitetura preparada, ainda não implementados) —
+# cada chave corresponde a uma entrada em HQ_LEVEL_BENEFITS[i]['unlocks'].
+HQ_DEPARTMENTS = {
+    'financeiro': {'name': 'Gabinete Financeiro', 'desc': 'Análise financeira avançada e investimentos.'},
+    'rh': {'name': 'Recursos Humanos', 'desc': 'Gestão avançada de pessoal e recrutamento.'},
+    'logistica': {'name': 'Logística', 'desc': 'Otimização de rotas e frota.'},
+    'investigacao': {'name': 'Investigação', 'desc': 'Inteligência sobre a concorrência e a polícia.'},
+    'comunicacoes': {'name': 'Comunicações', 'desc': 'Coordenação e automação avançada de operações.'},
+}
+
 # VEHICLE REPAIR COSTS (REDESIGNED - 6x INCREASE)
 # Old multiplier: 0.002 (0.2% of vehicle price)
 # New multiplier: 0.012 (1.2% of vehicle price)

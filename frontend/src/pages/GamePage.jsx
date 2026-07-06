@@ -9,6 +9,7 @@ import { EmpirePanel } from "../components/game/EmpirePanel";
 import { EmployeesPanel } from "../components/game/EmployeesPanel";
 import { FleetPanel } from "../components/game/FleetPanel";
 import { PropertiesPanel } from "../components/game/PropertiesPanel";
+import { HQPanel } from "../components/game/HQPanel";
 import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
@@ -113,6 +114,7 @@ export default function GamePage() {
         serverNow={serverNow}
         selectedOppId={selectedOpp?.id}
         onSelectOpp={(opp) => setSelectedOpp(opp)}
+        onSelectHQ={() => setOpenPanel("hq")}
       />
 
       <ResourceBar />
@@ -204,6 +206,7 @@ export default function GamePage() {
       <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={navigateTo} />
       <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={navigateTo} />
       <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={navigateTo} />
+      <HQPanel open={openPanel === "hq"} onOpenChange={(o) => setOpenPanel(o ? "hq" : null)} onNavigate={navigateTo} />
       <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={navigateTo} />
       <SettingsPanel open={openPanel === "settings"} onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />
     </div>

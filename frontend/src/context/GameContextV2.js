@@ -447,6 +447,8 @@ export function GameProvider({ children }) {
     action("properties/upgrade", { property_id: propertyId }, "Melhoria iniciada");
   const renameProperty = (propertyId, name) =>
     action("properties/rename", { property_id: propertyId, name }, "Propriedade renomeada");
+  const upgradeHQ = () => action("hq/upgrade", {}, "Melhoria do Quartel-General iniciada");
+  const setOrgPriority = (priority) => action("hq/priority", { priority }, "Prioridade atualizada");
   const bribePolice = () => action("police/bribe", {}, "Suborno pago");
   const updateAutomationSettings = (patch) => action("settings", patch);
   const launder = (amount) => action("launder", { amount }, "Dinheiro lavado");
@@ -508,6 +510,8 @@ export function GameProvider({ children }) {
         sellProperty,
         upgradeProperty,
         renameProperty,
+        upgradeHQ,
+        setOrgPriority,
         bribePolice,
         launder,
         claimQuest,

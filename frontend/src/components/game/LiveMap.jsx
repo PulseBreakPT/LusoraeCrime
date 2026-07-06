@@ -268,7 +268,7 @@ const MissionUnit = ({ mission, serverNow }) => {
   );
 };
 
-export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }) {
+export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ }) {
   const { catalog } = useGame();
   const hq = state.player.hq;
   const hqMarkerIcon = useMemo(() => hqIcon(), []);
@@ -287,12 +287,17 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
       />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
-      <Marker position={[hq.lat, hq.lng]} icon={hqMarkerIcon} zIndexOffset={400}>
+      <Marker
+        position={[hq.lat, hq.lng]}
+        icon={hqMarkerIcon}
+        zIndexOffset={400}
+        eventHandlers={{ click: () => onSelectHQ && onSelectHQ() }}
+      >
         <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">
           <div className="min-w-[130px]">
             <p className="text-[11px] font-bold text-white">{hq.name}</p>
             <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">Quartel-general · {state.player.org_name}</p>
-            <p className="mt-0.5 text-[9px] text-zinc-400">As equipas partem e regressam aqui.</p>
+            <p className="mt-0.5 text-[9px] text-cyan-400">Nível {hq.level} · clica para gerir</p>
           </div>
         </LTooltip>
       </Marker>
