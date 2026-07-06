@@ -25,8 +25,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
   if (!state) return null;
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
@@ -259,6 +258,5 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
     </Sheet>
 
     <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
-  </>
   );
 };
