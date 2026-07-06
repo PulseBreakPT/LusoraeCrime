@@ -158,7 +158,6 @@ export default function GamePage() {
       >
         <HudButton
           testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
-          badge={alerts.claimable} badgeColor="#059669"
           alert={alerts.claimable > 0}
           tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) por reclamar — história, diárias e semanais.` : "Missões de história, diárias, semanais e alertas dinâmicos."}
           onClick={() => setOpenPanel("quests")}
@@ -171,20 +170,17 @@ export default function GamePage() {
         />
         <HudButton
           testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400"
-          badge={tr.busy} badgeColor="#0E7490"
           alert={alerts.teams > 0}
           tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Coordenação de membros, veículos e despacho rápido.`}
           onClick={() => setOpenPanel("teams")}
         />
         <HudButton
           testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400"
-          badge={hrAlertCount} badgeColor={NOTIFY_COLOR}
           tip={hrAlertCount > 0 ? `Efetivo precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o efetivo leal."}
           onClick={() => setOpenPanel("employees")}
         />
         <HudButton
           testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400"
-          badge={fleetAlertCount} badgeColor="#D97706"
           tip={fleetAlertCount > 0 ? `Frota precisa de atenção: ${fleetTipParts.join(" · ")}.` : "Abastecer, reparar, comprar e atribuir veículos às equipas."}
           onClick={() => setOpenPanel("fleet")}
         />
@@ -214,7 +210,7 @@ export default function GamePage() {
   );
 }
 
-const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = NOTIFY_COLOR, alert, tip, onClick }) => (
+const HudButton = ({ testId, icon: Icon, label, color, alert, tip, onClick }) => (
   <Tip tip={tip} side="top">
     <Button
       data-testid={testId}
@@ -224,9 +220,6 @@ const HudButton = ({ testId, icon: Icon, label, color, badge, badgeColor = NOTIF
     >
       <Icon size={15} className={color} />
       <span className="hidden md:inline">{label}</span>
-      {badge > 0 && (
-        <Badge className="rounded-full px-1.5 py-0 font-mono text-[10px] font-bold" style={{ background: badgeColor }}>{badge}</Badge>
-      )}
       {alert && (
         <span
           className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full"
