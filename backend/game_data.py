@@ -1,4 +1,11 @@
 import random
+from economy_constants import (
+    PROPERTY_COSTS, TEAM_CREATE_COST, PAYROLL_CYCLE_MIN, POOL_REFRESH_MIN,
+    DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
+    VEHICLE_REPAIR_BASE_MULTIPLIER, VEHICLE_REPAIR_MIN,
+    MEMBER_SPLIT_PENALTY_PER_EXTRA, MEMBER_SPLIT_PENALTY_MAX,
+    TEAM_MAX_MEMBERS, BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, PROPERTY_MAX_LEVEL
+)
 
 LISBON_SPOTS = [
     {"name": "Baixa", "lat": 38.7118, "lng": -9.1366},
@@ -27,7 +34,7 @@ TEAM_NAMES = ["Crew Alfa", "Crew Bravo", "Crew Cobra", "Crew Delta", "Crew Eco",
               "Crew Fénix", "Crew Gama", "Crew Hidra", "Crew Íbis", "Crew Jaguar",
               "Crew Kilo", "Crew Lince", "Crew Mamba", "Crew Norte", "Crew Onix"]
 
-TEAM_CREATE_COST = 5000
+# TEAM_CREATE_COST is imported from economy_constants.py
 
 TEAM_SPECS = {
     "assalto": {"name": "Crew de Assalto", "desc": "Especializada em assaltos, roubos e ataques a territórios."},
@@ -142,10 +149,7 @@ RECRUIT_SOURCES = {
                   "rarity_w": {"comum": 20, "raro": 40, "elite": 30, "lendario": 10}},
 }
 
-POOL_REFRESH_MIN = 5
-PAYROLL_CYCLE_MIN = 120  # ciclos mais longos dão folga a quem não joga sem parar,
-                          # sem quebrar a pressão económica — evita perder o efetivo
-                          # todo de repente por uma ausência de algumas horas
+# POOL_REFRESH_MIN and PAYROLL_CYCLE_MIN are imported from economy_constants.py
 
 EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
 
@@ -212,8 +216,7 @@ VEHICLE_MODELS = {
                      "best_for": ["tecnica", "especial"], "luxury": False},
 }
 
-# Nº máximo de membros ativos por equipa (independente do veículo).
-TEAM_MAX_MEMBERS = 4
+# TEAM_MAX_MEMBERS is imported from economy_constants.py
 
 # ---------------- Coordenação e prontidão das equipas ----------------
 
@@ -251,12 +254,9 @@ FULL_ENERGY_XP_BONUS = 0.10           # bónus de XP ao entrar em missão com en
 XP_DECAY_IDLE_DAYS = 5                # dias sem participar numa missão antes de começar a perder XP
 XP_DECAY_PER_MIN = 0.05               # XP perdido por minuto real de inatividade prolongada
 
-# ---------------- Missões: recompensa, disponibilidade e cancelamento ----------------
-
-MEMBER_SPLIT_PENALTY_PER_EXTRA = 0.04  # redução de recompensa por membro acima do mínimo exigido
-MEMBER_SPLIT_PENALTY_MAX = 0.20        # redução máxima de recompensa por divisão do saque
-AGE_DECAY_MAX = 0.20                   # decaimento máximo de recompensa por a missão estar disponível há muito tempo
-AGE_DECAY_RAMP_S = 480                 # tempo (s) até atingir o decaimento máximo
+# Missão reward parameters are imported from economy_constants.py
+# MEMBER_SPLIT_PENALTY_PER_EXTRA, MEMBER_SPLIT_PENALTY_MAX, AGE_DECAY_MAX, AGE_DECAY_RAMP_S
+# NOTE: These are now configured in economy_constants.py for easier tuning
 REPEAT_TYPE_XP_MULT = 0.85             # multiplicador de XP quando a equipa repete o mesmo tipo de missão
 DURATION_REWARD_BASELINE_S = 90        # duração neutra (nem bónus nem penalização) de recompensa por minuto
 DURATION_REWARD_MAX_BONUS = 0.15       # bónus máximo de recompensa para operações longas
@@ -268,7 +268,7 @@ RECALL_PENALTY_FRACTION = 0.5          # fração da viagem a partir da qual cha
 RECALL_PENALTY_HEAT = 3                # calor extra ao chamar de volta tarde
 RECALL_PENALTY_FATIGUE = 8             # fadiga extra da equipa ao chamar de volta tarde
 
-FUEL_PRICES = {"gasolina": 1.80, "gasoleo": 1.60}
+# FUEL_PRICES is imported from economy_constants.py
 
 # ---------------- Imóveis: manutenção, melhorias e sinergias ----------------
 
@@ -283,39 +283,37 @@ LAUNDER_PROPERTY_BONUS_PER_LEVEL = 0.03      # bónus de eficiência na lavagem 
 # ---------------- Propriedades ----------------
 
 PROPERTY_TYPES = {
-    "esconderijo": {"name": "Esconderijo", "min_level": 1, "price": 20000, "cap_employees": 4,
+    "esconderijo": {"name": "Esconderijo", "min_level": 1, "price": PROPERTY_COSTS['esconderijo'], "cap_employees": 4,
                     "desc": "Alarga a capacidade de operacionais da organização."},
-    "garagem": {"name": "Garagem", "min_level": 1, "price": 15000, "cap_vehicles": 2,
+    "garagem": {"name": "Garagem", "min_level": 1, "price": PROPERTY_COSTS['garagem'], "cap_vehicles": 2,
                 "desc": "Espaço extra para a frota de veículos."},
-    "empresa_legal": {"name": "Empresa de Fachada", "min_level": 2, "price": 35000, "launder_per_h": 2000,
+    "empresa_legal": {"name": "Empresa de Fachada", "min_level": 2, "price": PROPERTY_COSTS['empresa_legal'], "launder_per_h": 1400,
                       "desc": "Lava dinheiro sujo automaticamente (90% de retorno)."},
-    "armazem": {"name": "Armazém", "min_level": 2, "price": 25000, "bonus_pct": 0.05, "bonus_category": "logistica",
+    "armazem": {"name": "Armazém", "min_level": 2, "price": PROPERTY_COSTS['armazem'], "bonus_pct": 0.05, "bonus_category": "logistica",
                 "bonus_label": "recompensas de logística", "desc": "Aumenta recompensas de operações logísticas."},
-    "laboratorio": {"name": "Laboratório", "min_level": 3, "price": 40000, "dirty_per_h": 3000, "heat_per_h": 0.8,
+    "laboratorio": {"name": "Laboratório", "min_level": 3, "price": PROPERTY_COSTS['laboratorio'], "dirty_per_h": 2100, "heat_per_h": 0.8,
                     "desc": "Produz dinheiro sujo passivamente, mas atrai calor."},
-    "oficina": {"name": "Oficina", "min_level": 3, "price": 30000, "repair_discount_pct": 0.15,
+    "oficina": {"name": "Oficina", "min_level": 3, "price": PROPERTY_COSTS['oficina'], "repair_discount_pct": 0.15,
                 "desc": "Reduz o custo de reparações da frota."},
-    "porto_clandestino": {"name": "Porto Clandestino", "min_level": 4, "price": 60000, "bonus_pct": 0.05,
+    "porto_clandestino": {"name": "Porto Clandestino", "min_level": 4, "price": PROPERTY_COSTS['porto_clandestino'], "bonus_pct": 0.05,
                           "bonus_category": "all", "bonus_label": "todas as recompensas",
                           "desc": "Rede de contrabando que aumenta todas as recompensas."},
-    "posto_vigilancia": {"name": "Posto de Vigilância", "min_level": 2, "price": 28000, "bonus_pct": 0.05,
+    "posto_vigilancia": {"name": "Posto de Vigilância", "min_level": 2, "price": PROPERTY_COSTS['posto_vigilancia'], "bonus_pct": 0.05,
                          "bonus_category": "tecnica", "bonus_label": "recompensas técnicas",
                          "desc": "Rede de vigilância que aumenta recompensas de operações técnicas."},
-    "escritorio_advocacia": {"name": "Escritório de Advocacia", "min_level": 2, "price": 32000, "bonus_pct": 0.05,
+    "escritorio_advocacia": {"name": "Escritório de Advocacia", "min_level": 2, "price": PROPERTY_COSTS['escritorio_advocacia'], "bonus_pct": 0.05,
                             "bonus_category": "influencia", "bonus_label": "recompensas de influência",
                             "desc": "Fachada legal que aumenta as recompensas de operações de influência."},
-    "arsenal": {"name": "Arsenal", "min_level": 3, "price": 38000, "bonus_pct": 0.05,
+    "arsenal": {"name": "Arsenal", "min_level": 3, "price": PROPERTY_COSTS['arsenal'], "bonus_pct": 0.05,
                 "bonus_category": "assalto", "bonus_label": "recompensas de assalto",
                 "desc": "Equipamento tático que aumenta as recompensas de operações de assalto."},
-    "casa_cambio": {"name": "Casa de Câmbio", "min_level": 3, "price": 42000, "launder_per_h": 2500,
+    "casa_cambio": {"name": "Casa de Câmbio", "min_level": 3, "price": PROPERTY_COSTS['casa_cambio'], "launder_per_h": 1750,
                     "desc": "Duplica a capacidade de lavagem automática através de câmbios internacionais."},
-    "centro_logistico": {"name": "Centro Logístico", "min_level": 4, "price": 55000, "cap_vehicles": 3,
+    "centro_logistico": {"name": "Centro Logístico", "min_level": 4, "price": PROPERTY_COSTS['centro_logistico'], "cap_vehicles": 3,
                          "desc": "Grande centro de operações que amplia bastante a capacidade da frota."},
 }
 
-BASE_EMPLOYEE_CAP = 4
-BASE_VEHICLE_CAP = 2
-PROPERTY_MAX_LEVEL = 3
+# BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, PROPERTY_MAX_LEVEL are imported from economy_constants.py
 
 # ---------------- Oportunidades ----------------
 
@@ -531,12 +529,6 @@ NIGHT_STEALTH_BONUS = 0.04               # bónus de chance em operações discr
 # Bónus percentuais (recompensa, desconto de reparação) de propriedades do mesmo
 # tipo empilhadas: a 1ª unidade dá o valor cheio, a 2ª 70%, a 3ª+ apenas 50% —
 # em vez de um limite artificial, cada compra extra do mesmo tipo rende menos.
-PROPERTY_STACK_DIMINISH = [1.0, 0.7, 0.5]
-
-DIRTY_MONEY_CAP_BASE = 80000              # limite de armazenamento de dinheiro sujo ao nível 1
-DIRTY_MONEY_CAP_PER_LEVEL = 8000          # +limite por cada nível acima do 1º
-
-REFUEL_DURATION_BASE_S = 15               # tempo mínimo de abastecimento
-REFUEL_DURATION_PER_L_S = 0.5             # +tempo por cada litro atestado
-
-PAYROLL_MORALE_REGEN = 0.4                # moral e lealdade recuperadas por funcionário quando os salários são pagos em dia
+# PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
+# REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, and PAYROLL_MORALE_REGEN
+# are now imported from economy_constants.py for centralized economic management
