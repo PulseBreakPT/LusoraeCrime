@@ -209,6 +209,10 @@ def org_bonuses(employees):
                 b["launder_rate"] += 0.15
             elif t == "lingua_de_prata":
                 b["bribe_discount"] += 0.15
+            elif t == "maos_de_seda":
+                b["heal"] += 0.15
+            elif t == "formula_secreta":
+                b["lab_boost"] += 0.15
     caps = {"repair_discount": 0.5, "rare_opp": 0.3, "heal": 0.6, "legal": 0.6,
             "launder_rate": 0.2, "empresa_boost": 0.75, "bribe_discount": 0.4, "lab_boost": 0.6}
     return {k: round(min(v, caps[k]), 3) for k, v in b.items()}

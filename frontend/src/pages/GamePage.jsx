@@ -73,12 +73,13 @@ export default function GamePage() {
   if (alerts.exhausted) hrTipParts.push(`${alerts.exhausted} exausto(s)`);
   if (alerts.nearExhausted) hrTipParts.push(`${alerts.nearExhausted} perto da exaustão`);
   if (alerts.betrayal) hrTipParts.push(`${alerts.betrayal} risco de traição`);
-  if (alerts.payrollDueSoon) hrTipParts.push("salários por pagar em breve");
+  if (alerts.payrollShort) hrTipParts.push("fundos insuficientes para os salários");
+  else if (alerts.payrollDueSoon) hrTipParts.push("salários por pagar em breve");
   const fleetTipParts = [];
   if (alerts.lowFuel) fleetTipParts.push(`${alerts.lowFuel} sem combustível`);
   if (alerts.damaged) fleetTipParts.push(`${alerts.damaged} avariado(s)`);
   if (alerts.nearBreakdown) fleetTipParts.push(`${alerts.nearBreakdown} perto de avariar`);
-  const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollDueSoon ? 1 : 0);
+  const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollShort ? 1 : alerts.payrollDueSoon ? 1 : 0);
   const fleetAlertCount = alerts.fleet + alerts.nearBreakdown;
   const mapState = hideImpossibleMissions
     ? { ...state, opportunities: state.opportunities.filter((o) => opportunityReachable(state, o)) }

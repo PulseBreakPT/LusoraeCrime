@@ -14,6 +14,8 @@ const KIND_COLORS = {
   vehicle: "#22D3EE",
   launder: "#34D399",
   system: "#FFFFFF",
+  property: "#A78BFA",
+  intel: "#FBBF24",
 };
 
 const KIND_LABELS = {
@@ -25,6 +27,8 @@ const KIND_LABELS = {
   vehicle: "Veículo",
   launder: "Lavagem",
   system: "Sistema",
+  property: "Imóvel",
+  intel: "Informação",
 };
 
 const relTime = (ts, nowMs) => {

@@ -123,6 +123,8 @@ TALENTS = {
                        "roles": ["negociador", "advogado", "relacoes_publicas", "chantagista"]},
     "fantasma_digital": {"name": "Fantasma Digital", "desc": "-50% calor em operações técnicas",
                         "roles": ["hacker", "falsificador", "espiao", "engenheiro_social", "criptografo"]},
+    "maos_de_seda": {"name": "Mãos de Seda", "desc": "+15% eficácia na cura de feridos", "roles": ["medico"]},
+    "formula_secreta": {"name": "Fórmula Secreta", "desc": "+15% produção de laboratórios", "roles": ["quimico"]},
 }
 
 RECRUIT_SOURCES = {
@@ -155,6 +157,7 @@ TRAINING_COURSES = {
     "logistica": {"name": "Logística", "attr": "resistencia", "spec": "logistica", "cost": 2400, "duration_s": 90, "xp": 45},
     "gestao": {"name": "Gestão", "attr": "inteligencia", "spec": None, "cost": 3200, "duration_s": 130, "xp": 60},
     "lideranca": {"name": "Liderança", "attr": "sangue_frio", "spec": None, "cost": 4000, "duration_s": 150, "xp": 70, "morale": 10},
+    "treino_fisico": {"name": "Treino Físico", "attr": "forca", "spec": "assalto", "cost": 2700, "duration_s": 100, "xp": 50},
 }
 
 _FIRST_NAMES = ["Rui", "Tiago", "Miguel", "André", "Bruno", "Carlos", "Diogo", "Vasco", "Nuno", "Pedro",
