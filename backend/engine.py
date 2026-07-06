@@ -979,6 +979,28 @@ async def _process_statuses(db, pid, now):
         await add_event(db, pid, "team", msg)
 
 
+BAILOUT_GRANT = 6000
+BAILOUT_MIN_FUNDS = 2500  # abaixo disto não dá para contratar nem o candidato mais barato
+
+
+async def _maybe_grant_bailout(db, player, employees):
+    """Rede de segurança única: se a organização ficar sem ninguém e sem
+    fundos para recrutar (por atraso salarial, despedimentos, etc.), o
+    jogador fica bloqueado sem forma de recuperar. Empresta-se capital de
+    emergência uma única vez por jogador."""
+    if employees or player.get("bailout_used") or player["clean_money"] >= BAILOUT_MIN_FUNDS:
+        return
+    pid = str(player["_id"])
+    player["clean_money"] += BAILOUT_GRANT
+    player["bailout_used"] = True
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"bailout_used": True}})
+    await add_event(
+        db, pid, "system",
+        f"A organização ficou sem pessoal e sem fundos — um contacto antigo emprestou {BAILOUT_GRANT:,} € "
+        "para reergueres o negócio. Este apoio só acontece uma vez, por isso mantém os salários em dia.",
+    )
+
+
 async def _process_payroll(db, player, employees, now):
     pid = str(player["_id"])
     if not player.get("next_payroll_at"):
@@ -1006,16 +1028,25 @@ async def _process_payroll(db, player, employees, now):
                 await db.employees.update_many({"_id": {"$in": idle_ids}, "loyalty": {"$gt": 100.0}}, {"$set": {"loyalty": 100.0}})
         else:
             await add_event(db, pid, "police", f"Sem fundos para os salários ({total:,} €)! Moral e lealdade em queda.")
-            survivors = []
             for e in employees:
                 e["loyalty"] = max(0.0, e.get("loyalty", 70) - 8)
                 e["morale"] = max(0.0, e.get("morale", 70) - 10)
-                if e["loyalty"] <= 10 and e.get("status") == "idle":
+            would_leave = [e for e in employees if e["loyalty"] <= 10 and e.get("status") == "idle"]
+            # Nunca deixar a organização ficar sem ninguém só por salários em
+            # atraso — o mais leal dos que sairiam fica (a contragosto) para
+            # não bloquear o jogador sem forma de recuperar.
+            spare_id = None
+            if would_leave and len(would_leave) == len(employees):
+                spare_id = max(would_leave, key=lambda e: e["loyalty"])["_id"]
+            survivors = []
+            for e in employees:
+                if e in would_leave and e["_id"] != spare_id:
                     await db.employees.delete_one({"_id": e["_id"]})
                     await add_event(db, pid, "police", f"{e['name']} abandonou a organização por salários em atraso!")
                 else:
+                    note = "Salário em atraso." if e["_id"] != spare_id else "Ficou apesar do atraso — é o último e não abandona a organização sozinho."
                     await db.employees.update_one({"_id": e["_id"]}, {"$set": {"loyalty": e["loyalty"], "morale": e["morale"]}})
-                    await push_history(db, e["_id"], "Salário em atraso.")
+                    await push_history(db, e["_id"], note)
                     survivors.append(e)
             employees[:] = survivors
 
@@ -1478,6 +1509,7 @@ async def advance(db, player):
     bonuses = org_bonuses(employees)
 
     await _process_payroll(db, player, employees, now)
+    await _maybe_grant_bailout(db, player, employees)
     await _process_betrayals(db, player, employees, minutes)
     await _process_absences(db, player, employees, minutes, now)
     await _process_xp_decay(db, player, employees, minutes, now)

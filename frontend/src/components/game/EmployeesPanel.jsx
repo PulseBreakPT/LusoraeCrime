@@ -11,6 +11,7 @@ import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmBut
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import { Alert, AlertDescription } from "../ui/alert";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -487,6 +488,15 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
             As pessoas são o coração da organização — recruta, treina e mantém-nas leais.
           </SheetDescription>
         </SheetHeader>
+
+        {state.player.clean_money < state.salary_total && state.salary_total > 0 && (
+          <Alert variant="destructive" data-testid="payroll-warning" className="mt-3 border-red-600/40 bg-red-600/10 py-2">
+            <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
+              <AlertTriangle size={12} /> Fundos insuficientes para a próxima folha salarial (faltam {fmtMoney(state.salary_total - state.player.clean_money)}) —
+              o plantel vai perder moral e lealdade, e quem estiver disponível pode abandonar a organização.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card className="mt-3 flex items-center justify-between border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
           <div>
