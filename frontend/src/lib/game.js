@@ -551,6 +551,118 @@ export function orgAlerts(state) {
   };
 }
 
+// ---------------- Quartel-General ----------------
+
+// Tier de benefícios cumulativos de um nível de HQ (hq_level_benefits vem do
+// catálogo, indexado por nível — índice 0 é o nível 1).
+export function hqBenefitsAt(catalog, level) {
+  const tiers = catalog?.hq_level_benefits || [];
+  const max = catalog?.hq_max_level || tiers.length || 1;
+  const idx = Math.min(Math.max(level, 1), max) - 1;
+  return tiers[idx] || null;
+}
+
+// Texto legível dos benefícios cumulativos de um tier (mirror de propertyBenefit).
+export function hqBenefitDesc(tier) {
+  if (!tier) return "";
+  const parts = [];
+  if (tier.cap_employees) parts.push(`+${tier.cap_employees} operacionais`);
+  if (tier.cap_vehicles) parts.push(`+${tier.cap_vehicles} veículos`);
+  if (tier.passive_income_pct) parts.push(`+${Math.round(tier.passive_income_pct * 100)}% produção/lavagem passiva`);
+  if (tier.heat_reduction_pct) parts.push(`-${Math.round(tier.heat_reduction_pct * 100)}% calor das propriedades`);
+  return parts.join(" · ") || "Sem bónus adicional.";
+}
+
+// Painel de situação do Quartel-General — reaproveita orgAlerts (não
+// reimplementa a deteção de problemas) e acrescenta duas heurísticas próprias
+// do HQ: melhoria recomendada e oportunidades de expansão (propriedades por
+// comprar). Devolve cartões {id, severity, label, navigate} para a UI.
+export function hqSituationItems(state, catalog) {
+  const alerts = orgAlerts(state);
+  const items = [];
+  const push = (id, severity, label, navigate) => items.push({ id, severity, label, navigate });
+
+  if (alerts.claimable > 0) push("claimable", "info", `${alerts.claimable} recompensa(s) de missão por reclamar`, "quests");
+  if (alerts.teams > 0) push("teams", "warn", `${alerts.teams} equipa(s) indisponível(is) (sem veículo ou membros)`, "teams");
+  if (alerts.fleet > 0) push("fleet", "warn", `${alerts.fleet} veículo(s) avariado(s) ou sem combustível`, "fleet");
+  if (alerts.hr > 0) push("hr", "danger", `${alerts.hr} operacional(is) ferido(s), preso(s), exausto(s) ou desleal(is)`, "employees");
+  if (alerts.payrollShort) push("payroll", "danger", "Fundos insuficientes para os salários", "employees");
+  else if (alerts.payrollDueSoon) push("payroll-soon", "info", "Salários por pagar em breve", "employees");
+  if (alerts.dirtyNearCap) push("dirtycap", "warn", "Cofre de dinheiro sujo quase cheio — produção a ser desperdiçada", "empire");
+  if (alerts.raidRisk) push("raid", "danger", "Risco de rusga policial aos laboratórios", "properties");
+
+  const hq = state?.player?.hq;
+  const catalogHq = catalog?.hq_level_benefits;
+  if (hq && catalogHq && hq.level < (catalog?.hq_max_level || catalogHq.length)) {
+    const nextTier = catalogHq[hq.level]; // índice = nível-alvo (hq.level+1) - 1 = hq.level
+    const upgrading = hq.upgrading_until && Date.parse(hq.upgrading_until) > Date.now();
+    if (!upgrading && nextTier?.upgrade_cost != null && (state?.player?.clean_money || 0) >= nextTier.upgrade_cost) {
+      push("hq-upgrade", "opportunity", `Podes melhorar o Quartel-General para o nível ${hq.level + 1} (${fmtMoney(nextTier.upgrade_cost)})`, "hq");
+    }
+  }
+
+  const ownedTypes = new Set((state?.properties || []).map((p) => p.type_key));
+  const buyableCount = Object.entries(catalog?.property_types || {}).filter(
+    ([key, pt]) => !ownedTypes.has(key) && (state?.player?.level || 1) >= pt.min_level && (state?.player?.clean_money || 0) >= pt.price
+  ).length;
+  if (buyableCount > 0) push("expansion", "opportunity", `${buyableCount} propriedade(s) novas disponíveis para comprar`, "properties");
+
+  return items;
+}
+
+// Pesos por prioridade — cada chave é o id de um cartão de hqSituationItems.
+// Prioridades não listadas explicitamente usam peso 1 (neutro).
+const HQ_PRIORITY_WEIGHTS = {
+  lucro: { expansion: 3, "hq-upgrade": 2, dirtycap: 3 },
+  custos: { payroll: 3, hr: 2, fleet: 2 },
+  velocidade: { fleet: 3, teams: 3, hr: 2 },
+  reputacao: { claimable: 3, teams: 2, expansion: 2 },
+  complexidade: { teams: 2, hr: 2, expansion: 2, "hq-upgrade": 2 },
+};
+
+// Dicas do "consultor" do Quartel-General — pondera o painel de situação de
+// acordo com a prioridade global ativa. Motor determinístico por regras (não
+// chama nenhum serviço de IA externo); a versão do Intel não tem noção de
+// prioridade, esta tem.
+export function hqAdvisorTips(state, catalog) {
+  const priority = state?.player?.priorities?.active || "equilibrio";
+  const weights = HQ_PRIORITY_WEIGHTS[priority] || {};
+  const severityRank = { danger: 3, warn: 2, opportunity: 1, info: 0 };
+  return hqSituationItems(state, catalog)
+    .map((it) => ({ ...it, score: weights[it.id] ?? 1 }))
+    .sort((a, b) => (severityRank[b.severity] - severityRank[a.severity]) || (b.score - a.score));
+}
+
+// KPIs de desempenho do Quartel-General — deriva de state.player.stats
+// (contadores já mantidos pelo backend) e state.history (últimas missões
+// concluídas), sem precisar de nenhum endpoint novo.
+export function hqPerformanceMetrics(state) {
+  const stats = state?.player?.stats || {};
+  const missionsTotal = stats.missions_total || 0;
+  const successRate = missionsTotal > 0 ? (stats.missions_success || 0) / missionsTotal : null;
+
+  const history = state?.history || [];
+  const durations = history
+    .filter((m) => m.depart_at && m.return_at)
+    .map((m) => (Date.parse(m.return_at) - Date.parse(m.depart_at)) / 1000)
+    .filter((s) => Number.isFinite(s) && s >= 0);
+  const avgDurationS = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+
+  const vehicles = state?.vehicles || [];
+  const fleetUtilization = vehicles.length ? vehicles.filter((v) => v.team_id).length / vehicles.length : null;
+
+  const netProfit = (stats.earned_clean || 0) + Math.round((stats.laundered_total || 0) * 0.9) - (stats.fines_paid || 0);
+
+  const byCategory = stats.by_category || {};
+  const successByCategory = stats.success_by_category || {};
+  const categoryBreakdown = Object.entries(byCategory).map(([category, total]) => ({
+    category, total, success: successByCategory[category] || 0,
+    rate: total > 0 ? (successByCategory[category] || 0) / total : 0,
+  }));
+
+  return { successRate, avgDurationS, fleetUtilization, netProfit, missionsTotal, categoryBreakdown };
+}
+
 // Classifica um evento do registo de atividade ("Últimos Registos") para o
 // painel a abrir ao clicar (nunca a Central de Inteligência por defeito) E
 // para a cor do marcador — a mesma análise de conteúdo alimenta as duas

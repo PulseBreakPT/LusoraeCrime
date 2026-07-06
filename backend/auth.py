@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
 from db import db
-from game_data import HQ_LOCATION
+from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
 from engine import now_utc, add_event, vehicle_doc, starting_employee
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -110,7 +110,9 @@ async def create_player_for_user(user_id: str, org_name: str):
         "clean_money": 75000, "dirty_money": 5000,
         "respect": 0, "level": 1, "heat": 0.0,
         "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0, "v2": True,
-        "hq": HQ_LOCATION, "last_tick": now, "created_at": now,
+        "hq": {**HQ_LOCATION, "level": 1, "upgrading_until": None, "upgrade_history": []},
+        "priorities": {"active": HQ_DEFAULT_PRIORITY},
+        "last_tick": now, "created_at": now,
     })
     pid = str(result.inserted_id)
     team_res = await db.teams.insert_one({

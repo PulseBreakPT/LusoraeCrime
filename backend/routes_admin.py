@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from db import db
 from auth import get_current_user
 from engine import now_utc, default_stats
-from game_data import HQ_LOCATION
+from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -243,7 +243,8 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
         "frac_dirty": 0.0,
         "frac_clean": 0.0,
         "frac_launder": 0.0,
-        "hq": HQ_LOCATION,
+        "hq": {**HQ_LOCATION, "level": 1, "upgrading_until": None, "upgrade_history": []},
+        "priorities": {"active": HQ_DEFAULT_PRIORITY},
         "last_tick": now,
         "stats": default_stats(),
         "type_cooldowns": {},

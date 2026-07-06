@@ -33,7 +33,9 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, RAIN_CHANCE, RAIN_TRAVEL_MULT,
                        EMPLOYEE_HEAVY_USE_THRESHOLD,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
-                       ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE)
+                       ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
+                       HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
+                       HQ_DEPARTMENTS)
 from reward_engine import calculate_full_reward
 
 router = APIRouter(prefix="/api/game", tags=["game"])
@@ -49,6 +51,10 @@ async def get_player(user: dict) -> dict:
     player = await db.players.find_one({"user_id": user["_id"]})
     if not player:
         raise HTTPException(status_code=404, detail="Organização não encontrada")
+    player["hq"].setdefault("level", 1)
+    player["hq"].setdefault("upgrading_until", None)
+    player["hq"].setdefault("upgrade_history", [])
+    player.setdefault("priorities", {"active": "equilibrio"})
     return player
 
 
@@ -131,6 +137,10 @@ class PropertyRenameInput(BaseModel):
     name: str = Field(min_length=1, max_length=40)
 
 
+class PriorityInput(BaseModel):
+    priority: str
+
+
 class LaunderInput(BaseModel):
     amount: int
 
@@ -181,6 +191,11 @@ async def catalog():
         "opportunity_types": {k: {kk: vv for kk, vv in v.items() if kk != "duration_s"} for k, v in OPPORTUNITY_TYPES.items()},
         "achievement_milestones": ACHIEVEMENT_MILESTONES,
         "achievement_bonus_pct_per_milestone": ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
+        "hq_max_level": HQ_MAX_LEVEL,
+        "hq_level_benefits": HQ_LEVEL_BENEFITS,
+        "hq_priorities": HQ_PRIORITIES,
+        "hq_default_priority": HQ_DEFAULT_PRIORITY,
+        "hq_departments": HQ_DEPARTMENTS,
     }
 
 
@@ -208,7 +223,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         db.missions.find({"player_id": pid, "phase": "done"}).sort("return_at", -1).to_list(20),
         db.events.find({"player_id": pid}).sort("ts", -1).to_list(30),
         db.quests.find({"player_id": pid}).to_list(400),
-        get_caps(db, pid),
+        get_caps(db, pid, player["hq"]["level"]),
         get_org_bonuses(db, pid),
     )
     caps = caps[0]
@@ -509,9 +524,19 @@ async def _try_prepare_dispatch(player, opp, team):
         return None
 
 
-def _rank_key(prep):
-    # Melhor primeiro: maior probabilidade de sucesso, depois mais perto,
-    # depois maior recompensa (desempate).
+def _rank_key(prep, priority=HQ_DEFAULT_PRIORITY):
+    # Critério principal depende da prioridade global da organização; os
+    # restantes campos servem de desempate, na mesma ordem de sempre (maior
+    # probabilidade de sucesso, depois mais perto, depois maior recompensa).
+    if priority == "lucro":
+        return (-prep["reward"], -prep["chance"], prep["dist"])
+    if priority == "velocidade":
+        return (prep["travel_s"], -prep["chance"], -prep["reward"])
+    if priority == "reputacao":
+        return (-prep.get("reward_reputation", 0), -prep["chance"], -prep["reward"])
+    if priority == "complexidade":
+        return (-prep.get("reward_difficulty_score", 0), -prep["chance"], -prep["reward"])
+    # "custos" e "equilibrio" (por omissão): comportamento clássico.
     return (-prep["chance"], prep["dist"], -prep["reward"])
 
 
@@ -527,6 +552,7 @@ async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Equipa não encontrada")
     if player["heat"] >= 90:
         return {"opportunity_id": None}
+    priority = player["priorities"]["active"]
     now = now_utc()
     opps = await db.opportunities.find({
         "player_id": pid, "status": "active", "expires_at": {"$gt": now.isoformat()},
@@ -538,7 +564,7 @@ async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_curr
         if not prep:
             continue
         if len(prep["members"]) >= prep["min_members"]:
-            if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+            if best_prep is None or _rank_key(prep, priority) < _rank_key(best_prep, priority):
                 best_opp, best_prep = opp, prep
     if not best_opp:
         return {"opportunity_id": None}
@@ -563,13 +589,14 @@ async def recommend_team(body: OpportunityIdInput, user: dict = Depends(get_curr
         return {"team_id": None}
     if player["heat"] >= 90 or player["level"] < opp["min_level"]:
         return {"team_id": None}
+    priority = player["priorities"]["active"]
     teams = await db.teams.find({"player_id": pid, "status": "idle"}).to_list(50)
     best_team, best_prep = None, None
     for team in teams:
         prep = await _try_prepare_dispatch(player, opp, team)
         if not prep or len(prep["members"]) < prep["min_members"]:
             continue
-        if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+        if best_prep is None or _rank_key(prep, priority) < _rank_key(best_prep, priority):
             best_team, best_prep = team, prep
     if not best_team:
         return {"team_id": None}
@@ -593,6 +620,7 @@ async def recommend_repeat(body: TeamIdInput, user: dict = Depends(get_current_u
         return {"opportunity_id": None}
     if player["heat"] >= 90:
         return {"opportunity_id": None}
+    priority = player["priorities"]["active"]
     now = now_utc()
     opps = await db.opportunities.find({
         "player_id": pid, "status": "active", "expires_at": {"$gt": now.isoformat()},
@@ -603,7 +631,7 @@ async def recommend_repeat(body: TeamIdInput, user: dict = Depends(get_current_u
         prep = await _try_prepare_dispatch(player, opp, team)
         if not prep or len(prep["members"]) < prep["min_members"]:
             continue
-        if best_prep is None or _rank_key(prep) < _rank_key(best_prep):
+        if best_prep is None or _rank_key(prep, priority) < _rank_key(best_prep, priority):
             best_opp, best_prep = opp, prep
     if not best_opp:
         return {"opportunity_id": None}
@@ -721,7 +749,7 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=f"Requer {cand['min_respect']:,} respeito para recrutar {RARITIES[cand['rarity']]['name']}")
     if player["clean_money"] < cand["cost"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    caps, _ = await get_caps(db, pid)
+    caps, _ = await get_caps(db, pid, player["hq"]["level"])
     used = await db.employees.count_documents({"player_id": pid})
     if used >= caps["employees"]:
         raise HTTPException(status_code=400, detail="Sem capacidade. Compra ou melhora um esconderijo.")
@@ -970,7 +998,7 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
         raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {model['min_level']}")
     if player["clean_money"] < model["price"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    caps, _ = await get_caps(db, pid)
+    caps, _ = await get_caps(db, pid, player["hq"]["level"])
     used = await db.vehicles.count_documents({"player_id": pid})
     if used >= caps["vehicles"]:
         raise HTTPException(status_code=400, detail="Garagem cheia. Compra ou melhora uma garagem.")
@@ -1048,7 +1076,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     missing = 100 - vehicle["condition"]
     if missing < 1:
         raise HTTPException(status_code=400, detail="Veículo em perfeitas condições")
-    _, props = await get_caps(db, pid)
+    _, props = await get_caps(db, pid, player["hq"]["level"])
     bonuses = await get_org_bonuses(db, pid)
     now = now_utc()
     prop_ranks = property_stack_ranks(props)
@@ -1145,7 +1173,7 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
     if prop.get("upgrading_until") and parse_dt(prop["upgrading_until"]) > now_utc():
         raise HTTPException(status_code=400, detail="Não podes vender: está a ser melhorado")
     pt = PROPERTY_TYPES[prop["type_key"]]
-    caps, _ = await get_caps(db, pid)
+    caps, _ = await get_caps(db, pid, player["hq"]["level"])
     if pt.get("cap_employees"):
         used = await db.employees.count_documents({"player_id": pid})
         if used > caps["employees"] - pt["cap_employees"] * prop["level"]:
@@ -1200,6 +1228,46 @@ async def rename_property(body: PropertyRenameInput, user: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail="Nome não pode estar vazio")
     await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"name": name}})
     return {"ok": True}
+
+
+# ---------------- Quartel-General ----------------
+
+@router.post("/hq/upgrade")
+async def upgrade_hq(user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    hq = player["hq"]
+    level = hq["level"]
+    if level >= HQ_MAX_LEVEL:
+        raise HTTPException(status_code=400, detail="Nível máximo atingido")
+    now = now_utc()
+    if hq.get("upgrading_until") and parse_dt(hq["upgrading_until"]) > now:
+        raise HTTPException(status_code=400, detail="Já está a ser melhorado")
+    target_level = level + 1
+    tier = HQ_LEVEL_BENEFITS[target_level - 1]
+    if player["level"] < tier["min_org_level"]:
+        raise HTTPException(status_code=400, detail=f"Requer nível de organização {tier['min_org_level']}")
+    cost = tier["upgrade_cost"]
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    duration_s = tier["upgrade_duration_s"]
+    until = (now + timedelta(seconds=duration_s)).isoformat()
+    await db.players.update_one({"_id": player["_id"]}, {
+        "$inc": {"clean_money": -cost},
+        "$set": {"hq.upgrading_until": until},
+    })
+    await add_event(db, pid, "property", f"Quartel-General começou a ser melhorado para nível {target_level} por {cost:,} € — pronto em {round(duration_s / 60, 1)} min.")
+    await record_tx(db, pid, "hq_upgrade", -cost, "clean", player["clean_money"] - cost, f"Melhoria do Quartel-General para nível {target_level}")
+    return {"ok": True, "upgrading_until": until}
+
+
+@router.post("/hq/priority")
+async def set_hq_priority(body: PriorityInput, user: dict = Depends(get_current_user)):
+    if body.priority not in HQ_PRIORITIES:
+        raise HTTPException(status_code=400, detail="Prioridade inválida")
+    player = await get_player(user)
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"priorities.active": body.priority}})
+    return {"ok": True, "priority": body.priority}
 
 
 # ---------------- Polícia / economia ----------------
