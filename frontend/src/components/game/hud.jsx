@@ -90,7 +90,7 @@ export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => 
   </div>
 );
 
-// Nome de um item (veículo/funcionário/propriedade) com um lápis ao lado que troca
+// Nome de um item (veículo/operacional/propriedade) com um lápis ao lado que troca
 // para um input inline + guardar/cancelar. Substitui o <p>{item.name}</p> estático.
 export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassName = "" }) => {
   const [editing, setEditing] = useState(false);
@@ -154,7 +154,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
 };
 
 // Estrela de favorito — puramente local (não passa pelo servidor). Equipas,
-// funcionários e veículos favoritos ficam sempre fixos no topo da respetiva lista.
+// operacionais e veículos favoritos ficam sempre fixos no topo da respetiva lista.
 export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
   <Tip tip={active ? "Remover dos favoritos" : "Marcar como favorito — fica sempre no topo da lista"}>
     <button

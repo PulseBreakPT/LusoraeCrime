@@ -264,7 +264,7 @@ export function matchesSearch(query, ...fields) {
 
 export function propertyBenefit(pt, level = 1) {
   const parts = [];
-  if (pt.cap_employees) parts.push(`+${pt.cap_employees * level} funcionários`);
+  if (pt.cap_employees) parts.push(`+${pt.cap_employees * level} operacionais`);
   if (pt.cap_vehicles) parts.push(`+${pt.cap_vehicles * level} veículos`);
   if (pt.dirty_per_h) parts.push(`+${pt.dirty_per_h * level} €/h sujos`);
   if (pt.launder_per_h) parts.push(`lava ${pt.launder_per_h * level} €/h`);
