@@ -806,7 +806,8 @@ async def _analyze_team_creation_intelligence(pid: str) -> dict:
     ],
     "best_spec": sorted_recs[0][0] if sorted_recs else None,
     "available_employees": available_emps,
-    "team_counts": teams_by_spec
+    "team_counts": teams_by_spec,
+    "opportunities": opps_by_category
   }
 
 
@@ -838,19 +839,36 @@ async def recommend_team_members(body: TeamCreateInput, user: dict = Depends(get
 
   # Calcular score para cada um
   scored = []
+  spec_roles = {rk for rk, rv in SPECIALIZATIONS.items() if rv.get("spec") == body.spec}
+
   for emp in available:
     score = _score_employee_for_spec(emp, body.spec, len(available))
+    emp_role = emp.get("role_key", "")
+    emp_spec = SPECIALIZATIONS.get(emp_role, {}).get("spec")
+
+    # Gerar razão legível
+    reasons = []
+    if emp_spec == body.spec:
+      reasons.append("especialização ideal")
+    elif emp_spec == "suporte":
+      reasons.append("suporte versátil")
+    if emp.get("rarity") in ["elite", "lendario"]:
+      reasons.append(f"{emp.get('rarity')} rarity")
+    if emp.get("talents"):
+      reasons.append(f"{len(emp.get('talents'))} talento(s)")
+
     scored.append({
       "id": str(emp["_id"]),
       "name": emp["name"],
-      "role": SPECIALIZATIONS.get(emp.get("role_key"), {}).get("name"),
+      "role": SPECIALIZATIONS.get(emp_role, {}).get("name"),
       "rarity": emp.get("rarity"),
       "level": emp.get("level", 0),
       "health": emp.get("health", 100),
       "fatigue": emp.get("fatigue", 0),
       "talents": emp.get("talents", []),
-      "score": score,
-      "attrs": emp.get("attrs", {})
+      "score": round(score, 1),
+      "attrs": emp.get("attrs", {}),
+      "fit_reason": " · ".join(reasons) if reasons else "funcionário disponível"
     })
 
   # Ordenar por score
@@ -864,6 +882,7 @@ async def recommend_team_members(body: TeamCreateInput, user: dict = Depends(get
     "team_spec_name": TEAM_SPECS[body.spec]["name"],
     "recommended_members": top_members,
     "total_available": len(available),
+    "total_scored": len(scored),
     "category_attrs": CATEGORY_ATTRS.get(body.spec, [])
   }
 
