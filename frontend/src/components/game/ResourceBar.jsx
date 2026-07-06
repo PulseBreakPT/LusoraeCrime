@@ -109,7 +109,7 @@ export const ResourceBar = () => {
             sub={payrollShort ? "fundos insuficientes!" : payrollS != null ? `em ${fmtDuration(payrollS)}` : null} subColor={payrollShort ? "#EF4444" : "#F59E0B"} align="end"
             tip={payrollShort
               ? `Não tens dinheiro limpo suficiente para o próximo ciclo salarial (${fmtMoney(state.salary_total)}) — os operacionais vão perder moral e lealdade, e quem estiver disponível pode abandonar a organização.`
-              : "Ciclo salarial pago a cada 30 min com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia."}
+              : `Ciclo salarial pago a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia.`}
           />
         </div>
       </div>

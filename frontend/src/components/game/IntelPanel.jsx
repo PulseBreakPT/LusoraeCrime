@@ -1,5 +1,5 @@
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
+import { fmtMoney, fmtDuration, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -183,7 +183,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             <Cell label="Lavado total" value={fmtMoney(s.laundered_total || 0)} color="#34D399" tip="Total convertido de sujo para limpo (manual e passivo)." />
             <Cell label="Multas/Apreensões" value={fmtMoney(s.fines_paid || 0)} color="#EF4444" tip="Dinheiro perdido para a polícia em multas e apreensões." />
             <Cell label="Fortuna total" value={fmtMoney(netWorth)} tip="Caixa (limpo + sujo) + valor de revenda da frota e do património." />
-            <Cell label="Salários/ciclo" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip="Ciclo salarial atual, pago a cada 30 minutos." />
+            <Cell label="Salários/ciclo" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip={`Ciclo salarial atual, pago a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)}.`} />
           </Grid>
         </Section>
 

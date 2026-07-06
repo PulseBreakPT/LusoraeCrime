@@ -143,7 +143,9 @@ RECRUIT_SOURCES = {
 }
 
 POOL_REFRESH_MIN = 5
-PAYROLL_CYCLE_MIN = 30
+PAYROLL_CYCLE_MIN = 120  # ciclos mais longos dão folga a quem não joga sem parar,
+                          # sem quebrar a pressão económica — evita perder o efetivo
+                          # todo de repente por uma ausência de algumas horas
 
 EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
 
