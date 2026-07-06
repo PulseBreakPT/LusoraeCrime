@@ -178,11 +178,20 @@ const TABS = [
   { key: "alertas", label: "Alertas" },
 ];
 
-export const QuestsPanel = ({ open, onOpenChange, onNavigate }) => {
+export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusTabConsumed }) => {
   const { state, serverNow, claimQuest } = useGame();
   const { rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("questsTab", "historia", rememberSort);
   useTick(open);
+  // Ao chegar de um registo de atividade que aponta para uma aba específica
+  // (ex.: uma decisão pendente), abre já nessa aba em vez da última usada.
+  useEffect(() => {
+    if (open && focusTab) {
+      setTab(focusTab);
+      onFocusTabConsumed && onFocusTabConsumed();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, focusTab]);
   if (!state) return null;
 
   const quests = state.quests || [];

@@ -221,6 +221,9 @@ export function effectiveSpeed(v) {
 }
 
 export function chanceColor(c) {
+  // 0% é impossível, não "mau" — cor neutra distinta do vermelho (que
+  // significa "possível mas arriscado"), para nunca ser confundida com sucesso.
+  if (c == null || c <= 0) return "#71717A";
   if (c >= 0.75) return "#34D399";
   if (c >= 0.5) return "#F59E0B";
   return "#EF4444";
@@ -539,6 +542,47 @@ export function orgAlerts(state) {
     hr, fleet, teams: teamsIssues,
     total: hr + fleet + teamsIssues + nearExhausted + nearBreakdown + (payrollDueSoon ? 1 : 0) + (payrollShort ? 1 : 0) + (raidRisk ? 1 : 0),
   };
+}
+
+// Mapeia um evento do registo de atividade ("Últimos Registos") para o painel
+// que o jogador deve ver ao clicar — nunca a Central de Inteligência por
+// defeito. O "kind" guardado no backend é por vezes genérico (ex.: "police"
+// cobre rusgas, traições e perseguições), por isso desambiguamos pelo
+// conteúdo da mensagem quando necessário. Devolve { panel, tab? } — "tab" só
+// vem preenchido quando o evento corresponde a uma decisão/alerta pendente
+// que deve abrir já na aba certa das Missões.
+export function panelForEvent(kind, message) {
+  const msg = message || "";
+  if (/^DECISÃO:/.test(msg) || /^EVENTO:/.test(msg)) return { panel: "quests", tab: "alertas" };
+  if (/missões diárias|missões semanais|missão sugerida|reclamada automaticamente/i.test(msg)) {
+    return { panel: "quests" };
+  }
+  switch (kind) {
+    case "team":
+    case "dispatch":
+      return { panel: "teams" };
+    case "vehicle":
+      return { panel: "fleet" };
+    case "property":
+      return { panel: "properties" };
+    case "launder":
+      return { panel: "empire" };
+    case "police":
+      if (/durante/i.test(msg)) return { panel: "teams" };
+      if (/RUSGA/i.test(msg)) return { panel: "properties" };
+      if (/dinheiro sujo|desperdiçad/i.test(msg)) return { panel: "empire" };
+      if (/salári|abandonou a organização|roubou|vendeu informação|sabotou/i.test(msg)) return { panel: "employees" };
+      return { panel: "teams" };
+    case "success":
+      if (/despistou/i.test(msg)) return { panel: "teams" };
+      return { panel: "quests" };
+    case "system":
+      if (/folha salarial paga|sem pessoal e sem fundos/i.test(msg)) return { panel: "employees" };
+      return { panel: "intel" };
+    case "intel":
+    default:
+      return { panel: "intel" };
+  }
 }
 
 export function formatApiErrorDetail(detail) {
