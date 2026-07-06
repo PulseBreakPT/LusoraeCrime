@@ -62,19 +62,22 @@ const RarityBadge = ({ rarity, rar }) => (
   </Tip>
 );
 
-const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => (
-  <Tip tip={title} block>
-    <Button
-      data-testid={testId}
-      variant="outline"
-      onClick={onClick}
-      disabled={disabled}
-      className={`h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5 ${color}`}
-    >
-      <Icon size={11} /> {label}
-    </Button>
-  </Tip>
-);
+const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => {
+  const btnColor = disabled ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20";
+  return (
+    <Tip tip={title} block>
+      <Button
+        data-testid={testId}
+        variant="outline"
+        onClick={onClick}
+        disabled={disabled}
+        className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${btnColor}`}
+      >
+        <Icon size={11} /> {label}
+      </Button>
+    </Tip>
+  );
+};
 
 const EmployeeCard = ({ e }) => {
   const {

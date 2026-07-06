@@ -117,7 +117,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 variant="outline" size="sm"
                 onClick={repairAll}
                 disabled={state.player.clean_money < repairAllCost}
-                className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-success hover:bg-white/5"
+                className={`h-auto shrink-0 gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                  state.player.clean_money < repairAllCost
+                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                }`}
               >
                 <Wrench size={11} /> Reparar todos
               </Button>
@@ -277,7 +281,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         variant="outline"
                         onClick={() => refuelVehicle(v.id)}
                         disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
-                        className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-400 hover:bg-white/5"
+                        className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                          busy || fuelPct > 99 || state.player.clean_money < refuelCost
+                            ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                        }`}
                       >
                         <Fuel size={11} /> {fmtMoney(refuelCost)}
                       </Button>
@@ -289,7 +297,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       variant="outline"
                       onClick={() => repairVehicle(v.id)}
                       disabled={busy || v.condition > 99 || state.player.clean_money < repairCost}
-                      className="h-auto w-full gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-success hover:bg-white/5"
+                      className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
+                        busy || v.condition > 99 || state.player.clean_money < repairCost
+                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                      }`}
                     >
                       <Wrench size={11} /> {fmtMoney(repairCost)}
                     </Button>

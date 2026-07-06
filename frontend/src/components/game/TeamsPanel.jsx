@@ -400,7 +400,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                             variant="outline" size="sm"
                             onClick={() => refuelVehicle(vehicle.id)}
                             disabled={money < refuelCost}
-                            className="h-auto gap-0.5 border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-400 hover:bg-white/5"
+                            className={`h-auto gap-0.5 px-1.5 py-0.5 font-mono text-[9px] ${
+                              money < refuelCost
+                                ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                            }`}
                           >
                             <Fuel size={9} /> {fmtMoney(refuelCost)}
                           </Button>
@@ -413,7 +417,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                             variant="outline" size="sm"
                             onClick={() => repairVehicle(vehicle.id)}
                             disabled={money < repairCost}
-                            className="h-auto gap-0.5 border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-success hover:bg-white/5"
+                            className={`h-auto gap-0.5 px-1.5 py-0.5 font-mono text-[9px] ${
+                              money < repairCost
+                                ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                            }`}
                           >
                             <Wrench size={9} /> {fmtMoney(repairCost)}
                           </Button>
@@ -428,7 +436,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     best && rec
                       ? `Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`
                       : r.ok
-                      ? "Equipa pronta, mas sem missões disponíveis ou elegíveis neste momento."
+                      ? `Equipa pronta, mas sem missões disponíveis ou elegíveis neste momento. Certifica-te que: tens missões geradas no mapa (cria novas se necessário), a equipa cumpre os requisitos de nível mínimo, e tem membros suficientes (${r.ready || 0} disponíveis).`
                       : r.reason
                   }
                   block
@@ -440,8 +448,8 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     disabled={!best || !rec}
                     className={`mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
                       best && rec
-                        ? "border-success/30 bg-success/10 text-success hover:bg-success/20 disabled:opacity-50"
-                        : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+                        : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                     }`}
                   >
                     <div className="flex items-center gap-1 truncate">
@@ -471,7 +479,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`team-repeat-last-${t.id}`}
                       variant="outline"
                       onClick={() => dispatchTeam(repeatOpp.id, t.id)}
-                      className="mt-1.5 h-auto w-full flex-col items-start gap-1 border-white/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-zinc-400 hover:bg-white/5 md:flex-row md:items-center md:text-[10px]"
+                      className="mt-1.5 h-auto w-full flex-col items-start gap-1 border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-cyan-400 hover:bg-cyan-500/20 md:flex-row md:items-center md:text-[10px]"
                     >
                       <div className="flex items-center gap-1 truncate">
                         <Undo2 size={11} className="shrink-0 rotate-180" /> Repetir última → {repeatOpp.name}
