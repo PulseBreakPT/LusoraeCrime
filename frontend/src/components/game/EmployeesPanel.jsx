@@ -18,9 +18,8 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from ".
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
-  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff, Brain,
+  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
 } from "lucide-react";
-import { IntelligentDashboard } from "./IntelligentDashboard";
 
 const EMP_STATUS_TIPS = {
   idle: "Disponível para missões, treino ou descanso.",
@@ -441,7 +440,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state || !catalog) return null;
 
@@ -478,219 +476,207 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const hiddenCount = searched.length - unavailableHidden.length;
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2 text-white">
-              <IdCard size={18} className="text-primary" /> Recursos Humanos
-              <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
-            </SheetTitle>
-            <SheetDescription className="text-zinc-500">
-              As pessoas são o coração da organização — recruta, treina e mantém-nas leais.
-            </SheetDescription>
-          </SheetHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2 text-white">
+            <IdCard size={18} className="text-primary" /> Recursos Humanos
+            <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
+          </SheetTitle>
+          <SheetDescription className="text-zinc-500">
+            As pessoas são o coração da organização — recruta, treina e mantém-nas leais.
+          </SheetDescription>
+        </SheetHeader>
 
-          <Card className="mt-3 flex items-center justify-between border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
-            <div>
-              <p className="text-[9px] uppercase tracking-wider text-zinc-500">Folha salarial</p>
-              <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(state.salary_total)}/ciclo</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[9px] uppercase tracking-wider text-zinc-500">Próximo pagamento</p>
-              <p className="font-mono text-xs font-bold text-amber-400" data-testid="payroll-countdown">
-                {payrollMs !== null ? fmtDuration(payrollMs / 1000) : "—"}
-              </p>
-            </div>
-          </Card>
+        <Card className="mt-3 flex items-center justify-between border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
+          <div>
+            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Folha salarial</p>
+            <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(state.salary_total)}/ciclo</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Próximo pagamento</p>
+            <p className="font-mono text-xs font-bold text-amber-400" data-testid="payroll-countdown">
+              {payrollMs !== null ? fmtDuration(payrollMs / 1000) : "—"}
+            </p>
+          </div>
+        </Card>
 
-          {(() => {
-            const emps = state.employees;
-            const avg = (fn) => (emps.length ? Math.round(emps.reduce((a, e) => a + fn(e), 0) / emps.length) : 0);
-            const avgMorale = avg((e) => e.morale);
-            const avgLoyalty = avg((e) => e.loyalty);
-            const avgFatigue = avg((e) => e.fatigue);
-            const available = emps.filter((e) => e.status === "idle" && e.fatigue < 90).length;
-            const statusCounts = {};
-            emps.forEach((e) => { statusCounts[e.status] = (statusCounts[e.status] || 0) + 1; });
-            return (
-              <>
-                <SummaryStrip cols={4} className="mt-2" testId="hr-summary">
-                  <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
-                    tip="Moral média do plantel. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
-                  <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
-                    tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
-                  <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
-                    tip="Fadiga média. Aos 90% um funcionário fica indisponível — manda-o descansar (recupera 50)." />
-                  <Kpi icon={UserCheck} label="Disponíveis" value={`${available}/${emps.length}`} color={available > 0 ? "#34D399" : "#EF4444"}
-                    tip="Funcionários prontos para operar já: sem tarefa atribuída e com fadiga abaixo de 90%." />
-                </SummaryStrip>
-                {Object.keys(statusCounts).length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">
-                    {Object.entries(statusCounts).map(([s, n]) => (
-                      <Tip key={s} tip={EMP_STATUS_TIPS[s]}>
-                        <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase"
-                          style={{ color: EMP_STATUS_COLORS[s], background: `${EMP_STATUS_COLORS[s]}14` }}
-                        >
-                          {n} {EMP_STATUS_LABELS[s]}
-                        </span>
-                      </Tip>
-                    ))}
-                  </div>
-                )}
-              </>
-            );
-          })()}
-
-          {capFull && (
-            <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none" data-testid="hr-cap-full">
-              <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
-              {canBuyHideout ? (
-                <Button
-                  data-testid="hr-buy-hideout-inline"
-                  variant="outline" size="sm"
-                  onClick={() => buyProperty("esconderijo")}
-                  className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
-                >
-                  <Warehouse size={10} /> Comprar esconderijo · {fmtMoney(hideout.price)}
-                </Button>
-              ) : (
-                <button
-                  data-testid="hr-nav-properties"
-                  onClick={() => onNavigate && onNavigate("properties")}
-                  className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
-                >
-                  Ver Imóveis
-                </button>
-              )}
-            </Card>
-          )}
-
-          <Tabs value={tab} onValueChange={setTab} className="mt-3">
-            <TabsList className="grid w-full grid-cols-2 bg-black/40">
-              <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Plantel ({state.employees.length})
-              </TabsTrigger>
-              <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Recrutar ({(state.candidates || []).length})
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {tab === "roster" && (
-            <div className="mt-3">
-              {state.employees.length === 0 ? (
-                <p className="font-mono text-[11px] text-zinc-600">Sem funcionários. Vai à aba Recrutar.</p>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <div className="relative flex-1">
-                      <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
-                      <Input
-                        data-testid="employees-search"
-                        value={query}
-                        onChange={(ev) => setQuery(ev.target.value)}
-                        placeholder="Pesquisar funcionário..."
-                        className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
-                      />
-                    </div>
-                    <Tip tip={hideUnavailable ? "A mostrar só disponíveis (e favoritos) — clica para ver todos." : "A mostrar todos — clica para esconder indisponíveis."}>
-                      <Button
-                        data-testid="employees-toggle-unavailable"
-                        variant="outline"
-                        onClick={() => setHideUnavailable(!hideUnavailable)}
-                        className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
+        {(() => {
+          const emps = state.employees;
+          const avg = (fn) => (emps.length ? Math.round(emps.reduce((a, e) => a + fn(e), 0) / emps.length) : 0);
+          const avgMorale = avg((e) => e.morale);
+          const avgLoyalty = avg((e) => e.loyalty);
+          const avgFatigue = avg((e) => e.fatigue);
+          const available = emps.filter((e) => e.status === "idle" && e.fatigue < 90).length;
+          const statusCounts = {};
+          emps.forEach((e) => { statusCounts[e.status] = (statusCounts[e.status] || 0) + 1; });
+          return (
+            <>
+              <SummaryStrip cols={4} className="mt-2" testId="hr-summary">
+                <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
+                  tip="Moral média do plantel. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
+                <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
+                  tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
+                <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
+                  tip="Fadiga média. Aos 90% um funcionário fica indisponível — manda-o descansar (recupera 50)." />
+                <Kpi icon={UserCheck} label="Disponíveis" value={`${available}/${emps.length}`} color={available > 0 ? "#34D399" : "#EF4444"}
+                  tip="Funcionários prontos para operar já: sem tarefa atribuída e com fadiga abaixo de 90%." />
+              </SummaryStrip>
+              {Object.keys(statusCounts).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">
+                  {Object.entries(statusCounts).map(([s, n]) => (
+                    <Tip key={s} tip={EMP_STATUS_TIPS[s]}>
+                      <span
+                        className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase"
+                        style={{ color: EMP_STATUS_COLORS[s], background: `${EMP_STATUS_COLORS[s]}14` }}
                       >
-                        {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
-                        {hideUnavailable && hiddenCount > 0 ? ` +${hiddenCount}` : ""}
+                        {n} {EMP_STATUS_LABELS[s]}
+                      </span>
+                    </Tip>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
+
+        {capFull && (
+          <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none" data-testid="hr-cap-full">
+            <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
+            {canBuyHideout ? (
+              <Button
+                data-testid="hr-buy-hideout-inline"
+                variant="outline" size="sm"
+                onClick={() => buyProperty("esconderijo")}
+                className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
+              >
+                <Warehouse size={10} /> Comprar esconderijo · {fmtMoney(hideout.price)}
+              </Button>
+            ) : (
+              <button
+                data-testid="hr-nav-properties"
+                onClick={() => onNavigate && onNavigate("properties")}
+                className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+              >
+                Ver Imóveis
+              </button>
+            )}
+          </Card>
+        )}
+
+        <Tabs value={tab} onValueChange={setTab} className="mt-3">
+          <TabsList className="grid w-full grid-cols-2 bg-black/40">
+            <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Plantel ({state.employees.length})
+            </TabsTrigger>
+            <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Recrutar ({(state.candidates || []).length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {tab === "roster" && (
+          <div className="mt-3">
+            {state.employees.length === 0 ? (
+              <p className="font-mono text-[11px] text-zinc-600">Sem funcionários. Vai à aba Recrutar.</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <div className="relative flex-1">
+                    <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
+                    <Input
+                      data-testid="employees-search"
+                      value={query}
+                      onChange={(ev) => setQuery(ev.target.value)}
+                      placeholder="Pesquisar funcionário..."
+                      className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+                    />
+                  </div>
+                  <Tip tip={hideUnavailable ? "A mostrar só disponíveis (e favoritos) — clica para ver todos." : "A mostrar todos — clica para esconder indisponíveis."}>
+                    <Button
+                      data-testid="employees-toggle-unavailable"
+                      variant="outline"
+                      onClick={() => setHideUnavailable(!hideUnavailable)}
+                      className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
+                    >
+                      {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
+                      {hideUnavailable && hiddenCount > 0 ? ` +${hiddenCount}` : ""}
+                    </Button>
+                  </Tip>
+                  {restAllIds.length > 0 && (
+                    <Tip tip={`Manda descansar todos os funcionários disponíveis com fadiga (${restAllIds.length}).`}>
+                      <Button
+                        data-testid="employees-rest-all"
+                        variant="outline"
+                        onClick={restAll}
+                        className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 hover:bg-white/5"
+                      >
+                        <BedDouble size={11} /> Descansar todos
                       </Button>
                     </Tip>
-                    {restAllIds.length > 0 && (
-                      <Tip tip={`Manda descansar todos os funcionários disponíveis com fadiga (${restAllIds.length}).`}>
-                        <Button
-                          data-testid="employees-rest-all"
-                          variant="outline"
-                          onClick={restAll}
-                          className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 hover:bg-white/5"
-                        >
-                          <BedDouble size={11} /> Descansar todos
-                        </Button>
-                      </Tip>
-                    )}
-                  </div>
-                  <div className="mt-2 space-y-2" data-testid="employees-list">
-                    {sortedEmployees.length === 0 && (
-                      <p className="font-mono text-[11px] text-zinc-600">Nenhum funcionário corresponde aos filtros.</p>
-                    )}
-                    {sortedEmployees.map((e) => (
-                      <EmployeeCard key={e.id} e={e} />
-                    ))}
-                  </div>
-                </>
-              )}
+                  )}
+                </div>
+                <div className="mt-2 space-y-2" data-testid="employees-list">
+                  {sortedEmployees.length === 0 && (
+                    <p className="font-mono text-[11px] text-zinc-600">Nenhum funcionário corresponde aos filtros.</p>
+                  )}
+                  {sortedEmployees.map((e) => (
+                    <EmployeeCard key={e.id} e={e} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {tab === "recruit" && (
+          <div className="mt-3" data-testid="recruitment-list">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-mono text-[10px] text-zinc-500">
+                Novos contactos em <span className="text-white">{poolMs !== null ? fmtDuration(Math.max(0, poolMs / 1000)) : "—"}</span>
+              </p>
+              <Button
+                data-testid="refresh-pool-btn"
+                variant="outline" size="sm"
+                onClick={() => refreshPool()}
+                disabled={state.player.clean_money < catalog.hr_costs.pool_refresh}
+                className="h-auto gap-1 border-white/10 px-2 py-1 font-mono text-[10px] text-cyan-400 hover:bg-white/5"
+              >
+                <RefreshCw size={10} /> Atualizar {fmtMoney(catalog.hr_costs.pool_refresh)}
+              </Button>
             </div>
-          )}
 
-          {tab === "recruit" && (
-            <div className="mt-3" data-testid="recruitment-list">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-[10px] text-zinc-500">
-                  Novos contactos em <span className="text-white">{poolMs !== null ? fmtDuration(Math.max(0, poolMs / 1000)) : "—"}</span>
-                </p>
-                <Button
-                  data-testid="refresh-pool-btn"
-                  variant="outline" size="sm"
-                  onClick={() => refreshPool()}
-                  disabled={state.player.clean_money < catalog.hr_costs.pool_refresh}
-                  className="h-auto gap-1 border-white/10 px-2 py-1 font-mono text-[10px] text-cyan-400 hover:bg-white/5"
-                >
-                  <RefreshCw size={10} /> Atualizar {fmtMoney(catalog.hr_costs.pool_refresh)}
-                </Button>
-              </div>
-
-              {Object.entries(catalog.recruit_sources).map(([key, src]) => {
-                const locked = state.player.level < src.min_level;
-                const cands = grouped[key] || [];
-                // Secções desbloqueadas e sem candidatos colapsam-se sozinhas — só as
-                // bloqueadas ficam sempre visíveis (mostram o que falta desbloquear).
-                if (!locked && cands.length === 0) return null;
-                return (
-                  <div key={key} className="mb-4">
-                    <h3 className="mb-1.5 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                      {src.name}
-                      {locked && (
-                        <span className="flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
-                          <Lock size={9} /> Nível {src.min_level}
-                        </span>
-                      )}
-                    </h3>
-                    {locked ? (
-                      <p className="font-mono text-[10px] text-zinc-600">Sobe de nível para desbloquear esta fonte de recrutamento.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {cands.map((c) => (
-                          <CandidateCard key={c.id} c={c} />
-                        ))}
-                      </div>
+            {Object.entries(catalog.recruit_sources).map(([key, src]) => {
+              const locked = state.player.level < src.min_level;
+              const cands = grouped[key] || [];
+              // Secções desbloqueadas e sem candidatos colapsam-se sozinhas — só as
+              // bloqueadas ficam sempre visíveis (mostram o que falta desbloquear).
+              if (!locked && cands.length === 0) return null;
+              return (
+                <div key={key} className="mb-4">
+                  <h3 className="mb-1.5 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    {src.name}
+                    {locked && (
+                      <span className="flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                        <Lock size={9} /> Nível {src.min_level}
+                      </span>
                     )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <Button
-            onClick={() => setDashboardOpen(true)}
-            className="mt-4 w-full border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-            variant="outline"
-          >
-            <Brain size={12} /> IA Inteligente — Análise Completa
-          </Button>
-        </SheetContent>
-      </Sheet>
-
-      <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
-    </>
+                  </h3>
+                  {locked ? (
+                    <p className="font-mono text-[10px] text-zinc-600">Sobe de nível para desbloquear esta fonte de recrutamento.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {cands.map((c) => (
+                        <CandidateCard key={c.id} c={c} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 };

@@ -6,8 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
-import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock, Brain } from "lucide-react";
-import { IntelligentDashboard } from "./IntelligentDashboard";
+import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -20,13 +19,11 @@ const useTick = (active) => {
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
   const { state, catalog, serverNow, buyProperty, sellProperty, upgradeProperty, renameProperty } = useGame();
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state) return null;
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
@@ -177,14 +174,6 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           })}
         </div>
 
-        <Button
-          onClick={() => setDashboardOpen(true)}
-          className="mt-4 w-full border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-          variant="outline"
-        >
-          <Brain size={12} /> IA Inteligente — Análise Completa
-        </Button>
-
         <div className="mt-6">
           <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">Mercado imobiliário</h3>
           <div className="space-y-2">
@@ -257,8 +246,5 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
         </div>
       </SheetContent>
     </Sheet>
-
-    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
-  </>
   );
 };
