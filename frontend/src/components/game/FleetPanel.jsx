@@ -429,7 +429,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     data-testid="fleet-buy-garage-inline"
                     variant="outline" size="sm"
                     onClick={() => buyProperty("garagem")}
-                    className="h-auto gap-1 border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-white/10"
+                    className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
                   >
                     <Warehouse size={10} /> Comprar garagem · {fmtMoney(garagem.price)}
                   </Button>

@@ -32,7 +32,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        LAUNDER_PROPERTY_BONUS_PER_LEVEL, LOCAL_PRESENCE_RADIUS_KM,
                        TRAFFIC_DELAY_CHANCE, TRAFFIC_DELAY_MAX_PCT, RAIN_CHANCE, RAIN_TRAVEL_MULT,
                        EMPLOYEE_HEAVY_USE_THRESHOLD,
-                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S)
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, CATEGORY_ATTRS)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -69,6 +69,11 @@ class TypeKeyInput(BaseModel):
 
 class TeamCreateInput(BaseModel):
     spec: str
+
+
+class AssignMembersBatchInput(BaseModel):
+    team_id: str
+    employee_ids: list[str] = []
 
 
 class RecruitInput(BaseModel):
@@ -638,6 +643,250 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
     return {"ok": True, "return_at": ret.isoformat(), "late_penalty": late}
 
 
+# ============ Lógica Inteligente de Formação de Equipas ============
+
+def _score_employee_for_spec(emp: dict, spec: str, available: int) -> float:
+  """Calcula um score (0-100) de adequação de um funcionário para uma especialização.
+
+  A pontuação considera:
+  - Especialização principal (30 pts) vs suporte (5 pts)
+  - Talentos relevantes (10 pts cada)
+  - Atributos categoria (até 5 pts cada)
+  - Raridade (0-15 pts)
+  - Nível (até 10 pts)
+  - Estado físico (penalidades)
+  - Fadiga (penalidades)
+  """
+  score = 0.0
+
+  # === ESPECIALIZAÇÃO (peso: 30%) ===
+  emp_spec = SPECIALIZATIONS.get(emp.get("role_key"), {}).get("spec")
+  if emp_spec == spec:
+    score += 30
+  elif emp_spec == "suporte":
+    score += 5
+
+  # === TALENTOS (peso: 20%) ===
+  talents = emp.get("talents", [])
+  for talent in talents:
+    talent_info = TALENTS.get(talent, {})
+    roles = talent_info.get("roles", [])
+    if not roles or emp.get("role_key") in roles:
+      score += 10
+
+  # === ATRIBUTOS (peso: 25%) ===
+  attrs = CATEGORY_ATTRS.get(spec, [])
+  if attrs:
+    emp_attrs = emp.get("attrs", {})
+    attr_total = sum(emp_attrs.get(attr, 0) for attr in attrs)
+    attr_avg = attr_total / len(attrs) if attrs else 0
+    score += min(12, attr_avg / 10)  # Até 12 pontos (normalizado por 2 atributos)
+
+  # === RARIDADE (peso: 15%) ===
+  rarity = emp.get("rarity", "comum")
+  rarity_mult = {"comum": 0, "raro": 5, "elite": 10, "lendario": 15}
+  score += rarity_mult.get(rarity, 0)
+
+  # === NÍVEL (peso: 10%) ===
+  level = emp.get("level", 0)
+  score += min(10, level / 1.5)  # Até 10 pontos
+
+  # === PENALIDADES ===
+  # Fadiga: penaliza se cansado
+  fatigue = emp.get("fatigue", 0)
+  if fatigue > 80:
+    score -= 20  # Muito cansado
+  elif fatigue > 60:
+    score -= 8   # Moderadamente cansado
+  elif fatigue > 40:
+    score -= 2   # Ligeiramente cansado
+
+  # Saúde: penaliza se ferido
+  health = emp.get("health", 100)
+  if health < 60:
+    score -= 15  # Muito ferido
+  elif health < 80:
+    score -= 8   # Moderadamente ferido
+
+  return max(0.0, min(100.0, score))
+
+
+async def _analyze_team_creation_intelligence(pid: str) -> dict:
+  """Análise completa de qual especialização é melhor criar."""
+  now = now_utc()
+
+  # Contar equipas existentes por especialização
+  teams_by_spec = {}
+  for spec in TEAM_SPECS:
+    count = await db.teams.count_documents({"player_id": pid, "spec": spec})
+    teams_by_spec[spec] = count
+
+  # Contar funcionários disponíveis por especialização
+  available_emps = {}
+  emps_in_teams = set()
+
+  teams = await db.teams.find({"player_id": pid}).to_list(100)
+  for team in teams:
+    team_emps = await db.employees.find({
+      "player_id": pid,
+      "team_id": str(team["_id"])
+    }).to_list(50)
+    for emp in team_emps:
+      emps_in_teams.add(str(emp["_id"]))
+
+  for spec in TEAM_SPECS:
+    idle_count = await db.employees.count_documents({
+      "player_id": pid,
+      "status": "idle",
+      "fatigue": {"$lt": 90}
+    })
+
+    # Contar quantos poderiam ser bons para essa especialização
+    best_fit = await db.employees.find({
+      "player_id": pid,
+      "status": "idle",
+      "fatigue": {"$lt": 80},
+      "$or": [
+        {"role_key": {"$in": [rk for rk, rv in SPECIALIZATIONS.items() if rv.get("spec") == spec]}},
+        {"talents": {"$in": [t for t, tv in TALENTS.items() if spec in str(tv.get("roles", []))]}}
+      ]
+    }).to_list(20)
+
+    available_emps[spec] = {
+      "count": idle_count,
+      "best_fit": len(best_fit),
+      "employees": best_fit
+    }
+
+  # Contar oportunidades pendentes por categoria
+  opps_by_category = {}
+  opps = await db.opportunities.find({
+    "player_id": pid,
+    "status": "active",
+    "expires_at": {"$gt": now.isoformat()}
+  }).to_list(100)
+
+  for opp in opps:
+    cat = opp.get("category", "especial")
+    if cat not in opps_by_category:
+      opps_by_category[cat] = 0
+    opps_by_category[cat] += 1
+
+  # Calcular score de recomendação para cada especialização
+  recommendations = {}
+  for spec, team_count in teams_by_spec.items():
+    category = spec
+    opp_count = opps_by_category.get(category, 0)
+    best_fit_emps = available_emps[spec]["best_fit"]
+
+    # Score: oportunidades pendentes × funcionários bons ÷ (equipas existentes + 1)
+    if best_fit_emps > 0:
+      score = (opp_count + 1) * best_fit_emps / (team_count + 1)
+    else:
+      score = (opp_count + 0.5) / (team_count + 1)
+
+    recommendations[spec] = {
+      "score": score,
+      "opportunities": opp_count,
+      "best_fit_employees": best_fit_emps,
+      "teams_existing": team_count,
+      "description": TEAM_SPECS[spec]["desc"]
+    }
+
+  # Ordenar por score (melhor primeiro)
+  sorted_recs = sorted(recommendations.items(), key=lambda x: x[1]["score"], reverse=True)
+
+  return {
+    "recommendations": [
+      {
+        "spec": spec,
+        **rec
+      }
+      for spec, rec in sorted_recs
+    ],
+    "best_spec": sorted_recs[0][0] if sorted_recs else None,
+    "available_employees": available_emps,
+    "team_counts": teams_by_spec,
+    "opportunities": opps_by_category
+  }
+
+
+@router.get("/teams/intelligence")
+async def get_team_creation_intelligence(user: dict = Depends(get_current_user)):
+  """Análise inteligente de qual especialização de equipa criar."""
+  player = await get_player(user)
+  pid = str(player["_id"])
+  analysis = await _analyze_team_creation_intelligence(pid)
+  return analysis
+
+
+@router.post("/teams/recommend_members")
+async def recommend_team_members(body: TeamCreateInput, user: dict = Depends(get_current_user)):
+  """Recomenda os melhores funcionários para uma especialização."""
+  if body.spec not in TEAM_SPECS:
+    raise HTTPException(status_code=400, detail="Especialização inválida")
+
+  player = await get_player(user)
+  pid = str(player["_id"])
+
+  # Pegar todos os funcionários ociosos com boa saúde
+  available = await db.employees.find({
+    "player_id": pid,
+    "status": "idle",
+    "fatigue": {"$lt": 90},
+    "health": {"$gte": 70}
+  }).to_list(100)
+
+  # Calcular score para cada um
+  scored = []
+  spec_roles = {rk for rk, rv in SPECIALIZATIONS.items() if rv.get("spec") == body.spec}
+
+  for emp in available:
+    score = _score_employee_for_spec(emp, body.spec, len(available))
+    emp_role = emp.get("role_key", "")
+    emp_spec = SPECIALIZATIONS.get(emp_role, {}).get("spec")
+
+    # Gerar razão legível
+    reasons = []
+    if emp_spec == body.spec:
+      reasons.append("especialização ideal")
+    elif emp_spec == "suporte":
+      reasons.append("suporte versátil")
+    if emp.get("rarity") in ["elite", "lendario"]:
+      reasons.append(f"{emp.get('rarity')} rarity")
+    if emp.get("talents"):
+      reasons.append(f"{len(emp.get('talents'))} talento(s)")
+
+    scored.append({
+      "id": str(emp["_id"]),
+      "name": emp["name"],
+      "role": SPECIALIZATIONS.get(emp_role, {}).get("name"),
+      "rarity": emp.get("rarity"),
+      "level": emp.get("level", 0),
+      "health": emp.get("health", 100),
+      "fatigue": emp.get("fatigue", 0),
+      "talents": emp.get("talents", []),
+      "score": round(score, 1),
+      "attrs": emp.get("attrs", {}),
+      "fit_reason": " · ".join(reasons) if reasons else "funcionário disponível"
+    })
+
+  # Ordenar por score
+  scored.sort(key=lambda x: x["score"], reverse=True)
+
+  # Recomendar os top 5
+  top_members = scored[:5] if scored else []
+
+  return {
+    "spec": body.spec,
+    "team_spec_name": TEAM_SPECS[body.spec]["name"],
+    "recommended_members": top_members,
+    "total_available": len(available),
+    "total_scored": len(scored),
+    "category_attrs": CATEGORY_ATTRS.get(body.spec, [])
+  }
+
+
 @router.post("/teams/create")
 async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_user)):
     if body.spec not in TEAM_SPECS:
@@ -661,6 +910,60 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
     await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €.")
     await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", player["clean_money"] - TEAM_CREATE_COST, f"Nova equipa: {name}")
     return {"ok": True}
+
+
+@router.post("/teams/assign_members_batch")
+async def assign_members_batch(body: AssignMembersBatchInput, user: dict = Depends(get_current_user)):
+  """Atribui múltiplos funcionários a uma equipa em batch (usado ao criar equipa com IA)."""
+  player = await get_player(user)
+  pid = str(player["_id"])
+
+  team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
+  if not team:
+    raise HTTPException(status_code=404, detail="Equipa não encontrada")
+
+  if not body.employee_ids:
+    return {"ok": True, "assigned": 0}
+
+  # Validar que todos os funcionários existem e estão ociosos
+  employees = []
+  invalid_ids = []
+  for emp_id in body.employee_ids[:TEAM_MAX_MEMBERS]:  # Limitar ao máximo
+    emp = await db.employees.find_one({
+      "_id": _oid(emp_id, "Inválido"),
+      "player_id": pid,
+      "status": "idle"
+    })
+    if not emp:
+      invalid_ids.append(emp_id)
+    else:
+      employees.append(emp)
+
+  if invalid_ids:
+    raise HTTPException(status_code=400,
+                       detail=f"Alguns funcionários não estão disponíveis: {len(invalid_ids)} não encontrados ou ocupados")
+
+  if not employees:
+    return {"ok": True, "assigned": 0}
+
+  # Atribuir todos os funcionários à equipa
+  now_iso = now_utc().isoformat()
+  reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
+
+  await db.employees.update_many(
+    {"_id": {"$in": [emp["_id"] for emp in employees]}},
+    {"$set": {"team_id": body.team_id}}
+  )
+
+  # Inicializar o registo estável da equipa
+  await db.teams.update_one(
+    {"_id": team["_id"]},
+    {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until}}
+  )
+
+  await add_event(db, pid, "team", f"{len(employees)} funcionário(s) foram atribuído(s) a {team['name']}.")
+
+  return {"ok": True, "assigned": len(employees)}
 
 
 # ---------------- Funcionários ----------------

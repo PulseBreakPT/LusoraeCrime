@@ -218,7 +218,11 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                             onClick={() => buyProperty(key)}
                             disabled={locked || state.player.clean_money < pt.price}
                             size="sm"
-                            className="shrink-0 text-[10px] font-bold uppercase"
+                            className={`shrink-0 text-[10px] font-bold uppercase ${
+                              locked || state.player.clean_money < pt.price
+                                ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                : "border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+                            }`}
                           >
                             {fmtMoney(pt.price)}
                           </Button>
