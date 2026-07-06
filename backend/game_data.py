@@ -5,7 +5,13 @@ from economy_constants import (
     VEHICLE_REPAIR_BASE_MULTIPLIER, VEHICLE_REPAIR_MIN,
     MEMBER_SPLIT_PENALTY_PER_EXTRA, MEMBER_SPLIT_PENALTY_MAX,
     TEAM_MAX_MEMBERS, BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, PROPERTY_MAX_LEVEL,
-    TEAM_COST_SCALING_BASE, PAYROLL_MORALE_REGEN
+    TEAM_COST_SCALING_BASE, PAYROLL_MORALE_REGEN,
+    AGE_DECAY_MAX, AGE_DECAY_RAMP_S,
+    PROPERTY_MAINTENANCE_PCT_PER_DAY, PROPERTY_CONDITION_RECOVERY_PER_HOUR,
+    PROPERTY_CONDITION_DECAY_PER_HOUR, PROPERTY_UPGRADE_BASE_S, PROPERTY_UPGRADE_PER_LEVEL_S,
+    HIDEOUT_PREP_REDUCTION_PER_LEVEL, LAUNDER_PROPERTY_BONUS_PER_LEVEL,
+    DIRTY_MONEY_HEAT_THRESHOLD, DIRTY_MONEY_HEAT_PER_10K,
+    LEVEL_THRESHOLDS, EMP_LEVEL_XP, PROPERTY_STACK_DIMINISH
 )
 
 LISBON_SPOTS = [
@@ -28,8 +34,6 @@ LISBON_SPOTS = [
 ]
 
 HQ_LOCATION = {"name": "Armazém do Cais", "lat": 38.7062, "lng": -9.1480}
-
-LEVEL_THRESHOLDS = [0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000]
 
 TEAM_NAMES = ["Crew Alfa", "Crew Bravo", "Crew Cobra", "Crew Delta", "Crew Eco",
               "Crew Fénix", "Crew Gama", "Crew Hidra", "Crew Íbis", "Crew Jaguar",
@@ -151,8 +155,7 @@ RECRUIT_SOURCES = {
 }
 
 # POOL_REFRESH_MIN and PAYROLL_CYCLE_MIN are imported from economy_constants.py
-
-EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
+# EMP_LEVEL_XP is imported from economy_constants.py
 
 TRAINING_COURSES = {
     "combate": {"name": "Combate", "attr": "tiro", "spec": "assalto", "cost": 3000, "duration_s": 120, "xp": 60},
@@ -273,13 +276,11 @@ RECALL_PENALTY_FATIGUE = 8             # fadiga extra da equipa ao chamar de vol
 
 # ---------------- Imóveis: manutenção, melhorias e sinergias ----------------
 
-PROPERTY_MAINTENANCE_PCT_PER_DAY = 0.0015    # custo diário de manutenção, % do preço × nível
-PROPERTY_CONDITION_RECOVERY_PER_HOUR = 2.0   # recuperação de condição por hora quando a manutenção é paga
-PROPERTY_CONDITION_DECAY_PER_HOUR = 3.0      # degradação de condição por hora quando a manutenção falha
-PROPERTY_UPGRADE_BASE_S = 90                 # tempo base (s) de uma melhoria de imóvel
-PROPERTY_UPGRADE_PER_LEVEL_S = 60            # tempo adicional (s) por nível-alvo da melhoria
-HIDEOUT_PREP_REDUCTION_PER_LEVEL = 0.25      # redução do atraso de preparação de equipas incompletas, por nível de esconderijo
-LAUNDER_PROPERTY_BONUS_PER_LEVEL = 0.03      # bónus de eficiência na lavagem manual por nível de empresa de fachada
+# The following are imported from economy_constants.py:
+# PROPERTY_MAINTENANCE_PCT_PER_DAY, PROPERTY_CONDITION_RECOVERY_PER_HOUR,
+# PROPERTY_CONDITION_DECAY_PER_HOUR, PROPERTY_UPGRADE_BASE_S,
+# PROPERTY_UPGRADE_PER_LEVEL_S, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
+# LAUNDER_PROPERTY_BONUS_PER_LEVEL
 
 # ---------------- Propriedades ----------------
 
