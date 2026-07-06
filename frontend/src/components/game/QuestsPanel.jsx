@@ -61,7 +61,7 @@ const NAV_BY_CATEGORY = {
 };
 
 const QuestCard = ({ q, featured, onClose, onNavigate }) => {
-  const { catalog, serverNow, claimQuest, chooseQuest } = useGame();
+  const { state, catalog, serverNow, claimQuest, chooseQuest } = useGame();
   const dim = q.status === "claimed" || q.status === "expired";
   const locked = q.status === "locked";
   const remaining = q.expires_at && q.status === "active"
@@ -131,17 +131,26 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
 
       {q.type === "decisao" && q.status === "active" && q.options && (
         <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {Object.entries(q.options).map(([key, o]) => (
-            <Button
-              key={key}
-              variant="outline"
-              data-testid={`quest-choice-${q.id}-${key}`}
-              onClick={() => chooseQuest(q.id, key)}
-              className="h-auto border-white/10 px-2 py-1.5 font-mono text-[10px] text-cyan-300 hover:bg-white/5"
-            >
-              {o.label}
-            </Button>
-          ))}
+          {Object.entries(q.options).map(([key, o]) => {
+            const unaffordable = (o.cost_clean || 0) > (state?.player?.clean_money || 0);
+            return (
+              <Button
+                key={key}
+                variant="outline"
+                data-testid={`quest-choice-${q.id}-${key}`}
+                onClick={() => chooseQuest(q.id, key)}
+                disabled={unaffordable}
+                title={unaffordable ? `Precisas de ${fmtMoney(o.cost_clean)} limpos para esta opção.` : undefined}
+                className={`h-auto px-2 py-1.5 font-mono text-[10px] ${
+                  unaffordable
+                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    : "border-white/10 text-cyan-300 hover:bg-white/5"
+                }`}
+              >
+                {o.label}
+              </Button>
+            );
+          })}
         </div>
       )}
 

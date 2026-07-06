@@ -53,7 +53,12 @@ def enrich_quest(qd):
         "order": QUEST_ORDER.get(qd.get("quest_key"), 999),
     })
     if d.get("type") == "decisao":
-        qd["options"] = {k: {"label": o["label"]} for k, o in d.get("options", {}).items()}
+        # cost_clean incluído para o frontend poder desativar (e pintar de
+        # vermelho) opções que o jogador não pode pagar, antes de clicar.
+        qd["options"] = {
+            k: {"label": o["label"], "cost_clean": o.get("cost_clean", 0)}
+            for k, o in d.get("options", {}).items()
+        }
     return qd
 
 
