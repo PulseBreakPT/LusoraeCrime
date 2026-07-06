@@ -22,7 +22,16 @@ const RecommendedActions = ({ onNavigate }) => {
       action: `Subornar · ${fmtMoney(bribeCost)}`, run: () => bribePolice(), can: p.clean_money >= bribeCost,
     });
   }
-  if (p.dirty_money >= 15000) {
+  const dirtyCap = state.caps?.dirty_money?.max || 0;
+  const dirtyNearCap = dirtyCap > 0 && p.dirty_money >= dirtyCap * 0.9;
+  if (dirtyNearCap) {
+    // Prioridade sobre o aviso genérico de lavagem: aqui há produção dos
+    // laboratórios a ser deitada fora em tempo real.
+    recs.push({
+      id: "dirtycap", text: `Cofre de sujo a ${Math.round((p.dirty_money / dirtyCap) * 100)}% (${fmtMoney(p.dirty_money)}/${fmtMoney(dirtyCap)}) — produção a ser desperdiçada`,
+      action: `Lavar tudo (+${fmtMoney(Math.floor(p.dirty_money * 0.75))})`, run: () => launder(p.dirty_money), can: true,
+    });
+  } else if (p.dirty_money >= 15000) {
     recs.push({
       id: "launder", text: `${fmtMoney(p.dirty_money)} sujos no cofre — um alvo apetecível`,
       action: `Lavar tudo (+${fmtMoney(Math.floor(p.dirty_money * 0.75))})`, run: () => launder(p.dirty_money), can: true,
@@ -130,6 +139,32 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             <Cell label="Falhadas" value={s.missions_failure || 0} color="#F59E0B" tip="Operações falhadas — sem recompensa e com possíveis ferimentos." />
             <Cell label="Interceções" value={s.missions_police || 0} color="#EF4444" tip="Operações intercetadas pela polícia — risco de detenções e multas." />
           </Grid>
+          {(() => {
+            const milestones = catalog?.achievement_milestones || [];
+            const perMilestone = catalog?.achievement_bonus_pct_per_milestone || 0;
+            if (!milestones.length) return null;
+            const successes = s.missions_success || 0;
+            const bonusPct = Math.round((state.player.achievement_bonus_pct || 0) * 100);
+            const next = milestones.find((m) => successes < m);
+            return (
+              <Tip
+                tip={`Marcos de reputação: cada ${milestones.join("/")} operações bem-sucedidas dá +${Math.round(perMilestone * 100)}% permanente a todas as recompensas. Tens ${successes} sucessos.`}
+                block
+              >
+                <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5" data-testid="intel-achievements">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300">Bónus permanente de recompensas</span>
+                    <span className="font-mono text-xs font-bold text-amber-300">+{bonusPct}%</span>
+                  </div>
+                  <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
+                    {next
+                      ? <>Próximo marco: {next} sucessos — faltam <span className="text-white">{next - successes}</span> para +{Math.round(perMilestone * 100)}%</>
+                      : "Todos os marcos atingidos — bónus máximo."}
+                  </p>
+                </div>
+              </Tip>
+            );
+          })()}
           {Object.keys(s.by_category || {}).length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {Object.entries(s.by_category).map(([cat, n]) => (

@@ -64,12 +64,20 @@ export const ResourceBar = () => {
           tip="Dinheiro limpo — paga compras, reparações, salários e subornos. Cresce com lavagem (taxa 25%) e empresas de fachada."
           className={moneyFlash ? "lus-flash rounded" : ""}
         />
-        <Stat
-          testId="stat-dirty-money" icon={Coins} color="#F59E0B" label="Sujo"
-          value={<AnimatedNumber value={p.dirty_money} format={fmtMoney} />}
-          sub={dirtyPerH > 0 ? `+${fmtMoney(dirtyPerH)}/h` : null} subColor="#F59E0B"
-          tip="Dinheiro sujo vindo do crime — lava-o no Império para o poderes gastar. Montantes altos atraem atenção."
-        />
+        {(() => {
+          const dirtyCap = state.caps?.dirty_money?.max || 0;
+          const dirtyPct = dirtyCap > 0 ? p.dirty_money / dirtyCap : 0;
+          const nearCap = dirtyPct >= 0.9;
+          return (
+            <Stat
+              testId="stat-dirty-money" icon={Coins} color={nearCap ? "#EF4444" : "#F59E0B"} label="Sujo"
+              value={<AnimatedNumber value={p.dirty_money} format={fmtMoney} />}
+              sub={nearCap ? "cofre quase cheio!" : dirtyPerH > 0 ? `+${fmtMoney(dirtyPerH)}/h` : null}
+              subColor={nearCap ? "#EF4444" : "#F59E0B"}
+              tip={`Dinheiro sujo vindo do crime — lava-o no Império para o poderes gastar. Capacidade do cofre: ${fmtMoney(p.dirty_money)}/${fmtMoney(dirtyCap)}${nearCap ? " — produção dos laboratórios acima do limite é DESPERDIÇADA. Lava dinheiro já!" : ". Produção acima do limite é desperdiçada; montantes altos atraem atenção."}`}
+            />
+          );
+        })()}
         <Stat
           testId="stat-respect" icon={Trophy} color="#0A84FF" label="Respeito" value={<AnimatedNumber value={p.respect} />}
           tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."

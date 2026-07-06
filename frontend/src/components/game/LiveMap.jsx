@@ -361,7 +361,9 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
                     ? "Missão em curso — clica para ver detalhes"
                     : locked
                     ? `Bloqueada — requer nível ${opp.min_level}`
-                    : "Clica para escolher equipa e despachar"}
+                    : state.player.heat >= 90
+                    ? "Polícia em alerta máximo — reduz o calor para operar"
+                    : `Clica para escolher equipa e despachar (mín. ${opp.min_members} membro${opp.min_members > 1 ? "s" : ""})`}
                 </p>
               </div>
             </LTooltip>

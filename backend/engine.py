@@ -638,7 +638,7 @@ def _compute_chase_chance(player, m):
     reduction = 0.0
     if "fantasma_digital" in talents:
         reduction += 0.10
-    if "cabeca_fria" in talents:
+    if "motorista_fantasma" in talents:
         reduction += 0.05
     # Team skill matters a bit.
     skill = m.get("team_skill", 3)
@@ -656,7 +656,7 @@ def _compute_escape_chance(player, m):
     base += min(0.20, max(0.0, (skill - 3) * 0.05))
     if "rei_da_noite" in talents:
         base += 0.08
-    if "conducao_defensiva" in talents:
+    if "motorista_fantasma" in talents:
         base += 0.10
     heat = player.get("heat", 0)
     base -= (heat / 100) * 0.10
@@ -891,11 +891,19 @@ async def _progress_mission(db, player, m, now):
                 updates[k] = m[k]
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
         if outcome == "success":
-            player.setdefault("stats", default_stats())["missions_success"] = \
-                player["stats"].get("missions_success", 0) + 1
+            stats = player.setdefault("stats", default_stats())
+            stats["missions_success"] = stats.get("missions_success", 0) + 1
+            # Métricas usadas pelas missões (quests) de categoria e alto valor —
+            # sem estes incrementos, 19 quests ficavam impossíveis de completar.
+            cat = m["opportunity"].get("category")
+            if cat:
+                stats.setdefault("success_by_category", {})
+                stats["success_by_category"][cat] = stats["success_by_category"].get(cat, 0) + 1
+            if int(m.get("pending_reward", 0) or 0) >= 8000:
+                stats["high_value_ops"] = stats.get("high_value_ops", 0) + 1
             # Conquistas permanentes: cada marco de missões bem-sucedidas concede
             # um pequeno bónus passivo de recompensa, para sempre.
-            player["achievement_bonus_pct"] = achievement_bonus_pct(player["stats"]["missions_success"])
+            player["achievement_bonus_pct"] = achievement_bonus_pct(stats["missions_success"])
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning"}, "$inc": {"missions_done": 1}})
         kind = "success" if outcome == "success" else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))

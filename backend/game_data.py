@@ -111,7 +111,7 @@ RANKS = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equi
 RANK_REQ_LEVEL = [1, 2, 3, 4, 6, 8, 10]
 
 TALENTS = {
-    "motorista_fantasma": {"name": "Motorista Fantasma", "desc": "-10% tempo de viagem",
+    "motorista_fantasma": {"name": "Motorista Fantasma", "desc": "-10% tempo de viagem; despista perseguições policiais mais facilmente",
                           "roles": ["motorista", "contrabandista", "piloto", "estafeta"]},
     "contabilista_sujo": {"name": "Contabilista Sujo", "desc": "+15% lavagem de dinheiro", "roles": ["lavador", "gestor"]},
     "olhos_na_rua": {"name": "Olhos na Rua", "desc": "+10% oportunidades raras", "roles": ["informador", "espiao", "recrutador"]},
