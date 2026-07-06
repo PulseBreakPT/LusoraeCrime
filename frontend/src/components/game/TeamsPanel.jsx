@@ -8,9 +8,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper, Brain } from "lucide-react";
-import { TeamCreationModal } from "./TeamCreationModal";
-import { IntelligentDashboard } from "./IntelligentDashboard";
+import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper } from "lucide-react";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
 
@@ -32,9 +30,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
   const [repeatRecs, setRepeatRecs] = useState({});
-  const [creationModalOpen, setCreationModalOpen] = useState(false);
-  const [teamIntelligence, setTeamIntelligence] = useState(null);
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
 
   // Equipas sem veículo recebem automaticamente o melhor disponível (o que
@@ -65,23 +60,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   // que ela consegue mesmo cumprir (nunca uma abaixo dos requisitos mínimos).
   // Só volta a perguntar quando o conjunto de equipas prontas ou o número de
   // oportunidades disponíveis muda — não a cada refrescamento de 4s.
-  // Carregar inteligência de formação de equipa quando o modal abre
-  useEffect(() => {
-    if (!creationModalOpen) return;
-    const loadIntelligence = async () => {
-      try {
-        const response = await fetch("/api/game/teams/intelligence");
-        if (response.ok) {
-          const data = await response.json();
-          setTeamIntelligence(data);
-        }
-      } catch (err) {
-        console.error("Erro ao carregar inteligência:", err);
-      }
-    };
-    loadIntelligence();
-  }, [creationModalOpen]);
-
   const readyIds = state ? state.teams.filter((t) => t.status === "idle").map((t) => t.id) : [];
   const recomputeKey = `${readyIds.join(",")}|${state?.opportunities?.length || 0}|${state?.player?.heat || 0}`;
   useEffect(() => {
@@ -544,9 +522,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-6">
           <h3 className="mb-2 flex items-center justify-between font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <span className="flex items-center gap-1.5">
-              <Brain size={12} className="text-cyan-400" /> Formar nova equipa · {catalog && fmtMoney(catalog.team_create_cost)}
-            </span>
+            <span>Formar nova equipa · {catalog && fmtMoney(catalog.team_create_cost)}</span>
             {state.caps?.teams && (
               <Tip tip="Nº de equipas vs. o limite atual — sobe de nível da organização para desbloquear mais.">
                 <span className={state.caps.teams.used >= state.caps.teams.max ? "text-amber-400" : "text-zinc-500"}>
@@ -560,20 +536,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               Limite de equipas atingido para o nível {state.player.level} — sobe de nível para desbloquear mais.
             </p>
           )}
-          <div className="mb-3">
-            <Button
-              onClick={() => setCreationModalOpen(true)}
-              disabled={state.caps?.teams && state.caps.teams.used >= state.caps.teams.max}
-              className={`w-full ${
-                state.caps?.teams && state.caps.teams.used >= state.caps.teams.max
-                  ? "border-red-500/30 text-red-400"
-                  : "border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-              }`}
-              variant="outline"
-            >
-              <Brain size={12} /> IA Inteligente — Análise Completa
-            </Button>
-          </div>
           <div className="grid grid-cols-2 gap-2">
             {catalog &&
               Object.entries(catalog.team_specs).map(([key, ts]) => {
@@ -585,11 +547,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       onClick={() => createTeam(key)}
                       disabled={atCap || state.player.clean_money < catalog.team_create_cost}
                       variant="outline"
-                      className={`h-full w-full flex-col items-start px-3 py-2 text-left ${
-                        atCap || state.player.clean_money < catalog.team_create_cost
-                          ? "border-red-500/30 bg-red-500/10 text-red-400 opacity-40"
-                          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
-                      }`}
+                      className="h-full w-full flex-col items-start border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40"
                     >
                       <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
                       <span className="whitespace-normal text-[10px] leading-tight text-zinc-500">{ts.desc}</span>
@@ -599,24 +557,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               })}
           </div>
         </div>
-
-        <TeamCreationModal
-          open={creationModalOpen}
-          onOpenChange={setCreationModalOpen}
-          intelligence={teamIntelligence}
-          recommendations={catalog?.team_specs}
-        />
-
-        <Button
-          onClick={() => setDashboardOpen(true)}
-          className="mt-4 w-full border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-          variant="outline"
-        >
-          <Brain size={12} /> IA Inteligente — Análise Completa
-        </Button>
       </SheetContent>
     </Sheet>
-
-    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
   );
 };

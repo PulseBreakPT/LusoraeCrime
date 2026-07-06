@@ -7,8 +7,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users, Search, Clock, Brain } from "lucide-react";
-import { IntelligentDashboard } from "./IntelligentDashboard";
+import { Car, Fuel, Wrench, Trash2, Lock, BarChart3, ChevronDown, Warehouse, UserRound, Route, CheckCircle2, Banknote, Gem, Users, Search, Clock } from "lucide-react";
 
 const VStat = ({ label, value }) => (
   <Card className="rounded bg-black/40 px-1.5 py-1 text-center shadow-none">
@@ -33,7 +32,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state) return null;
   const caps = state.caps.vehicles;
@@ -448,17 +446,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             );
           })()}
         </div>
-
-        <Button
-          onClick={() => setDashboardOpen(true)}
-          className="mt-4 w-full border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-          variant="outline"
-        >
-          <Brain size={12} /> IA Inteligente — Análise Completa
-        </Button>
       </SheetContent>
     </Sheet>
-
-    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
   );
 };
