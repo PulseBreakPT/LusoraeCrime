@@ -436,10 +436,12 @@ export const ATTR_FULL = {
 // O calor é sempre um indicador de perigo — ícone e texto ficam a vermelho
 // em qualquer nível, em vez de "esconder" o risco com verde/âmbar quando baixo.
 export function heatStatus(h) {
+  // Escala de cor progressiva (calmo→crítico) em vez de vermelho fixo em
+  // todos os níveis — o jogador deve ver de relance se está seguro ou não.
   if (h >= 90) return { label: "Crítico", color: "#EF4444", desc: "Polícia em alerta máximo — operações bloqueadas até subornares ou o calor baixar." };
-  if (h >= 70) return { label: "Alerta", color: "#EF4444", desc: "Risco de rusga aos laboratórios e interceções frequentes." };
-  if (h >= 40) return { label: "Vigiado", color: "#EF4444", desc: "A polícia está atenta — probabilidade de sucesso reduzida." };
-  return { label: "Calmo", color: "#EF4444", desc: "Radar limpo — momento ideal para operar." };
+  if (h >= 70) return { label: "Alerta", color: "#F97316", desc: "Risco de rusga aos laboratórios e interceções frequentes." };
+  if (h >= 40) return { label: "Vigiado", color: "#F59E0B", desc: "A polícia está atenta — probabilidade de sucesso reduzida." };
+  return { label: "Calmo", color: "#34D399", desc: "Radar limpo — momento ideal para operar." };
 }
 
 export function vehicleRangeKm(v) {
@@ -549,44 +551,79 @@ export function orgAlerts(state) {
   };
 }
 
-// Mapeia um evento do registo de atividade ("Últimos Registos") para o painel
-// que o jogador deve ver ao clicar — nunca a Central de Inteligência por
-// defeito. O "kind" guardado no backend é por vezes genérico (ex.: "police"
-// cobre rusgas, traições e perseguições), por isso desambiguamos pelo
-// conteúdo da mensagem quando necessário. Devolve { panel, tab? } — "tab" só
-// vem preenchido quando o evento corresponde a uma decisão/alerta pendente
-// que deve abrir já na aba certa das Missões.
-export function panelForEvent(kind, message) {
+// Classifica um evento do registo de atividade ("Últimos Registos") para o
+// painel a abrir ao clicar (nunca a Central de Inteligência por defeito) E
+// para a cor do marcador — a mesma análise de conteúdo alimenta as duas
+// decisões, para nunca divergirem. O "kind" guardado no backend é por vezes
+// genérico (ex.: "police" cobre rusgas, traições, perseguições E subornos;
+// "team" cobre tanto a equipa em si como ações individuais de um
+// operacional), por isso desambiguamos sempre pelo conteúdo da mensagem.
+// Devolve { panel, tab?, color } — "tab" só vem preenchido quando o evento
+// aponta para uma decisão/alerta pendente que deve abrir já na aba certa.
+//
+// Paleta (com significado consistente em todo o jogo):
+//   #34D399 esmeralda — sucesso, dinheiro recebido, resolução positiva
+//   #F59E0B âmbar     — aviso financeiro, contratempo leve
+//   #EF4444 vermelho  — ação policial grave (prisão, rusga, interceção)
+//   #F97316 laranja   — incidente não-policial (ferimento, avaria)
+//   #F43F5E rosa      — ameaça interna (traição, deslealdade, abandono)
+//   #22D3EE ciano     — logística/operações em curso (despacho, combustível)
+//   #A78BFA violeta   — imóveis
+//   #FBBF24 dourado   — progressão e missões (nível, talento, decisão)
+//   #60A5FA azul-céu  — informação neutra do sistema
+//   #8E8E93 cinzento  — atividade rotineira da equipa
+export function classifyEvent(kind, message) {
   const msg = message || "";
-  if (/^DECISÃO:/.test(msg) || /^EVENTO:/.test(msg)) return { panel: "quests", tab: "alertas" };
-  if (/missões diárias|missões semanais|missão sugerida|reclamada automaticamente/i.test(msg)) {
-    return { panel: "quests" };
+
+  if (/^DECISÃO:/.test(msg) || /^EVENTO:/.test(msg)) return { panel: "quests", tab: "alertas", color: "#FBBF24" };
+  if (/missões diárias|missões semanais|missão sugerida/i.test(msg)) {
+    return { panel: "quests", color: "#FBBF24" };
   }
+
   switch (kind) {
-    case "team":
+    case "team": {
+      // Progressão de carreira de um operacional — dourado, como uma conquista.
+      if (/desbloqueou o talento|subiu para o nível/i.test(msg)) return { panel: "employees", color: "#FBBF24" };
+      // Movimentação/composição da própria equipa (não de um operacional).
+      if (/está pronta|formada por|regressou à base|a caminho de/i.test(msg)) return { panel: "teams", color: "#8E8E93" };
+      // Faltou ao trabalho por moral baixa — negativo, mas leve.
+      if (/faltou ao trabalho/i.test(msg)) return { panel: "employees", color: "#F59E0B" };
+      // Restantes: ações de gestão de um operacional (treino, descanso,
+      // promoção, bónus, cura, libertação, despedimento, recrutamento) —
+      // sempre iniciadas pelo jogador, por isso esmeralda.
+      return { panel: "employees", color: "#34D399" };
+    }
     case "dispatch":
-      return { panel: "teams" };
-    case "vehicle":
-      return { panel: "fleet" };
+      return { panel: "teams", color: "#22D3EE" };
+    case "vehicle": {
+      if (/avaria inesperada/i.test(msg)) return { panel: "fleet", color: "#F97316" };
+      if (/abastecer|depósito cheio/i.test(msg)) return { panel: "fleet", color: "#22D3EE" };
+      return { panel: "fleet", color: "#34D399" };
+    }
     case "property":
-      return { panel: "properties" };
+      return { panel: "properties", color: "#A78BFA" };
     case "launder":
-      return { panel: "empire" };
-    case "police":
-      if (/durante/i.test(msg)) return { panel: "teams" };
-      if (/RUSGA/i.test(msg)) return { panel: "properties" };
-      if (/dinheiro sujo|desperdiçad/i.test(msg)) return { panel: "empire" };
-      if (/salári|abandonou a organização|roubou|vendeu informação|sabotou/i.test(msg)) return { panel: "employees" };
-      return { panel: "teams" };
+      return { panel: "empire", color: "#34D399" };
+    case "police": {
+      if (/durante/i.test(msg)) return { panel: "teams", color: /PRESO/.test(msg) ? "#EF4444" : "#F97316" };
+      if (/RUSGA|POLÍCIA APANHOU/i.test(msg)) return { panel: /RUSGA/i.test(msg) ? "properties" : "teams", color: "#EF4444" };
+      if (/dinheiro sujo|desperdiçad/i.test(msg)) return { panel: "empire", color: "#F59E0B" };
+      if (/salári/i.test(msg)) return { panel: "employees", color: "#F59E0B" };
+      if (/abandonou a organização|roubou|vendeu informação|sabotou/i.test(msg)) return { panel: "employees", color: "#F43F5E" };
+      if (/suborno/i.test(msg)) return { panel: "empire", color: "#34D399" };
+      return { panel: "teams", color: "#EF4444" };
+    }
     case "success":
-      if (/despistou/i.test(msg)) return { panel: "teams" };
-      return { panel: "quests" };
-    case "system":
-      if (/ciclo salarial pago|sem pessoal e sem fundos/i.test(msg)) return { panel: "employees" };
-      return { panel: "intel" };
+      if (/despistou/i.test(msg)) return { panel: "teams", color: "#34D399" };
+      return { panel: "quests", color: "#FBBF24" };
+    case "system": {
+      if (/ciclo salarial pago/i.test(msg)) return { panel: "employees", color: "#F59E0B" };
+      if (/sem pessoal e sem fundos/i.test(msg)) return { panel: "employees", color: "#34D399" };
+      return { panel: "intel", color: "#60A5FA" };
+    }
     case "intel":
     default:
-      return { panel: "intel" };
+      return { panel: "intel", color: "#FBBF24" };
   }
 }
 

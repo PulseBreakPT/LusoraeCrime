@@ -37,7 +37,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
   const hs = heatStatus(p.heat);
   const alerts = orgAlerts(state);
-  const salaryPerH = (state.salary_total || 0) * 2;
+  const salaryPerH = (state.salary_total || 0) * (60 / (catalog?.payroll_cycle_min || 120));
   const netPerH = dirtyPerH + launderPerH - salaryPerH;
   // Autonomia financeira: quanto tempo aguenta a organização ao ritmo atual de
   // despesas de dinheiro limpo (salários) vs. entradas passivas (lavagem).
@@ -123,7 +123,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 <p className="font-mono text-[11px] font-bold text-emerald-400">+{fmtMoney(launderPerH)}/h</p>
               </div>
             </Tip>
-            <Tip tip={`Ciclo salarial: ${fmtMoney(state.salary_total || 0)} a cada 30 min (${fmtMoney(salaryPerH)}/h).`} block>
+            <Tip tip={`Ciclo salarial: ${fmtMoney(state.salary_total || 0)} a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} (${fmtMoney(salaryPerH)}/h).`} block>
               <div>
                 <p className="text-[8px] uppercase tracking-wider text-zinc-600">Salários</p>
                 <p className="font-mono text-[11px] font-bold text-red-400">-{fmtMoney(salaryPerH)}/h</p>

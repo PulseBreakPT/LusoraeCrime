@@ -196,6 +196,8 @@ const sfx = {
 // ---------------- Sirene de perseguição (contínua) ----------------
 
 let sirenHandle = null;
+let sirenAutoStopTimer = null;
+const SIREN_MAX_DUR_MS = 10000;
 
 function sirenStart() {
   const c = getCtx();
@@ -223,9 +225,16 @@ function sirenStart() {
   osc.start();
   lfo.start();
   sirenHandle = { osc, lfo, env };
+  // Nunca deixa a sirene tocar sem fim — ao fim de 10s desliga sozinha,
+  // mesmo que a perseguição ainda esteja ativa no próximo ciclo de estado.
+  sirenAutoStopTimer = setTimeout(sirenStop, SIREN_MAX_DUR_MS);
 }
 
 function sirenStop() {
+  if (sirenAutoStopTimer) {
+    clearTimeout(sirenAutoStopTimer);
+    sirenAutoStopTimer = null;
+  }
   const c = ctx;
   if (!c || !sirenHandle) return;
   const { osc, lfo, env } = sirenHandle;

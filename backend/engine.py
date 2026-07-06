@@ -579,7 +579,11 @@ def _roll_outcome(player, m):
         chance, _ = chance_breakdown(player["heat"], m["opportunity"]["risk"], m["team_skill"], m.get("spec_match", False))
     if random.random() <= chance:
         return "success"
-    return "police" if random.random() < 0.4 else "failure"
+    # Numa falha, o calor atual decide se foi só azar ou se a polícia estava
+    # mesmo à espera: mais calor, mais provável que a falha vire interceção
+    # (prisão + multa) em vez de um falhanço sem consequências extra.
+    police_prob = min(0.65, 0.20 + player.get("heat", 0) * 0.0045)
+    return "police" if random.random() < police_prob else "failure"
 
 
 def _apply_outcome(player, m, outcome):

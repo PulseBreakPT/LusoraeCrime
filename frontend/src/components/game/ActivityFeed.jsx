@@ -3,20 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
-import { parseActivityMessage, panelForEvent } from "../../lib/game";
-
-const KIND_COLORS = {
-  success: "#10B981",
-  failure: "#F59E0B",
-  police: "#DC2626",
-  dispatch: "#22D3EE",
-  team: "#8E8E93",
-  vehicle: "#22D3EE",
-  launder: "#34D399",
-  system: "#FFFFFF",
-  property: "#A78BFA",
-  intel: "#FBBF24",
-};
+import { parseActivityMessage, classifyEvent } from "../../lib/game";
 
 const KIND_LABELS = {
   success: "Sucesso",
@@ -71,7 +58,7 @@ export const ActivityFeed = ({ onNavigate }) => {
             <p className="px-1 font-mono text-[11px] text-zinc-600">Sem atividade registada.</p>
           )}
           {state.events.map((e) => {
-            const dest = panelForEvent(e.kind, e.message);
+            const dest = classifyEvent(e.kind, e.message);
             return (
               <button
                 key={e.id}
@@ -80,7 +67,7 @@ export const ActivityFeed = ({ onNavigate }) => {
                 title={`${KIND_LABELS[e.kind] || e.kind} — clica para abrir ${PANEL_LABELS[dest.panel] || dest.panel}`}
                 className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
               >
-                <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
+                <span className="shrink-0 pt-0.5" style={{ color: dest.color }}>▸</span>
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-[11px] leading-snug text-zinc-400">{parseActivityMessage(e.message)}</p>
                   <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
@@ -130,7 +117,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
           <p className="mb-1.5 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">Últimos registos</p>
           <div className="space-y-1.5">
             {recent.map((e) => {
-              const dest = panelForEvent(e.kind, e.message);
+              const dest = classifyEvent(e.kind, e.message);
               return (
                 <button
                   key={e.id}
@@ -139,7 +126,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
                   title={`${KIND_LABELS[e.kind] || e.kind} — toca para abrir ${PANEL_LABELS[dest.panel] || dest.panel}`}
                   className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
                 >
-                  <span className="shrink-0 pt-0.5" style={{ color: KIND_COLORS[e.kind] || "#8E8E93" }}>▸</span>
+                  <span className="shrink-0 pt-0.5" style={{ color: dest.color }}>▸</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-[10px] leading-snug text-zinc-300">{parseActivityMessage(e.message)}</p>
                     <p className="font-mono text-[9px] text-zinc-600">{absTime(e.ts)}</p>
@@ -156,7 +143,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
         onClick={() => setOpen((o) => !o)}
         className="pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-border bg-card/90 px-3 py-1.5 text-left backdrop-blur-xl"
       >
-        <span className="shrink-0" style={{ color: KIND_COLORS[latest.kind] || "#8E8E93" }}>▸</span>
+        <span className="shrink-0" style={{ color: classifyEvent(latest.kind, latest.message).color }}>▸</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">{parseActivityMessage(latest.message)}</span>
         <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, serverNow())}</span>
       </button>

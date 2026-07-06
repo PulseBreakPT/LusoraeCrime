@@ -258,7 +258,7 @@ const EmployeeCard = ({ e }) => {
             })}
           </SelectContent>
         </Select>
-        <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de 30 min, em dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
+        <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)}, em dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
           <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
         </Tip>
       </div>
@@ -386,7 +386,7 @@ const CandidateCard = ({ c }) => {
           </p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec} ·{" "}
-            <Tip tip={`Impacto no ciclo salarial: ${fmtMoney(state.salary_total || 0)} → ${fmtMoney(newPayroll)} por ciclo de 30 min.`}>
+            <Tip tip={`Impacto no ciclo salarial: ${fmtMoney(state.salary_total || 0)} → ${fmtMoney(newPayroll)} por ciclo de ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)}.`}>
               <span>{fmtMoney(c.salary)}/ciclo</span>
             </Tip>
           </p>
