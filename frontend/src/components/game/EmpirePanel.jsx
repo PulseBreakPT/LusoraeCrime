@@ -176,13 +176,13 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-3">
           <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <LayoutGrid size={12} /> Gestão rápida
+            <LayoutGrid size={12} /> Acesso rápido
           </h3>
           <div className="grid grid-cols-2 gap-2">
-            <QuickNav testId="empire-nav-employees" label="Funcionários"
+            <QuickNav testId="empire-nav-employees" label="Operacionais"
               value={`${state.caps.employees.used}/${state.caps.employees.max} · ${fmtMoney(state.salary_total || 0)}/ciclo`}
               alert={alerts.hr > 0 || alerts.payrollShort} alertText={alerts.payrollShort ? "sem fundos p/ salários!" : alerts.hr > 0 ? `${alerts.hr} a precisar de atenção` : null}
-              tip={alerts.payrollShort ? "Fundos insuficientes para a próxima folha salarial — o plantel vai perder lealdade." : alerts.hr > 0 ? `${alerts.hr} funcionário(s) feridos, presos, exaustos ou com risco de traição — abre o RH.` : "Plantel, recrutamento, formações e promoções."}
+              tip={alerts.payrollShort ? "Fundos insuficientes para o próximo ciclo salarial — o efetivo vai perder lealdade." : alerts.hr > 0 ? `${alerts.hr} operacional(is) feridos, presos, exaustos ou com risco de traição — abre Operacionais.` : "Efetivo, recrutamento, formações e promoções."}
               onClick={() => nav("employees")} />
             <QuickNav testId="empire-nav-fleet" label="Frota"
               value={`${state.caps.vehicles.used}/${state.caps.vehicles.max} veículos`}

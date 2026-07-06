@@ -57,7 +57,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   // Ao abrir uma oportunidade, pré-seleciona automaticamente a equipa com maior
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
   // sempre escolher outra equipa manualmente clicando numa linha diferente.
-  // Toque de abertura ao selecionar uma missão no mapa — os marcadores do
+  // Toque de abertura ao selecionar uma operação no mapa — os marcadores do
   // Leaflet não são <button>, por isso o som global de interface não os cobre.
   useEffect(() => {
     audio.sfx.notify();
@@ -157,7 +157,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
     }
     if (r.reason === "Sem membros" || r.reason === "Membros indisponíveis" || r.reason.startsWith("Mín. ")) {
-      return { icon: IdCard, label: "RH", color: "text-emerald-400", can: true, run: () => { onClose(); onNavigate && onNavigate("employees"); } };
+      return { icon: IdCard, label: "Operacionais", color: "text-emerald-400", can: true, run: () => { onClose(); onNavigate && onNavigate("employees"); } };
     }
     return null;
   };
@@ -180,7 +180,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          <Tip tip={isFavorite ? "Remover dos favoritos." : "Marcar como favorita — este tipo de missão passa a aparecer destacado."}>
+          <Tip tip={isFavorite ? "Remover dos favoritos." : "Marcar como favorita — este tipo de operação passa a aparecer destacado."}>
             <Button
               data-testid="opportunity-card-favorite"
               variant="ghost" size="icon"
@@ -233,7 +233,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           label={inProgress && activeMission ? (activeMission.phase === "en_route" ? "Chega em" : activeMission.phase === "operating" ? "Conclui" : "Regressa") : "Expira"}
           value={fmtDuration(timeLeft)}
           color="#F59E0B"
-          tip={inProgress ? "Tempo até à próxima fase da missão em curso." : "Tempo até esta oportunidade desaparecer do mapa. Despacha uma equipa antes disso."}
+          tip={inProgress ? "Tempo até à próxima fase da operação em curso." : "Tempo até esta oportunidade desaparecer do mapa. Despacha uma equipa antes disso."}
         />
       </div>
 
@@ -283,7 +283,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           <p className="mt-2 font-mono text-[10px] leading-snug text-zinc-500">
             {activeMission.chase_active && activeMission.phase === "returning"
               ? "Um carro-patrulha segue a equipa. Se apanhados antes do QG, perdem toda a carga."
-              : "A missão está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
+              : "A operação está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
           </p>
           {activeMission.phase === "en_route" && (
             <Button
@@ -436,7 +436,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 <PreviewFactor
                   label="Condições"
                   value={preview.breakdown.condicoes}
-                  tip="Condições da operação: missões discretas durante a noite fechada têm um pequeno bónus furtivo."
+                  tip="Condições da operação: operações discretas durante a noite fechada têm um pequeno bónus furtivo."
                 />
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">

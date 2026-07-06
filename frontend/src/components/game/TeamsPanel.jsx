@@ -149,7 +149,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               <Kpi icon={Activity} label="Em operação" value={tr.busy} color={tr.busy > 0 ? "#22D3EE" : "#FFFFFF"}
                 tip="Equipas em viagem ou a executar operações neste momento — acompanha-as no mapa." />
               <Kpi icon={UserRound} label="Afetos" value={`${assigned.length}/${state.employees.length}`}
-                tip="Funcionários atribuídos a equipas vs. total do plantel. Só membros de equipas participam em operações." />
+                tip="Operacionais atribuídos a equipas vs. total do efetivo. Só membros de equipas participam em operações." />
               <Kpi icon={Target} label="Fadiga" value={`${avgFat}%`} color={fatigueColor(avgFat)} bar={avgFat} barColor={fatigueColor(avgFat)}
                 tip={`Fadiga média dos membros das equipas. Acima de 90% ficam indisponíveis. Total de operações concluídas: ${opsDone}.`} />
             </SummaryStrip>
@@ -270,7 +270,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                         onClick={() => nav("employees")}
                         className="flex items-center gap-1 font-mono text-[10px] text-red-400 underline-offset-2 hover:underline"
                       >
-                        <IdCard size={10} /> Sem membros — recrutar no RH
+                        <IdCard size={10} /> Sem membros — recrutar em Operacionais
                       </button>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1">
@@ -438,7 +438,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       : state.player.heat >= 90
                       ? "Polícia em alerta máximo (calor ≥ 90%) — todas as operações estão bloqueadas até o calor baixar. Suborna a polícia no Império ou aguarda."
                       : r.ok
-                      ? `Equipa pronta, mas sem missões disponíveis ou elegíveis neste momento. Certifica-te que: tens missões geradas no mapa (cria novas se necessário), a equipa cumpre os requisitos de nível mínimo, e tem membros suficientes (${r.ready || 0} disponíveis).`
+                      ? `Equipa pronta, mas sem operações disponíveis ou elegíveis neste momento. Certifica-te que: tens operações geradas no mapa (cria novas se necessário), a equipa cumpre os requisitos de nível mínimo, e tem membros suficientes (${r.ready || 0} disponíveis).`
                       : r.reason
                   }
                   block
@@ -459,7 +459,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       {best && rec ? (
                         <>Despachar → {best.name}</>
                       ) : (
-                        <>Sem missões elegíveis</>
+                        <>Sem operações elegíveis</>
                       )}
                     </div>
                     {best && rec && (
@@ -474,7 +474,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
                 {repeatOpp && repeatRec && (
                   <Tip
-                    tip={`Repetir o último tipo de missão desta equipa: ${repeatOpp.name}, a ${repeatRec.dist_km}km, ${Math.round(repeatRec.chance * 100)}% de probabilidade de sucesso.`}
+                    tip={`Repetir o último tipo de operação desta equipa: ${repeatOpp.name}, a ${repeatRec.dist_km}km, ${Math.round(repeatRec.chance * 100)}% de probabilidade de sucesso.`}
                     block
                   >
                     <Button

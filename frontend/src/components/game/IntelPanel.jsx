@@ -42,11 +42,11 @@ const RecommendedActions = ({ onNavigate }) => {
   const lowFuel = state.vehicles.filter((v) => v.fuel_l < v.tank_l * 0.25).length;
   if (lowFuel) recs.push({ id: "fuel", text: `${lowFuel} veículo(s) quase sem combustível`, action: "Abrir Frota", run: () => onNavigate && onNavigate("fleet"), can: true });
   const tired = state.employees.filter((e) => e.fatigue > 60).length;
-  if (tired) recs.push({ id: "rest", text: `${tired} funcionário(s) exaustos — vão falhar operações`, action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true });
+  if (tired) recs.push({ id: "rest", text: `${tired} operacional(is) exaustos — vão falhar operações`, action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true });
   const troubled = state.employees.filter((e) => e.status === "injured" || e.status === "arrested").length;
-  if (troubled) recs.push({ id: "troubled", text: `${troubled} funcionário(s) feridos ou presos`, action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true });
+  if (troubled) recs.push({ id: "troubled", text: `${troubled} operacional(is) feridos ou presos`, action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true });
   const disloyal = state.employees.filter((e) => (e.betrayal_risk || 0) >= 25).length;
-  if (disloyal) recs.push({ id: "loyalty", text: `${disloyal} funcionário(s) com risco de traição`, action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true });
+  if (disloyal) recs.push({ id: "loyalty", text: `${disloyal} operacional(is) com risco de traição`, action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true });
   const teamsNoVehicle = state.teams.filter((t) => !t.vehicle_id).length;
   if (teamsNoVehicle) recs.push({ id: "novehicle", text: `${teamsNoVehicle} equipa(s) sem veículo`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
   const teamsNoMembers = state.teams.filter((t) => state.employees.every((e) => e.team_id !== t.id)).length;
@@ -55,8 +55,8 @@ const RecommendedActions = ({ onNavigate }) => {
   if (claimable) recs.push({ id: "quests", text: `${claimable} recompensa(s) de missão por reclamar`, action: "Abrir Missões", run: () => onNavigate && onNavigate("quests"), can: true });
   if (state.salary_total > 0 && p.clean_money < state.salary_total) {
     recs.push({
-      id: "payroll", text: `Fundos insuficientes para a folha salarial (${fmtMoney(state.salary_total)})`,
-      action: "Abrir RH", run: () => onNavigate && onNavigate("employees"), can: true,
+      id: "payroll", text: `Fundos insuficientes para o ciclo salarial (${fmtMoney(state.salary_total)})`,
+      action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true,
     });
   }
   const degraded = (state.properties || []).filter((pr) => (pr.condition ?? 100) < 50).length;
@@ -125,14 +125,14 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <BrainCircuit size={18} className="text-primary" /> Central de Inteligência
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Todos os dados do teu império num só lugar.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Toda a informação da organização, num só lugar.</SheetDescription>
         </SheetHeader>
 
         <RecommendedActions onNavigate={onNavigate} />
 
         <Section title="Operações" testId="intel-operations">
           <Grid>
-            <Cell label="Missões" value={total} tip="Total de operações concluídas (com qualquer resultado)." />
+            <Cell label="Operações" value={total} tip="Total de operações concluídas (com qualquer resultado)." />
             <Cell label="Taxa de sucesso" value={successRate === null ? "—" : `${successRate}%`}
                   color={successRate === null ? undefined : chanceColor(successRate / 100)}
                   tip="Percentagem de operações bem-sucedidas. Melhora com equipas compatíveis, membros treinados e calor baixo." />
@@ -183,16 +183,16 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             <Cell label="Lavado total" value={fmtMoney(s.laundered_total || 0)} color="#34D399" tip="Total convertido de sujo para limpo (manual e passivo)." />
             <Cell label="Multas/Apreensões" value={fmtMoney(s.fines_paid || 0)} color="#EF4444" tip="Dinheiro perdido para a polícia em multas e apreensões." />
             <Cell label="Fortuna total" value={fmtMoney(netWorth)} tip="Caixa (limpo + sujo) + valor de revenda da frota e do património." />
-            <Cell label="Salários/ciclo" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip="Folha salarial atual, paga a cada 30 minutos." />
+            <Cell label="Salários/ciclo" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip="Ciclo salarial atual, pago a cada 30 minutos." />
           </Grid>
         </Section>
 
-        <Section title="Recursos humanos" testId="intel-hr">
+        <Section title="Operacionais" testId="intel-hr">
           <Grid>
-            <Cell label="Funcionários" value={`${emps.length}/${state.caps.employees.max}`} tip="Plantel atual vs. capacidade (compra esconderijos para expandir)." />
-            <Cell label="Nível médio" value={avgLevel} tip="Nível médio do plantel — sobe com XP de operações e formações." />
-            <Cell label="Fadiga média" value={`${avgFatigue}%`} color={avgFatigue >= 60 ? "#EF4444" : undefined} tip="Fadiga média — aos 90% um funcionário fica indisponível." />
-            <Cell label="Em formação" value={emps.filter((e) => e.status === "training").length} color="#22D3EE" tip="Funcionários em cursos de formação neste momento." />
+            <Cell label="Efetivo" value={`${emps.length}/${state.caps.employees.max}`} tip="Operacionais ativos vs. capacidade (compra esconderijos para expandir)." />
+            <Cell label="Nível médio" value={avgLevel} tip="Nível médio dos operacionais — sobe com experiência de operações e formações." />
+            <Cell label="Fadiga média" value={`${avgFatigue}%`} color={avgFatigue >= 60 ? "#EF4444" : undefined} tip="Fadiga média — aos 90% um operacional fica indisponível." />
+            <Cell label="Em formação" value={emps.filter((e) => e.status === "training").length} color="#22D3EE" tip="Operacionais em cursos de formação neste momento." />
           </Grid>
         </Section>
 
@@ -215,9 +215,9 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           </Grid>
         </Section>
 
-        <Section title="Registo de missões" testId="intel-history">
+        <Section title="Registo de operações" testId="intel-history">
           {state.history.length === 0 && (
-            <p className="font-mono text-[11px] text-zinc-600">Ainda sem missões concluídas.</p>
+            <p className="font-mono text-[11px] text-zinc-600">Nenhuma operação concluída ainda.</p>
           )}
           <div className="space-y-1">
             {state.history.map((m) => (

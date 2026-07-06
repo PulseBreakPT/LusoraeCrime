@@ -130,12 +130,12 @@ export const SPEC_LABELS = {
 
 export const EMP_STATUS_LABELS = {
   idle: "Disponível",
-  on_mission: "Em missão",
+  on_mission: "Em operação",
   training: "Em formação",
-  resting: "A descansar",
+  resting: "Em descanso",
   injured: "Ferido",
   arrested: "Preso",
-  absent: "Faltou ao trabalho",
+  absent: "Fora de serviço",
 };
 
 export const EMP_STATUS_COLORS = {
