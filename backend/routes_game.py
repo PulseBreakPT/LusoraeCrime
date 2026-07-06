@@ -336,6 +336,14 @@ async def _prepare_dispatch(player, opp, team):
     age_mult = age_decay_mult(age_s)
     split_mult = member_split_mult(len(members), opp.get("min_members", 1))
 
+    team_skill = team_effectiveness(members, opp["category"], now)
+    spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
+    team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
+    vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
+    situational_bonus = situational_bonus_for(opp["category"], now)
+    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match,
+                                          talent_bonus, team_bonus, vehicle_bonus, situational_bonus)
+
     # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
     duration_range = opp.get("duration_s", [180, 300])
     duration_avg = sum(duration_range) / len(duration_range) if duration_range else 240
@@ -362,13 +370,6 @@ async def _prepare_dispatch(player, opp, team):
     # Aplicar multiplicadores existentes (achievements, properties, temp bonus) e penalidades
     reward = int(reward_data["money"] * mult * age_mult * split_mult)
 
-    team_skill = team_effectiveness(members, opp["category"], now)
-    spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
-    team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
-    vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
-    situational_bonus = situational_bonus_for(opp["category"], now)
-    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match,
-                                          talent_bonus, team_bonus, vehicle_bonus, situational_bonus)
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
