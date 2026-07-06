@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect } from "react";
 import { usePersistedState } from "../lib/persist";
 import { setDisplayPrefs } from "../lib/game";
 import { haptics } from "../lib/haptics";
+import { audio } from "../lib/audio";
 
 // Definições puramente do dispositivo (Interface, Jogabilidade, Notificações) —
 // não passam pelo servidor. As Automatizações (reparar/abastecer/descansar/
@@ -41,6 +42,25 @@ export function SettingsProvider({ children }) {
   const [notifications, setNotifications] = usePersistedState("set.notifications", DEFAULT_NOTIFICATIONS);
   const setNotification = (key, value) => setNotifications((prev) => ({ ...prev, [key]: value }));
 
+  const [soundEnabled, setSoundEnabled] = usePersistedState("set.soundEnabled", true);
+  const [musicEnabled, setMusicEnabled] = usePersistedState("set.musicEnabled", true);
+  const [sfxEnabled, setSfxEnabled] = usePersistedState("set.sfxEnabled", true);
+  const [musicVolume, setMusicVolume] = usePersistedState("set.musicVolume", 0.25);
+  const [sfxVolume, setSfxVolume] = usePersistedState("set.sfxVolume", 0.5);
+
+  // O motor de áudio vive fora do React (Web Audio API) — espelha aqui as
+  // preferências e gere o arranque/paragem com o ciclo de vida do jogo.
+  useEffect(() => {
+    audio.init();
+    return () => audio.shutdown();
+  }, []);
+  useEffect(() => {
+    audio.configure({
+      enabled: soundEnabled, music: musicEnabled, sfx: sfxEnabled,
+      musicVolume, sfxVolume,
+    });
+  }, [soundEnabled, musicEnabled, sfxEnabled, musicVolume, sfxVolume]);
+
   // fmtMoney/fmtDuration em lib/game.js são funções puras chamadas em dezenas de
   // sítios — em vez de as tornar dependentes de contexto (grande refactor de
   // props), espelha aqui as preferências relevantes num estado global simples.
@@ -63,6 +83,8 @@ export function SettingsProvider({ children }) {
         hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
         autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
         notifications, setNotification,
+        soundEnabled, setSoundEnabled, musicEnabled, setMusicEnabled,
+        sfxEnabled, setSfxEnabled, musicVolume, setMusicVolume, sfxVolume, setSfxVolume,
       }}
     >
       {children}
