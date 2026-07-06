@@ -345,8 +345,8 @@ async def _prepare_dispatch(player, opp, team):
                                           talent_bonus, team_bonus, vehicle_bonus, situational_bonus)
 
     # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
-    duration_range = opp.get("duration_s", [180, 300])
-    duration_avg = sum(duration_range) / len(duration_range) if duration_range else 240
+    # opp["duration_s"] é sempre um único int (gerado em spawn_opportunities), não um intervalo.
+    duration_avg = opp.get("duration_s") or 240
 
     reward_data = calculate_full_reward(
         risk=opp["risk"],
