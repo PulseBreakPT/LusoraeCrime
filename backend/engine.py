@@ -979,8 +979,8 @@ async def _process_statuses(db, pid, now):
         await add_event(db, pid, "team", msg)
 
 
-BAILOUT_GRANT = 6000
-BAILOUT_MIN_FUNDS = 2500  # abaixo disto não dá para contratar nem o candidato mais barato
+BAILOUT_GRANT = 8000
+BAILOUT_MIN_FUNDS = 6000  # candidato "comum" mais barato ronda ~4.300€; margem de segurança
 
 
 async def _maybe_grant_bailout(db, player, employees):
