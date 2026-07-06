@@ -10,6 +10,7 @@ import { Badge } from "../ui/badge";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper, Brain } from "lucide-react";
 import { TeamCreationModal } from "./TeamCreationModal";
+import { IntelligentDashboard } from "./IntelligentDashboard";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
 
@@ -33,6 +34,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const [repeatRecs, setRepeatRecs] = useState({});
   const [creationModalOpen, setCreationModalOpen] = useState(false);
   const [teamIntelligence, setTeamIntelligence] = useState(null);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
 
   // Equipas sem veículo recebem automaticamente o melhor disponível (o que
@@ -604,7 +606,17 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
           intelligence={teamIntelligence}
           recommendations={catalog?.team_specs}
         />
+
+        <Button
+          onClick={() => setDashboardOpen(true)}
+          className="mt-4 w-full border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
+          variant="outline"
+        >
+          <Brain size={12} /> IA Inteligente — Análise Completa
+        </Button>
       </SheetContent>
     </Sheet>
+
+    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
   );
 };

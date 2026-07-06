@@ -9,6 +9,8 @@ from datetime import timedelta
 
 from db import db
 from auth import get_current_user
+from intelligent_analysis import (analyze_properties_intelligence, analyze_fleet_intelligence,
+                                   analyze_hr_intelligence, analyze_teams_intelligence)
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
                     team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown,
@@ -1621,3 +1623,92 @@ async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_
     }})
     await add_event(db, pid, "intel", f"{d['name']}: {res['outcome']}")
     return {"ok": True, "outcome": res["outcome"]}
+
+
+# ============ INTELIGÊNCIA E ANÁLISE EXTREMA ============
+
+@router.get("/analysis/properties")
+async def analyze_properties(user: dict = Depends(get_current_user)):
+  """Análise inteligente extrema de imóveis com recomendações"""
+  player = await get_player(user)
+  pid = str(player["_id"])
+  state_data = await get_state(user)
+  catalog = state_data.get("catalog", {})
+
+  analysis = await analyze_properties_intelligence(db, pid, state_data.get("state", {}), catalog)
+  return analysis
+
+
+@router.get("/analysis/fleet")
+async def analyze_fleet(user: dict = Depends(get_current_user)):
+  """Análise inteligente extrema de frota com gestão automática"""
+  player = await get_player(user)
+  pid = str(player["_id"])
+  state_data = await get_state(user)
+  catalog = state_data.get("catalog", {})
+
+  analysis = await analyze_fleet_intelligence(db, pid, state_data.get("state", {}), catalog)
+  return analysis
+
+
+@router.get("/analysis/hr")
+async def analyze_hr(user: dict = Depends(get_current_user)):
+  """Análise inteligente extrema de RH com gestão de talentos"""
+  player = await get_player(user)
+  pid = str(player["_id"])
+  state_data = await get_state(user)
+  catalog = state_data.get("catalog", {})
+
+  analysis = await analyze_hr_intelligence(db, pid, state_data.get("state", {}), catalog)
+  return analysis
+
+
+@router.get("/analysis/teams")
+async def analyze_teams(user: dict = Depends(get_current_user)):
+  """Análise inteligente extrema de equipas com estratégia"""
+  player = await get_player(user)
+  pid = str(player["_id"])
+  state_data = await get_state(user)
+  catalog = state_data.get("catalog", {})
+
+  analysis = await analyze_teams_intelligence(db, pid, state_data.get("state", {}), catalog)
+  return analysis
+
+
+@router.get("/analysis/comprehensive")
+async def comprehensive_analysis(user: dict = Depends(get_current_user)):
+  """Análise compreensiva de todos os 4 módulos em uma chamada"""
+  player = await get_player(user)
+  pid = str(player["_id"])
+  state_data = await get_state(user)
+  catalog = state_data.get("catalog", {})
+  state = state_data.get("state", {})
+
+  # Executar todas as análises em paralelo
+  props_analysis, fleet_analysis, hr_analysis, teams_analysis = await asyncio.gather(
+    analyze_properties_intelligence(db, pid, state, catalog),
+    analyze_fleet_intelligence(db, pid, state, catalog),
+    analyze_hr_intelligence(db, pid, state, catalog),
+    analyze_teams_intelligence(db, pid, state, catalog)
+  )
+
+  # Calcular pontuação global de eficiência
+  overall_score = (
+    (props_analysis.get("property_analysis", []) and sum(p.get("roi_months", 999) for p in props_analysis["property_analysis"]) / len(props_analysis["property_analysis"])) or 50,
+    (fleet_analysis.get("fleet_summary", {}).get("total_condition_avg", 50)),
+    (hr_analysis.get("hr_summary", {}).get("avg_health", 50)),
+    (teams_analysis.get("teams_summary", {}).get("teams_idle", 0) / max(1, teams_analysis.get("teams_summary", {}).get("total_teams", 1)) * 100)
+  )
+
+  return {
+    "properties": props_analysis,
+    "fleet": fleet_analysis,
+    "hr": hr_analysis,
+    "teams": teams_analysis,
+    "overall_efficiency": {
+      "property_roi_avg_months": round(overall_score[0], 1),
+      "fleet_condition_avg": round(overall_score[1]),
+      "staff_health_avg": round(overall_score[2]),
+      "teams_utilization_pct": round(overall_score[3])
+    }
+  }
