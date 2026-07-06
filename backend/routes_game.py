@@ -261,7 +261,7 @@ async def _prepare_dispatch(player, opp, team):
         "player_id": pid, "team_id": str(team["_id"]), "status": "idle", "fatigue": {"$lt": 90},
     }).to_list(50)
     if not members:
-        raise HTTPException(status_code=400, detail="A equipa não tem membros disponíveis (sem funcionários ou demasiado fatigados)")
+        raise HTTPException(status_code=400, detail="A equipa não tem membros disponíveis (sem operacionais ou demasiado fatigados)")
     if not team.get("vehicle_id"):
         raise HTTPException(status_code=400, detail="A equipa não tem veículo atribuído")
     vehicle = await db.vehicles.find_one({"_id": ObjectId(team["vehicle_id"]), "player_id": pid})
@@ -583,10 +583,10 @@ async def recommend_repeat(body: TeamIdInput, user: dict = Depends(get_current_u
 
 @router.post("/opportunities/favorite")
 async def toggle_favorite_type(body: TypeKeyInput, user: dict = Depends(get_current_user)):
-    """Marca/desmarca um tipo de missão como favorito — favoritos aparecem
+    """Marca/desmarca um tipo de operação como favorito — favoritos aparecem
     primeiro no mapa e na lista de oportunidades."""
     if body.type_key not in OPPORTUNITY_TYPES:
-        raise HTTPException(status_code=400, detail="Tipo de missão inválido")
+        raise HTTPException(status_code=400, detail="Tipo de operação inválido")
     player = await get_player(user)
     favorites = list(player.get("favorite_types", []))
     if body.type_key in favorites:
@@ -601,9 +601,9 @@ async def toggle_favorite_type(body: TypeKeyInput, user: dict = Depends(get_curr
 async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
-    m = await db.missions.find_one({"_id": _oid(body.mission_id, "Missão inválida"), "player_id": pid})
+    m = await db.missions.find_one({"_id": _oid(body.mission_id, "Operação inválida"), "player_id": pid})
     if not m:
-        raise HTTPException(status_code=404, detail="Missão não encontrada")
+        raise HTTPException(status_code=404, detail="Operação não encontrada")
     if m["phase"] != "en_route":
         raise HTTPException(status_code=400, detail="Só podes chamar de volta uma equipa que ainda vai a caminho do alvo")
     now = now_utc()
@@ -671,7 +671,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
 async def _get_employee(pid, employee_id):
     emp = await db.employees.find_one({"_id": _oid(employee_id, "Funcionário inválido"), "player_id": pid})
     if not emp:
-        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+        raise HTTPException(status_code=404, detail="Operacional não encontrado")
     return emp
 
 
@@ -733,7 +733,7 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
     pid = str(player["_id"])
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "idle":
-        raise HTTPException(status_code=400, detail="Funcionário está ocupado")
+        raise HTTPException(status_code=400, detail="Operacional está ocupado")
     if body.team_id:
         team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
         if not team:
@@ -765,7 +765,7 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
     course = TRAINING_COURSES[body.course_key]
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "idle":
-        raise HTTPException(status_code=400, detail="Funcionário está ocupado")
+        raise HTTPException(status_code=400, detail="Operacional está ocupado")
     if player["clean_money"] < course["cost"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     ends = now_utc() + timedelta(seconds=course["duration_s"])
@@ -785,7 +785,7 @@ async def rest_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     pid = str(player["_id"])
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "idle":
-        raise HTTPException(status_code=400, detail="Funcionário está ocupado")
+        raise HTTPException(status_code=400, detail="Operacional está ocupado")
     if emp["fatigue"] < 15:
         raise HTTPException(status_code=400, detail="Não está fatigado o suficiente para descansar")
     until = (now_utc() + timedelta(seconds=REST_DURATION_S)).isoformat()
@@ -801,7 +801,7 @@ async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     pid = str(player["_id"])
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] == "on_mission":
-        raise HTTPException(status_code=400, detail="Funcionário está em missão")
+        raise HTTPException(status_code=400, detail="Operacional está em operação")
     try:
         idx = RANKS.index(emp.get("rank", "recruta"))
     except ValueError:
@@ -853,7 +853,7 @@ async def heal_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     pid = str(player["_id"])
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "injured":
-        raise HTTPException(status_code=400, detail="Funcionário não está ferido")
+        raise HTTPException(status_code=400, detail="Operacional não está ferido")
     bonuses = await get_org_bonuses(db, pid)
     cost = max(200, int(HEAL_BASE_COST * (1 - bonuses["heal"])))
     if player["clean_money"] < cost:
@@ -872,7 +872,7 @@ async def release_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     pid = str(player["_id"])
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "arrested":
-        raise HTTPException(status_code=400, detail="Funcionário não está preso")
+        raise HTTPException(status_code=400, detail="Operacional não está preso")
     bonuses = await get_org_bonuses(db, pid)
     cost = max(300, int((RELEASE_BASE_COST + player["heat"] * 30) * (1 - bonuses["legal"]) * (1 - bonuses["bribe_discount"])))
     if player["clean_money"] < cost:
@@ -894,7 +894,7 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     pid = str(player["_id"])
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] == "on_mission":
-        raise HTTPException(status_code=400, detail="Não podes despedir alguém em missão")
+        raise HTTPException(status_code=400, detail="Não podes despedir alguém em operação")
     severance = emp.get("salary", 100) * 3
     if player["clean_money"] < severance:
         raise HTTPException(status_code=400, detail=f"Indemnização de {severance:,} € — dinheiro limpo insuficiente")
@@ -962,7 +962,7 @@ async def sell_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_us
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
-        raise HTTPException(status_code=400, detail="O veículo está em missão")
+        raise HTTPException(status_code=400, detail="O veículo está em operação")
     if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
         raise HTTPException(status_code=400, detail="O veículo está a abastecer")
     value = int(vehicle["price"] * 0.4 * vehicle["condition"] / 100)
@@ -983,7 +983,7 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
-        raise HTTPException(status_code=400, detail="O veículo está em missão")
+        raise HTTPException(status_code=400, detail="O veículo está em operação")
     if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
         raise HTTPException(status_code=400, detail="Já está a abastecer")
     missing = vehicle["tank_l"] - vehicle["fuel_l"]
@@ -1009,7 +1009,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
-        raise HTTPException(status_code=400, detail="O veículo está em missão")
+        raise HTTPException(status_code=400, detail="O veículo está em operação")
     missing = 100 - vehicle["condition"]
     if missing < 1:
         raise HTTPException(status_code=400, detail="Veículo em perfeitas condições")
@@ -1043,7 +1043,7 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
-        raise HTTPException(status_code=400, detail="O veículo está em missão")
+        raise HTTPException(status_code=400, detail="O veículo está em operação")
     if vehicle.get("team_id"):
         await db.teams.update_one({"_id": ObjectId(vehicle["team_id"])}, {"$set": {"vehicle_id": None}})
     if body.team_id:
@@ -1051,7 +1051,7 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
         if not team:
             raise HTTPException(status_code=404, detail="Equipa não encontrada")
         if team["status"] != "idle":
-            raise HTTPException(status_code=400, detail="A equipa está em missão")
+            raise HTTPException(status_code=400, detail="A equipa está em operação")
         if team.get("vehicle_id"):
             await db.vehicles.update_one({"_id": ObjectId(team["vehicle_id"])}, {"$set": {"team_id": None}})
         await db.teams.update_one({"_id": team["_id"]}, {"$set": {"vehicle_id": str(vehicle["_id"])}})
@@ -1114,7 +1114,7 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
     if pt.get("cap_employees"):
         used = await db.employees.count_documents({"player_id": pid})
         if used > caps["employees"] - pt["cap_employees"] * prop["level"]:
-            raise HTTPException(status_code=400, detail="Não podes vender: os teus funcionários ficariam sem espaço")
+            raise HTTPException(status_code=400, detail="Não podes vender: os teus operacionais ficariam sem espaço")
     if pt.get("cap_vehicles"):
         used = await db.vehicles.count_documents({"player_id": pid})
         if used > caps["vehicles"] - pt["cap_vehicles"] * prop["level"]:
