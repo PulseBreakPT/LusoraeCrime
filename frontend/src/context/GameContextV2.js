@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useAuth } from "./AuthContextV2";
 import { useSettings } from "./SettingsContext";
-import { formatApiErrorDetail } from "../lib/game";
+import { formatApiErrorDetail, fmtMoney } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
 import { haptics } from "../lib/haptics";
 
@@ -73,14 +73,36 @@ export function GameProvider({ children }) {
         });
         if (returned.length > 0) {
           haptics.success();
-          if (notifications?.teamAvailable !== false) {
-            returned.forEach((t) => toast.info(`${t.name} regressou e está pronta`));
-          }
-          if (notifications?.missionCompleted !== false) {
-            returned.forEach((t) =>
-              toast.success(`${t.name} concluiu a operação — vê o relatório em Intel.`)
-            );
-          }
+          returned.forEach((t) => {
+            // Toast consciente do resultado: diz o que aconteceu (e quanto
+            // rendeu), em vez do genérico "concluiu a operação". O histórico
+            // vem ordenado do mais recente, por isso o primeiro registo da
+            // equipa é a missão que acabou de terminar.
+            const rec = notifications?.missionCompleted !== false
+              ? (data.history || []).find((h) => h.team_id === t.id)
+              : null;
+            if (rec) {
+              const oppName = rec.opportunity?.name || "a operação";
+              if (rec.outcome === "success" && rec.chase_outcome === "caught") {
+                toast.error(`${t.name}: a polícia apanhou a equipa no regresso — carga de ${oppName} perdida.`);
+              } else if (rec.outcome === "success") {
+                const credited = Number(rec.pending_reward || 0);
+                toast.success(
+                  credited > 0
+                    ? `${t.name}: sucesso em ${oppName} — +${fmtMoney(credited)} ${rec.pending_pays === "clean" ? "limpos" : "sujos"}.`
+                    : `${t.name}: sucesso em ${oppName}.`
+                );
+              } else if (rec.outcome === "police") {
+                toast.error(`${t.name}: intercetada pela polícia em ${oppName}.`);
+              } else if (rec.outcome === "recalled") {
+                toast.info(`${t.name} regressou sem completar ${oppName}.`);
+              } else {
+                toast.warning(`${t.name}: falhou ${oppName} — sem recompensa.`);
+              }
+            } else if (notifications?.teamAvailable !== false) {
+              toast.info(`${t.name} regressou e está pronta`);
+            }
+          });
           setJustReturnedTeamIds((prev) => [
             ...new Set([...prev, ...returned.map((t) => t.id)]),
           ]);

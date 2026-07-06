@@ -435,6 +435,8 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   tip={
                     best && rec
                       ? `Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`
+                      : state.player.heat >= 90
+                      ? "Polícia em alerta máximo (calor ≥ 90%) — todas as operações estão bloqueadas até o calor baixar. Suborna a polícia no Império ou aguarda."
                       : r.ok
                       ? `Equipa pronta, mas sem missões disponíveis ou elegíveis neste momento. Certifica-te que: tens missões geradas no mapa (cria novas se necessário), a equipa cumpre os requisitos de nível mínimo, e tem membros suficientes (${r.ready || 0} disponíveis).`
                       : r.reason
