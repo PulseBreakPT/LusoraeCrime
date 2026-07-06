@@ -18,8 +18,9 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from ".
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
-  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
+  HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff, Brain,
 } from "lucide-react";
+import { IntelligentDashboard } from "./IntelligentDashboard";
 
 const EMP_STATUS_TIPS = {
   idle: "Disponível para missões, treino ou descanso.",
@@ -440,6 +441,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state || !catalog) return null;
 
@@ -676,7 +678,17 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
             })}
           </div>
         )}
+
+        <Button
+          onClick={() => setDashboardOpen(true)}
+          className="mt-4 w-full border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
+          variant="outline"
+        >
+          <Brain size={12} /> IA Inteligente — Análise Completa
+        </Button>
       </SheetContent>
     </Sheet>
+
+    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
   );
 };
