@@ -605,7 +605,8 @@ def _apply_outcome(player, m, outcome):
             m["bonus_loot"] = True
         m["pending_reward"] = int(reward)
         m["pending_pays"] = t["pays"]
-        player["respect"] += t["respect"]
+        # Reputação: usar novo cálculo dinâmico se disponível, fallback para antigo
+        player["respect"] += m.get("reward_reputation", t["respect"])
         player["heat"] = min(100, player["heat"] + t["heat"] * heat_mult)
         # Roll for police chase during return trip.
         chase_chance = _compute_chase_chance(player, m)
@@ -615,7 +616,9 @@ def _apply_outcome(player, m, outcome):
         m["chase_chance"] = round(chase_chance, 3)
     elif outcome == "failure":
         stats["missions_failure"] += 1
-        player["respect"] += max(1, t["respect"] // 4)
+        # Reputação por falha: 25% do valor de sucesso (usando novo cálculo se disponível)
+        base_rep = m.get("reward_reputation", t["respect"])
+        player["respect"] += max(1, int(base_rep * 0.25))
         player["heat"] = min(100, player["heat"] + t["heat"] * 1.5 * heat_mult)
         # Este tipo de missão fica temporariamente mais raro depois de falhar.
         cooldowns = player.setdefault("type_cooldowns", {})
@@ -774,14 +777,19 @@ async def _crew_returns(db, player, m, outcome):
 
     for emp in members:
         match = emp.get("spec") == t["category"] or t["category"] == "especial"
+
+        # XP baseado em dificuldade real da operação (armazenado em m["reward_xp"] se disponível)
+        # Fallback para cálculo clássico se não estiver disponível
+        base_xp = m.get("reward_xp", max(1, int(t["respect"] * 0.5)))
+
         if outcome == "success":
-            xp_gain = int(t["respect"] * 0.5 * (1.5 if match else 1.0))
+            xp_gain = int(base_xp * (1.5 if match else 1.0))
             d_morale, d_loyal = 2, 1
         elif outcome == "failure":
-            xp_gain = max(1, int(t["respect"] * 0.2))
+            xp_gain = max(1, int(base_xp * 0.2))
             d_morale, d_loyal = -4, 0
         else:
-            xp_gain = max(1, int(t["respect"] * 0.2))
+            xp_gain = max(1, int(base_xp * 0.2))
             d_morale, d_loyal = -6, -2
         # Foi para a operação com a energia (fadiga) no máximo: pequeno bónus de XP.
         if emp["fatigue"] <= FULL_ENERGY_FATIGUE_MAX:

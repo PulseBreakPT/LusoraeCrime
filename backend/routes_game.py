@@ -34,6 +34,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        EMPLOYEE_HEAVY_USE_THRESHOLD,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
                        ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE)
+from reward_engine import calculate_full_reward
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -334,7 +335,32 @@ async def _prepare_dispatch(player, opp, team):
     age_s = (now - parse_dt(opp["created_at"])).total_seconds()
     age_mult = age_decay_mult(age_s)
     split_mult = member_split_mult(len(members), opp.get("min_members", 1))
-    reward = int(opp["reward"] * mult * age_mult * split_mult)
+
+    # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
+    duration_range = opp.get("duration_s", [180, 300])
+    duration_avg = sum(duration_range) / len(duration_range) if duration_range else 240
+
+    reward_data = calculate_full_reward(
+        risk=opp["risk"],
+        team_members=len(members),
+        min_members_required=opp.get("min_members", 1),
+        required_models=opp.get("required_models", []),
+        duration_s=int(duration_avg),
+        distance_km=dist,
+        num_objectives=opp.get("num_objectives", 1),
+        specialization_required=opp["category"] != "especial",
+        org_level=player.get("level", 1),
+        category=opp["category"],
+        failure_probability=1.0 - chance,  # Probabilidade de falha
+        is_rare_mission=opp.get("weight", 1) >= 8,  # Missões com weight alto são raras
+        multiplier_stack=min(2.5, mult),  # Limitar stack para evitar abuso
+        repeat_count=0,  # TODO: rastrear repetições consecutivas se desejado
+        vehicles_dict=VEHICLE_MODELS,
+        specialization_match=spec_match,
+    )
+
+    # Aplicar multiplicadores existentes (achievements, properties, temp bonus) e penalidades
+    reward = int(reward_data["money"] * mult * age_mult * split_mult)
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
@@ -347,6 +373,10 @@ async def _prepare_dispatch(player, opp, team):
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
         "reward": reward, "reward_mult": mult, "age_mult": age_mult, "split_mult": split_mult,
+        "reward_difficulty_score": reward_data["difficulty_score"],
+        "reward_xp": reward_data["xp"],
+        "reward_reputation": reward_data["reputation"],
+        "reward_bonus_chance": reward_data["bonus_reward_chance"],
         "team_skill": team_skill,
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
         "talents": member_talents, "min_members": opp.get("min_members", 1),
@@ -442,6 +472,10 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
             "risk": opp["risk"], "heat": opp["heat"], "pays": opp["pays"], "min_level": opp["min_level"],
         },
+        # Dados de recompensa dinâmica para cálculo consistente de XP/reputação
+        "reward_xp": prep.get("reward_xp"),
+        "reward_reputation": prep.get("reward_reputation"),
+        "reward_difficulty_score": prep.get("reward_difficulty_score"),
         "origin": {"lat": player["hq"]["lat"], "lng": player["hq"]["lng"]},
         "target": {"lat": opp["lat"], "lng": opp["lng"]},
         "phase": "en_route", "outcome": None,
