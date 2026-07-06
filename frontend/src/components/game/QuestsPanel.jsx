@@ -55,7 +55,7 @@ const ProgressBar = ({ q }) => {
 };
 
 const NAV_BY_CATEGORY = {
-  funcionarios: ["employees", "Abrir RH"],
+  funcionarios: ["employees", "Abrir Operacionais"],
   frota: ["fleet", "Abrir Frota"],
   economia: ["empire", "Abrir Império"],
 };

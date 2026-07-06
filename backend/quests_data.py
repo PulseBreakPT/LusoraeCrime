@@ -7,7 +7,7 @@ QUEST_DEFS = {
         "desc": "Toda a organização precisa de um teto. Compra o teu primeiro esconderijo para abrigar mais gente.",
         "objective": {"kind": "state", "metric": "prop_count:esconderijo", "target": 1, "label": "Comprar 1 esconderijo"},
         "requires": [], "rewards": {"dirty": 3000, "respect": 50},
-        "unlocks_text": "Capacidade para mais funcionários.",
+        "unlocks_text": "Capacidade para mais operacionais.",
     },
     "c1_first_dispatch": {
         "name": "Primeira Viagem", "type": "principal", "category": "operacao", "chapter": 1, "difficulty": "facil",
@@ -24,8 +24,8 @@ QUEST_DEFS = {
     },
     "c1_first_recruit": {
         "name": "Sangue Novo", "type": "principal", "category": "funcionarios", "chapter": 1, "difficulty": "facil",
-        "desc": "A organização vive das pessoas. Recruta o teu primeiro funcionário no painel de RH.",
-        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 1, "label": "Recrutar 1 funcionário"},
+        "desc": "A organização vive das pessoas. Recruta o teu primeiro operacional no painel de Operacionais.",
+        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 1, "label": "Recrutar 1 operacional"},
         "requires": ["c1_first_hit"], "rewards": {"dirty": 2000, "respect": 50},
     },
     "c1_launder": {
@@ -73,7 +73,7 @@ QUEST_DEFS = {
     },
     "c3_train3": {
         "name": "Formação Contínua", "type": "principal", "category": "funcionarios", "chapter": 3, "difficulty": "dificil",
-        "desc": "Profissionais treinados falham menos. Completa 3 formações de funcionários.",
+        "desc": "Profissionais treinados falham menos. Completa 3 formações de operacionais.",
         "objective": {"kind": "counter", "metric": "trainings_completed", "target": 3, "label": "Completar 3 formações"},
         "requires": ["c3_team2"], "rewards": {"clean": 5000, "respect": 120},
     },
@@ -107,7 +107,7 @@ QUEST_DEFS = {
     },
     "c4_promote2": {
         "name": "Hierarquia", "type": "principal", "category": "funcionarios", "chapter": 4, "difficulty": "dificil",
-        "desc": "Constrói a tua cadeia de comando. Promove funcionários 2 vezes.",
+        "desc": "Constrói a tua cadeia de comando. Promove operacionais 2 vezes.",
         "objective": {"kind": "counter", "metric": "employees_promoted", "target": 2, "label": "2 promoções"},
         "requires": ["c3_informant"], "rewards": {"clean": 8000, "respect": 180},
     },
@@ -153,13 +153,13 @@ QUEST_DEFS = {
     },
     "c5_recruit5": {
         "name": "Recrutamento em Massa", "type": "principal", "category": "funcionarios", "chapter": 5, "difficulty": "dificil",
-        "desc": "O império precisa de gente. Recruta mais 5 funcionários.",
-        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 5, "label": "Recrutar 5 funcionários"},
+        "desc": "O império precisa de gente. Recruta mais 5 operacionais.",
+        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 5, "label": "Recrutar 5 operacionais"},
         "requires": ["c5_upgrade3"], "rewards": {"dirty": 15000, "respect": 300},
     },
     "c5_promote3": {
         "name": "Nova Hierarquia", "type": "principal", "category": "funcionarios", "chapter": 5, "difficulty": "dificil",
-        "desc": "A cadeia de comando cresce. Promove funcionários mais 3 vezes.",
+        "desc": "A cadeia de comando cresce. Promove operacionais mais 3 vezes.",
         "objective": {"kind": "counter", "metric": "employees_promoted", "target": 3, "label": "3 promoções"},
         "requires": ["c5_recruit5"], "rewards": {"clean": 14000, "respect": 320},
     },
@@ -229,7 +229,7 @@ QUEST_DEFS = {
     },
     "c6_promote5": {
         "name": "Sucessão", "type": "principal", "category": "funcionarios", "chapter": 6, "difficulty": "lendaria",
-        "desc": "Promove funcionários mais 5 vezes. O legado precisa de líderes.",
+        "desc": "Promove operacionais mais 5 vezes. O legado precisa de líderes.",
         "objective": {"kind": "counter", "metric": "employees_promoted", "target": 5, "label": "5 promoções"},
         "requires": ["c5_empire2"], "rewards": {"clean": 30000, "respect": 460},
     },
@@ -287,7 +287,7 @@ QUEST_DEFS = {
     },
     "d_rest1": {
         "name": "Recuperação", "type": "diaria", "category": "funcionarios", "difficulty": "facil",
-        "desc": "Gente cansada comete erros. Manda 1 funcionário descansar.",
+        "desc": "Gente cansada comete erros. Manda 1 operacional descansar.",
         "objective": {"kind": "counter", "metric": "employees_rested", "target": 1, "label": "1 descanso"},
         "rewards": {"dirty": 1000},
     },
@@ -335,13 +335,13 @@ QUEST_DEFS = {
     },
     "d_recruit1": {
         "name": "Novo na Rua", "type": "diaria", "category": "funcionarios", "difficulty": "facil",
-        "desc": "Sempre há espaço para mais um. Recruta 1 funcionário.",
-        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 1, "label": "Recrutar 1 funcionário"},
+        "desc": "Sempre há espaço para mais um. Recruta 1 operacional.",
+        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 1, "label": "Recrutar 1 operacional"},
         "rewards": {"dirty": 1800, "respect": 30},
     },
     "d_promote1": {
         "name": "Reconhecimento", "type": "diaria", "category": "funcionarios", "difficulty": "normal",
-        "desc": "O mérito não pode esperar. Promove 1 funcionário.",
+        "desc": "O mérito não pode esperar. Promove 1 operacional.",
         "objective": {"kind": "counter", "metric": "employees_promoted", "target": 1, "label": "1 promoção"},
         "rewards": {"clean": 1500, "respect": 40},
     },
@@ -371,7 +371,7 @@ QUEST_DEFS = {
     },
     "d_rest2": {
         "name": "Turno de Descanso", "type": "diaria", "category": "funcionarios", "difficulty": "facil",
-        "desc": "Gente cansada comete erros. Manda 2 funcionários descansar.",
+        "desc": "Gente cansada comete erros. Manda 2 operacionais descansar.",
         "objective": {"kind": "counter", "metric": "employees_rested", "target": 2, "label": "2 descansos"},
         "rewards": {"dirty": 1200},
     },
@@ -451,8 +451,8 @@ QUEST_DEFS = {
     },
     "w_recruit2": {
         "name": "Reforços", "type": "semanal", "category": "funcionarios", "difficulty": "normal",
-        "desc": "O império precisa de braços. Recruta 2 funcionários esta semana.",
-        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 2, "label": "Recrutar 2 funcionários"},
+        "desc": "O império precisa de braços. Recruta 2 operacionais esta semana.",
+        "objective": {"kind": "counter", "metric": "recruits_hired", "target": 2, "label": "Recrutar 2 operacionais"},
         "rewards": {"dirty": 6000, "respect": 150},
     },
     "w_highvalue2": {
@@ -469,7 +469,7 @@ QUEST_DEFS = {
     },
     "w_promote3": {
         "name": "Ascensão na Hierarquia", "type": "semanal", "category": "funcionarios", "difficulty": "dificil",
-        "desc": "Constrói a tua cadeia de comando esta semana. Promove 3 funcionários.",
+        "desc": "Constrói a tua cadeia de comando esta semana. Promove 3 operacionais.",
         "objective": {"kind": "counter", "metric": "employees_promoted", "target": 3, "label": "3 promoções"},
         "rewards": {"clean": 9000, "respect": 180},
     },
@@ -545,7 +545,7 @@ QUEST_DEFS = {
     },
     "dyn_fatigue": {
         "name": "Rodar Equipas", "type": "dinamica", "category": "funcionarios", "difficulty": "facil",
-        "desc": "Há gente exausta na organização. Manda 2 funcionários descansar.",
+        "desc": "Há gente exausta na organização. Manda 2 operacionais descansar.",
         "objective": {"kind": "counter", "metric": "employees_rested", "target": 2, "label": "2 descansos"},
         "trigger": {"kind": "fatigued_employees", "count": 2, "above": 60},
         "rewards": {"respect": 80, "dirty": 1500},
@@ -559,7 +559,7 @@ QUEST_DEFS = {
     },
     "dyn_morale": {
         "name": "Manter a Tropa Feliz", "type": "dinamica", "category": "funcionarios", "difficulty": "normal",
-        "desc": "A moral da organização está em baixo. Paga 2 bónus aos teus funcionários.",
+        "desc": "A moral da organização está em baixo. Paga 2 bónus aos teus operacionais.",
         "objective": {"kind": "counter", "metric": "bonuses_paid", "target": 2, "label": "Pagar 2 bónus"},
         "trigger": {"kind": "avg_morale_below", "value": 50},
         "rewards": {"respect": 100},

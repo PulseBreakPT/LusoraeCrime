@@ -173,13 +173,13 @@ export default function GamePage() {
           testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400"
           badge={tr.busy} badgeColor="#0E7490"
           alert={alerts.teams > 0}
-          tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Gestão de membros, veículos e despacho rápido.`}
+          tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Coordenação de membros, veículos e despacho rápido.`}
           onClick={() => setOpenPanel("teams")}
         />
         <HudButton
-          testId="open-employees-button" icon={IdCard} label="RH" color="text-emerald-400"
+          testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400"
           badge={hrAlertCount} badgeColor={NOTIFY_COLOR}
-          tip={hrAlertCount > 0 ? `Plantel precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o plantel leal."}
+          tip={hrAlertCount > 0 ? `Efetivo precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o efetivo leal."}
           onClick={() => setOpenPanel("employees")}
         />
         <HudButton

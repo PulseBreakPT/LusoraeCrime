@@ -16,13 +16,13 @@ const BOOT_STATES = {
 };
 
 const PHASES = {
-  VALIDATING: { min: 0, max: 15, label: "A validar sessão…" },
-  LOADING_PROFILE: { min: 15, max: 30, label: "A carregar perfil…" },
+  VALIDATING: { min: 0, max: 15, label: "A verificar credenciais…" },
+  LOADING_PROFILE: { min: 15, max: 30, label: "A carregar dossiê…" },
   LOADING_ORG: { min: 30, max: 45, label: "A carregar organização…" },
-  LOADING_RESOURCES: { min: 45, max: 60, label: "A carregar recursos…" },
+  LOADING_RESOURCES: { min: 45, max: 60, label: "A carregar património…" },
   LOADING_TEAMS: { min: 60, max: 75, label: "A carregar equipas e frota…" },
   LOADING_MISSIONS: { min: 75, max: 90, label: "A carregar operações…" },
-  PREPARING_UI: { min: 90, max: 100, label: "A preparar interface…" },
+  PREPARING_UI: { min: 90, max: 100, label: "A preparar posto de comando…" },
 };
 
 export function BootProvider({ children }) {

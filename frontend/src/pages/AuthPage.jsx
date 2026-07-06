@@ -137,7 +137,7 @@ export default function AuthPage() {
           </Card>
 
           <p className="mt-6 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
-            Simulador de império criminoso · MVP Temporada 0
+            Simulador de império criminoso · Temporada 0
           </p>
         </div>
       </div>

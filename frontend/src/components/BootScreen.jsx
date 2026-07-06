@@ -8,13 +8,13 @@ export function BootScreen() {
   const navigate = useNavigate();
 
   const phaseLabels = {
-    VALIDATING: "A validar sessão…",
-    LOADING_PROFILE: "A carregar perfil…",
+    VALIDATING: "A verificar credenciais…",
+    LOADING_PROFILE: "A carregar dossiê…",
     LOADING_ORG: "A carregar organização…",
-    LOADING_RESOURCES: "A carregar recursos…",
+    LOADING_RESOURCES: "A carregar património…",
     LOADING_TEAMS: "A carregar equipas e frota…",
     LOADING_MISSIONS: "A carregar operações…",
-    PREPARING_UI: "A preparar interface…",
+    PREPARING_UI: "A preparar posto de comando…",
   };
 
   if (!isBootLoading && !isBootError) return null;
@@ -26,7 +26,7 @@ export function BootScreen() {
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-10 w-10 text-destructive flex-shrink-0" />
             <div>
-              <p className="font-bold text-white text-lg">Erro ao Carregar Jogo</p>
+              <p className="font-bold text-white text-lg">Falha na ligação à organização</p>
               <p className="text-xs text-zinc-400 mt-1">
                 {error?.phase ? `Falha em: ${error.phase.replace(/_/g, " ").toLowerCase()}` : "Erro desconhecido"}
               </p>
@@ -77,7 +77,7 @@ export function BootScreen() {
       <div className="max-w-md w-full mx-4 space-y-6">
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <p className="font-bold text-white text-base">A Carregar Lusorae</p>
+            <p className="font-bold text-white text-base">A entrar em Lusorae</p>
             <p className="text-xs text-zinc-500 font-mono">{progress}%</p>
           </div>
           <p className="text-xs text-zinc-400 mt-1">
@@ -102,13 +102,13 @@ export function BootScreen() {
 
         <div className="space-y-1 text-[11px]">
           {Object.entries({
-            VALIDATING: "Validar sessão",
-            LOADING_PROFILE: "Carregar perfil",
+            VALIDATING: "Verificar credenciais",
+            LOADING_PROFILE: "Carregar dossiê",
             LOADING_ORG: "Carregar organização",
-            LOADING_RESOURCES: "Carregar recursos",
+            LOADING_RESOURCES: "Carregar património",
             LOADING_TEAMS: "Carregar equipas",
             LOADING_MISSIONS: "Carregar operações",
-            PREPARING_UI: "Preparar interface",
+            PREPARING_UI: "Preparar posto de comando",
           }).map(([key, label]) => {
             const isActive = key === currentPhase;
             const isComplete = progress >= 100;
@@ -137,7 +137,7 @@ export function BootScreen() {
             className="w-full text-xs"
             size="sm"
           >
-            ⚠️ Carregamento lento - Recarregar
+            ⚠️ Ligação lenta — recarregar
           </Button>
         )}
       </div>

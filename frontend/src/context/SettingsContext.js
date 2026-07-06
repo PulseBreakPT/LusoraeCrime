@@ -11,14 +11,14 @@ import { audio } from "../lib/audio";
 const SettingsContext = createContext(null);
 
 export const NOTIFICATION_KEYS = [
-  { key: "missionCompleted", label: "Missão concluída" },
+  { key: "missionCompleted", label: "Operação concluída" },
   { key: "teamAvailable", label: "Equipa disponível" },
-  { key: "employeeExhausted", label: "Funcionário exausto" },
+  { key: "employeeExhausted", label: "Operacional exausto" },
   { key: "vehicleBroken", label: "Veículo avariado" },
   { key: "repairCompleted", label: "Reparação concluída" },
   { key: "constructionCompleted", label: "Construção concluída" },
   { key: "payrollDue", label: "Salários por pagar" },
-  { key: "rareMissions", label: "Missões raras disponíveis" },
+  { key: "rareMissions", label: "Operações raras disponíveis" },
 ];
 
 const DEFAULT_NOTIFICATIONS = Object.fromEntries(NOTIFICATION_KEYS.map((n) => [n.key, true]));

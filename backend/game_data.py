@@ -282,7 +282,7 @@ LAUNDER_PROPERTY_BONUS_PER_LEVEL = 0.03      # bónus de eficiência na lavagem 
 
 PROPERTY_TYPES = {
     "esconderijo": {"name": "Esconderijo", "min_level": 1, "price": 20000, "cap_employees": 4,
-                    "desc": "Alarga a capacidade de funcionários da organização."},
+                    "desc": "Alarga a capacidade de operacionais da organização."},
     "garagem": {"name": "Garagem", "min_level": 1, "price": 15000, "cap_vehicles": 2,
                 "desc": "Espaço extra para a frota de veículos."},
     "empresa_legal": {"name": "Empresa de Fachada", "min_level": 2, "price": 35000, "launder_per_h": 2000,

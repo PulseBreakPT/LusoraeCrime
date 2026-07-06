@@ -23,13 +23,13 @@ import {
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
-  idle: "Disponível para missões, treino ou descanso.",
-  on_mission: "Em operação — regressa quando a equipa voltar ao QG.",
-  training: "Em formação — ganha atributos e XP quando terminar.",
-  resting: "A descansar — recupera 50 de fadiga e +5 de moral.",
-  injured: "Ferido — não pode operar. Paga a clínica para o curar.",
-  arrested: "Preso — contrata o advogado ou paga suborno para o libertar.",
-  absent: "Faltou ao trabalho por moral demasiado baixa — volta sozinho passado um tempo.",
+  idle: "Disponível para operações, formação ou descanso.",
+  on_mission: "Em operação — regressa quando a equipa voltar à base.",
+  training: "Em formação — ganha atributos e experiência quando terminar.",
+  resting: "Em descanso — recupera 50 de fadiga e +5 de moral.",
+  injured: "Ferido — não pode operar. Paga a clínica para o recuperar.",
+  arrested: "Preso — contrata o advogado ou paga um suborno para o libertar.",
+  absent: "Fora de serviço por moral demasiado baixa — regressa sozinho passado um tempo.",
 };
 
 const useTick = (active) => {
@@ -147,14 +147,14 @@ const EmployeeCard = ({ e }) => {
             </Tip>
             <span className="shrink-0 font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
             {isNewbie && (
-              <Tip tip="Recém-contratado — ainda se está a adaptar, com um pequeno desempenho reduzido que desaparece na primeira hora ao serviço.">
+              <Tip tip="Recém-recrutado — ainda se está a adaptar, com um pequeno desempenho reduzido que desaparece na primeira hora ao serviço.">
                 <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-lime-400">
                   <Leaf size={9} /> novato
                 </span>
               </Tip>
             )}
             {isHeavyUse && (
-              <Tip tip={`Muito utilizado (${e.missions_done} missões) — cansa-se mais depressa e precisa de descansar com mais frequência.`}>
+              <Tip tip={`Muito solicitado (${e.missions_done} operações) — cansa-se mais depressa e precisa de descansar com mais frequência.`}>
                 <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-orange-400">
                   <BatteryMedium size={9} /> veterano
                 </span>
@@ -175,7 +175,7 @@ const EmployeeCard = ({ e }) => {
         <div className="flex shrink-0 flex-col items-end gap-1">
           <RarityBadge rarity={e.rarity} rar={rar} />
           <Tip
-            tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · termina em ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
+            tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · conclui em ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
             align="end"
           >
             <Badge
@@ -258,7 +258,7 @@ const EmployeeCard = ({ e }) => {
             })}
           </SelectContent>
         </Select>
-        <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de 30 min, pago com dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
+        <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de 30 min, em dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
           <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
         </Tip>
       </div>
@@ -288,7 +288,7 @@ const EmployeeCard = ({ e }) => {
         onClick={() => setManage(!manage)}
         className="mt-2 flex w-full items-center justify-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
       >
-        Gerir <ChevronDown size={11} className={`transition-transform ${manage ? "rotate-180" : ""}`} />
+        Opções <ChevronDown size={11} className={`transition-transform ${manage ? "rotate-180" : ""}`} />
       </button>
 
       {manage && (
@@ -386,7 +386,7 @@ const CandidateCard = ({ c }) => {
           </p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec} ·{" "}
-            <Tip tip={`Impacto na folha salarial: ${fmtMoney(state.salary_total || 0)} → ${fmtMoney(newPayroll)} por ciclo de 30 min.`}>
+            <Tip tip={`Impacto no ciclo salarial: ${fmtMoney(state.salary_total || 0)} → ${fmtMoney(newPayroll)} por ciclo de 30 min.`}>
               <span>{fmtMoney(c.salary)}/ciclo</span>
             </Tip>
           </p>
@@ -419,7 +419,7 @@ const CandidateCard = ({ c }) => {
             </Tip>
           )}
         </div>
-        <Tip tip={blockers.length ? `Não podes contratar: ${blockers.join(" · ")}.` : `Contratar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`} align="end">
+        <Tip tip={blockers.length ? `Não podes recrutar: ${blockers.join(" · ")}.` : `Recrutar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`} align="end">
           <Button
             data-testid={`hire-candidate-${c.id}`}
             size="sm"
@@ -485,26 +485,26 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <IdCard size={18} className="text-primary" /> Recursos Humanos
+            <IdCard size={18} className="text-primary" /> Operacionais
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            As pessoas são o coração da organização — recruta, treina e mantém-nas leais.
+            O motor da organização — recruta, forma e mantém o efetivo leal.
           </SheetDescription>
         </SheetHeader>
 
         {state.player.clean_money < state.salary_total && state.salary_total > 0 && (
           <Alert variant="destructive" data-testid="payroll-warning" className="mt-3 border-red-600/40 bg-red-600/10 py-2">
             <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
-              <AlertTriangle size={12} /> Fundos insuficientes para a próxima folha salarial (faltam {fmtMoney(state.salary_total - state.player.clean_money)}) —
-              o plantel vai perder moral e lealdade, e quem estiver disponível pode abandonar a organização.
+              <AlertTriangle size={12} /> Fundos insuficientes para o próximo ciclo salarial (faltam {fmtMoney(state.salary_total - state.player.clean_money)}) —
+              o efetivo vai perder moral e lealdade, e quem estiver disponível pode abandonar a organização.
             </AlertDescription>
           </Alert>
         )}
 
         <Card className="mt-3 flex items-center justify-between border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
           <div>
-            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Folha salarial</p>
+            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Ciclo salarial</p>
             <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(state.salary_total)}/ciclo</p>
           </div>
           <div className="text-right">
@@ -528,13 +528,13 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
             <>
               <SummaryStrip cols={4} className="mt-2" testId="hr-summary">
                 <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
-                  tip="Moral média do plantel. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
+                  tip="Moral média do efetivo. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
                 <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
                   tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
                 <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
-                  tip="Fadiga média. Aos 90% um funcionário fica indisponível — manda-o descansar (recupera 50)." />
+                  tip="Fadiga média. Aos 90% um operacional fica indisponível — manda-o descansar (recupera 50)." />
                 <Kpi icon={UserCheck} label="Disponíveis" value={`${available}/${emps.length}`} color={available > 0 ? "#34D399" : "#EF4444"}
-                  tip="Funcionários prontos para operar já: sem tarefa atribuída e com fadiga abaixo de 90%." />
+                  tip="Operacionais prontos para operar já: sem tarefa atribuída e com fadiga abaixo de 90%." />
               </SummaryStrip>
               {Object.keys(statusCounts).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">
@@ -581,7 +581,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
           <TabsList className="grid w-full grid-cols-2 bg-black/40">
             <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Plantel ({state.employees.length})
+              Efetivo ({state.employees.length})
             </TabsTrigger>
             <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Recrutar ({(state.candidates || []).length})
@@ -592,7 +592,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         {tab === "roster" && (
           <div className="mt-3">
             {state.employees.length === 0 ? (
-              <p className="font-mono text-[11px] text-zinc-600">Sem funcionários. Vai à aba Recrutar.</p>
+              <p className="font-mono text-[11px] text-zinc-600">Sem operacionais. Vai à aba Recrutar.</p>
             ) : (
               <>
                 <div className="flex items-center gap-1.5">
@@ -602,7 +602,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid="employees-search"
                       value={query}
                       onChange={(ev) => setQuery(ev.target.value)}
-                      placeholder="Pesquisar funcionário..."
+                      placeholder="Pesquisar operacional..."
                       className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
                     />
                   </div>
@@ -618,7 +618,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     </Button>
                   </Tip>
                   {restAllIds.length > 0 && (
-                    <Tip tip={`Manda descansar todos os funcionários disponíveis com fadiga (${restAllIds.length}).`}>
+                    <Tip tip={`Manda descansar todos os operacionais disponíveis com fadiga (${restAllIds.length}).`}>
                       <Button
                         data-testid="employees-rest-all"
                         variant="outline"
@@ -632,7 +632,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                 </div>
                 <div className="mt-2 space-y-2" data-testid="employees-list">
                   {sortedEmployees.length === 0 && (
-                    <p className="font-mono text-[11px] text-zinc-600">Nenhum funcionário corresponde aos filtros.</p>
+                    <p className="font-mono text-[11px] text-zinc-600">Nenhum operacional corresponde aos filtros.</p>
                   )}
                   {sortedEmployees.map((e) => (
                     <EmployeeCard key={e.id} e={e} />
@@ -660,7 +660,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     : "border-white/10 text-cyan-400 hover:bg-white/5"
                 }`}
               >
-                <RefreshCw size={10} /> Atualizar {fmtMoney(catalog.hr_costs.pool_refresh)}
+                <RefreshCw size={10} /> Novos contactos {fmtMoney(catalog.hr_costs.pool_refresh)}
               </Button>
             </div>
 

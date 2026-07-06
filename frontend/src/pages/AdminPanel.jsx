@@ -439,7 +439,7 @@ export default function AdminPanel() {
                       </label>
                     </div>
                     <p className="text-zinc-500 text-xs">
-                      Isto vai limpar todas as equipas, funcionários, veículos, propriedades e missões.
+                      Isto vai limpar todas as equipas, operacionais, veículos, propriedades e operações.
                     </p>
                     <Button onClick={handleResetProgress} className="w-full bg-orange-600 hover:bg-orange-700">
                       <RotateCcw size={16} className="mr-2" />

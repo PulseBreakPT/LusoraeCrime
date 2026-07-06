@@ -21,17 +21,17 @@ export function LoadingScreen() {
 
   const getStageLabel = (key) => {
     const labels = {
-      auth: "Autenticação",
+      auth: "Verificação de acesso",
       teams: "Equipas",
-      employees: "Recursos Humanos",
+      employees: "Operacionais",
       vehicles: "Frota",
       properties: "Imóveis",
-      opportunities: "Operações",
-      missions: "Missões",
-      events: "Registo",
-      quests: "Missões Especiais",
+      opportunities: "Oportunidades",
+      missions: "Operações em curso",
+      events: "Registo de atividade",
+      quests: "Missões",
       catalogo: "Catálogo",
-      processamento: "Processamento Final",
+      processamento: "Sincronização final",
     };
     return labels[key] || key;
   };
@@ -44,7 +44,7 @@ export function LoadingScreen() {
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-8 w-8 text-destructive flex-shrink-0" />
               <div>
-                <p className="font-bold text-white">Falha ao Carregar</p>
+                <p className="font-bold text-white">Falha na ligação à organização</p>
                 <p className="text-xs text-zinc-400 mt-1">
                   {getStageLabel(error.stage)}
                 </p>
@@ -56,7 +56,7 @@ export function LoadingScreen() {
               </p>
             </div>
             <p className="text-xs text-zinc-400 text-center">
-              Tenta recarregar a página ou contacta suporte se o problema persistir.
+              Tenta recarregar a página. Se o problema persistir, contacta o suporte.
             </p>
           </div>
         ) : (
@@ -64,9 +64,9 @@ export function LoadingScreen() {
             <div className="flex items-center gap-3">
               <BarChart3 className="h-6 w-6 text-primary animate-pulse" />
               <div>
-                <p className="font-bold text-white text-sm">A Carregar Jogo</p>
+                <p className="font-bold text-white text-sm">A ligar à organização</p>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  {progress}% — {currentStage ? getStageLabel(currentStage.key) : "Inicializando..."}
+                  {progress}% — {currentStage ? getStageLabel(currentStage.key) : "A preparar operações..."}
                 </p>
               </div>
             </div>

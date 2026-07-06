@@ -18,15 +18,16 @@ import {
 import { audio } from "../../lib/audio";
 import { toast } from "sonner";
 
-const GAME_VERSION = "1.0.0";
+const GAME_VERSION = "1.1.0";
 
 const CHANGELOG = [
+  { v: "1.1.0", text: "Banda sonora original e efeitos sonoros temáticos — sirenes de perseguição, dinheiro, subida de nível e mais." },
   { v: "1.0.0", text: "Módulo de Definições: conta, interface, jogabilidade, automatizações e notificações." },
-  { v: "0.9.0", text: "Interligação total do jogo: novos veículos exigidos por missões, novas especialidades com talentos e bónus próprios." },
-  { v: "0.8.0", text: "50 novas missões, novos funcionários, veículos, imóveis e capítulos de história." },
+  { v: "0.9.0", text: "Interligação total do jogo: novos veículos exigidos por operações, novas especialidades com talentos e bónus próprios." },
+  { v: "0.8.0", text: "50 novas operações, novos operacionais, veículos, imóveis e capítulos de história." },
   { v: "0.7.0", text: "Extrato financeiro, autonomia de tesouraria, limite de armazenamento de dinheiro sujo, abastecimento com tempo de espera." },
   { v: "0.6.0", text: "Favoritos, ordenação, ações em lote e confirmações de segurança em toda a interface." },
-  { v: "0.5.0", text: "Distância ao QG a afetar risco e recompensa das missões; requisito mínimo de equipa por risco." },
+  { v: "0.5.0", text: "Distância ao QG a afetar risco e recompensa das operações; requisito mínimo de equipa por risco." },
 ];
 
 // Adapta a Switch genérica do shadcn à cor "ligado = verde" já usada no resto
@@ -222,7 +223,7 @@ const DeleteAccountForm = () => {
   return (
     <Card className="border-red-500/20 bg-red-500/5 p-2 shadow-none">
       <p className="text-[10px] leading-snug text-red-300">
-        Esta ação é irreversível: apaga a organização, o plantel, a frota, os imóveis e todo o progresso. Não há forma de recuperar depois.
+        Esta ação é irreversível: apaga a organização, o efetivo, a frota, os imóveis e todo o progresso. Não há forma de recuperar depois.
       </p>
       <Input
         data-testid="settings-delete-password-input"
@@ -316,7 +317,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Conta, interface, jogabilidade, automatizações e notificações.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Conta, interface, jogabilidade, automatizações, áudio e notificações.</SheetDescription>
         </SheetHeader>
 
         <Section icon={UserCog} title="Conta" testId="settings-section-account">
@@ -371,13 +372,13 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Row label="Selecionar automaticamente o melhor veículo" testId="settings-row-auto-vehicle">
             <ToggleSwitch testId="settings-toggle-auto-vehicle" checked={autoSelectBestVehicle} onChange={setAutoSelectBestVehicle} />
           </Row>
-          <Row label="Ocultar missões impossíveis" hint="Esconde do mapa as que nenhuma equipa consegue cumprir agora" testId="settings-row-hide-impossible">
+          <Row label="Ocultar operações impossíveis" hint="Esconde do mapa as que nenhuma equipa consegue cumprir agora" testId="settings-row-hide-impossible">
             <ToggleSwitch testId="settings-toggle-hide-impossible" checked={hideImpossibleMissions} onChange={setHideImpossibleMissions} />
           </Row>
           <Row label="Repetir automaticamente a última configuração" testId="settings-row-repeat-config">
             <ToggleSwitch testId="settings-toggle-repeat-config" checked={repeatLastConfig} onChange={setRepeatLastConfig} />
           </Row>
-          <Row label="Abrir automaticamente o relatório da missão" hint="Abre o Intel quando uma equipa regressa" testId="settings-row-auto-report">
+          <Row label="Abrir automaticamente o relatório da operação" hint="Abre o Intel quando uma equipa regressa" testId="settings-row-auto-report">
             <ToggleSwitch testId="settings-toggle-auto-report" checked={autoOpenReport} onChange={setAutoOpenReport} />
           </Row>
           <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success">
@@ -422,7 +423,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
               />
             </div>
           </Row>
-          <Row label="Pôr funcionários a descansar automaticamente" hint="Abaixo da energia indicada" testId="settings-row-auto-rest">
+          <Row label="Pôr operacionais a descansar automaticamente" hint="Abaixo da energia indicada" testId="settings-row-auto-rest">
             <div className="flex items-center gap-2">
               <ThresholdInput
                 testId="settings-auto-rest-threshold"

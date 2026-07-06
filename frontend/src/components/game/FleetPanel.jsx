@@ -262,7 +262,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     onClick={() => onNavigate && onNavigate("employees")}
                     className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
                   >
-                    <UserRound size={10} /> Equipa sem membros — atribuir no RH
+                    <UserRound size={10} /> Equipa sem membros — atribuir em Operacionais
                   </button>
                 )}
 

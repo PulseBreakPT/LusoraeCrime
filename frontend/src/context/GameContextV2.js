@@ -399,8 +399,8 @@ export function GameProvider({ children }) {
   }, []);
   const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
   const recruitEmployee = (candidateId) =>
-    action("employees/recruit", { candidate_id: candidateId }, "Recruta contratado");
-  const refreshPool = () => action("recruitment/refresh", {}, "Contactos atualizados");
+    action("employees/recruit", { candidate_id: candidateId }, "Operacional recrutado");
+  const refreshPool = () => action("recruitment/refresh", {}, "Novos contactos disponíveis");
   const assignEmployee = (employeeId, teamId) =>
     action(
       "employees/assign",

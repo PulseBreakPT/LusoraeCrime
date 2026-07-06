@@ -358,7 +358,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp }
                 </div>
                 <p className="mt-1 text-[9px] text-zinc-500">
                   {taken
-                    ? "Missão em curso — clica para ver detalhes"
+                    ? "Operação em curso — clica para ver detalhes"
                     : locked
                     ? `Bloqueada — requer nível ${opp.min_level}`
                     : state.player.heat >= 90

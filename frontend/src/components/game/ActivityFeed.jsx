@@ -44,7 +44,7 @@ const absTime = (ts) => new Date(ts).toLocaleString("pt-PT");
 
 const PANEL_LABELS = {
   teams: "Equipas", fleet: "Frota", properties: "Imóveis", empire: "Império",
-  employees: "RH", quests: "Missões", intel: "Central de Inteligência",
+  employees: "Operacionais", quests: "Missões", intel: "Central de Inteligência",
 };
 
 export const ActivityFeed = ({ onNavigate }) => {
