@@ -63,6 +63,17 @@ const unitIcon = (phase, chased) => {
   return makeDivIcon(html, chased ? 30 : 26);
 };
 
+const TRANSFER_COLOR = "#A78BFA";
+
+const transferIcon = () => {
+  const html = `
+    <div class="unit-pin" style="--mk:${TRANSFER_COLOR}">
+      <span class="unit-pulse"></span>
+      ${renderToStaticMarkup(<Warehouse size={12} strokeWidth={2.5} />)}
+    </div>`;
+  return makeDivIcon(html, 24);
+};
+
 const policeChaseIcon = () => {
   const html = `
     <div class="chase-pin" style="--mk:#EF4444">
@@ -302,6 +313,69 @@ const MissionUnit = ({ mission, serverNow, dim = false }) => {
   );
 };
 
+// Veículo a caminho de outra base (POST /vehicles/transfer) — mesmo padrão de
+// rota/animação do MissionUnit, mas mais simples (sem fases, sem perseguição).
+const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
+  const tr = vehicle.transfer;
+  const origin = tr.from;
+  const target = tr.to;
+  const [route, setRoute] = useState(null);
+  const cumRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRoute(origin, target).then((info) => {
+      if (cancelled) return;
+      cumRef.current = buildCumulative(info.latlngs);
+      setRoute(info);
+    });
+    return () => { cancelled = true; };
+  }, [vehicle.id, origin.lat, origin.lng, target.lat, target.lng]);
+
+  const computePos = () => {
+    const now = serverNow();
+    const started = Date.parse(tr.started_at);
+    const ends = Date.parse(tr.ends_at);
+    const t = Math.min(1, Math.max(0, (now - started) / Math.max(1, ends - started)));
+    if (!route || !cumRef.current) {
+      return { lat: origin.lat + (target.lat - origin.lat) * t, lng: origin.lng + (target.lng - origin.lng) * t };
+    }
+    return pointOnRoute(route.latlngs, cumRef.current, t) || { lat: target.lat, lng: target.lng };
+  };
+
+  const [pos, setPos] = useState(() => computePos());
+  useEffect(() => {
+    const id = setInterval(() => setPos(computePos()), 350);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle, route, serverNow]);
+
+  const remaining = Math.max(0, (Date.parse(tr.ends_at) - serverNow()) / 1000);
+  const icon = useMemo(() => transferIcon(), []);
+
+  return (
+    <>
+      {route?.latlngs && route.latlngs.length > 1 && (
+        <Polyline
+          positions={route.latlngs}
+          smoothFactor={2}
+          pathOptions={{ color: TRANSFER_COLOR, weight: 2, opacity: dim ? 0.15 : 0.6, dashArray: "4 6" }}
+          interactive={false}
+        />
+      )}
+      <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={480} opacity={dim ? 0.25 : 1}>
+        <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
+          <div className="min-w-[140px]">
+            <p className="text-[11px] font-bold text-white">{vehicle.name}</p>
+            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: TRANSFER_COLOR }}>Em transferência</p>
+            <TipRow label="chega em" value={fmtDuration(remaining)} color={TRANSFER_COLOR} />
+          </div>
+        </LTooltip>
+      </Marker>
+    </>
+  );
+};
+
 export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, baseFilter = "all" }) {
   const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state.player.hq;
@@ -425,6 +499,20 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           dim={baseFilter !== "all" && (m.origin_property_id || "hq") !== baseFilter}
         />
       ))}
+      {state.vehicles
+        .filter((v) => v.transfer?.from && v.transfer?.to && v.transfer?.started_at)
+        .map((v) => (
+          <VehicleTransferUnit
+            key={v.id}
+            vehicle={v}
+            serverNow={serverNow}
+            dim={
+              baseFilter !== "all" &&
+              (v.property_id || "hq") !== baseFilter &&
+              (v.transfer.to_property_id || "hq") !== baseFilter
+            }
+          />
+        ))}
       <PanTo target={state.opportunities.find((o) => o.id === selectedOppId)} />
     </MapContainer>
   );

@@ -1202,11 +1202,16 @@ async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     duration_s = VEHICLE_TRANSFER_DURATION_BASE_S + VEHICLE_TRANSFER_DURATION_PER_KM_S * dist_km
-    until = (now_utc() + timedelta(seconds=duration_s)).isoformat()
+    now = now_utc()
+    until = (now + timedelta(seconds=duration_s)).isoformat()
     dest_name = to_prop["name"] if to_prop else player["hq"]["name"]
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
-        "transfer": {"to_property_id": body.to_property_id, "ends_at": until},
+        "transfer": {
+            "to_property_id": body.to_property_id, "started_at": now.isoformat(), "ends_at": until,
+            "from": {"lat": origin["lat"], "lng": origin["lng"]},
+            "to": {"lat": to_lat, "lng": to_lng},
+        },
     }})
     await add_event(db, pid, "vehicle", f"{vehicle['name']} a caminho de {dest_name} — chega em {round(duration_s)}s.")
     await record_tx(db, pid, "vehicle_transfer", -cost, "clean", player["clean_money"] - cost, f"Transferência de {vehicle['name']} para {dest_name}")
@@ -1438,7 +1443,10 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
             await db.vehicles.update_one({"_id": v["_id"]}, {"$set": {"property_id": None}})
         await db.vehicles.update_many(
             {"player_id": pid, "transfer.to_property_id": prop_id_str},
-            {"$set": {"transfer.to_property_id": None}},
+            {"$set": {
+                "transfer.to_property_id": None,
+                "transfer.to": {"lat": player["hq"]["lat"], "lng": player["hq"]["lng"]},
+            }},
         )
         if stranded:
             await add_event(db, pid, "property", f"{len(stranded)} veículo(s) realojado(s) no Quartel-General após venda de {prop['name']}.")
