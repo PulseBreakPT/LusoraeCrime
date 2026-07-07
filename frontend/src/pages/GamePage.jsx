@@ -121,6 +121,7 @@ export default function GamePage() {
         onSelectHQ={() => setOpenPanel("hq")}
         baseFilter={baseFilter}
       />
+      <div className="lus-vignette" aria-hidden="true" />
 
       <ResourceBar />
       <Tip
@@ -133,7 +134,7 @@ export default function GamePage() {
           data-testid="open-intel-button"
           variant="outline"
           onClick={() => setOpenPanel("intel")}
-          className="relative h-auto gap-1.5 rounded-full border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white md:px-3"
+          className="lus-hud-btn relative h-auto gap-1.5 rounded-full p-2.5 text-white backdrop-blur-xl hover:text-white md:px-3"
         >
           <BrainCircuit size={16} className="text-primary" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
@@ -147,7 +148,7 @@ export default function GamePage() {
           data-testid="open-settings-button"
           variant="outline"
           onClick={() => setOpenPanel("settings")}
-          className="h-auto gap-1.5 rounded-full border-white/10 bg-black/80 p-2.5 text-white shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white md:px-3"
+          className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white backdrop-blur-xl hover:text-white md:px-3"
         >
           <Settings size={16} className="text-zinc-400" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
@@ -239,10 +240,10 @@ const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onCli
       data-testid={testId}
       variant="outline"
       onClick={onClick}
-      className={`relative h-auto gap-1.5 rounded-full px-2 py-2 text-xs font-bold uppercase tracking-wider shadow-2xl backdrop-blur-xl md:px-3 md:py-2.5 ${
+      className={`lus-hud-btn relative h-auto gap-1.5 rounded-full px-2 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur-xl md:px-3 md:py-2.5 ${
         active
-          ? "border-primary/60 bg-primary/20 text-white shadow-[0_0_18px_rgba(220,38,38,0.45)] hover:bg-primary/25 hover:text-white"
-          : "border-white/10 bg-black/80 text-white hover:bg-black hover:text-white"
+          ? "lus-hud-btn-active text-white hover:text-white"
+          : "text-white hover:text-white"
       }`}
     >
       <Icon size={15} className={color} />
