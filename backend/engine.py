@@ -47,7 +47,11 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX,
                        WEAPON_COMPATIBILITY_MIN_FACTOR, WEAPON_PROFICIENCY_MAX,
                        WEAPON_PROFICIENCY_BONUS_MAX_PCT, WEAPON_PROFICIENCY_GAIN_PER_MISSION,
-                       WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT, WEAPON_LOUD_HEAT_MULT)
+                       WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT, WEAPON_LOUD_HEAT_MULT,
+                       VEHICLE_CATEGORY_WEIGHTS, MISSION_FACTOR_WEIGHTS, DIMENSION_SWING_CAP,
+                       LOYALTY_BONUS_MAX, LOYALTY_PENALTY_MAX, HQ_CHANCE_BONUS_PER_LEVEL,
+                       INCOMPLETE_CREW_PENALTY_PER_MISSING, INCOMPLETE_CREW_PENALTY_MAX,
+                       VEHICLE_MISMATCH_PENALTY, WEAPON_MISMATCH_PENALTY_MAX)
 from quests import process_quests, make_instance
 from quests_data import QUEST_DEFS
 
@@ -502,33 +506,26 @@ def effective_speed(vehicle):
     return vehicle["speed"] * (0.6 + 0.4 * c / 50)
 
 
-def chance_breakdown(heat, risk, team_skill, spec_match, talent_bonus=0.0, team_bonus=0.0,
-                      vehicle_bonus=0.0, situational_bonus=0.0, weapon_bonus=0.0):
-    base = 0.92
-    risk_pen = -risk * 0.07
-    skill_bonus = team_skill * 0.05
-    heat_pen = -heat * 0.0015
-    match_bonus = 0.12 if spec_match else 0.0
-    chance = max(0.15, min(0.97, base + risk_pen + skill_bonus + heat_pen + match_bonus
-                            + talent_bonus + team_bonus + vehicle_bonus + situational_bonus + weapon_bonus))
-    return chance, {"base": base, "risco": round(risk_pen, 4), "equipa": round(skill_bonus, 4),
-                    "calor": round(heat_pen, 4), "match": round(match_bonus, 4),
-                    "talentos": round(talent_bonus, 4), "coordenacao": round(team_bonus, 4),
-                    "veiculo": round(vehicle_bonus, 4), "condicoes": round(situational_bonus, 4),
-                    "armamento": round(weapon_bonus, 4)}
+BASE_CHANCE = 0.92
 
 
-def situational_bonus_for(category, now):
-    """Operações noturnas dão um pequeno bónus furtivo em categorias discretas."""
-    start, end = NIGHT_STEALTH_HOURS
-    h = now.hour
-    is_night = (start <= h < end) if start <= end else (h >= start or h < end)
-    if is_night and category in DISCREET_CATEGORIES:
-        return NIGHT_STEALTH_BONUS
-    return 0.0
+def _dim_scale(category, dim):
+    """Peso final de uma dimensão (team/vehicle/weapon/environment) para esta
+    categoria de missão: tecto de oscilação da dimensão (DIMENSION_SWING_CAP)
+    * peso da categoria nessa dimensão (MISSION_FACTOR_WEIGHTS, game_data.py).
+    A ponderação interna de cada dimensão (CATEGORY_ATTRS, WEAPON_CATEGORY_WEIGHTS,
+    VEHICLE_CATEGORY_WEIGHTS) já faz a maior parte do trabalho de "esta
+    categoria valoriza X" — este peso exterior é deliberadamente mais estreito
+    para não duplicar esse sinal (ver comentário em MISSION_FACTOR_WEIGHTS)."""
+    weights = MISSION_FACTOR_WEIGHTS.get(category, MISSION_FACTOR_WEIGHTS["especial"])
+    return DIMENSION_SWING_CAP.get(dim, 0.0) * weights.get(dim, 0.0)
 
 
 def team_effectiveness(members, category, now=None):
+    """Score de competência da equipa usado pela mecânica de perseguição
+    policial pós-sucesso (_compute_chase_chance/_compute_escape_chance) —
+    NÃO alimenta chance_breakdown (que decompõe a equipa nos seus próprios
+    modificadores nomeados, mod_team_*, para dar transparência ao jogador)."""
     now = now or now_utc()
 
     def eff(e):
@@ -558,40 +555,20 @@ def team_effectiveness(members, category, now=None):
     return sum(eff(e) for e in members) / len(members) + 0.3 * (len(members) - 1)
 
 
-def team_bonus_breakdown(members, category, roster_stable_since, now):
-    """Ajustes de chance derivados da coordenação da equipa: falta de líder,
-    equipa demasiado pequena, homogeneidade de especialização e veterania
-    (tempo desde a última alteração de membros)."""
-    total = 0.0
-    try:
-        leader_idx = RANKS.index(TEAM_LEADER_MIN_RANK)
-    except ValueError:
-        leader_idx = len(RANKS) - 1
-    has_leader = any(RANKS.index(e["rank"]) >= leader_idx for e in members if e.get("rank") in RANKS)
-    if not has_leader:
-        total -= NO_LEADER_PENALTY
-    if len(members) == 1:
-        total -= SOLO_MEMBER_PENALTY
-    if len(members) > 1 and all(e.get("spec") == category for e in members):
-        total += UNIFORM_SPEC_BONUS
-    if roster_stable_since:
-        stable_s = max(0.0, (now - parse_dt(roster_stable_since)).total_seconds())
-        total += COORDINATION_BONUS_MAX * min(1.0, stable_s / COORDINATION_RAMP_S)
-    return total
-
-
-def vehicle_bonus_breakdown(vehicle, category):
-    """Ajustes de chance derivados do veículo: pouca durabilidade aumenta o
-    risco de algo correr mal; um veículo adequado ao tipo de operação ajuda."""
-    total = 0.0
-    condition = vehicle.get("condition", 100)
-    if condition < VEHICLE_CONDITION_PENALTY_THRESHOLD:
-        frac = (VEHICLE_CONDITION_PENALTY_THRESHOLD - condition) / VEHICLE_CONDITION_PENALTY_THRESHOLD
-        total -= VEHICLE_CONDITION_PENALTY_MAX * min(1.0, frac)
-    model = VEHICLE_MODELS.get(vehicle.get("model_key"), {})
-    if category in model.get("best_for", []):
-        total += VEHICLE_MATCH_BONUS
-    return total
+def vehicle_mission_score(model, category):
+    """Combina velocidade e discrição do veículo (propriedades fixas do
+    modelo) num score 0-1 ponderado pela categoria da missão
+    (VEHICLE_CATEGORY_WEIGHTS, game_data.py) — mirror exacto de
+    weapon_combat_score, mesma filosofia: nenhum veículo é "sempre melhor",
+    só mais adequado a certas operações. A adequação de lugares depende do
+    tamanho da equipa e é avaliada à parte (mod_vehicle_capacity)."""
+    weights = VEHICLE_CATEGORY_WEIGHTS.get(category, VEHICLE_CATEGORY_WEIGHTS.get("logistica", {}))
+    denom = weights.get("speed", 0) + weights.get("discretion", 0)
+    if denom <= 0:
+        return 0.0
+    speed = min(1.0, model.get("speed", 0) / 26.0)  # 26 = supercarro, o mais rápido do catálogo
+    discretion = model.get("discretion", 50) / 100.0
+    return (speed * weights.get("speed", 0) + discretion * weights.get("discretion", 0)) / denom
 
 
 def weapon_combat_score(model, category):
@@ -634,17 +611,245 @@ def weapon_compatibility_factor(emp, model):
     return max(WEAPON_COMPATIBILITY_MIN_FACTOR, 1.0 - shortfall * 0.3)
 
 
-def weapon_bonus_breakdown(members, weapons_by_employee_id, category):
-    """Ajustes de chance derivados do armamento da equipa: combina o score de
-    combate do modelo equipado por cada membro (ponderado pela categoria da
-    missão), o estado de conservação e a fiabilidade da arma, a compatibilidade
-    de atributos do funcionário, e a proficiência acumulada — tudo em conjunto,
-    sem depender de nenhum evento aleatório de encravamento à parte. A média é
-    feita sobre toda a equipa (não só os membros equipados), para que uma
-    equipa parcialmente equipada não receba o crédito de uma equipa completa."""
+# ---------------- Modificadores de chance (sistema modular) ----------------
+# Cada modificador lê o mesmo `ctx` (montado em _prepare_dispatch) e devolve
+# None (não aplicável) ou {"key","label","pct","tip"}. Acrescentar um
+# modificador novo no futuro é acrescentar uma função a MODIFIERS — a ordem
+# só afecta a ordem de exibição (a soma é comutativa), nunca a lógica de
+# agregação/clamping em chance_breakdown.
+
+def mod_risk_type(ctx):
+    bump = distance_risk_bump(ctx.get("dist_km", 0.0))
+    base_risk = max(0, ctx["risk"] - bump)
+    if base_risk <= 0:
+        return None
+    return {"key": "risco_base", "label": "Risco da operação", "pct": -base_risk * 0.07,
+            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão."}
+
+
+def mod_risk_distance(ctx):
+    bump = distance_risk_bump(ctx.get("dist_km", 0.0))
+    if bump <= 0:
+        return None
+    return {"key": "distancia", "label": "Distância excessiva", "pct": -bump * 0.07,
+            "tip": f"Alvo a {ctx.get('dist_km', 0.0):.1f}km do QG — risco adicional por estar longe do QG."}
+
+
+def mod_heat(ctx):
+    heat = ctx["heat"]
+    if heat <= 0:
+        return None
+    return {"key": "calor", "label": "Calor policial elevado", "pct": -heat * 0.0015,
+            "tip": f"Calor actual: {round(heat)}%. Reduz a probabilidade em qualquer operação."}
+
+
+def mod_team_quality(ctx):
+    members = ctx["members"]
     if not members:
-        return 0.0
-    total = 0.0
+        return None
+    category, now = ctx["category"], ctx["now"]
+
+    def quality(e):
+        attrs = e.get("attrs") or {}
+        aks = CATEGORY_ATTRS.get(category)
+        attr = (sum(attrs.get(a, 2) for a in aks) / len(aks)) if aks else (sum(attrs.values()) / max(1, len(attrs)) if attrs else 2)
+        match = e.get("spec") == category or category == "especial"
+        try:
+            rank_f = 1 + 0.02 * RANKS.index(e.get("rank", "recruta"))
+        except ValueError:
+            rank_f = 1.0
+        newbie_f = 1.0
+        hired_at = e.get("hired_at")
+        if hired_at:
+            elapsed_s = max(0.0, (now - parse_dt(hired_at)).total_seconds())
+            newbie_f -= NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+        return (e.get("level", 1) * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * rank_f * newbie_f
+
+    avg_quality = sum(quality(e) for e in members) / len(members)
+    baseline = (3 * 0.5 + 4 * 0.45)  # recruta nível 3, atributo médio 4, sem match nem bónus
+    raw = max(-1.0, min(1.0, (avg_quality - baseline) / max(1.0, baseline)))
+    pct = raw * _dim_scale(category, "team")
+    return {"key": "nivel_especializacao", "label": "Nível e especialização da equipa", "pct": pct,
+            "tip": "Nível médio, atributos relevantes para esta categoria e patente dos operacionais."}
+
+
+def mod_team_size(ctx):
+    members, min_members, category = ctx["members"], ctx.get("min_members", 1), ctx["category"]
+    n = len(members)
+    if n == 0:
+        return None
+    if n < min_members:
+        missing = min_members - n
+        pct = -min(INCOMPLETE_CREW_PENALTY_MAX, INCOMPLETE_CREW_PENALTY_PER_MISSING * missing)
+        return {"key": "equipa_incompleta", "label": "Equipa incompleta", "pct": pct,
+                "tip": f"Faltam {missing} operacional(is) face ao recomendado ({min_members}) para esta operação."}
+    if n == 1:
+        return {"key": "membro_solo", "label": "A trabalhar sozinho", "pct": -SOLO_MEMBER_PENALTY,
+                "tip": "Um único operacional tem muito menos margem para imprevistos."}
+    raw = min(1.0, (n - 1) * 0.2)
+    pct = raw * _dim_scale(category, "team") * 0.5
+    if pct < 0.0005:
+        return None
+    return {"key": "equipa_completa", "label": "Equipa completa", "pct": pct,
+            "tip": "Mais operacionais disponíveis dão mais margem de segurança."}
+
+
+def mod_team_fatigue(ctx):
+    members = ctx["members"]
+    if not members:
+        return None
+    avg_fatigue = sum(e.get("fatigue", 0) for e in members) / len(members)
+    if avg_fatigue <= 30:
+        return None
+    raw = -min(1.0, (avg_fatigue - 30) / 70)
+    pct = raw * _dim_scale(ctx["category"], "team")
+    if abs(pct) < 0.0005:
+        return None
+    return {"key": "fadiga", "label": "Fadiga elevada", "pct": pct,
+            "tip": f"Fadiga média de {round(avg_fatigue)}% — reduz a atenção e a coordenação da equipa."}
+
+
+def mod_team_morale(ctx):
+    members = ctx["members"]
+    if not members:
+        return None
+    avg_morale = sum(e.get("morale", 70) for e in members) / len(members)
+    raw = max(-1.0, min(1.0, (avg_morale - 70) / 30))
+    pct = raw * _dim_scale(ctx["category"], "team") * 0.6
+    if abs(pct) < 0.0005:
+        return None
+    label = "Moral elevada" if raw > 0 else "Moral baixa"
+    return {"key": "moral", "label": label, "pct": pct, "tip": f"Moral média de {round(avg_morale)}%."}
+
+
+def mod_team_loyalty(ctx):
+    members = ctx["members"]
+    if not members:
+        return None
+    avg_loyalty = sum(e.get("loyalty", 70) for e in members) / len(members)
+    if avg_loyalty >= 70:
+        pct = min(1.0, (avg_loyalty - 70) / 30) * LOYALTY_BONUS_MAX
+        if pct < 0.0005:
+            return None
+        return {"key": "lealdade", "label": "Lealdade elevada", "pct": pct,
+                "tip": f"Lealdade média de {round(avg_loyalty)}% — equipa empenhada."}
+    pct = -min(1.0, (70 - avg_loyalty) / 70) * LOYALTY_PENALTY_MAX
+    if abs(pct) < 0.0005:
+        return None
+    return {"key": "lealdade", "label": "Lealdade baixa", "pct": pct,
+            "tip": f"Lealdade média de {round(avg_loyalty)}% — maior risco de falhas de empenho."}
+
+
+def mod_team_leader(ctx):
+    members = ctx["members"]
+    if not members:
+        return None
+    try:
+        leader_idx = RANKS.index(TEAM_LEADER_MIN_RANK)
+    except ValueError:
+        leader_idx = len(RANKS) - 1
+    has_leader = any(RANKS.index(e["rank"]) >= leader_idx for e in members if e.get("rank") in RANKS)
+    if has_leader:
+        return None
+    return {"key": "sem_lider", "label": "Sem líder presente", "pct": -NO_LEADER_PENALTY,
+            "tip": f"Nenhum operacional tem a patente de {TEAM_LEADER_MIN_RANK} ou superior."}
+
+
+def mod_team_uniform_spec(ctx):
+    members, category = ctx["members"], ctx["category"]
+    if len(members) < 2:
+        return None
+    fraction = 1.0 if category == "especial" else sum(1 for e in members if e.get("spec") == category) / len(members)
+    if fraction <= 0:
+        return None
+    pct = UNIFORM_SPEC_BONUS * fraction
+    label = "Especializações todas correctas" if fraction >= 0.999 else "Especializações parcialmente correctas"
+    return {"key": "especializacao", "label": label, "pct": pct,
+            "tip": f"{round(fraction * 100)}% dos operacionais têm a especialização certa para esta operação."}
+
+
+def mod_team_coordination(ctx):
+    roster_stable_since = ctx.get("roster_stable_since")
+    if not roster_stable_since:
+        return None
+    stable_s = max(0.0, (ctx["now"] - parse_dt(roster_stable_since)).total_seconds())
+    pct = COORDINATION_BONUS_MAX * min(1.0, stable_s / COORDINATION_RAMP_S)
+    if pct < 0.0005:
+        return None
+    return {"key": "coordenacao", "label": "Equipa há muito tempo junta", "pct": pct,
+            "tip": "Tempo desde a última alteração de membros — mais tempo junto, melhor coordenação."}
+
+
+def mod_vehicle_condition(ctx):
+    vehicle = ctx.get("vehicle")
+    if not vehicle:
+        return None
+    condition = vehicle.get("condition", 100)
+    if condition >= VEHICLE_CONDITION_PENALTY_THRESHOLD:
+        return None
+    frac = (VEHICLE_CONDITION_PENALTY_THRESHOLD - condition) / VEHICLE_CONDITION_PENALTY_THRESHOLD
+    raw = -min(1.0, frac)
+    pct = raw * _dim_scale(ctx["category"], "vehicle") * 2.0
+    if abs(pct) < 0.0005:
+        return None
+    return {"key": "veiculo_danificado", "label": "Veículo danificado", "pct": pct,
+            "tip": f"Condição do veículo em {round(condition)}%."}
+
+
+def mod_vehicle_fit(ctx):
+    vehicle = ctx.get("vehicle")
+    if not vehicle:
+        return None
+    model = VEHICLE_MODELS.get(vehicle.get("model_key"))
+    if not model:
+        return None
+    category = ctx["category"]
+    best_for = model.get("best_for", [])
+    score = vehicle_mission_score(model, category)
+    raw = max(-1.0, min(1.0, 2 * score - 1))
+    pct = raw * _dim_scale(category, "vehicle")
+    if best_for and category not in best_for:
+        pct -= VEHICLE_MISMATCH_PENALTY
+    elif category in best_for:
+        pct += _dim_scale(category, "vehicle") * 0.3
+    if abs(pct) < 0.0005:
+        return None
+    label = "Veículo ideal" if pct > 0 else "Veículo pouco adequado"
+    return {"key": "veiculo_adequacao", "label": label, "pct": pct,
+            "tip": "Velocidade e discrição do veículo face às exigências desta categoria de operação."}
+
+
+def mod_vehicle_capacity(ctx):
+    vehicle = ctx.get("vehicle")
+    if not vehicle:
+        return None
+    model = VEHICLE_MODELS.get(vehicle.get("model_key"))
+    seats = model.get("seats") if model else None
+    members = ctx["members"]
+    if not seats or not members:
+        return None
+    category = ctx["category"]
+    weights = VEHICLE_CATEGORY_WEIGHTS.get(category, VEHICLE_CATEGORY_WEIGHTS.get("logistica", {}))
+    w = weights.get("seats_fit", 0)
+    if w <= 0:
+        return None
+    ratio = len(members) / seats
+    raw = 1.0 if ratio >= 0.75 else max(-0.3, ratio / 0.75 - 1.0)
+    pct = raw * DIMENSION_SWING_CAP["vehicle"] * w
+    if abs(pct) < 0.0005:
+        return None
+    label = "Capacidade do veículo bem aproveitada" if raw > 0 else "Veículo sobredimensionado para a equipa"
+    return {"key": "veiculo_capacidade", "label": label, "pct": pct,
+            "tip": f"{len(members)} operacional(is) para {seats} lugares."}
+
+
+def mod_weapon_score(ctx):
+    members = ctx["members"]
+    weapons_by_employee_id = ctx.get("weapons_by_employee_id") or {}
+    if not members:
+        return None
+    category = ctx["category"]
+    equipped, total, mismatch = 0, 0.0, False
     for e in members:
         weapon = weapons_by_employee_id.get(str(e["_id"]))
         if not weapon:
@@ -652,8 +857,12 @@ def weapon_bonus_breakdown(members, weapons_by_employee_id, category):
         model = WEAPON_MODELS.get(weapon.get("model_key"))
         if not model:
             continue
+        equipped += 1
         score = weapon_combat_score(model, category)
-        best_for_mult = 1.3 if category in model.get("best_for", []) else 0.7
+        best_for = model.get("best_for", [])
+        best_for_mult = 1.3 if category in best_for else 0.7
+        if best_for and category not in best_for:
+            mismatch = True
         condition_factor = weapon.get("condition", 100) / 100
         reliability_factor = model.get("reliability", 100) / 100
         compat = weapon_compatibility_factor(e, model)
@@ -661,14 +870,94 @@ def weapon_bonus_breakdown(members, weapons_by_employee_id, category):
         proficiency_bonus = (proficiency / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
         total += score * best_for_mult * condition_factor * reliability_factor * compat * WEAPON_COMBAT_SCORE_SCALE
         total += proficiency_bonus
+    if equipped == 0:
+        return None
     avg = total / len(members)
-    return max(WEAPON_BONUS_MIN, min(WEAPON_BONUS_MAX, avg))
+    raw = max(-1.0, min(1.0, avg / max(0.001, WEAPON_BONUS_MAX)))
+    pct = raw * _dim_scale(category, "weapon")
+    if mismatch and pct > 0:
+        pct -= WEAPON_MISMATCH_PENALTY_MAX * 0.5
+    if abs(pct) < 0.0005:
+        return None
+    label = "Armas adequadas" if pct > 0 else "Armas pouco adequadas"
+    return {"key": "armamento", "label": label, "pct": pct,
+            "tip": f"{equipped}/{len(members)} operacional(is) equipados; qualidade e adequação da arma a esta categoria."}
+
+
+def mod_environment_night(ctx):
+    category, now = ctx["category"], ctx["now"]
+    start, end = NIGHT_STEALTH_HOURS
+    h = now.hour
+    is_night = (start <= h < end) if start <= end else (h >= start or h < end)
+    if not is_night:
+        return None
+    pct = _dim_scale(category, "environment")
+    if pct < 0.0005:
+        return None
+    return {"key": "noite", "label": "Cobertura da noite", "pct": pct,
+            "tip": "Operação de madrugada — mais discrição em categorias que a valorizam."}
+
+
+def mod_hq_level(ctx):
+    hq_level = ctx.get("hq_level", 1)
+    if hq_level <= 1:
+        return None
+    return {"key": "organizacao", "label": "Organização evoluída", "pct": HQ_CHANCE_BONUS_PER_LEVEL * (hq_level - 1),
+            "tip": f"Quartel-General nível {hq_level} — competência transversal da organização."}
+
+
+def mod_talents(ctx):
+    if ctx["category"] != "assalto":
+        return None
+    if not any("pontaria_letal" in (e.get("talents") or []) for e in ctx["members"]):
+        return None
+    return {"key": "talentos", "label": "Talento: Pontaria Letal", "pct": 0.05,
+            "tip": "Um operacional da equipa tem o talento Pontaria Letal."}
+
+
+MODIFIERS = [
+    mod_risk_type, mod_risk_distance, mod_heat,
+    mod_team_quality, mod_team_size, mod_team_fatigue, mod_team_morale, mod_team_loyalty,
+    mod_team_leader, mod_team_uniform_spec, mod_team_coordination,
+    mod_vehicle_condition, mod_vehicle_fit, mod_vehicle_capacity,
+    mod_weapon_score, mod_environment_night, mod_hq_level, mod_talents,
+]
+
+
+def chance_breakdown(ctx):
+    """Sistema modular de probabilidade de sucesso: soma o ponto de partida
+    (BASE_CHANCE) com cada modificador aplicável de MODIFIERS, todos lidos do
+    mesmo `ctx`. Devolve (chance 0-1, items[]) — items começa sempre por
+    "base" e só inclui modificadores com efeito real (não-zero), pela ordem
+    de MODIFIERS. Acrescentar um modificador novo no futuro é acrescentar uma
+    função a MODIFIERS; a soma é comutativa, a ordem só afecta a exibição, a
+    lógica de agregação/clamping nunca muda."""
+    items = [{"key": "base", "label": "Base da missão", "pct": round(BASE_CHANCE, 4),
+              "tip": "Ponto de partida antes de qualquer ajuste."}]
+    total = BASE_CHANCE
+    for mod in MODIFIERS:
+        result = mod(ctx)
+        if not result:
+            continue
+        pct = result["pct"]
+        if abs(pct) < 0.0005:
+            continue
+        total += pct
+        items.append({**result, "pct": round(pct, 4)})
+    chance = max(0.0, min(1.0, total))
+    return chance, items
 
 
 def _roll_outcome(player, m):
     chance = m.get("success_chance")
     if chance is None:
-        chance, _ = chance_breakdown(player["heat"], m["opportunity"]["risk"], m["team_skill"], m.get("spec_match", False))
+        # success_chance é sempre persistida no dispatch (routes_game.py) —
+        # este ramo só existe para missões antigas/malformadas. Reconstruir
+        # o ctx completo (membros, veículo, armas) aqui não está disponível
+        # nesta função, por isso usa-se um valor neutro em vez de arriscar
+        # uma recomputação parcial e inconsistente.
+        logger.warning("Mission %s sem success_chance persistida — a usar valor neutro (0.5).", m.get("id") or m.get("_id"))
+        chance = 0.5
     if random.random() <= chance:
         return "success"
     # Numa falha, o calor atual decide se foi só azar ou se a polícia estava

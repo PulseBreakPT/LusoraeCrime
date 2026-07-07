@@ -463,7 +463,7 @@ class TestTeamCoordination:
         assert team["roster_stable_since"] is not None
         assert team["available_at"] is None
 
-    def test_preview_breakdown_includes_coordenacao(self):
+    def test_preview_breakdown_is_itemized_list_starting_with_base(self):
         s, _ = register_new()
         st = get_state(s)
         team = st["teams"][0]
@@ -472,7 +472,12 @@ class TestTeamCoordination:
         r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
                    json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
-        assert "coordenacao" in r.json()["breakdown"]
+        breakdown = r.json()["breakdown"]
+        assert isinstance(breakdown, list) and breakdown
+        assert breakdown[0]["key"] == "base"
+        for item in breakdown:
+            assert set(item.keys()) >= {"key", "label", "pct", "tip"}
+            assert isinstance(item["pct"], (int, float))
 
     def test_roster_change_blocks_dispatch_during_reorg(self):
         s, _ = register_new()
@@ -511,8 +516,12 @@ class TestTeamCoordination:
         r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
                    json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
-        # Sem líder (recruta) e equipa de 1 membro: penalização, nunca bónus.
-        assert r.json()["breakdown"]["coordenacao"] < 0
+        # Sem líder (recruta) e equipa de 1 membro: penalizações explícitas, nunca um bónus de coordenação.
+        breakdown = r.json()["breakdown"]
+        by_key = {i["key"]: i["pct"] for i in breakdown}
+        assert "membro_solo" in by_key and by_key["membro_solo"] < 0
+        assert "sem_lider" in by_key and by_key["sem_lider"] < 0
+        assert "coordenacao" not in by_key
 
 
 # ---------------- Frota: adequação, condição e lugares ----------------
@@ -528,7 +537,7 @@ class TestVehicleMechanics:
             assert "best_for" in m and isinstance(m["best_for"], list), key
             assert "luxury" in m and isinstance(m["luxury"], bool), key
 
-    def test_preview_breakdown_includes_veiculo(self):
+    def test_preview_breakdown_includes_vehicle_fit_item(self):
         s, _ = register_new()
         st = get_state(s)
         team = st["teams"][0]
@@ -537,7 +546,8 @@ class TestVehicleMechanics:
         r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
                    json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
-        assert "veiculo" in r.json()["breakdown"]
+        breakdown = r.json()["breakdown"]
+        assert any(i["key"].startswith("veiculo_") for i in breakdown)
 
     def test_seats_block_when_team_bigger_than_vehicle(self):
         s, _ = register_new()
@@ -1024,7 +1034,7 @@ class TestFavoritesAndRepeat:
 
 # ---------------- Pequenos detalhes: condições situacionais na preview ----------------
 class TestSituationalConditions:
-    def test_preview_breakdown_includes_condicoes(self):
+    def test_preview_breakdown_night_bonus_only_when_applicable(self):
         s, _ = register_new()
         st = get_state(s)
         team = st["teams"][0]
@@ -1033,11 +1043,14 @@ class TestSituationalConditions:
         r = s.post(f"{BASE_URL}/api/game/dispatch/preview",
                    json={"opportunity_id": opps[0]["id"], "team_id": team["id"]}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
-        d = r.json()["breakdown"]
-        assert "condicoes" in d
-        # bónus furtivo noturno só se aplica a categorias discretas de noite; caso
-        # contrário o valor é neutro (0.0) — ambos os casos são válidos aqui.
-        assert d["condicoes"] in (0.0, 0.04)
+        breakdown = r.json()["breakdown"]
+        noite = next((i for i in breakdown if i["key"] == "noite"), None)
+        # O bónus de cobertura noturna só aparece (sempre positivo) fora de horas
+        # diurnas e apenas se a categoria valorizar discrição/ambiente; caso
+        # contrário o item nem aparece (só os aplicáveis são mostrados) — ambos
+        # os casos são válidos aqui, dependendo da hora e categoria do teste.
+        if noite is not None:
+            assert noite["pct"] > 0
 
 
 # ---------------- Manutenção: uso, desgaste e reparação ----------------
