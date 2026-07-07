@@ -20,8 +20,9 @@ import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
-  Swords, ShieldAlert,
+  Swords, ShieldAlert, Brain,
 } from "lucide-react";
+import { IntelligentDashboard } from "./IntelligentDashboard";
 
 const EMP_STATUS_TIPS = {
   idle: "Disponível para operações, formação ou descanso.",
@@ -506,6 +507,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state || !catalog) return null;
 
@@ -542,6 +544,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const hiddenCount = searched.length - unavailableHidden.length;
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
         <SheetHeader>
@@ -752,7 +755,17 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
             })}
           </div>
         )}
+        <Button
+          data-testid="hr-open-intel-dashboard"
+          onClick={() => setDashboardOpen(true)}
+          className="mt-4 w-full gap-1.5 border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
+          variant="outline"
+        >
+          <Brain size={14} /> IA Inteligente — Análise Completa
+        </Button>
       </SheetContent>
     </Sheet>
+    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
+    </>
   );
 };

@@ -39,6 +39,9 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
                        HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER)
 from reward_engine import calculate_full_reward
+from intelligent_analysis import (analyze_properties_intelligence, analyze_fleet_intelligence,
+                                  analyze_hr_intelligence, analyze_teams_intelligence,
+                                  analyze_weapons_intelligence)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -1620,3 +1623,89 @@ async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_
     }})
     await add_event(db, pid, "intel", f"{d['name']}: {res['outcome']}")
     return {"ok": True, "outcome": res["outcome"]}
+
+
+# ============ INTELIGÊNCIA E ANÁLISE EXTREMA ============
+
+@router.get("/analysis/properties")
+async def analysis_properties(user: dict = Depends(get_current_user)):
+    """Análise inteligente extrema de imóveis com recomendações."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    state = await get_state(user, skip_advance=True)
+    cat = await catalog()
+    return await analyze_properties_intelligence(db, pid, state, cat)
+
+
+@router.get("/analysis/fleet")
+async def analysis_fleet(user: dict = Depends(get_current_user)):
+    """Análise inteligente extrema de frota com gestão de condição e combustível."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    state = await get_state(user, skip_advance=True)
+    cat = await catalog()
+    return await analyze_fleet_intelligence(db, pid, state, cat)
+
+
+@router.get("/analysis/hr")
+async def analysis_hr(user: dict = Depends(get_current_user)):
+    """Análise inteligente extrema de RH com gestão de talentos e treino."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    state = await get_state(user, skip_advance=True)
+    cat = await catalog()
+    return await analyze_hr_intelligence(db, pid, state, cat)
+
+
+@router.get("/analysis/teams")
+async def analysis_teams(user: dict = Depends(get_current_user)):
+    """Análise inteligente extrema de equipas com composição e estratégia."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    state = await get_state(user, skip_advance=True)
+    cat = await catalog()
+    return await analyze_teams_intelligence(db, pid, state, cat)
+
+
+@router.get("/analysis/weapons")
+async def analysis_weapons(user: dict = Depends(get_current_user)):
+    """Análise inteligente extrema de armamento com cobertura de categorias."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    state = await get_state(user, skip_advance=True)
+    cat = await catalog()
+    return await analyze_weapons_intelligence(db, pid, state, cat)
+
+
+@router.get("/analysis/comprehensive")
+async def analysis_comprehensive(user: dict = Depends(get_current_user)):
+    """Análise compreensiva de todos os 5 módulos numa só chamada."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    state = await get_state(user, skip_advance=True)
+    cat = await catalog()
+
+    props_a, fleet_a, hr_a, teams_a, weapons_a = await asyncio.gather(
+        analyze_properties_intelligence(db, pid, state, cat),
+        analyze_fleet_intelligence(db, pid, state, cat),
+        analyze_hr_intelligence(db, pid, state, cat),
+        analyze_teams_intelligence(db, pid, state, cat),
+        analyze_weapons_intelligence(db, pid, state, cat),
+    )
+
+    teams_total = teams_a["teams_summary"]["total_teams"]
+    return {
+        "properties": props_a,
+        "fleet": fleet_a,
+        "hr": hr_a,
+        "teams": teams_a,
+        "weapons": weapons_a,
+        "overall_efficiency": {
+            "property_upgrades_pending": len(props_a["upgrade_recommendations"]),
+            "fleet_condition_avg": fleet_a["fleet_summary"]["avg_condition"],
+            "staff_morale_avg": hr_a["hr_summary"]["avg_morale"],
+            "teams_idle_pct": round(100 * teams_a["teams_summary"]["teams_idle"] / max(1, teams_total)),
+            "weapons_condition_avg": weapons_a["weapons_summary"]["avg_condition"],
+            "weapons_equip_rate_pct": round(100 * weapons_a["weapons_summary"]["equipped"] / max(1, weapons_a["weapons_summary"]["total"])),
+        },
+    }
