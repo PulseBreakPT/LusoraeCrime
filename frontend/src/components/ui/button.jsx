@@ -10,15 +10,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "border border-red-500/40 bg-primary font-semibold text-primary-foreground shadow-[0_0_16px_rgba(220,38,38,0.28)] hover:bg-red-500 hover:shadow-[0_0_22px_rgba(220,38,38,0.4)]",
+          "border border-red-500/50 bg-gradient-to-b from-red-600 to-red-800 font-semibold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(220,38,38,0.3)] hover:from-red-500 hover:to-red-700 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_26px_rgba(220,38,38,0.45)]",
         destructive:
-          "border border-red-500/30 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+          "border border-red-500/40 bg-gradient-to-b from-red-700 to-red-900 text-destructive-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:from-red-600 hover:to-red-800",
         outline:
-          "border border-white/10 bg-white/[0.04] text-zinc-200 shadow-sm hover:border-white/20 hover:bg-white/10 hover:text-white",
+          "border border-white/10 bg-gradient-to-b from-white/[0.08] to-white/[0.02] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:border-white/25 hover:from-white/[0.13] hover:to-white/[0.05] hover:text-white",
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         success:
-          "border border-emerald-500/40 bg-emerald-600 font-semibold text-white shadow-[0_0_14px_rgba(16,185,129,0.25)] hover:bg-emerald-500 hover:shadow-[0_0_20px_rgba(16,185,129,0.35)]",
+          "border border-emerald-500/50 bg-gradient-to-b from-emerald-500 to-emerald-700 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_14px_rgba(16,185,129,0.25)] hover:from-emerald-400 hover:to-emerald-600 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_20px_rgba(16,185,129,0.4)]",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },

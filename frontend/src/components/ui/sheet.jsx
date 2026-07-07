@@ -16,7 +16,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-black/70 backdrop-blur-[3px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -64,7 +64,7 @@ const SheetHeader = ({
 }) => (
   <div
     className={cn(
-      "relative -mx-6 mb-1 flex flex-col space-y-1.5 border-b border-white/[0.07] px-6 pb-4 pl-[27px] text-left before:absolute before:left-4 before:top-1 before:h-[calc(100%-1.5rem)] before:w-[3px] before:rounded-full before:bg-primary before:content-['']",
+      "relative -mx-6 mb-1 flex flex-col space-y-1.5 border-b border-white/[0.07] bg-gradient-to-b from-white/[0.025] to-transparent px-6 pb-4 pl-[27px] text-left before:absolute before:left-4 before:top-1 before:h-[calc(100%-1.5rem)] before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-red-500 before:to-red-800 before:shadow-[0_0_10px_rgba(220,38,38,0.6)] before:content-['']",
       className
     )}
     {...props} />
@@ -84,7 +84,7 @@ SheetFooter.displayName = "SheetFooter"
 const SheetTitle = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Title
     ref={ref}
-    className={cn("font-display text-lg font-bold uppercase tracking-wide text-foreground", className)}
+    className={cn("font-display text-xl font-bold uppercase tracking-wider text-foreground", className)}
     {...props} />
 ))
 SheetTitle.displayName = SheetPrimitive.Title.displayName

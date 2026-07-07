@@ -296,3 +296,14 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Frontend-only. .env recriados pós-fork (backend+frontend) e credenciais em /app/memory/test_credentials.md. Verificado por screenshots (auth, mapa, painel Império). Lint limpo. Sem alterações de lógica/API."
+  - task: "SSS tier ronda 2: button.jsx variantes gradiente+glow, tabs.jsx segmented tático (ativo vermelho), input.jsx foco com glow, sheet.jsx overlay/header/título refinados, BootScreen+LoadingScreen cinematográficos (lus-boot-bg grelha tática, logo pulsante, barra lus-progress-fill com sheen)"
+    implemented: true
+    working: true
+    file: "components/ui/button.jsx, tabs.jsx, input.jsx, sheet.jsx, components/BootScreen.jsx, LoadingScreen.jsx, App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Verificado por screenshots (boot screen capturado em live, painel Missões com tabs vermelhas, painel Operacionais). Lógica dos ecrãs de loading preservada; apenas estilos. Lint limpo."
