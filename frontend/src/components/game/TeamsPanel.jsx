@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -394,38 +394,28 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {fuelPct < 60 && (
-                        <Tip tip="Atestar o depósito por completo com dinheiro limpo.">
-                          <Button
-                            data-testid={`team-refuel-${t.id}`}
-                            variant="outline" size="sm"
-                            onClick={() => refuelVehicle(vehicle.id)}
-                            disabled={money < refuelCost}
-                            className={`h-auto gap-0.5 px-1.5 py-0.5 font-mono text-[9px] ${
-                              money < refuelCost
-                                ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                                : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                            }`}
-                          >
-                            <Fuel size={9} /> {fmtMoney(refuelCost)}
-                          </Button>
-                        </Tip>
+                        <PurchaseButton
+                          testId={`team-refuel-${t.id}`}
+                          icon={Fuel}
+                          label={fmtMoney(refuelCost)}
+                          can={money >= refuelCost}
+                          blockedReasons={["Dinheiro insuficiente."]}
+                          availableTip="Atestar o depósito por completo com dinheiro limpo."
+                          onConfirm={() => refuelVehicle(vehicle.id)}
+                          className="w-auto shrink-0"
+                        />
                       )}
                       {vehicle.condition < 60 && (
-                        <Tip tip="Reparação completa — devolve o veículo a 100% de condição e velocidade máxima.">
-                          <Button
-                            data-testid={`team-repair-${t.id}`}
-                            variant="outline" size="sm"
-                            onClick={() => repairVehicle(vehicle.id)}
-                            disabled={money < repairCost}
-                            className={`h-auto gap-0.5 px-1.5 py-0.5 font-mono text-[9px] ${
-                              money < repairCost
-                                ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                                : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                            }`}
-                          >
-                            <Wrench size={9} /> {fmtMoney(repairCost)}
-                          </Button>
-                        </Tip>
+                        <PurchaseButton
+                          testId={`team-repair-${t.id}`}
+                          icon={Wrench}
+                          label={fmtMoney(repairCost)}
+                          can={money >= repairCost}
+                          blockedReasons={["Dinheiro insuficiente."]}
+                          availableTip="Reparação completa — devolve o veículo a 100% de condição e velocidade máxima."
+                          onConfirm={() => repairVehicle(vehicle.id)}
+                          className="w-auto shrink-0"
+                        />
                       )}
                     </div>
                   </div>
@@ -542,23 +532,24 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             {catalog &&
               Object.entries(catalog.team_specs).map(([key, ts]) => {
                 const atCap = state.caps?.teams && state.caps.teams.used >= state.caps.teams.max;
+                const lackMoney = state.player.clean_money < catalog.team_create_cost;
                 return (
-                  <Tip key={key} tip={atCap ? `Limite de equipas atingido para o nível ${state.player.level}.` : `${ts.desc} Bónus de sucesso em operações da categoria ${SPEC_LABELS[key]}. Custo: ${fmtMoney(catalog.team_create_cost)} limpos.`} block>
-                    <Button
-                      data-testid={`create-team-${key}`}
-                      onClick={() => createTeam(key)}
-                      disabled={atCap || state.player.clean_money < catalog.team_create_cost}
-                      variant="outline"
-                      className={`h-full w-full flex-col items-start bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.08] disabled:opacity-40 ${
-                        atCap || state.player.clean_money < catalog.team_create_cost
-                          ? "border-red-500/30"
-                          : "border-emerald-500/30"
-                      }`}
-                    >
-                      <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
-                      <span className="whitespace-normal text-[10px] leading-tight text-zinc-500">{ts.desc}</span>
-                    </Button>
-                  </Tip>
+                  <PurchaseButton
+                    key={key}
+                    testId={`create-team-${key}`}
+                    can={!atCap && !lackMoney}
+                    blockedReasons={[
+                      atCap ? `Limite de equipas atingido para o nível ${state.player.level}.` : null,
+                      !atCap && lackMoney ? "Dinheiro insuficiente." : null,
+                    ].filter(Boolean)}
+                    availableTip={`${ts.desc} Bónus de sucesso em operações da categoria ${SPEC_LABELS[key]}. Custo: ${fmtMoney(catalog.team_create_cost)} limpos.`}
+                    onConfirm={() => createTeam(key)}
+                    layout="card"
+                    className="h-full"
+                  >
+                    <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
+                    <span className="whitespace-normal text-[10px] font-normal normal-case leading-tight text-zinc-500">{ts.desc}</span>
+                  </PurchaseButton>
                 );
               })}
           </div>

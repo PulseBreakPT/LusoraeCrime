@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
@@ -128,31 +127,20 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                   </p>
                 )}
                 <div className="mt-2 flex gap-1.5">
-                  <Tip
-                    tip={
-                      upgrading
-                        ? `Melhoria em curso — pronto em ${fmtDuration(upgradeRemaining)}.`
-                        : maxed
-                        ? "Nível máximo atingido."
-                        : `Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} (demora um tempo a ficar concluído) — benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`
-                    }
-                    block
+                  <PurchaseButton
+                    testId={`upgrade-property-${p.id}`}
+                    icon={ArrowUpCircle}
+                    label={upgrading ? "A melhorar..." : maxed ? "Máx." : fmtMoney(upgradeCost)}
+                    can={!maxed && !upgrading && state.player.clean_money >= upgradeCost}
+                    blockedReasons={[
+                      upgrading ? `Melhoria em curso — pronto em ${fmtDuration(upgradeRemaining)}.` : null,
+                      !upgrading && maxed ? "Nível máximo atingido." : null,
+                      !upgrading && !maxed && state.player.clean_money < upgradeCost ? "Dinheiro insuficiente." : null,
+                    ].filter(Boolean)}
+                    availableTip={`Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} (demora um tempo a ficar concluído) — benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`}
+                    onConfirm={() => upgradeProperty(p.id)}
                     className="flex-1"
-                  >
-                    <Button
-                      data-testid={`upgrade-property-${p.id}`}
-                      variant="outline"
-                      onClick={() => upgradeProperty(p.id)}
-                      disabled={maxed || upgrading || state.player.clean_money < upgradeCost}
-                      className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                        maxed || upgrading || state.player.clean_money < upgradeCost
-                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          : "border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
-                      }`}
-                    >
-                      <ArrowUpCircle size={11} /> {upgrading ? "A melhorar..." : maxed ? "Máx." : fmtMoney(upgradeCost)}
-                    </Button>
-                  </Tip>
+                  />
                   <ConfirmButton
                     testId={`sell-property-${p.id}`}
                     icon={Trash2}
@@ -200,34 +188,19 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                           </span>
                         )}
                       </p>
-                      {pt.price >= LARGE_PURCHASE_THRESHOLD ? (
-                        <ConfirmButton
-                          testId={`buy-property-${key}`}
-                          label={fmtMoney(pt.price)}
-                          confirmLabel="Confirmar?"
-                          color="text-cyan-300"
-                          onConfirm={() => buyProperty(key)}
-                          disabled={locked || state.player.clean_money < pt.price}
-                          className="w-auto shrink-0"
-                          tip={buyTip}
-                        />
-                      ) : (
-                        <Tip tip={buyTip} align="end">
-                          <Button
-                            data-testid={`buy-property-${key}`}
-                            onClick={() => buyProperty(key)}
-                            disabled={locked || state.player.clean_money < pt.price}
-                            size="sm"
-                            className={`shrink-0 text-[10px] font-bold uppercase ${
-                              locked || state.player.clean_money < pt.price
-                                ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                                : "border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
-                            }`}
-                          >
-                            {fmtMoney(pt.price)}
-                          </Button>
-                        </Tip>
-                      )}
+                      <PurchaseButton
+                        testId={`buy-property-${key}`}
+                        label={fmtMoney(pt.price)}
+                        can={!locked && state.player.clean_money >= pt.price}
+                        requireConfirm={pt.price >= LARGE_PURCHASE_THRESHOLD}
+                        blockedReasons={[
+                          locked ? `Requer Nível ${pt.min_level}.` : null,
+                          state.player.clean_money < pt.price ? "Dinheiro insuficiente." : null,
+                        ].filter(Boolean)}
+                        availableTip={buyTip}
+                        onConfirm={() => buyProperty(key)}
+                        className="w-auto shrink-0"
+                      />
                     </div>
                     <p className="mt-1 text-[10px] text-zinc-500">{pt.desc}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, 1)}</p>

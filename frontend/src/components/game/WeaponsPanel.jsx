@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, conditionBand, weaponBenefit, weaponCompatibility, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
@@ -89,21 +88,16 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             />
           </div>
           {repairableIds.length > 0 && (
-            <Tip tip={`Repara todo o armamento disponível abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}>
-              <Button
-                data-testid="weapons-repair-all"
-                variant="outline" size="sm"
-                onClick={repairAll}
-                disabled={state.player.clean_money < repairAllCost}
-                className={`h-auto shrink-0 gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                  state.player.clean_money < repairAllCost
-                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                    : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                }`}
-              >
-                <Wrench size={11} /> Reparar todas
-              </Button>
-            </Tip>
+            <PurchaseButton
+              testId="weapons-repair-all"
+              icon={Wrench}
+              label="Reparar todas"
+              can={state.player.clean_money >= repairAllCost}
+              blockedReasons={["Dinheiro insuficiente."]}
+              availableTip={`Repara todo o armamento disponível abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}
+              onConfirm={repairAll}
+              className="w-auto shrink-0"
+            />
           )}
         </div>
 
@@ -205,21 +199,20 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 )}
 
                 <div className="mt-2 flex gap-1.5">
-                  <Tip tip={`Reparar até 100% de condição.`} block className="flex-1">
-                    <Button
-                      data-testid={`repair-weapon-${w.id}`}
-                      variant="outline"
-                      onClick={() => repairWeapon(w.id)}
-                      disabled={busy || w.condition > 99 || state.player.clean_money < repairCost}
-                      className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                        busy || w.condition > 99 || state.player.clean_money < repairCost
-                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                      }`}
-                    >
-                      <Wrench size={11} /> {fmtMoney(repairCost)}
-                    </Button>
-                  </Tip>
+                  <PurchaseButton
+                    testId={`repair-weapon-${w.id}`}
+                    icon={Wrench}
+                    label={fmtMoney(repairCost)}
+                    can={!busy && w.condition <= 99 && state.player.clean_money >= repairCost}
+                    blockedReasons={[
+                      busy ? "Arma equipada por operacional em serviço." : null,
+                      w.condition > 99 ? "Já está a 100% de condição." : null,
+                      state.player.clean_money < repairCost ? "Dinheiro insuficiente." : null,
+                    ].filter(Boolean)}
+                    availableTip="Reparar até 100% de condição."
+                    onConfirm={() => repairWeapon(w.id)}
+                    className="flex-1"
+                  />
                   <ConfirmButton
                     testId={`sell-weapon-${w.id}`}
                     icon={Trash2}
@@ -279,34 +272,19 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                         </Tip>
                       )}
                     </div>
-                    {m.price >= LARGE_PURCHASE_THRESHOLD ? (
-                      <ConfirmButton
-                        testId={`buy-weapon-${key}`}
-                        label={fmtMoney(m.price)}
-                        confirmLabel="Confirmar?"
-                        color="text-cyan-300"
-                        onConfirm={() => buyWeapon(key)}
-                        disabled={locked || state.player.clean_money < m.price}
-                        className="shrink-0"
-                        tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Compra grande — pede confirmação. ${fmtMoney(m.price)} limpos.`}
-                      />
-                    ) : (
-                      <Tip tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Comprar por ${fmtMoney(m.price)} limpos.`} align="end">
-                        <Button
-                          data-testid={`buy-weapon-${key}`}
-                          onClick={() => buyWeapon(key)}
-                          disabled={locked || state.player.clean_money < m.price}
-                          size="sm"
-                          className={`shrink-0 text-[10px] font-bold uppercase ${
-                            locked || state.player.clean_money < m.price
-                              ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                              : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                          }`}
-                        >
-                          {fmtMoney(m.price)}
-                        </Button>
-                      </Tip>
-                    )}
+                    <PurchaseButton
+                      testId={`buy-weapon-${key}`}
+                      label={fmtMoney(m.price)}
+                      can={!locked && state.player.clean_money >= m.price}
+                      requireConfirm={m.price >= LARGE_PURCHASE_THRESHOLD}
+                      blockedReasons={[
+                        locked ? `Requer Nível ${m.min_level}.` : null,
+                        state.player.clean_money < m.price ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      availableTip={`Comprar por ${fmtMoney(m.price)} limpos.`}
+                      onConfirm={() => buyWeapon(key)}
+                      className="w-auto shrink-0"
+                    />
                   </Card>
                 );
               })}
