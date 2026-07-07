@@ -7,9 +7,7 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
-import { GameImage, PanelBanner } from "./GameImage";
-import { employeeAvatar } from "../../lib/images";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -66,22 +64,17 @@ const RarityBadge = ({ rarity, rar }) => (
   </Tip>
 );
 
-const ActionBtn = ({ testId, icon: Icon, label, color, onClick, disabled, title }) => {
-  const btnColor = disabled ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20";
-  return (
-    <Tip tip={title} block>
-      <Button
-        data-testid={testId}
-        variant="outline"
-        onClick={onClick}
-        disabled={disabled}
-        className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${btnColor}`}
-      >
-        <Icon size={11} /> {label}
-      </Button>
-    </Tip>
-  );
-};
+const ActionBtn = ({ testId, icon, label, onClick, disabled, title, blockedReasons }) => (
+  <PurchaseButton
+    testId={testId}
+    icon={icon}
+    label={label}
+    can={!disabled}
+    blockedReasons={blockedReasons || (title ? [title] : [])}
+    availableTip={title}
+    onConfirm={onClick}
+  />
+);
 
 const EmployeeCard = ({ e, onNavigate }) => {
   const {
@@ -142,18 +135,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
   return (
     <Card data-testid={`employee-card-${e.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-start gap-2">
-          <GameImage
-            src={employeeAvatar(e.id, e.spec)}
-            alt={e.name}
-            className="h-9 w-9 shrink-0 rounded-md border border-white/10 bg-black/40 object-cover"
-            fallback={
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/40">
-                <IdCard size={16} className="text-zinc-600" />
-              </div>
-            }
-          />
-          <div className="min-w-0">
+        <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
             <InlineRename
@@ -189,7 +171,6 @@ const EmployeeCard = ({ e, onNavigate }) => {
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank}
           </p>
-          </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <RarityBadge rarity={e.rarity} rar={rar} />
@@ -329,14 +310,16 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
       {e.status === "injured" && (
         <div className="mt-2">
-          <ActionBtn testId={`emp-heal-${e.id}`} icon={Cross} label={`Clínica ${fmtMoney(healCost)}`} color="w-full text-orange-400"
-            onClick={() => healEmployee(e.id)} disabled={money < healCost} />
+          <ActionBtn testId={`emp-heal-${e.id}`} icon={Cross} label={`Clínica ${fmtMoney(healCost)}`}
+            onClick={() => healEmployee(e.id)} disabled={money < healCost}
+            title="Recupera o operacional ferido — volta a ficar disponível." blockedReasons={money < healCost ? ["Dinheiro insuficiente."] : []} />
         </div>
       )}
       {e.status === "arrested" && (
         <div className="mt-2">
-          <ActionBtn testId={`emp-release-${e.id}`} icon={Gavel} label={`Advogado ${fmtMoney(releaseCost)}`} color="w-full text-red-400"
-            onClick={() => releaseEmployee(e.id)} disabled={money < releaseCost} />
+          <ActionBtn testId={`emp-release-${e.id}`} icon={Gavel} label={`Advogado ${fmtMoney(releaseCost)}`}
+            onClick={() => releaseEmployee(e.id)} disabled={money < releaseCost}
+            title="Liberta o operacional preso — volta a ficar disponível." blockedReasons={money < releaseCost ? ["Dinheiro insuficiente."] : []} />
         </div>
       )}
 
@@ -363,34 +346,57 @@ const EmployeeCard = ({ e, onNavigate }) => {
               </SelectContent>
             </Select>
             <ActionBtn
-              testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar" color="text-cyan-400"
+              testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar"
               onClick={() => { trainEmployee(e.id, course); setCourse(""); }}
               disabled={!idle || !course || money < (catalog.training_courses[course]?.cost || Infinity)}
+              title="Envia o operacional para a formação escolhida."
+              blockedReasons={[
+                !idle ? "Operacional indisponível (em missão, ferido ou preso)." : null,
+                idle && !course ? "Escolhe uma formação." : null,
+                idle && course && money < (catalog.training_courses[course]?.cost || Infinity) ? "Dinheiro insuficiente." : null,
+              ].filter(Boolean)}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
             <ActionBtn
-              testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar" color="text-purple-300"
+              testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar"
               onClick={() => restEmployee(e.id)} disabled={!idle || e.fatigue < 15}
               title="Recupera 50 de fadiga e +5 moral"
+              blockedReasons={[
+                !idle ? "Operacional indisponível." : null,
+                idle && e.fatigue < 15 ? "Fadiga já baixa — não precisa de descansar." : null,
+              ].filter(Boolean)}
             />
             <ActionBtn
               testId={`emp-promote-${e.id}`} icon={ChevronUp}
-              label={isTopRank ? "Topo" : `Promover ${fmtMoney(promoteCost)}`} color="text-emerald-400"
+              label={isTopRank ? "Topo" : `Promover ${fmtMoney(promoteCost)}`}
               onClick={() => promoteEmployee(e.id)}
               disabled={isTopRank || e.status === "on_mission" || e.level < nextRankReq || money < promoteCost}
               title={isTopRank ? "Já é o teu braço-direito" : `Requer nível ${nextRankReq} · +10 lealdade, +8 moral, +10% salário`}
+              blockedReasons={[
+                isTopRank ? "Já é o teu braço-direito." : null,
+                !isTopRank && e.status === "on_mission" ? "Operacional em missão." : null,
+                !isTopRank && e.status !== "on_mission" && e.level < nextRankReq ? `Requer Nível ${nextRankReq}.` : null,
+                !isTopRank && e.status !== "on_mission" && e.level >= nextRankReq && money < promoteCost ? "Dinheiro insuficiente." : null,
+              ].filter(Boolean)}
             />
             <ActionBtn
-              testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`} color="text-amber-400"
+              testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`}
               onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
               title="+15 moral, +10 lealdade"
+              blockedReasons={money < bonusCost ? ["Dinheiro insuficiente."] : []}
             />
             <ConfirmButton
               testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?" color="text-red-400"
               onConfirm={() => fireEmployee(e.id)} disabled={e.status === "on_mission" || money < fireCost}
-              tip="Indemnização de 3 salários. Baixa a moral dos restantes. Ação irreversível."
+              tip={
+                e.status === "on_mission"
+                  ? "Operacional em missão."
+                  : money < fireCost
+                  ? "Dinheiro insuficiente."
+                  : "Indemnização de 3 salários. Baixa a moral dos restantes. Ação irreversível."
+              }
             />
           </div>
 
@@ -476,21 +482,19 @@ const CandidateCard = ({ c }) => {
             </Tip>
           )}
         </div>
-        <Tip tip={blockers.length ? `Não podes recrutar: ${blockers.join(" · ")}.` : `Recrutar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`} align="end">
-          <Button
-            data-testid={`hire-candidate-${c.id}`}
-            size="sm"
-            onClick={() => recruitEmployee(c.id)}
-            disabled={lackRespect || lackMoney || full}
-            className={`font-mono text-[10px] font-bold uppercase ${
-              lackRespect || lackMoney || full
-                ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-            }`}
-          >
-            {fmtMoney(c.cost)}
-          </Button>
-        </Tip>
+        <PurchaseButton
+          testId={`hire-candidate-${c.id}`}
+          label={fmtMoney(c.cost)}
+          can={!lackRespect && !lackMoney && !full}
+          blockedReasons={[
+            full ? "Esconderijos cheios." : null,
+            lackRespect ? `Requer ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} de respeito adicional.` : null,
+            lackMoney ? "Dinheiro insuficiente." : null,
+          ].filter(Boolean)}
+          availableTip={`Recrutar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`}
+          onConfirm={() => recruitEmployee(c.id)}
+          className="w-auto shrink-0"
+        />
       </div>
     </Card>
   );
@@ -540,7 +544,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
-        <PanelBanner panelKey="employees" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <IdCard size={18} className="text-primary" /> Operacionais
@@ -707,19 +710,16 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
               <p className="font-mono text-[10px] text-zinc-500">
                 Novos contactos em <span className="text-white">{poolMs !== null ? fmtDuration(Math.max(0, poolMs / 1000)) : "—"}</span>
               </p>
-              <Button
-                data-testid="refresh-pool-btn"
-                variant="outline" size="sm"
-                onClick={() => refreshPool()}
-                disabled={state.player.clean_money < catalog.hr_costs.pool_refresh}
-                className={`h-auto gap-1 px-2 py-1 font-mono text-[10px] ${
-                  state.player.clean_money < catalog.hr_costs.pool_refresh
-                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                    : "border-white/10 text-cyan-400 hover:bg-white/5"
-                }`}
-              >
-                <RefreshCw size={10} /> Novos contactos {fmtMoney(catalog.hr_costs.pool_refresh)}
-              </Button>
+              <PurchaseButton
+                testId="refresh-pool-btn"
+                icon={RefreshCw}
+                label={`Novos contactos ${fmtMoney(catalog.hr_costs.pool_refresh)}`}
+                can={state.player.clean_money >= catalog.hr_costs.pool_refresh}
+                blockedReasons={["Dinheiro insuficiente."]}
+                availableTip="Gera uma nova lista de candidatos a recrutar."
+                onConfirm={() => refreshPool()}
+                className="w-auto shrink-0"
+              />
             </div>
 
             {Object.entries(catalog.recruit_sources).map(([key, src]) => {

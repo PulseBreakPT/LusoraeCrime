@@ -203,6 +203,56 @@ export const ConfirmButton = ({
   );
 };
 
+// Botão único para toda e qualquer compra/melhoria/ação com custo em todo o jogo
+// (veículos, armas, propriedades, QG, recrutamento, formação, etc.) — verde quando
+// possível, vermelho quando não, sempre visível e com o motivo do bloqueio no tooltip.
+// `requireConfirm` dobra o passo de confirmação (mirror do ConfirmButton) para compras
+// grandes, sem precisar de um componente/estilo à parte.
+export const PurchaseButton = ({
+  testId, label, icon: Icon, can, blockedReasons = [], availableTip, confirmLabel = "Confirmar?",
+  requireConfirm = false, onConfirm, className = "", layout = "row", children,
+}) => {
+  const [armed, setArmed] = useState(false);
+  const skipArm = getDisplayPrefs().confirmIrreversible === false;
+  useEffect(() => {
+    if (!armed) return;
+    const id = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(id);
+  }, [armed]);
+  const tip = armed
+    ? "Clica outra vez para confirmar — ação irreversível."
+    : !can
+    ? (blockedReasons.length ? blockedReasons.join(" ") : null)
+    : availableTip;
+  const handleClick = () => {
+    if (!can) return;
+    if (!requireConfirm || skipArm) { onConfirm(); return; }
+    if (armed) { setArmed(false); onConfirm(); } else setArmed(true);
+  };
+  return (
+    <Tip tip={tip} block className={className}>
+      <button
+        data-testid={testId}
+        onClick={handleClick}
+        disabled={!can}
+        className={cn(
+          layout === "card"
+            ? "flex h-full w-full flex-col items-start gap-1 rounded-md border px-3 py-2 text-left font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px]"
+            : "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase",
+          "transition-colors disabled:cursor-not-allowed",
+          armed
+            ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+            : can
+            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:border-emerald-500/60 hover:bg-emerald-500/20"
+            : "border-red-500/30 bg-red-500/10 text-red-400"
+        )}
+      >
+        {children != null ? children : (<>{Icon && <Icon size={11} />} {armed ? confirmLabel : label}</>)}
+      </button>
+    </Tip>
+  );
+};
+
 // Pisca brevemente quando um valor observado muda (ex.: uma equipa que acabou
 // de regressar, uma missão que ficou pronta) — chama a atenção sem depender de texto.
 export const useFlash = (value, ms = 2500) => {

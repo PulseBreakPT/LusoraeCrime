@@ -4,8 +4,7 @@ import {
   fmtMoney, fmtDuration, hqBenefitsAt, hqBenefitDesc, hqAdvisorTips, hqPerformanceMetrics,
   CATEGORY_COLORS, SPEC_LABELS,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar } from "./hud";
-import { PanelBanner } from "./GameImage";
+import { Tip, Kpi, SummaryStrip, MiniBar, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
@@ -156,7 +155,6 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm" data-testid="hq-panel">
-        <PanelBanner panelKey="hq" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Landmark size={18} className="text-primary" /> Quartel-General
@@ -270,30 +268,19 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Lock size={10} /> Requer nível de organização {nextTier.min_org_level}
                     </p>
                   )}
-                  <Tip
-                    tip={
-                      !meetsOrgLevel
-                        ? `Requer nível de organização ${nextTier.min_org_level}.`
-                        : !canAffordNext
-                        ? "Dinheiro limpo insuficiente."
-                        : `Melhorar para o nível ${hq.level + 1} por ${fmtMoney(nextTier.upgrade_cost)} — demora ${fmtDuration(nextTier.upgrade_duration_s)}.`
-                    }
-                    block
-                  >
-                    <Button
-                      data-testid="hq-upgrade-button"
-                      variant="outline"
-                      onClick={() => upgradeHQ()}
-                      disabled={!canAffordNext || !meetsOrgLevel}
-                      className={`mt-2 h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                        !canAffordNext || !meetsOrgLevel
-                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          : "border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
-                      }`}
-                    >
-                      <ArrowUpCircle size={11} /> Melhorar — {fmtMoney(nextTier.upgrade_cost)}
-                    </Button>
-                  </Tip>
+                  <PurchaseButton
+                    testId="hq-upgrade-button"
+                    icon={ArrowUpCircle}
+                    label={`Melhorar — ${fmtMoney(nextTier.upgrade_cost)}`}
+                    can={canAffordNext && meetsOrgLevel}
+                    blockedReasons={[
+                      !meetsOrgLevel ? `Requer Quartel-General nível ${nextTier.min_org_level}.` : null,
+                      meetsOrgLevel && !canAffordNext ? "Dinheiro insuficiente." : null,
+                    ].filter(Boolean)}
+                    availableTip={`Melhorar para o nível ${hq.level + 1} por ${fmtMoney(nextTier.upgrade_cost)} — demora ${fmtDuration(nextTier.upgrade_duration_s)}.`}
+                    onConfirm={() => upgradeHQ()}
+                    className="mt-2"
+                  />
                 </>
               )}
             </Card>

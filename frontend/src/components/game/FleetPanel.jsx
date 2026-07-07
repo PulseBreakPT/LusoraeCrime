@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
-import { Thumb, PanelBanner } from "./GameImage";
-import { vehicleImage } from "../../lib/images";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -73,7 +71,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
-        <PanelBanner panelKey="fleet" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Car size={18} className="text-primary" /> Frota
@@ -114,21 +111,16 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             />
           </div>
           {repairableIds.length > 0 && (
-            <Tip tip={`Repara todos os veículos disponíveis abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}>
-              <Button
-                data-testid="fleet-repair-all"
-                variant="outline" size="sm"
-                onClick={repairAll}
-                disabled={state.player.clean_money < repairAllCost}
-                className={`h-auto shrink-0 gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                  state.player.clean_money < repairAllCost
-                    ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                    : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                }`}
-              >
-                <Wrench size={11} /> Reparar todos
-              </Button>
-            </Tip>
+            <PurchaseButton
+              testId="fleet-repair-all"
+              icon={Wrench}
+              label="Reparar todos"
+              can={state.player.clean_money >= repairAllCost}
+              blockedReasons={["Dinheiro insuficiente."]}
+              availableTip={`Repara todos os veículos disponíveis abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}
+              onConfirm={repairAll}
+              className="w-auto shrink-0"
+            />
           )}
         </div>
 
@@ -168,8 +160,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             }
             return (
               <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
-                <div className="flex items-center justify-between gap-2">
-                  <Thumb src={vehicleImage(v.model_key)} alt={modelName} icon={Car} iconColor="#fbbf24" className="h-11 w-16" />
+                <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <FavoriteStar testId={`vehicle-favorite-${v.id}`} active={favoriteVehicleIds.includes(v.id)} onToggle={() => toggleFavoriteVehicle(v.id)} />
@@ -279,37 +270,35 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Clock size={11} /> A abastecer · {fmtDuration(refuelRemaining)}
                     </span>
                   ) : (
-                    <Tip tip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${(state.fuel_prices?.[v.fuel_type] || 0).toFixed(2)} €/L) — demora alguns segundos.`} block className="flex-1">
-                      <Button
-                        data-testid={`refuel-vehicle-${v.id}`}
-                        variant="outline"
-                        onClick={() => refuelVehicle(v.id)}
-                        disabled={busy || fuelPct > 99 || state.player.clean_money < refuelCost}
-                        className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                          busy || fuelPct > 99 || state.player.clean_money < refuelCost
-                            ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                            : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                        }`}
-                      >
-                        <Fuel size={11} /> {fmtMoney(refuelCost)}
-                      </Button>
-                    </Tip>
+                    <PurchaseButton
+                      testId={`refuel-vehicle-${v.id}`}
+                      icon={Fuel}
+                      label={fmtMoney(refuelCost)}
+                      can={!busy && fuelPct <= 99 && state.player.clean_money >= refuelCost}
+                      blockedReasons={[
+                        busy ? "Veículo em operação." : null,
+                        fuelPct > 99 ? "Depósito já cheio." : null,
+                        state.player.clean_money < refuelCost ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      availableTip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${(state.fuel_prices?.[v.fuel_type] || 0).toFixed(2)} €/L) — demora alguns segundos.`}
+                      onConfirm={() => refuelVehicle(v.id)}
+                      className="flex-1"
+                    />
                   )}
-                  <Tip tip={`Reparar até 100% de condição — recupera velocidade máxima${state.bonuses?.repair_discount ? " (desconto de oficina aplicado)" : ""}.`} block className="flex-1">
-                    <Button
-                      data-testid={`repair-vehicle-${v.id}`}
-                      variant="outline"
-                      onClick={() => repairVehicle(v.id)}
-                      disabled={busy || v.condition > 99 || state.player.clean_money < repairCost}
-                      className={`h-auto w-full gap-1 px-2 py-1.5 font-mono text-[10px] ${
-                        busy || v.condition > 99 || state.player.clean_money < repairCost
-                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                      }`}
-                    >
-                      <Wrench size={11} /> {fmtMoney(repairCost)}
-                    </Button>
-                  </Tip>
+                  <PurchaseButton
+                    testId={`repair-vehicle-${v.id}`}
+                    icon={Wrench}
+                    label={fmtMoney(repairCost)}
+                    can={!busy && v.condition <= 99 && state.player.clean_money >= repairCost}
+                    blockedReasons={[
+                      busy ? "Veículo em operação." : null,
+                      v.condition > 99 ? "Já está a 100% de condição." : null,
+                      state.player.clean_money < repairCost ? "Dinheiro insuficiente." : null,
+                    ].filter(Boolean)}
+                    availableTip={`Reparar até 100% de condição — recupera velocidade máxima${state.bonuses?.repair_discount ? " (desconto de oficina aplicado)" : ""}.`}
+                    onConfirm={() => repairVehicle(v.id)}
+                    className="flex-1"
+                  />
                   <ConfirmButton
                     testId={`sell-vehicle-${v.id}`}
                     icon={Trash2}
@@ -354,9 +343,8 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               Object.entries(catalog.vehicle_models).map(([key, m]) => {
                 const locked = state.player.level < m.min_level;
                 return (
-                  <Card key={key} className="flex items-center gap-2 border-white/10 bg-white/[0.03] p-3 shadow-none">
-                    <Thumb src={vehicleImage(key)} alt={m.name} icon={Car} iconColor="#fbbf24" className="h-14 w-20 self-stretch" />
-                    <div className="min-w-0 flex-1">
+                  <Card key={key} className="flex items-center justify-between border-white/10 bg-white/[0.03] p-3 shadow-none">
+                    <div>
                       <p className="text-sm font-semibold text-white">
                         {m.name}
                         {locked && (
@@ -395,34 +383,20 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         )}
                       </p>
                     </div>
-                    {m.price >= LARGE_PURCHASE_THRESHOLD ? (
-                      <ConfirmButton
-                        testId={`buy-vehicle-${key}`}
-                        label={fmtMoney(m.price)}
-                        confirmLabel="Confirmar?"
-                        color="text-cyan-300"
-                        onConfirm={() => buyVehicle(key)}
-                        disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
-                        className="shrink-0"
-                        tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Compra grande — pede confirmação. ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`}
-                      />
-                    ) : (
-                      <Tip tip={locked ? `Desbloqueia ao nível ${m.min_level}.` : `Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`} align="end">
-                        <Button
-                          data-testid={`buy-vehicle-${key}`}
-                          onClick={() => buyVehicle(key)}
-                          disabled={locked || state.player.clean_money < m.price || caps.used >= caps.max}
-                          size="sm"
-                          className={`shrink-0 text-[10px] font-bold uppercase ${
-                            locked || state.player.clean_money < m.price || caps.used >= caps.max
-                              ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                              : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                          }`}
-                        >
-                          {fmtMoney(m.price)}
-                        </Button>
-                      </Tip>
-                    )}
+                    <PurchaseButton
+                      testId={`buy-vehicle-${key}`}
+                      label={fmtMoney(m.price)}
+                      can={!locked && state.player.clean_money >= m.price && caps.used < caps.max}
+                      requireConfirm={m.price >= LARGE_PURCHASE_THRESHOLD}
+                      blockedReasons={[
+                        locked ? `Requer Nível ${m.min_level}.` : null,
+                        state.player.clean_money < m.price ? "Dinheiro insuficiente." : null,
+                        caps.used >= caps.max ? "Capacidade máxima atingida." : null,
+                      ].filter(Boolean)}
+                      availableTip={`Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`}
+                      onConfirm={() => buyVehicle(key)}
+                      className="w-auto shrink-0"
+                    />
                   </Card>
                 );
               })}
