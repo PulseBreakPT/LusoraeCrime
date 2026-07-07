@@ -195,15 +195,19 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   return (
     <Card
       data-testid="opportunity-card"
-      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up lus-panel p-4 shadow-2xl"
+      style={{ "--mk": color }}
+      className="lus-opp-card pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up lus-panel p-4 shadow-2xl"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md" style={{ background: `${color}22`, color }}>
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-md border"
+            style={{ background: `${color}1e`, color, borderColor: `${color}44`, boxShadow: `0 0 16px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.08)` }}
+          >
             <Icon size={18} />
           </span>
           <div>
-            <h3 className="text-sm font-bold text-white">{opp.name}</h3>
+            <h3 className="font-display text-base font-bold uppercase leading-tight tracking-wide text-white">{opp.name}</h3>
             <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               {opp.district} · {SPEC_LABELS[opp.category]}
             </p>
@@ -560,10 +564,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               disabled={!selectedTeamId || busy}
               className={`mt-3 w-full font-bold uppercase tracking-wider ${
                 !selectedTeamId || busy
-                  ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  ? "border-red-500/30 bg-red-500/10 from-transparent to-transparent text-red-400 shadow-none hover:bg-red-500/20"
                   : confirmLowChance
-                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
-                  : "bg-success text-success-foreground shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-success/90"
+                  ? "border-amber-500/50 bg-gradient-to-b from-amber-500/30 to-amber-600/20 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.25)]"
+                  : "border-emerald-500/50 bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_18px_rgba(16,185,129,0.35)] hover:from-emerald-400 hover:to-emerald-600 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_26px_rgba(16,185,129,0.5)]"
               }`}
             >
               {busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}

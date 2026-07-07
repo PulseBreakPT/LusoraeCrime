@@ -643,6 +643,30 @@
     animation: lus-sweep 1.6s linear infinite;
 }
 
+/* ============================================================
+   Micro-polish global
+   ============================================================ */
+
+/* Cartão de oportunidade: a linha laser do topo assume a cor da categoria */
+.lus-opp-card {
+    overflow: hidden;
+}
+
+.lus-opp-card::before {
+    background: linear-gradient(90deg, transparent 2%, var(--mk, #dc2626) 35%, rgba(212, 168, 83, 0.5) 70%, transparent 98%);
+    opacity: 0.85;
+}
+
+/* Conteúdo de tabs entra com deslize subtil (radix TabsContent) */
+[role="tabpanel"][data-state="active"] {
+    animation: slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Scrollbar com acento vermelho ao pairar */
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(220, 38, 38, 0.55) !important;
+}
+
 /* ---------- Acessibilidade: reduzir movimento ---------- */
 @media (prefers-reduced-motion: reduce) {
     .lus-kenburns,

@@ -307,3 +307,14 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshots (boot screen capturado em live, painel Missões com tabs vermelhas, painel Operacionais). Lógica dos ecrãs de loading preservada; apenas estilos. Lint limpo."
+  - task: "SSS tier ronda 3: OpportunityCard identidade por categoria (laser --mk, ícone com glow, título Rajdhani), CTA despacho esmeralda gradiente, micro-interações globais (tabpanel slide-up, scrollbar vermelho hover)"
+    implemented: true
+    working: true
+    file: "components/game/OpportunityCard.jsx, App.css"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Verificado por screenshot em live (cartão aberto com equipa recomendada, preview 72% e CTA premium). Sem alterações de lógica. Lint limpo."
