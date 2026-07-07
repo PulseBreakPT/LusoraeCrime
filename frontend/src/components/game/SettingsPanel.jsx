@@ -197,7 +197,8 @@ const ClaimAdminForm = () => {
         data-testid="settings-claim-admin-button"
         onClick={run}
         disabled={busy}
-        className="mt-2 w-full bg-amber-600 text-xs font-bold uppercase tracking-wider text-white hover:bg-amber-700"
+        variant="outline"
+        className="mt-2 w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-xs font-bold uppercase tracking-wider text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white"
       >
         <ShieldCheck size={14} className="mr-1.5" /> Tornar-me Administrador
       </Button>

@@ -416,7 +416,7 @@ export default function AdminPanel() {
                         placeholder="0"
                       />
                     </div>
-                    <Button onClick={handleGrantResources} className="w-full bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleGrantResources} variant="success" className="w-full">
                       Conceder
                     </Button>
                   </div>
@@ -441,7 +441,7 @@ export default function AdminPanel() {
                     <p className="text-zinc-500 text-xs">
                       Isto vai limpar todas as equipas, operacionais, veículos, propriedades e operações.
                     </p>
-                    <Button onClick={handleResetProgress} className="w-full bg-orange-600 hover:bg-orange-700">
+                    <Button onClick={handleResetProgress} variant="outline" className="w-full border-orange-500/50 bg-gradient-to-b from-orange-500 to-orange-700 text-white hover:border-orange-400/70 hover:from-orange-400 hover:to-orange-600 hover:text-white">
                       <RotateCcw size={16} className="mr-2" />
                       Resetar Tudo
                     </Button>
@@ -455,7 +455,7 @@ export default function AdminPanel() {
                     {userDetails.user.role === "admin" ? (
                       <>
                         <p className="text-green-400 text-sm font-semibold">✓ Utilizador é administrador</p>
-                        <Button onClick={handleRevokeAdmin} className="w-full bg-amber-600 hover:bg-amber-700">
+                        <Button onClick={handleRevokeAdmin} variant="outline" className="w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white">
                           <Lock size={16} className="mr-2" />
                           Remover Admin
                         </Button>
@@ -463,7 +463,7 @@ export default function AdminPanel() {
                     ) : (
                       <>
                         <p className="text-zinc-400 text-sm">Utilizador é jogador normal</p>
-                        <Button onClick={handleGrantAdmin} className="w-full bg-green-600 hover:bg-green-700">
+                        <Button onClick={handleGrantAdmin} variant="success" className="w-full">
                           <Unlock size={16} className="mr-2" />
                           Tornar Admin
                         </Button>
@@ -486,7 +486,7 @@ export default function AdminPanel() {
                           placeholder="Ex: Comportamento abusivo, spam, etc..."
                         />
                       </div>
-                      <Button onClick={handleBanUser} className="w-full bg-red-600 hover:bg-red-700">
+                      <Button onClick={handleBanUser} variant="destructive" className="w-full">
                         <Lock size={16} className="mr-2" />
                         Banir Utilizador
                       </Button>

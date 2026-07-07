@@ -236,6 +236,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 data-testid="launder-submit-button"
                 onClick={handleLaunder}
                 disabled={!amount || parseInt(amount, 10) > p.dirty_money}
+                variant="outline"
                 className={`shrink-0 text-xs font-bold uppercase ${
                   !amount || parseInt(amount, 10) > p.dirty_money
                     ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
@@ -296,6 +297,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 onClick={bribePolice}
                 disabled={p.heat < 10 || p.clean_money < Math.max(1000, Math.round(p.heat * 150))}
                 size="sm"
+                variant="outline"
                 className={`mt-2 w-full text-[10px] font-bold uppercase tracking-wider ${
                   p.heat < 10 || p.clean_money < Math.max(1000, Math.round(p.heat * 150))
                     ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"

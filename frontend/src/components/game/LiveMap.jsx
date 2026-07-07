@@ -615,7 +615,8 @@ export const PlacementControls = () => {
         data-testid="placement-confirm"
         onClick={confirmPlacement}
         disabled={!placement.point || !placement.valid}
-        className="gap-1.5 rounded-full bg-emerald-600 text-white shadow-2xl hover:bg-emerald-500 disabled:opacity-40"
+        variant="success"
+        className="gap-1.5 rounded-full shadow-2xl disabled:opacity-40"
       >
         <Check size={15} /> Confirmar
       </Button>

@@ -329,3 +329,14 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Capturado em live durante o boot real (radar, cantos, cursor, flavor text visíveis). Lógica de fases/erros preservada. Lint limpo. prefers-reduced-motion respeitado."
+  - task: "SSS tier ronda 5 (botões): física de interação .lus-btn (spring transitions, press-down translateY+scale, sheen sweep por background-position que não corta badges), orla metálica mask-ring em primary/success, variantes button.jsx enriquecidas (via- stops, sombras em camadas, focus ring vermelho, disabled dessaturado), TabsTrigger com gradiente+ring inset+hover, icon glow nos lus-hud-btn, indicador luminoso no separador ativo do dock; fixes de intenção de cor: OpportunityCard dispatch (variant success — corrigida regressão via-red-600), EmpirePanel lavar/subornar (outline), SettingsPanel claim-admin (âmbar sólido), LiveMap placement-confirm (success), AdminPanel 5 botões (success/destructive/gradientes)"
+    implemented: true
+    working: true
+    file: "components/ui/button.jsx, components/ui/tabs.jsx, App.css, components/game/OpportunityCard.jsx, components/game/EmpirePanel.jsx, components/game/SettingsPanel.jsx, components/game/LiveMap.jsx, pages/AdminPanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Frontend-only. .env recriados pós-fork (preview URL 7f415bc7...). Verificado por screenshots: auth CTA hover (orla metálica+lift), dock (indicador ativo+icon glow), tabs RH (gradiente+ring), CTA Destacar Equipa esmeralda correto em rest+hover. Lint limpo (só warnings pré-existentes). prefers-reduced-motion desativa sheen/transições."

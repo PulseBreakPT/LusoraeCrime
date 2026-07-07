@@ -54,6 +54,11 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Império: fluxo de caixa passivo c/ balanço €/h, calor c/ thresholds 70/90, quick-nav c/ alertas
 - Frota: autonomia km por veículo e no stand; RH: impacto na folha salarial ao contratar, tooltips raridade/atributos/estados; Imóveis: preview do benefício no próximo nível
 - Intel: fortuna total, valor frota, salários/ciclo, tooltips em todas as células; Quests: badges de contagem nas tabs; ActivityFeed: tempo relativo + nº registos
+### Botões SSS (07/07/2026)
+- `button.jsx`: variantes enriquecidas (gradientes com via-stops, sombras em camadas, focus ring vermelho, disabled dessaturado) + classe base `lus-btn`
+- `App.css`: física de interação (spring easing, press-down translateY+scale+brightness), sheen sweep no hover via background-position (não corta badges externos), orla metálica mask-ring 1px em primary/success (branco→dourado→sombra), icon glow currentColor nos `lus-hud-btn`, indicador luminoso sob o separador ativo do dock, tudo coberto por prefers-reduced-motion
+- `tabs.jsx`: TabsTrigger ativo com gradiente rico + ring inset + inner shadow; hover nos inativos; active:scale
+- Fixes de intenção de cor (bg-color tapado pelo gradiente do variant default): OpportunityCard dispatch→success (corrigida regressão via-red-600), EmpirePanel lavar/subornar→outline, SettingsPanel claim-admin→âmbar sólido, LiveMap placement-confirm→success, AdminPanel 5 botões→variants corretos
 - NOTA infra: .env recriados pós-fork; CORS exige origens explícitas (não "*" c/ credentials); testar via preview URL
 
 ## Backlog priorizado
