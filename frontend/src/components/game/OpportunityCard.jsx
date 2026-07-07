@@ -23,6 +23,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [confirmLowChance, setConfirmLowChance] = useState(false);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
 
@@ -46,6 +47,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
   useEffect(() => {
     setPreview(null);
+    setConfirmLowChance(false);
     if (!selectedTeamId || inProgress) return;
     let cancelled = false;
     previewDispatch(opp.id, selectedTeamId).then((r) => {
@@ -53,6 +55,12 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     });
     return () => { cancelled = true; };
   }, [selectedTeamId, opp.id, previewDispatch, inProgress]);
+
+  useEffect(() => {
+    if (!confirmLowChance) return;
+    const id = setTimeout(() => setConfirmLowChance(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirmLowChance]);
 
   // Ao abrir uma oportunidade, pré-seleciona automaticamente a equipa com maior
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
@@ -111,8 +119,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle };
   };
 
+  const lowChanceThreshold = catalog?.low_chance_confirm_threshold;
+  const isLowChance = preview && lowChanceThreshold != null && preview.chance < lowChanceThreshold;
+
   const handleDispatch = async () => {
     if (!selectedTeamId) return;
+    if (isLowChance && !confirmLowChance) {
+      setConfirmLowChance(true);
+      return;
+    }
+    setConfirmLowChance(false);
     setBusy(true);
     const res = await dispatchTeam(opp.id, selectedTeamId);
     setBusy(false);
@@ -418,26 +434,20 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <AlertTriangle size={11} /> Probabilidade abaixo do limite definido ({Math.round(lowSuccessThreshold * 100)}%)
                 </p>
               )}
-              <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-7">
-                <PreviewFactor label="Risco" value={preview.breakdown.risco} tip="Penalização base do risco da operação." />
-                <PreviewFactor label="Equipa" value={preview.breakdown.equipa} tip="Competência dos membros nos atributos relevantes." />
-                <PreviewFactor label="Match" value={preview.breakdown.match} tip="Compatibilidade entre a especialização da equipa e a categoria da operação." />
-                <PreviewFactor label="Calor" value={preview.breakdown.calor} tip="Pressão policial atual — quanto mais calor, pior." />
-                <PreviewFactor
-                  label="Coord."
-                  value={preview.breakdown.coordenacao}
-                  tip="Coordenação da equipa: penaliza sem líder (patente de chefe de equipa ou acima) ou com um único membro; premeia veterania (tempo desde a última alteração de membros) e homogeneidade de especialização."
-                />
-                <PreviewFactor
-                  label="Veíc."
-                  value={preview.breakdown.veiculo}
-                  tip="Veículo: pouca durabilidade penaliza (risco de algo correr mal); um veículo adequado ao tipo de operação ajuda."
-                />
-                <PreviewFactor
-                  label="Condições"
-                  value={preview.breakdown.condicoes}
-                  tip="Condições da operação: operações discretas durante a noite fechada têm um pequeno bónus furtivo."
-                />
+              <div className="mt-1.5 space-y-0.5 border-t border-white/5 pt-1.5" data-testid="dispatch-preview-breakdown">
+                {preview.breakdown.map((item) => (
+                  <Tip key={item.key} tip={item.tip} side="left" block>
+                    <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
+                      <span className="truncate text-zinc-400">{item.label}</span>
+                      <span
+                        className="shrink-0 font-bold"
+                        style={{ color: item.key === "base" ? "#A1A1AA" : item.pct >= 0 ? "#34D399" : "#EF4444" }}
+                      >
+                        {item.key === "base" ? `${Math.round(item.pct * 100)}%` : pctSigned(item.pct)}
+                      </span>
+                    </div>
+                  </Tip>
+                ))}
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                 <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
@@ -457,34 +467,27 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               </p>
             </Card>
           )}
-          <Button
-            data-testid="dispatch-team-button"
-            onClick={handleDispatch}
-            disabled={!selectedTeamId || busy}
-            className={`mt-3 w-full font-bold uppercase tracking-wider ${
-              !selectedTeamId || busy
-                ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                : "bg-success text-success-foreground shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-success/90"
-            }`}
-          >
-            {busy ? "A destacar..." : "Destacar equipa"}
-          </Button>
+          <Tip tip={confirmLowChance ? "Probabilidade muito baixa — clica outra vez para confirmar mesmo assim." : null} block>
+            <Button
+              data-testid="dispatch-team-button"
+              onClick={handleDispatch}
+              disabled={!selectedTeamId || busy}
+              className={`mt-3 w-full font-bold uppercase tracking-wider ${
+                !selectedTeamId || busy
+                  ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  : confirmLowChance
+                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                  : "bg-success text-success-foreground shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-success/90"
+              }`}
+            >
+              {busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}
+            </Button>
+          </Tip>
         </>
       )}
     </Card>
   );
 };
-
-const PreviewFactor = ({ label, value, tip }) => (
-  <Tip tip={tip} block>
-    <Card className="rounded bg-black/40 px-1 py-0.5 text-center shadow-none">
-      <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
-      <p className="font-mono text-[10px] font-bold" style={{ color: value >= 0 ? "#34D399" : "#EF4444" }}>
-        {pctSigned(value)}
-      </p>
-    </Card>
-  </Tip>
-);
 
 const Metric = ({ icon: Icon, label, value, color, tip }) => (
   <Tip tip={tip} block>

@@ -17,7 +17,10 @@ from economy_constants import (
     WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT, WEAPON_PROFICIENCY_MAX,
     WEAPON_PROFICIENCY_GAIN_PER_MISSION, WEAPON_PROFICIENCY_BONUS_MAX_PCT,
     WEAPON_REPAIR_COST_MULTIPLIER, WEAPON_LOUD_HEAT_MULT,
-    WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX, WEAPON_COMPATIBILITY_MIN_FACTOR
+    WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX, WEAPON_COMPATIBILITY_MIN_FACTOR,
+    LOYALTY_BONUS_MAX, LOYALTY_PENALTY_MAX, HQ_CHANCE_BONUS_PER_LEVEL,
+    INCOMPLETE_CREW_PENALTY_PER_MISSING, INCOMPLETE_CREW_PENALTY_MAX,
+    VEHICLE_MISMATCH_PENALTY, WEAPON_MISMATCH_PENALTY_MAX, LOW_CHANCE_CONFIRM_THRESHOLD,
 )
 
 LISBON_SPOTS = [
@@ -193,37 +196,37 @@ def random_employee_name():
 VEHICLE_MODELS = {
     "usado": {"name": "Sedan Usado", "min_level": 1, "price": 6000, "speed": 9,
               "fuel_type": "gasolina", "tank_l": 45, "cons": 8.0, "seats": 4,
-              "best_for": ["logistica", "influencia"], "luxury": False},
+              "discretion": 75, "best_for": ["logistica", "influencia"], "luxury": False},
     "moto": {"name": "Moto Rápida", "min_level": 1, "price": 12000, "speed": 15,
              "fuel_type": "gasolina", "tank_l": 15, "cons": 4.5, "seats": 2,
-             "best_for": ["assalto", "tecnica"], "luxury": False},
+             "discretion": 70, "best_for": ["assalto", "tecnica"], "luxury": False},
     "van": {"name": "Van Reforçada", "min_level": 2, "price": 18000, "speed": 12,
             "fuel_type": "gasoleo", "tank_l": 70, "cons": 10.0, "seats": 6,
-            "best_for": ["logistica"], "luxury": False},
+            "discretion": 80, "best_for": ["logistica"], "luxury": False},
     "desportivo": {"name": "Desportivo", "min_level": 3, "price": 30000, "speed": 19,
                    "fuel_type": "gasolina", "tank_l": 55, "cons": 12.0, "seats": 2,
-                   "best_for": ["especial"], "luxury": True},
+                   "discretion": 15, "best_for": ["especial"], "luxury": True},
     "suv_blindado": {"name": "SUV Blindado", "min_level": 4, "price": 45000, "speed": 14,
                      "fuel_type": "gasoleo", "tank_l": 80, "cons": 13.0, "seats": 5,
-                     "best_for": ["assalto"], "luxury": False},
+                     "discretion": 35, "best_for": ["assalto"], "luxury": False},
     "supercarro": {"name": "Supercarro", "min_level": 5, "price": 65000, "speed": 26,
                    "fuel_type": "gasolina", "tank_l": 60, "cons": 15.0, "seats": 2,
-                   "best_for": ["especial"], "luxury": True},
+                   "discretion": 8, "best_for": ["especial"], "luxury": True},
     "carrinha_entrega": {"name": "Carrinha de Entregas", "min_level": 1, "price": 9000, "speed": 10,
                          "fuel_type": "gasolina", "tank_l": 50, "cons": 7.5, "seats": 3,
-                         "best_for": ["logistica"], "luxury": False},
+                         "discretion": 85, "best_for": ["logistica"], "luxury": False},
     "berlina_blindada": {"name": "Berlina Blindada", "min_level": 2, "price": 22000, "speed": 13,
                          "fuel_type": "gasoleo", "tank_l": 65, "cons": 11.0, "seats": 4,
-                         "best_for": ["influencia"], "luxury": False},
+                         "discretion": 45, "best_for": ["influencia"], "luxury": False},
     "buggy_todo_terreno": {"name": "Buggy Todo-o-Terreno", "min_level": 2, "price": 20000, "speed": 16,
                           "fuel_type": "gasolina", "tank_l": 40, "cons": 9.0, "seats": 2,
-                          "best_for": ["assalto"], "luxury": False},
+                          "discretion": 25, "best_for": ["assalto"], "luxury": False},
     "limousine": {"name": "Limousine", "min_level": 4, "price": 50000, "speed": 11,
                  "fuel_type": "gasolina", "tank_l": 70, "cons": 14.0, "seats": 6,
-                 "best_for": ["influencia", "especial"], "luxury": True},
+                 "discretion": 5, "best_for": ["influencia", "especial"], "luxury": True},
     "carro_furtivo": {"name": "Carro Furtivo", "min_level": 5, "price": 55000, "speed": 20,
                      "fuel_type": "gasolina", "tank_l": 50, "cons": 10.0, "seats": 2,
-                     "best_for": ["tecnica", "especial"], "luxury": False},
+                     "discretion": 95, "best_for": ["tecnica", "especial"], "luxury": False},
 }
 
 
@@ -240,42 +243,42 @@ WEAPON_MODELS = {
         "name": "Faca/Taser", "category": "silenciosa", "min_level": 1, "price": 1200,
         "power": 15, "accuracy": 65, "range": 3, "weight": 5, "use_speed": 95,
         "durability": 90, "reliability": 95, "magazine_capacity": 1, "maintenance_cost": 50,
-        "best_for": ["tecnica", "influencia"], "requires_attr": {}, "loud": False,
+        "discretion": 95, "best_for": ["tecnica", "influencia"], "requires_attr": {}, "loud": False,
         "desc": "Sem munições, silenciosa — ideal para operações discretas, mas quase sem poder de fogo.",
     },
     "pistola": {
         "name": "Pistola", "category": "equilibrada", "min_level": 1, "price": 2800,
         "power": 40, "accuracy": 60, "range": 25, "weight": 20, "use_speed": 75,
         "durability": 70, "reliability": 85, "magazine_capacity": 15, "maintenance_cost": 180,
-        "best_for": ["assalto", "tecnica", "influencia"], "requires_attr": {}, "loud": True,
+        "discretion": 45, "best_for": ["assalto", "tecnica", "influencia"], "requires_attr": {}, "loud": True,
         "desc": "Equilibrada e sem requisitos — funciona em qualquer categoria, sem se destacar em nenhuma.",
     },
     "espingarda": {
         "name": "Espingarda", "category": "assalto", "min_level": 2, "price": 5000,
         "power": 85, "accuracy": 45, "range": 12, "weight": 55, "use_speed": 55,
         "durability": 65, "reliability": 80, "magazine_capacity": 6, "maintenance_cost": 280,
-        "best_for": ["assalto"], "requires_attr": {"forca": 4}, "loud": True,
+        "discretion": 20, "best_for": ["assalto"], "requires_attr": {"forca": 4}, "loud": True,
         "desc": "Potência elevada a curta distância — péssima em operações discretas ou de longo alcance.",
     },
     "submetralhadora": {
         "name": "Submetralhadora", "category": "assalto", "min_level": 3, "price": 10000,
         "power": 60, "accuracy": 50, "range": 30, "weight": 45, "use_speed": 90,
         "durability": 60, "reliability": 75, "magazine_capacity": 30, "maintenance_cost": 450,
-        "best_for": ["assalto", "especial"], "requires_attr": {"forca": 3, "tiro": 4}, "loud": True,
+        "discretion": 25, "best_for": ["assalto", "especial"], "requires_attr": {"forca": 3, "tiro": 4}, "loud": True,
         "desc": "Cadência e carregador elevados — precisão baixa, exige manutenção frequente.",
     },
     "rifle_assalto": {
         "name": "Rifle de Assalto", "category": "assalto_especial", "min_level": 4, "price": 18000,
         "power": 75, "accuracy": 70, "range": 55, "weight": 60, "use_speed": 70,
         "durability": 75, "reliability": 85, "magazine_capacity": 25, "maintenance_cost": 650,
-        "best_for": ["assalto", "especial"], "requires_attr": {"tiro": 5, "forca": 4}, "loud": True,
+        "discretion": 30, "best_for": ["assalto", "especial"], "requires_attr": {"tiro": 5, "forca": 4}, "loud": True,
         "desc": "Alta gama equilibrada — sem fraquezas graves, mas cara e exigente.",
     },
     "rifle_precisao": {
         "name": "Rifle de Precisão", "category": "tecnica_especial", "min_level": 5, "price": 32000,
         "power": 90, "accuracy": 95, "range": 95, "weight": 70, "use_speed": 25,
         "durability": 80, "reliability": 80, "magazine_capacity": 5, "maintenance_cost": 900,
-        "best_for": ["tecnica", "especial"], "requires_attr": {"tiro": 7, "inteligencia": 4}, "loud": False,
+        "discretion": 65, "best_for": ["tecnica", "especial"], "requires_attr": {"tiro": 7, "inteligencia": 4}, "loud": False,
         "desc": "Precisão e alcance máximos, carregador e velocidade mínimos — investimento para 1-2 especialistas, não para toda a equipa.",
     },
 }
@@ -299,6 +302,41 @@ WEAPON_CATEGORY_WEIGHTS = {
     "influencia": {"power": 0.0, "accuracy": 0.40, "range": 0.0, "lightness": 0.35, "speed": 0.25, "magazine": 0.0},
     "logistica": {"power": 0.20, "accuracy": 0.20, "range": 0.0, "lightness": 0.20, "speed": 0.20, "magazine": 0.20},
 }
+
+# Peso de velocidade/capacidade(lugares vs. equipa)/discrição no score de
+# adequação do veículo à missão, por categoria — mirror exacto de
+# WEAPON_CATEGORY_WEIGHTS, mesma lógica: nenhum veículo é "sempre melhor",
+# só mais adequado a certas operações.
+VEHICLE_CATEGORY_WEIGHTS = {
+    "assalto": {"speed": 0.45, "seats_fit": 0.25, "discretion": 0.30},
+    "tecnica": {"speed": 0.20, "seats_fit": 0.20, "discretion": 0.60},
+    "especial": {"speed": 0.40, "seats_fit": 0.20, "discretion": 0.40},
+    "influencia": {"speed": 0.15, "seats_fit": 0.35, "discretion": 0.50},
+    "logistica": {"speed": 0.15, "seats_fit": 0.55, "discretion": 0.30},
+}
+
+# Peso de cada dimensão (equipa/veículo/armamento/ambiente) na probabilidade
+# de sucesso, por categoria de missão — soma 1.0 por categoria. É esta
+# ponderação exterior que faz cada missão valorizar factores diferentes
+# ("mais cara"/"melhor" nunca é universal); a ponderação interna de cada
+# dimensão (CATEGORY_ATTRS, WEAPON_CATEGORY_WEIGHTS, VEHICLE_CATEGORY_WEIGHTS)
+# já faz a maior parte do trabalho de "esta categoria valoriza X" — este peso
+# exterior é deliberadamente mais estreito (ver DIMENSION_SWING_CAP) para não
+# duplicar esse sinal.
+MISSION_FACTOR_WEIGHTS = {
+    "assalto":    {"team": 0.30, "vehicle": 0.20, "weapon": 0.30, "environment": 0.20},
+    "logistica":  {"team": 0.30, "vehicle": 0.40, "weapon": 0.10, "environment": 0.20},
+    "tecnica":    {"team": 0.30, "vehicle": 0.15, "weapon": 0.15, "environment": 0.40},
+    "influencia": {"team": 0.45, "vehicle": 0.20, "weapon": 0.05, "environment": 0.30},
+    "especial":   {"team": 0.25, "vehicle": 0.25, "weapon": 0.25, "environment": 0.25},
+}
+
+# Oscilação máxima (em pontos percentuais, antes do peso de categoria) que
+# cada dimensão pode contribuir para a chance final — aplicado ANTES de
+# MISSION_FACTOR_WEIGHTS, para que o peso exterior por categoria expresse
+# sobretudo "equipa importa mais que equipamento aqui", sem re-derivar o
+# mesmo sinal que a ponderação interna de cada dimensão já capturou.
+DIMENSION_SWING_CAP = {"team": 0.28, "vehicle": 0.15, "weapon": 0.15, "environment": 0.12}
 
 # TEAM_MAX_MEMBERS is imported from economy_constants.py
 

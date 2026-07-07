@@ -11,13 +11,13 @@ from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
-                    team_effectiveness, team_bonus_breakdown, vehicle_bonus_breakdown,
+                    team_effectiveness,
                     age_decay_mult, member_split_mult, property_active, property_condition_factor,
-                    local_presence_reduction_s, situational_bonus_for, max_teams_for,
+                    local_presence_reduction_s, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
                     record_tx, property_stack_ranks, property_stack_mult,
                     dirty_money_cap, grant_quest_rewards,
-                    weapon_bonus_breakdown, weapon_combat_score, weapon_compatibility_factor,
+                    weapon_combat_score,
                     _unlink_employee_weapon)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
@@ -37,7 +37,8 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
                        ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
-                       HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER)
+                       HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER,
+                       LOW_CHANCE_CONFIRM_THRESHOLD)
 from reward_engine import calculate_full_reward
 from intelligent_analysis import (analyze_properties_intelligence, analyze_fleet_intelligence,
                                   analyze_hr_intelligence, analyze_teams_intelligence,
@@ -220,6 +221,7 @@ async def catalog():
         "hq_departments": HQ_DEPARTMENTS,
         "weapon_models": WEAPON_MODELS,
         "weapon_categories": WEAPON_CATEGORIES,
+        "low_chance_confirm_threshold": LOW_CHANCE_CONFIRM_THRESHOLD,
     }
 
 
@@ -360,7 +362,6 @@ async def _prepare_dispatch(player, opp, team):
     member_talents = sorted({t for e in members for t in e.get("talents", [])})
     if "motorista_fantasma" in member_talents:
         travel_s *= 0.9
-    talent_bonus = 0.05 if ("pontaria_letal" in member_talents and opp["category"] == "assalto") else 0.0
 
     mult = 1.0
     prop_ranks = property_stack_ranks(props)
@@ -383,13 +384,14 @@ async def _prepare_dispatch(player, opp, team):
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
-    team_bonus = team_bonus_breakdown(members, opp["category"], team.get("roster_stable_since"), now)
-    vehicle_bonus = vehicle_bonus_breakdown(vehicle, opp["category"])
-    situational_bonus = situational_bonus_for(opp["category"], now)
-    weapon_bonus = weapon_bonus_breakdown(members, weapons_by_employee_id, opp["category"])
-    chance, breakdown = chance_breakdown(player["heat"], opp["risk"], team_skill, spec_match,
-                                          talent_bonus, team_bonus, vehicle_bonus, situational_bonus,
-                                          weapon_bonus=weapon_bonus)
+    chance_ctx = {
+        "heat": player["heat"], "risk": opp["risk"], "dist_km": opp.get("dist_km", 0.0),
+        "category": opp["category"], "members": members, "min_members": opp.get("min_members", 1),
+        "vehicle": vehicle, "weapons_by_employee_id": weapons_by_employee_id,
+        "roster_stable_since": team.get("roster_stable_since"), "hq_level": player["hq"]["level"],
+        "now": now,
+    }
+    chance, breakdown = chance_breakdown(chance_ctx)
     weapon_loud = any(
         WEAPON_MODELS.get(w.get("model_key"), {}).get("loud", False)
         for w in weapons_by_employee_id.values()

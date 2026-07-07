@@ -621,6 +621,16 @@ WEAPON_BONUS_MIN = -0.05                  # limite inferior do bónus total de a
 WEAPON_BONUS_MAX = 0.12                   # limite superior do bónus total de armamento
 WEAPON_COMPATIBILITY_MIN_FACTOR = 0.4     # factor mínimo quando os requisitos de atributo não são cumpridos
 
+# ---------------- Reformulação do cálculo de chance (sistema modular) ----------------
+LOYALTY_BONUS_MAX = 0.04                  # bónus máx. quando a lealdade média está bem acima do padrão (70)
+LOYALTY_PENALTY_MAX = 0.06                # penalização máx. quando a lealdade média está muito abaixo do padrão
+HQ_CHANCE_BONUS_PER_LEVEL = 0.006         # bónus fixo por nível de QG, agnóstico de categoria ("organização evoluída")
+INCOMPLETE_CREW_PENALTY_PER_MISSING = 0.05   # penalização por cada membro em falta face ao min_members da missão
+INCOMPLETE_CREW_PENALTY_MAX = 0.20
+VEHICLE_MISMATCH_PENALTY = 0.04           # penalização quando o veículo tem best_for definido e a categoria não está lá
+WEAPON_MISMATCH_PENALTY_MAX = 0.04        # penalização máx. quando a arma equipada é claramente inadequada à categoria
+LOW_CHANCE_CONFIRM_THRESHOLD = 0.15       # abaixo disto, o frontend pede confirmação extra antes de despachar
+
 # ============================================================================
 # TRAVEL & LOGISTICS
 # ============================================================================
