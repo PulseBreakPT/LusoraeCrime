@@ -975,6 +975,50 @@
     pointer-events: none;
 }
 
+/* ============================================================
+   Polish global SSS — seleção, scrollbars, tipografia, superfícies
+   ============================================================ */
+
+/* Seleção de texto na cor da marca */
+::selection {
+    background: rgba(220, 38, 38, 0.45);
+    color: #fff;
+}
+
+/* Scrollbars finas e discretas em toda a app */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+/* Números alinhados em colunas (dados táticos) */
+.font-mono,
+code,
+kbd {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Dropdowns/popovers do radix por cima do mapa com sombra profunda */
+[data-radix-popper-content-wrapper] {
+    z-index: 60 !important;
+}
+
 /* ---------- Acessibilidade: reduzir movimento ---------- */
 @media (prefers-reduced-motion: reduce) {
     .lus-kenburns,

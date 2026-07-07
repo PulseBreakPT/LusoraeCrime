@@ -340,3 +340,14 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Frontend-only. .env recriados pós-fork (preview URL 7f415bc7...). Verificado por screenshots: auth CTA hover (orla metálica+lift), dock (indicador ativo+icon glow), tabs RH (gradiente+ring), CTA Destacar Equipa esmeralda correto em rest+hover. Lint limpo (só warnings pré-existentes). prefers-reduced-motion desativa sheen/transições."
+  - task: "SSS tier ronda 6 (primitivos globais): Card (glass gradient+inner highlight+hover border), Badge (variantes gradiente/tints), Select (trigger glass c/ focus vermelho, content dark-glass blur c/ sombra profunda, item highlight vermelho+check red-400), Switch (checked gradiente+glow, track inset), Accordion (hover brighten, chevron vermelho aberto), Progress (track inset, indicador gradiente vermelho+glow); App.css polish global (::selection vermelho, scrollbars finas, tabular-nums no font-mono, z-index popper)"
+    implemented: true
+    working: true
+    file: "components/ui/card.jsx, badge.jsx, select.jsx, switch.jsx, accordion.jsx, progress.jsx, App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Verificado por screenshots (Equipas c/ dropdown aberto: dark-glass + item vermelho; Definições: switches/inputs). Lint limpo nos ficheiros tocados (calendar/command têm erros stock pré-existentes). Sem alterações de lógica/API."
