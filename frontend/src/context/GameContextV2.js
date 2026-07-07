@@ -7,6 +7,7 @@ import { formatApiErrorDetail, fmtMoney } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
 import { haptics } from "../lib/haptics";
 import { audio } from "../lib/audio";
+import { isOnLand } from "../lib/land";
 
 // Som temático por ação — o prefixo mais específico ganha. Ações fora desta
 // lista ficam em silêncio (o toast e o toque de interface já dão feedback).
@@ -48,6 +49,9 @@ export function GameProvider({ children }) {
 
   const [state, setState] = useState(initialGameState || null);
   const [stateError, setStateError] = useState(null);
+  // Modo de colocação manual de propriedades: null quando inativo. `point`
+  // fica null até o jogador tocar/clicar pela primeira vez no mapa.
+  const [placement, setPlacement] = useState(null);
 
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
@@ -451,10 +455,26 @@ export function GameProvider({ children }) {
     action("weapons/unassign", { employee_id: employeeId }, "Arma desatribuída");
   const autoAssignWeapon = (weaponId) =>
     action("weapons/auto_assign", { weapon_id: weaponId }, "Arma atribuída automaticamente");
-  const buyProperty = (typeKey) =>
-    action("properties/buy", { type_key: typeKey }, "Propriedade comprada");
+  const buyProperty = (typeKey, lat, lng) =>
+    action("properties/buy", { type_key: typeKey, lat, lng }, "Propriedade comprada");
   const sellProperty = (propertyId) =>
     action("properties/sell", { property_id: propertyId }, "Propriedade vendida");
+  const transferVehicle = (vehicleId, toPropertyId) =>
+    action("vehicles/transfer", { vehicle_id: vehicleId, to_property_id: toPropertyId }, "Veículo em trânsito");
+
+  // Modo de colocação manual — o dinheiro só é debitado em confirmPlacement,
+  // que é o único momento em que /properties/buy é chamado; cancelar nunca
+  // chega a fazer essa chamada, por isso não precisa de rollback.
+  const startPlacement = (typeKey) => setPlacement({ typeKey, point: null, valid: false });
+  const updatePlacementPoint = (lat, lng) =>
+    setPlacement((p) => (p ? { ...p, point: { lat, lng }, valid: isOnLand(lat, lng) } : p));
+  const cancelPlacement = () => setPlacement(null);
+  const confirmPlacement = async () => {
+    if (!placement?.point || !placement.valid) return { ok: false };
+    const r = await buyProperty(placement.typeKey, placement.point.lat, placement.point.lng);
+    if (r.ok) setPlacement(null);
+    return r;
+  };
   const upgradeProperty = (propertyId) =>
     action("properties/upgrade", { property_id: propertyId }, "Melhoria iniciada");
   const renameProperty = (propertyId, name) =>
@@ -517,6 +537,7 @@ export function GameProvider({ children }) {
         refuelVehicle,
         repairVehicle,
         assignVehicle,
+        transferVehicle,
         renameVehicle,
         buyWeapon,
         sellWeapon,
@@ -528,6 +549,11 @@ export function GameProvider({ children }) {
         sellProperty,
         upgradeProperty,
         renameProperty,
+        placement,
+        startPlacement,
+        updatePlacementPoint,
+        cancelPlacement,
+        confirmPlacement,
         upgradeHQ,
         setOrgPriority,
         bribePolice,

@@ -17,7 +17,7 @@ const useTick = (active) => {
 };
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, serverNow, buyProperty, sellProperty, upgradeProperty, renameProperty } = useGame();
+  const { state, catalog, serverNow, sellProperty, upgradeProperty, renameProperty, startPlacement } = useGame();
   useTick(open);
   if (!state) return null;
 
@@ -174,7 +174,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                 const nextStackPct = ownedOfType >= 2 ? 50 : 70;
                 const buyTip = locked
                   ? `Desbloqueia ao nível ${pt.min_level} da organização.`
-                  : `Comprar por ${fmtMoney(pt.price)} limpos. Benefício imediato: ${propertyBenefit(pt, 1)}.${
+                  : `${fmtMoney(pt.price)} limpos — escolhes a localização exacta no mapa antes de pagar. Benefício imediato: ${propertyBenefit(pt, 1)}.${
                       diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do bónus (rendimentos decrescentes).` : ""
                     }`;
                 return (
@@ -198,7 +198,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                           state.player.clean_money < pt.price ? "Dinheiro insuficiente." : null,
                         ].filter(Boolean)}
                         availableTip={buyTip}
-                        onConfirm={() => buyProperty(key)}
+                        onConfirm={() => { startPlacement(key); onOpenChange(false); }}
                         className="w-auto shrink-0"
                       />
                     </div>

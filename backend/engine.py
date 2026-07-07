@@ -51,7 +51,10 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        VEHICLE_CATEGORY_WEIGHTS, MISSION_FACTOR_WEIGHTS, DIMENSION_SWING_CAP,
                        LOYALTY_BONUS_MAX, LOYALTY_PENALTY_MAX, HQ_CHANCE_BONUS_PER_LEVEL,
                        INCOMPLETE_CREW_PENALTY_PER_MISSING, INCOMPLETE_CREW_PENALTY_MAX,
-                       VEHICLE_MISMATCH_PENALTY, WEAPON_MISMATCH_PENALTY_MAX)
+                       VEHICLE_MISMATCH_PENALTY, WEAPON_MISMATCH_PENALTY_MAX,
+                       VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
+                       VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S,
+                       PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT)
 from quests import process_quests, make_instance
 from quests_data import QUEST_DEFS
 
@@ -193,6 +196,7 @@ def vehicle_doc(pid, model_key, now_iso, team_id=None):
         "condition": 100.0, "speed": float(m["speed"]), "cons": float(m["cons"]),
         "price": m["price"], "min_level": m["min_level"],
         "team_id": team_id, "km_total": 0.0, "bought_at": now_iso,
+        "property_id": None, "transfer": None,
     }
 
 
@@ -242,6 +246,45 @@ async def get_caps(db, pid, hq_level=1):
     veh_cap = (BASE_VEHICLE_CAP + hq_tier["cap_vehicles"]
                + sum(PROPERTY_TYPES[p["type_key"]].get("cap_vehicles", 0) * p["level"] for p in props))
     return {"employees": emp_cap, "vehicles": veh_cap}, props
+
+
+async def get_property_vehicle_usage(db, pid, hq_level=1):
+    """Capacidade de veículos por base (propriedade ou QG), independente do
+    limite global de get_caps (que continua a ser o tecto aplicado na
+    compra). Devolve {'hq'|property_id: {'used','max','type_key'}} — o
+    somatório de todos os 'max' aqui é sempre igual ao veh_cap global de
+    get_caps para o mesmo jogador."""
+    props = await db.properties.find({"player_id": pid}).to_list(200)
+    vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
+    hq_tier = HQ_LEVEL_BENEFITS[min(hq_level, HQ_MAX_LEVEL) - 1]
+    usage = {"hq": {"used": 0, "max": BASE_VEHICLE_CAP + hq_tier["cap_vehicles"], "type_key": "hq"}}
+    for p in props:
+        usage[str(p["_id"])] = {
+            "used": 0,
+            "max": PROPERTY_TYPES[p["type_key"]].get("cap_vehicles", 0) * p["level"],
+            "type_key": p["type_key"],
+        }
+    for v in vehicles:
+        key = v.get("property_id") or "hq"
+        if key not in usage:
+            key = "hq"
+        usage[key]["used"] += 1
+    return usage
+
+
+async def resolve_mission_origin(db, player, vehicle):
+    """Ponto de partida actual do veículo (e por isso da sua equipa) — usado
+    tanto para o cálculo de ETA/distância como para o snapshot Mission.origin.
+    Cai para o QG quando o veículo não tem propriedade atribuída (property_id
+    None), cobrindo da mesma forma 'nunca atribuído' e veículos antigos
+    anteriores a esta funcionalidade."""
+    prop_id = vehicle.get("property_id")
+    if prop_id:
+        prop = await db.properties.find_one({"_id": ObjectId(prop_id), "player_id": str(player["_id"])})
+        if prop:
+            return {"lat": prop["lat"], "lng": prop["lng"], "property_id": prop_id}
+    hq = player["hq"]
+    return {"lat": hq["lat"], "lng": hq["lng"], "property_id": None}
 
 
 async def add_event(db, player_id, kind, message):
@@ -355,6 +398,39 @@ def _sample_on_land(spot):
     return spot["lat"], spot["lng"]
 
 
+def nearest_district(lat, lng):
+    """Rótulo de distrito mais próximo (só para exibição) para um ponto
+    escolhido manualmente pelo jogador — não é uma chave estrangeira."""
+    return min(LISBON_SPOTS, key=lambda s: haversine_m(lat, lng, s["lat"], s["lng"]))["name"]
+
+
+def _sample_around_property(center_lat, center_lng, radius_km):
+    """Amostragem uniforme num disco de raio configurável à volta de uma
+    propriedade — distinta de _sample_on_land (caixa fixa em torno de um
+    spot de Lisboa), já que aqui o raio é uma variável de jogo."""
+    for _ in range(10):
+        r = radius_km * math.sqrt(random.random())
+        theta = random.uniform(0, 2 * math.pi)
+        dlat = (r / 111.0) * math.cos(theta)
+        dlng = (r / (111.0 * math.cos(math.radians(center_lat)))) * math.sin(theta)
+        lat, lng = center_lat + dlat, center_lng + dlng
+        if is_on_land(lat, lng):
+            return lat, lng
+    return center_lat, center_lng
+
+
+def _property_spawn_weight(prop, all_props):
+    """Peso de spawn de uma propriedade como centro de missões — dividido
+    pela densidade de propriedades vizinhas, para que bases agrupadas não
+    empilhem peso e bases isoladas mantenham cobertura total."""
+    nearby = sum(
+        1 for other in all_props
+        if other["_id"] != prop["_id"]
+        and haversine_m(prop["lat"], prop["lng"], other["lat"], other["lng"]) / 1000 <= PROPERTY_INFLUENCE_RADIUS_KM
+    )
+    return PROPERTY_SPOT_WEIGHT / (1 + nearby)
+
+
 # ---------------- Oportunidades ----------------
 
 def distance_risk_bump(dist_km):
@@ -445,7 +521,7 @@ def apply_dirty_money_heat(player, hours):
     player["heat"] = min(100.0, player["heat"] + extra_heat)
 
 
-async def spawn_opportunities(db, player, rare_chance=0.0):
+async def spawn_opportunities(db, player, props, rare_chance=0.0):
     now = now_utc()
     pid = str(player["_id"])
     active = await db.opportunities.count_documents({
@@ -463,17 +539,33 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
         return
     weights = [OPPORTUNITY_TYPES[k]["weight"] for k in keys]
     hq = player["hq"]
+    # Centros candidatos: os 16 spots fixos de Lisboa (peso base) mais um
+    # centro sintético por propriedade possuída (peso maior, atenuado por
+    # densidade local) — sem propriedades, a distribuição é idêntica à de
+    # sempre; à medida que o jogador expande, a densidade desloca-se para
+    # as suas bases.
+    centers = [(spot, LISBON_SPOT_WEIGHT, None) for spot in LISBON_SPOTS]
+    for p in props:
+        centers.append(({"name": p["name"], "lat": p["lat"], "lng": p["lng"]},
+                         _property_spawn_weight(p, props), str(p["_id"])))
+    center_weights = [w for _, w, _ in centers]
     docs = []
     for _ in range(max(0, target - active)):
         key = random.choices(keys, weights=weights)[0]
         t = OPPORTUNITY_TYPES[key]
-        spot = random.choice(LISBON_SPOTS)
+        spot, _, origin_prop_id = random.choices(centers, weights=center_weights)[0]
         duration_s = random.randint(*t["duration_s"])
         mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s)
         rare = random.random() < rare_chance
         if rare:
             mult *= 2.0
-        lat, lng = _sample_on_land(spot)
+        if origin_prop_id:
+            lat, lng = _sample_around_property(spot["lat"], spot["lng"], PROPERTY_INFLUENCE_RADIUS_KM)
+        else:
+            lat, lng = _sample_on_land(spot)
+        # Risco/recompensa por distância continuam medidos a partir do QG —
+        # é uma fórmula de equilíbrio já afinada, distinta da distância de
+        # despacho (essa sim, resolvida por resolve_mission_origin).
         dist_km = haversine_m(hq["lat"], hq["lng"], lat, lng) / 1000
         risk = min(5, t["risk"] + distance_risk_bump(dist_km))
         mult *= distance_reward_mult(dist_km)
@@ -492,6 +584,7 @@ async def spawn_opportunities(db, player, rare_chance=0.0):
             "status": "active",
             "expires_at": (now + timedelta(seconds=random.randint(240, 600))).isoformat(),
             "created_at": now.isoformat(),
+            "generated_by_property_id": origin_prop_id,
         })
     if docs:
         await db.opportunities.insert_many(docs)
@@ -1917,6 +2010,19 @@ async def _complete_refuels(db, player, vehicles, now):
         await add_event(db, str(player["_id"]), "vehicle", f"{v['name']} terminou de abastecer — depósito cheio.")
 
 
+async def _complete_vehicle_transfers(db, player, vehicles, props_by_id, now):
+    """Transferência entre bases não é instantânea — o veículo só passa a
+    pertencer à propriedade destino quando o tempo de trânsito termina."""
+    for v in vehicles:
+        tr = v.get("transfer")
+        if not tr or parse_dt(tr["ends_at"]) > now:
+            continue
+        new_pid = tr.get("to_property_id")
+        await db.vehicles.update_one({"_id": v["_id"]}, {"$set": {"property_id": new_pid, "transfer": None}})
+        dest_name = props_by_id[new_pid]["name"] if new_pid and new_pid in props_by_id else player["hq"]["name"]
+        await add_event(db, str(player["_id"]), "vehicle", f"{v['name']} chegou a {dest_name}.")
+
+
 async def _maybe_raid(db, player, props, minutes, now):
     if player["heat"] < 70 or player["dirty_money"] <= 0:
         return
@@ -2000,6 +2106,7 @@ async def advance(db, player):
 
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
     await _complete_refuels(db, player, vehicles, now)
+    await _complete_vehicle_transfers(db, player, vehicles, {str(p["_id"]): p for p in props}, now)
     await process_quests(db, player, {"employees": employees, "props": props,
                                       "vehicles": vehicles, "minutes": minutes})
     await process_automations(db, player, employees, vehicles, props, bonuses, now)
@@ -2025,5 +2132,5 @@ async def advance(db, player):
         "type_cooldowns": player.get("type_cooldowns", {}),
         "achievement_bonus_pct": player.get("achievement_bonus_pct", 0.0),
     }})
-    await spawn_opportunities(db, player, rare_chance=bonuses.get("rare_opp", 0.0))
+    await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player

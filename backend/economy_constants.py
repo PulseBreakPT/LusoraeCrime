@@ -642,6 +642,17 @@ LOCAL_PRESENCE_PREP_REDUCTION_MAX_S = 18
 HIDEOUT_PREP_REDUCTION_PER_LEVEL = 0.25
 LAUNDER_PROPERTY_BONUS_PER_LEVEL = 0.03
 
+# Transferência de veículos entre propriedades (bases operacionais)
+VEHICLE_TRANSFER_COST_PER_KM = 25
+VEHICLE_TRANSFER_COST_MIN = 200
+VEHICLE_TRANSFER_DURATION_BASE_S = 60
+VEHICLE_TRANSFER_DURATION_PER_KM_S = 25
+
+# Geração de missões por área de influência das propriedades
+PROPERTY_INFLUENCE_RADIUS_KM = 2.5
+PROPERTY_SPOT_WEIGHT = 3.0
+LISBON_SPOT_WEIGHT = 1.0
+
 # ============================================================================
 # MISCELLANEOUS
 # ============================================================================

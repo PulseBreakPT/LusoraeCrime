@@ -3,12 +3,13 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star } from "lucide-react";
+import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 
 const PROP_ICONS = {
   esconderijo: Shield,
@@ -80,6 +81,39 @@ const propIcon = (typeKey) => {
   return makeDivIcon(html, 28);
 };
 
+const placementIcon = (valid) => {
+  const color = valid ? "#34D399" : "#EF4444";
+  const html = `
+    <div class="prop-pin placement-pin" style="--mk:${color};border-color:${color}">
+      ${renderToStaticMarkup(<Warehouse size={13} strokeWidth={2.5} />)}
+    </div>`;
+  return makeDivIcon(html, 30, "placement-pin-wrap");
+};
+
+// Modo de colocação de propriedades: cada clique/toque no mapa (ou arrasto
+// do marcador) reposiciona o pin de pré-visualização — não é preciso um
+// "primeiro clique" especial, mover é só voltar a clicar/arrastar.
+const PlacementPreview = ({ placement, onPick }) => {
+  useMapEvents({
+    click: (e) => onPick(e.latlng.lat, e.latlng.lng),
+  });
+  if (!placement.point) return null;
+  return (
+    <Marker
+      position={[placement.point.lat, placement.point.lng]}
+      icon={placementIcon(placement.valid)}
+      draggable={true}
+      eventHandlers={{
+        dragend: (e) => {
+          const p = e.target.getLatLng();
+          onPick(p.lat, p.lng);
+        },
+      }}
+      zIndexOffset={600}
+    />
+  );
+};
+
 const PanTo = ({ target }) => {
   const map = useMap();
   useEffect(() => {
@@ -104,7 +138,7 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   </div>
 );
 
-const MissionUnit = ({ mission, serverNow }) => {
+const MissionUnit = ({ mission, serverNow, dim = false }) => {
   const [route, setRoute] = useState(null);
   const cumRef = useRef(null);
   const glowRef = useRef(null);
@@ -223,7 +257,7 @@ const MissionUnit = ({ mission, serverNow }) => {
           />
         </>
       )}
-      <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={500}>
+      <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={500} opacity={dim ? 0.25 : 1}>
         <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
           <div className="min-w-[150px]">
             <p className="text-[11px] font-bold text-white">{mission.team_name}</p>
@@ -268,8 +302,8 @@ const MissionUnit = ({ mission, serverNow }) => {
   );
 };
 
-export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ }) {
-  const { catalog } = useGame();
+export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, baseFilter = "all" }) {
+  const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state.player.hq;
   const hqMarkerIcon = useMemo(() => hqIcon(), []);
   const level = state.player.level;
@@ -287,10 +321,12 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
       />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
+      {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
       <Marker
         position={[hq.lat, hq.lng]}
         icon={hqMarkerIcon}
         zIndexOffset={400}
+        opacity={baseFilter === "all" || baseFilter === "hq" ? 1 : 0.25}
         eventHandlers={{ click: () => onSelectHQ && onSelectHQ() }}
       >
         <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">
@@ -304,7 +340,13 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       {state.properties.map((p) => {
         const pt = catalog?.property_types?.[p.type_key];
         return (
-          <Marker key={p.id} position={[p.lat, p.lng]} icon={propIcon(p.type_key)} zIndexOffset={300}>
+          <Marker
+            key={p.id}
+            position={[p.lat, p.lng]}
+            icon={propIcon(p.type_key)}
+            zIndexOffset={300}
+            opacity={baseFilter === "all" || baseFilter === p.id ? 1 : 0.25}
+          >
             <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
               <div className="min-w-[140px]">
                 <p className="text-[11px] font-bold text-white">{p.name}</p>
@@ -376,7 +418,12 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
         );
       })}
       {state.missions.map((m) => (
-        <MissionUnit key={m.id} mission={m} serverNow={serverNow} />
+        <MissionUnit
+          key={m.id}
+          mission={m}
+          serverNow={serverNow}
+          dim={baseFilter !== "all" && (m.origin_property_id || "hq") !== baseFilter}
+        />
       ))}
       <PanTo target={state.opportunities.find((o) => o.id === selectedOppId)} />
     </MapContainer>
@@ -456,6 +503,67 @@ export const MapLegend = () => {
       >
         {open ? <X size={15} /> : <MapIcon size={15} />}
       </Button>
+    </div>
+  );
+};
+
+// Par de botões flutuante para o modo de colocação de propriedades — mesmo
+// visual de MapLegend. Mostra uma dica antes de haver ponto escolhido e
+// desativa Confirmar até o ponto estar num local válido.
+export const PlacementControls = () => {
+  const { placement, confirmPlacement, cancelPlacement } = useGame();
+  if (!placement) return null;
+  return (
+    <div
+      className="pointer-events-auto absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-2"
+      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+    >
+      {!placement.point && (
+        <span className="rounded-full border border-white/10 bg-black/80 px-3 py-1.5 font-mono text-[10px] text-zinc-300 shadow-2xl backdrop-blur-xl">
+          Toca no mapa para escolher a localização
+        </span>
+      )}
+      <Button
+        data-testid="placement-confirm"
+        onClick={confirmPlacement}
+        disabled={!placement.point || !placement.valid}
+        className="gap-1.5 rounded-full bg-emerald-600 text-white shadow-2xl hover:bg-emerald-500 disabled:opacity-40"
+      >
+        <Check size={15} /> Confirmar
+      </Button>
+      <Button
+        data-testid="placement-cancel"
+        variant="outline"
+        onClick={cancelPlacement}
+        className="gap-1.5 rounded-full border-white/10 bg-black/80 text-zinc-300 shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white"
+      >
+        <X size={15} /> Cancelar
+      </Button>
+    </div>
+  );
+};
+
+// Filtro do mapa por base — segmentado (Tabs), idioma já usado em
+// QuestsPanel.jsx para filtros (por oposição a <Select>, que neste código é
+// o idioma de atribuição). Esbate (não esconde) propriedades e missões que
+// não pertencem à base selecionada.
+export const MapBaseFilter = ({ value, onChange }) => {
+  const { state } = useGame();
+  if (!state?.properties?.length) return null;
+  return (
+    <div
+      className="pointer-events-auto absolute left-2 z-30 max-w-[calc(100vw-1rem)] overflow-x-auto"
+      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+    >
+      <Tabs value={value} onValueChange={onChange}>
+        <TabsList className="bg-black/80 backdrop-blur-xl">
+          <TabsTrigger value="all">Todos</TabsTrigger>
+          <TabsTrigger value="hq">QG</TabsTrigger>
+          {state.properties.map((p) => (
+            <TabsTrigger key={p.id} value={p.id}>{p.name}</TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   );
 };

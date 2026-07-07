@@ -176,6 +176,19 @@
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
 }
 
+/* ---------- Placement preview pin (colocação manual de propriedades) ---------- */
+.placement-pin {
+    color: var(--mk, #34d399);
+    border-width: 2px;
+    border-style: dashed;
+    box-shadow: 0 0 16px var(--mk, #34d399);
+    cursor: grab;
+}
+
+.placement-pin:active {
+    cursor: grabbing;
+}
+
 /* ---------- Unit pin (moving teams) ---------- */
 .unit-pin {
     display: flex;

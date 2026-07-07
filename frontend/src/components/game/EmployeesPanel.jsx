@@ -501,7 +501,7 @@ const CandidateCard = ({ c }) => {
 };
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, refreshPool, buyProperty, restEmployee, favoriteEmployeeIds } = useGame();
+  const { state, catalog, serverNow, refreshPool, startPlacement, restEmployee, favoriteEmployeeIds } = useGame();
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
@@ -622,7 +622,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
               <Button
                 data-testid="hr-buy-hideout-inline"
                 variant="outline" size="sm"
-                onClick={() => buyProperty("esconderijo")}
+                onClick={() => { startPlacement("esconderijo"); onOpenChange(false); }}
                 className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
               >
                 <Warehouse size={10} /> Comprar esconderijo · {fmtMoney(hideout.price)}

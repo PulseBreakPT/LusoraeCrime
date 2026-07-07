@@ -776,7 +776,7 @@ class TestProperties:
         s, _ = register_new()
         base_cap = get_state(s)["caps"]["employees"]["max"]
         r = s.post(f"{BASE_URL}/api/game/properties/buy",
-                   json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+                   json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
         new_cap = get_state(s)["caps"]["employees"]["max"]
         assert new_cap == base_cap + 4
@@ -784,7 +784,7 @@ class TestProperties:
     def test_garagem_cap_and_sell_guard(self):
         s, _ = register_new()
         r = s.post(f"{BASE_URL}/api/game/properties/buy",
-                   json={"type_key": "garagem"}, timeout=TIMEOUT)
+                   json={"type_key": "garagem", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         assert r.status_code == 200
         st = get_state(s)
         assert st["caps"]["vehicles"]["max"] == 4
@@ -807,7 +807,7 @@ class TestProperties:
 
     def test_rename_property(self):
         s, _ = register_new()
-        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s)["properties"][0]
         r = s.post(f"{BASE_URL}/api/game/properties/rename",
                    json={"property_id": prop["id"], "name": "QG Secreto"}, timeout=TIMEOUT)
@@ -819,7 +819,7 @@ class TestProperties:
     def test_rename_property_rejects_other_players_property(self):
         s1, _ = register_new()
         s2, _ = register_new()
-        s1.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s1.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s1)["properties"][0]
         r = s2.post(f"{BASE_URL}/api/game/properties/rename",
                     json={"property_id": prop["id"], "name": "Impostor"}, timeout=TIMEOUT)
@@ -830,14 +830,14 @@ class TestProperties:
 class TestPropertyMechanics:
     def test_property_exposes_condition_and_upgrade_fields(self):
         s, _ = register_new()
-        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s)["properties"][0]
         assert prop["condition"] == 100.0
         assert prop["upgrading_until"] is None
 
     def test_upgrade_is_timed_not_instant(self):
         s, _ = register_new()
-        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s)["properties"][0]
         r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
                    json={"property_id": prop["id"]}, timeout=TIMEOUT)
@@ -850,7 +850,7 @@ class TestPropertyMechanics:
 
     def test_cannot_upgrade_twice_while_upgrading(self):
         s, _ = register_new()
-        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s)["properties"][0]
         r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
                    json={"property_id": prop["id"]}, timeout=TIMEOUT)
@@ -861,7 +861,7 @@ class TestPropertyMechanics:
 
     def test_cannot_sell_while_upgrading(self):
         s, _ = register_new()
-        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s)["properties"][0]
         r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
                    json={"property_id": prop["id"]}, timeout=TIMEOUT)
@@ -874,7 +874,7 @@ class TestPropertyMechanics:
     @pytest.mark.slow
     def test_upgrade_completes_and_raises_level(self):
         s, _ = register_new()
-        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo"}, timeout=TIMEOUT)
+        s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "esconderijo", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         prop = get_state(s)["properties"][0]
         r = s.post(f"{BASE_URL}/api/game/properties/upgrade",
                    json={"property_id": prop["id"]}, timeout=TIMEOUT)
@@ -1257,14 +1257,14 @@ class TestPropertyStackingDiminish:
             return prev.json()["reward_bonus_pct"]
 
         base = reward_bonus_pct()
-        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "armazem"}, timeout=TIMEOUT)
+        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "armazem", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
         after_first = reward_bonus_pct()
         first_gain = after_first - base
         assert first_gain > 0
         if s.get(f"{BASE_URL}/api/game/state", timeout=TIMEOUT).json()["player"]["clean_money"] < armazem["price"]:
             pytest.skip("dinheiro insuficiente para o 2º armazém depois do 1º")
-        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "armazem"}, timeout=TIMEOUT)
+        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "armazem", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         assert r.status_code == 200, r.text
         after_second = reward_bonus_pct()
         second_gain = after_second - after_first
@@ -1379,7 +1379,7 @@ class TestNewPropertyContent:
 
     def test_buy_new_property_type(self):
         s, _ = register_new()
-        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "posto_vigilancia"}, timeout=TIMEOUT)
+        r = s.post(f"{BASE_URL}/api/game/properties/buy", json={"type_key": "posto_vigilancia", "lat": 38.7118, "lng": -9.1366}, timeout=TIMEOUT)
         # posto_vigilancia exige nível 2 — uma conta nova (nível 1) é bloqueada.
         assert r.status_code == 400
         assert "nível" in r.json()["detail"].lower()

@@ -127,6 +127,8 @@ class Vehicle(BaseDocument):
     missions_since_repair: int = 0
     refueling_until: Optional[str] = None
     bought_at: str
+    property_id: Optional[str] = None
+    transfer: Optional[dict] = None
 
 
 class Weapon(BaseDocument):
@@ -188,6 +190,7 @@ class Opportunity(BaseDocument):
     status: str
     expires_at: str
     created_at: str
+    generated_by_property_id: Optional[str] = None
 
 
 class Mission(BaseDocument):
@@ -205,6 +208,7 @@ class Mission(BaseDocument):
     talents: List[str] = []
     opportunity: dict
     origin: dict
+    origin_property_id: Optional[str] = None
     target: dict
     phase: str
     outcome: Optional[str] = None

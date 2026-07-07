@@ -31,6 +31,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [showDetails, setShowDetails] = useState(false);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
+  // Nunca devolve vazio — QG é sempre o fallback quando a missão não tem propriedade de origem.
+  const baseNameOf = (propertyId) => {
+    if (!propertyId) return "Quartel-General";
+    return state?.properties?.find((p) => p.id === propertyId)?.name || "Quartel-General";
+  };
 
   useEffect(() => {
     const tick = () => {
@@ -157,7 +162,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       return { icon: Wrench, label: fmtMoney(cost), color: can ? "text-emerald-400" : "text-red-400", can, run: () => repairVehicle(vehicle.id) };
     }
     if (r.reason === "Sem veículo") {
-      const free = state.vehicles.filter((v) => !v.team_id);
+      const free = state.vehicles.filter((v) => !v.team_id && !v.transfer);
       if (free.length) return { icon: Car, label: free[0].name, color: "text-cyan-400", can: true, run: () => assignVehicle(free[0].id, t.id) };
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
     }
@@ -165,7 +170,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       // Sugere um veículo livre com lugares suficientes para os membros prontos.
       const ready = state.employees.filter((e) => e.team_id === t.id && e.status === "idle" && e.fatigue < 90).length;
       const fit = state.vehicles.find(
-        (v) => !v.team_id && v.condition >= 30 && (catalog?.vehicle_models?.[v.model_key]?.seats ?? 99) >= ready
+        (v) => !v.team_id && !v.transfer && v.condition >= 30 && (catalog?.vehicle_models?.[v.model_key]?.seats ?? 99) >= ready
       );
       if (fit) return { icon: Car, label: fit.name, color: "text-cyan-400", can: true, run: () => assignVehicle(fit.id, t.id) };
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
@@ -173,7 +178,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     if (r.reason === "Veículo não adequado") {
       // Esta operação exige modelos específicos — sugere um da garagem se houver.
       const fit = state.vehicles.find(
-        (v) => !v.team_id && v.condition >= 30 && opp.required_models?.includes(v.model_key)
+        (v) => !v.team_id && !v.transfer && v.condition >= 30 && opp.required_models?.includes(v.model_key)
       );
       if (fit) return { icon: Car, label: fit.name, color: "text-cyan-400", can: true, run: () => assignVehicle(fit.id, t.id) };
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
@@ -272,6 +277,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   : activeMission.phase === "operating"
                   ? "Em operação no alvo"
                   : "A regressar à base"}
+              </p>
+              <p className="mt-0.5 font-mono text-[9px] text-zinc-500">
+                Partida: {baseNameOf(activeMission.origin_property_id)} · Regresso: {baseNameOf(activeMission.origin_property_id)}
               </p>
             </div>
             <div className="text-right">
