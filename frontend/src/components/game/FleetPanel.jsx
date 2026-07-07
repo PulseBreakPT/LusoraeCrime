@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
-import { Thumb, PanelBanner } from "./GameImage";
-import { vehicleImage } from "../../lib/images";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -73,7 +71,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
-        <PanelBanner panelKey="fleet" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Car size={18} className="text-primary" /> Frota
@@ -168,8 +165,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             }
             return (
               <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
-                <div className="flex items-center justify-between gap-2">
-                  <Thumb src={vehicleImage(v.model_key)} alt={modelName} icon={Car} iconColor="#fbbf24" className="h-11 w-16" />
+                <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <FavoriteStar testId={`vehicle-favorite-${v.id}`} active={favoriteVehicleIds.includes(v.id)} onToggle={() => toggleFavoriteVehicle(v.id)} />
@@ -354,9 +350,8 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               Object.entries(catalog.vehicle_models).map(([key, m]) => {
                 const locked = state.player.level < m.min_level;
                 return (
-                  <Card key={key} className="flex items-center gap-2 border-white/10 bg-white/[0.03] p-3 shadow-none">
-                    <Thumb src={vehicleImage(key)} alt={m.name} icon={Car} iconColor="#fbbf24" className="h-14 w-20 self-stretch" />
-                    <div className="min-w-0 flex-1">
+                  <Card key={key} className="flex items-center justify-between border-white/10 bg-white/[0.03] p-3 shadow-none">
+                    <div>
                       <p className="text-sm font-semibold text-white">
                         {m.name}
                         {locked && (

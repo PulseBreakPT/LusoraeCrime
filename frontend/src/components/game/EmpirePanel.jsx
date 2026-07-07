@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
 import { Tip, MiniBar } from "./hud";
-import { PanelBanner } from "./GameImage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -63,7 +62,6 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
-        <PanelBanner panelKey="empire" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Building2 size={18} className="text-primary" /> {p.org_name}
