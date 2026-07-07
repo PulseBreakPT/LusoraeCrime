@@ -3,6 +3,8 @@ import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar } from "./hud";
+import { GameImage } from "./GameImage";
+import { employeeAvatar } from "../../lib/images";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -276,6 +278,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       <div className="flex flex-wrap items-center gap-1">
                         {members.map((m) => (
                           <span key={m.id} className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                            <GameImage src={employeeAvatar(m.id, m.spec)} alt="" className="h-4 w-4 shrink-0 rounded-full object-cover" fallback={null} />
                             {m.name.split(" ")[0]} <span style={{ color: fatigueColor(m.fatigue) }}>{Math.round(m.fatigue)}%</span>
                             {m.status === "idle" && m.fatigue >= 60 && (
                               <button

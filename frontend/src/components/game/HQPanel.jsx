@@ -5,6 +5,7 @@ import {
   CATEGORY_COLORS, SPEC_LABELS,
 } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar } from "./hud";
+import { PanelBanner } from "./GameImage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
@@ -155,6 +156,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm" data-testid="hq-panel">
+        <PanelBanner panelKey="hq" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Landmark size={18} className="text-primary" /> Quartel-General
