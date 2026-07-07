@@ -74,66 +74,82 @@ export function BootScreen() {
 
   return (
     <div className="lus-boot-bg fixed inset-0 z-50 flex items-center justify-center">
-      <div className="mx-4 w-full max-w-md space-y-8 animate-slide-up">
-        <div className="text-center">
-          <p className="font-mono text-[10px] uppercase tracking-[0.45em] text-primary/90">Lisboa · Rede Criminosa</p>
-          <h1 className="lus-title lus-boot-logo mt-1 font-display text-6xl font-bold uppercase leading-none tracking-tight">Lusorae</h1>
-          <p className="mt-3 font-mono text-xs text-zinc-400">{phaseLabels[currentPhase] || "A inicializar…"}</p>
-        </div>
-
-        <div>
-          <div className="flex items-baseline justify-between font-mono text-[10px] uppercase tracking-widest text-zinc-500">
-            <span>Ligação segura</span>
-            <span className="text-zinc-200">{progress}%</span>
+      <div className="lus-scanline" aria-hidden="true" />
+      <div className="lus-frame mx-4 w-full max-w-md animate-slide-up">
+        <span className="lus-corner-tr" aria-hidden="true" />
+        <span className="lus-corner-bl" aria-hidden="true" />
+        <div className="space-y-6">
+          <div className="lus-radar" aria-hidden="true">
+            <span className="lus-radar-dot" />
+            <span className="lus-radar-blip" />
           </div>
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full border border-white/10 bg-black/60">
-            <div className="lus-progress-fill h-full rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+
+          <div className="text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.45em] text-primary/90">Lisboa · Rede Criminosa</p>
+            <h1 className="lus-title lus-boot-logo mt-1 font-display text-6xl font-bold uppercase leading-none tracking-tight">Lusorae</h1>
+            <p className="lus-cursor mt-3 font-mono text-xs text-zinc-400">{phaseLabels[currentPhase] || "A inicializar…"}</p>
           </div>
+
+          <div>
+            <div className="flex items-baseline justify-between font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+              <span>Ligação segura</span>
+              <span className="text-zinc-200">{progress}%</span>
+            </div>
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full border border-white/10 bg-black/60">
+              <div className="lus-progress-fill h-full rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+
+          <div className="space-y-1 font-mono text-[11px]">
+            {Object.entries({
+              VALIDATING: "Verificar credenciais",
+              LOADING_PROFILE: "Carregar dossiê",
+              LOADING_ORG: "Carregar organização",
+              LOADING_RESOURCES: "Carregar património",
+              LOADING_TEAMS: "Carregar equipas",
+              LOADING_MISSIONS: "Carregar operações",
+              PREPARING_UI: "Preparar posto de comando",
+            }).map(([key, label]) => {
+              const isActive = key === currentPhase;
+              const isComplete = progress >= 100;
+              return (
+                <div
+                  key={key}
+                  className={`flex items-center gap-2 rounded border px-2.5 py-1 transition-colors ${
+                    isActive
+                      ? "border-red-500/30 bg-red-500/10 text-red-200"
+                      : isComplete
+                      ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300/80"
+                      : "border-transparent text-zinc-600"
+                  }`}
+                >
+                  <span className={isActive ? "text-primary" : ""}>▸</span>
+                  <span className="uppercase tracking-wider">{label}</span>
+                  {isActive && <span className="ml-auto animate-pulse text-primary">●</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="lus-flavor text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+            <span>A subornar informadores nos bairros…</span>
+            <span>A escutar a frequência da polícia…</span>
+            <span>A contar notas no cofre do QG…</span>
+          </div>
+
+          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-zinc-700">{elapsedTime}s decorridos</p>
+
+          {showSkip && (
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="w-full text-xs"
+              size="sm"
+            >
+              Ligação lenta — recarregar
+            </Button>
+          )}
         </div>
-
-        <div className="space-y-1 font-mono text-[11px]">
-          {Object.entries({
-            VALIDATING: "Verificar credenciais",
-            LOADING_PROFILE: "Carregar dossiê",
-            LOADING_ORG: "Carregar organização",
-            LOADING_RESOURCES: "Carregar património",
-            LOADING_TEAMS: "Carregar equipas",
-            LOADING_MISSIONS: "Carregar operações",
-            PREPARING_UI: "Preparar posto de comando",
-          }).map(([key, label]) => {
-            const isActive = key === currentPhase;
-            const isComplete = progress >= 100;
-            return (
-              <div
-                key={key}
-                className={`flex items-center gap-2 rounded border px-2.5 py-1 transition-colors ${
-                  isActive
-                    ? "border-red-500/30 bg-red-500/10 text-red-200"
-                    : isComplete
-                    ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300/80"
-                    : "border-transparent text-zinc-600"
-                }`}
-              >
-                <span className={isActive ? "text-primary" : ""}>▸</span>
-                <span className="uppercase tracking-wider">{label}</span>
-                {isActive && <span className="ml-auto animate-pulse text-primary">●</span>}
-              </div>
-            );
-          })}
-        </div>
-
-        <p className="text-center font-mono text-[10px] uppercase tracking-widest text-zinc-600">{elapsedTime}s decorridos</p>
-
-        {showSkip && (
-          <Button
-            onClick={() => window.location.reload()}
-            variant="outline"
-            className="w-full text-xs"
-            size="sm"
-          >
-            Ligação lenta — recarregar
-          </Button>
-        )}
       </div>
     </div>
   );

@@ -318,3 +318,14 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshot em live (cartão aberto com equipa recomendada, preview 72% e CTA premium). Sem alterações de lógica. Lint limpo."
+  - task: "SSS tier ronda 4 (loading): radar tático animado (feixe conic + blip), moldura com 4 cantos HUD (lus-frame/lus-corner-*), scanline vertical no ecrã, reveal do logo (lus-logo-in), cursor terminal (lus-cursor), frases de ambiente rotativas CSS-only (lus-flavor) em BootScreen+LoadingScreen"
+    implemented: true
+    working: true
+    file: "components/BootScreen.jsx, components/LoadingScreen.jsx, App.css"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Capturado em live durante o boot real (radar, cantos, cursor, flavor text visíveis). Lógica de fases/erros preservada. Lint limpo. prefers-reduced-motion respeitado."

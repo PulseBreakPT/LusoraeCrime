@@ -667,6 +667,201 @@
     background: rgba(220, 38, 38, 0.55) !important;
 }
 
+/* ============================================================
+   Loading SSS — radar, moldura tática, scan e terminal
+   ============================================================ */
+
+/* Varrimento vertical de scan sobre todo o ecrã de arranque */
+.lus-scanline {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.lus-scanline::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 140px;
+    top: -25%;
+    background: linear-gradient(180deg, transparent, rgba(220, 38, 38, 0.04) 40%, rgba(220, 38, 38, 0.11) 50%, rgba(220, 38, 38, 0.04) 60%, transparent);
+    animation: lus-scan-y 4.2s linear infinite;
+}
+
+@keyframes lus-scan-y {
+    from { top: -25%; }
+    to { top: 115%; }
+}
+
+/* Moldura com cantos táticos (TL/BR via pseudos, TR/BL via spans) */
+.lus-frame {
+    position: relative;
+    padding: 30px 28px;
+}
+
+.lus-frame::before,
+.lus-frame::after,
+.lus-corner-tr,
+.lus-corner-bl {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    pointer-events: none;
+}
+
+.lus-frame::before {
+    content: "";
+    top: 0;
+    left: 0;
+    border-top: 2px solid rgba(220, 38, 38, 0.7);
+    border-left: 2px solid rgba(220, 38, 38, 0.7);
+}
+
+.lus-frame::after {
+    content: "";
+    bottom: 0;
+    right: 0;
+    border-bottom: 2px solid rgba(212, 168, 83, 0.6);
+    border-right: 2px solid rgba(212, 168, 83, 0.6);
+}
+
+.lus-corner-tr {
+    top: 0;
+    right: 0;
+    border-top: 2px solid rgba(212, 168, 83, 0.6);
+    border-right: 2px solid rgba(212, 168, 83, 0.6);
+}
+
+.lus-corner-bl {
+    bottom: 0;
+    left: 0;
+    border-bottom: 2px solid rgba(220, 38, 38, 0.7);
+    border-left: 2px solid rgba(220, 38, 38, 0.7);
+}
+
+/* Radar tático com feixe em varrimento, anéis e alvo detetado */
+.lus-radar {
+    position: relative;
+    width: 116px;
+    height: 116px;
+    margin: 0 auto;
+    border-radius: 9999px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: radial-gradient(circle, rgba(220, 38, 38, 0.12) 0%, transparent 62%);
+    box-shadow: 0 0 30px rgba(220, 38, 38, 0.12);
+    overflow: hidden;
+}
+
+.lus-radar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background:
+        radial-gradient(circle, transparent 54%, rgba(239, 68, 68, 0.22) 55%, transparent 57%),
+        radial-gradient(circle, transparent 29%, rgba(239, 68, 68, 0.22) 30%, transparent 32%),
+        linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15)) center / 100% 1px no-repeat,
+        linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15)) center / 1px 100% no-repeat;
+}
+
+.lus-radar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: conic-gradient(from 0deg, rgba(239, 68, 68, 0.5) 0deg, rgba(239, 68, 68, 0.12) 45deg, transparent 70deg);
+    animation: lus-spin 2.6s linear infinite;
+}
+
+.lus-radar-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    margin: -2.5px 0 0 -2.5px;
+    border-radius: 9999px;
+    background: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+    z-index: 1;
+}
+
+.lus-radar-blip {
+    position: absolute;
+    left: 66%;
+    top: 28%;
+    width: 4px;
+    height: 4px;
+    border-radius: 9999px;
+    background: #f59e0b;
+    box-shadow: 0 0 7px #f59e0b;
+    animation: lus-blip 2.6s ease-out infinite;
+    z-index: 1;
+}
+
+@keyframes lus-blip {
+    0%, 12% { opacity: 0; transform: scale(0.6); }
+    22%, 55% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.8); }
+}
+
+/* Reveal do wordmark: abre do espaçamento largo + fade, depois pulsa */
+.lus-boot-logo {
+    animation:
+        lus-logo-in 1s cubic-bezier(0.22, 1, 0.36, 1) both,
+        lus-logo-pulse 2.6s ease-in-out 1s infinite;
+}
+
+@keyframes lus-logo-in {
+    from {
+        opacity: 0;
+        letter-spacing: 0.35em;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        letter-spacing: -0.02em;
+        transform: translateY(0);
+    }
+}
+
+/* Cursor de terminal a piscar após o texto de fase */
+.lus-cursor::after {
+    content: "▌";
+    margin-left: 3px;
+    color: #ef4444;
+    animation: lus-blink 1s steps(2, start) infinite;
+}
+
+@keyframes lus-blink {
+    50% { opacity: 0; }
+}
+
+/* Frases de ambiente rotativas (CSS-only crossfade) */
+.lus-flavor {
+    position: relative;
+    height: 1.3em;
+    overflow: hidden;
+}
+
+.lus-flavor span {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    animation: lus-flavor-cycle 9s infinite;
+}
+
+.lus-flavor span:nth-child(2) { animation-delay: 3s; }
+.lus-flavor span:nth-child(3) { animation-delay: 6s; }
+
+@keyframes lus-flavor-cycle {
+    0% { opacity: 0; transform: translateY(7px); }
+    6%, 27% { opacity: 1; transform: translateY(0); }
+    33%, 100% { opacity: 0; transform: translateY(-7px); }
+}
+
 /* ---------- Acessibilidade: reduzir movimento ---------- */
 @media (prefers-reduced-motion: reduce) {
     .lus-kenburns,
@@ -674,6 +869,11 @@
     .lus-dock::after,
     .lus-boot-logo,
     .lus-progress-fill::after,
+    .lus-scanline::after,
+    .lus-radar::after,
+    .lus-radar-blip,
+    .lus-flavor span,
+    .lus-cursor::after,
     .opp-pin-selected::after {
         animation: none !important;
     }

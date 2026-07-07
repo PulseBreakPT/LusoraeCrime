@@ -38,7 +38,10 @@ export function LoadingScreen() {
 
   return (
     <div className="lus-boot-bg fixed inset-0 z-50 flex items-center justify-center">
-      <div className="mx-4 w-full max-w-md space-y-7 animate-slide-up">
+      <div className="lus-scanline" aria-hidden="true" />
+      <div className="lus-frame mx-4 w-full max-w-md animate-slide-up">
+        <span className="lus-corner-tr" aria-hidden="true" />
+        <span className="lus-corner-bl" aria-hidden="true" />
         {error ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -60,11 +63,16 @@ export function LoadingScreen() {
             </p>
           </div>
         ) : (
-          <>
+          <div className="space-y-6">
+            <div className="lus-radar" aria-hidden="true">
+              <span className="lus-radar-dot" />
+              <span className="lus-radar-blip" />
+            </div>
+
             <div className="text-center">
               <p className="font-mono text-[10px] uppercase tracking-[0.45em] text-primary/90">Lisboa · Rede Criminosa</p>
               <h1 className="lus-title lus-boot-logo mt-1 font-display text-6xl font-bold uppercase leading-none tracking-tight">Lusorae</h1>
-              <p className="mt-3 font-mono text-xs text-zinc-400">
+              <p className="lus-cursor mt-3 font-mono text-xs text-zinc-400">
                 {currentStage ? getStageLabel(currentStage.key) : "A preparar operações…"}
               </p>
             </div>
@@ -109,7 +117,13 @@ export function LoadingScreen() {
                 </div>
               ))}
             </div>
-          </>
+
+            <div className="lus-flavor text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+              <span>A subornar informadores nos bairros…</span>
+              <span>A escutar a frequência da polícia…</span>
+              <span>A contar notas no cofre do QG…</span>
+            </div>
+          </div>
         )}
       </div>
     </div>
