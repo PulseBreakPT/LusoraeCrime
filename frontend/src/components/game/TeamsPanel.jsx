@@ -8,8 +8,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper, Brain } from "lucide-react";
-import { IntelligentDashboard } from "./IntelligentDashboard";
+import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper } from "lucide-react";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
 
@@ -31,7 +30,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
   const [repeatRecs, setRepeatRecs] = useState({});
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
 
   // Equipas sem veículo recebem automaticamente o melhor disponível (o que
@@ -128,7 +126,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   };
 
   return (
-    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
         <SheetHeader>
@@ -557,17 +554,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               })}
           </div>
         </div>
-        <Button
-          data-testid="teams-open-intel-dashboard"
-          onClick={() => setDashboardOpen(true)}
-          className="mt-4 w-full gap-1.5 border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-          variant="outline"
-        >
-          <Brain size={14} /> IA Inteligente — Análise Completa
-        </Button>
       </SheetContent>
     </Sheet>
-    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
-    </>
   );
 };
