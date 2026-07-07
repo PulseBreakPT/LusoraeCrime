@@ -61,7 +61,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
+      <SheetContent side="left" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Building2 size={18} className="text-primary" /> {p.org_name}
@@ -107,7 +107,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           </Alert>
         )}
 
-        <Card className="mt-3 border-white/10 bg-white/[0.03] p-3 shadow-none" data-testid="empire-cashflow">
+        <Card className="mt-3 lus-card p-3 shadow-none" data-testid="empire-cashflow">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <TrendingUp size={11} className="text-emerald-400" /> Fluxo de caixa passivo
           </p>
@@ -158,7 +158,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
         </Card>
 
         {p.next_level_respect && (
-          <Card className="mt-3 border-white/10 bg-white/[0.03] p-3 shadow-none">
+          <Card className="mt-3 lus-card p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <span>Progresso nível {p.level + 1}</span>
               <span>{p.respect}/{p.next_level_respect}</span>
@@ -167,7 +167,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           </Card>
         )}
 
-        <Card className="mt-3 border-white/10 bg-white/[0.03] p-3 shadow-none">
+        <Card className="mt-3 lus-card p-3 shadow-none">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <MapPin size={11} className="text-primary" /> Quartel-general
           </p>
@@ -207,7 +207,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
             <Banknote size={12} /> Lavagem de dinheiro
           </h3>
-          <Card className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+          <Card className="lus-card p-3 shadow-none">
             <div className="flex items-baseline justify-between">
               <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Taxa de 25%.</p>
               {state.caps?.dirty_money?.max > 0 && (
@@ -275,7 +275,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
             <Siren size={12} /> Polícia
           </h3>
-          <Card className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+          <Card className="lus-card p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <Tip tip={hs.desc}>
                 <span>Calor policial · <span style={{ color: hs.color }}>{hs.label}</span></span>
@@ -353,7 +353,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 
 const StatBox = ({ label, value, accent = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full border-white/10 bg-white/[0.03] p-3 shadow-none">
+    <Card className="h-full lus-card p-3 shadow-none">
       <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color: accent }}>{value}</p>
     </Card>
@@ -365,7 +365,7 @@ const QuickNav = ({ testId, label, value, alert, alertText, tip, onClick }) => (
     <button
       data-testid={testId}
       onClick={onClick}
-      className="group relative h-full w-full rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.08]"
+      className="group relative h-full w-full rounded-xl border lus-card p-3 text-left transition-colors hover:bg-white/[0.08]"
     >
       <p className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
         {label} <ChevronRight size={11} className="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />

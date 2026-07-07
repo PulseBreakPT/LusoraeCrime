@@ -79,3 +79,10 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 
 ## Credenciais
 Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
+
+### UI Uniformization Pass (07/07/2026)
+- Design system CSS: `.lus-panel` (shell vidro escuro de todos os Sheets + OpportunityCard), `.lus-card` (cartão interno standard, substituiu `border-white/10 bg-white/[0.03]` em 11 ficheiros), `.lus-topbar` (ResourceBar)
+- sheet.jsx: overlay c/ blur, header c/ barra vermelha de destaque + border-b, título uppercase display, close button circular — afeta os 10 painéis
+- button.jsx: default/success c/ glow + border, outline elevado, active:scale press effect — afeta todos os botões
+- hud.jsx: Kpi (lus-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
+- ResourceBar: lus-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)

@@ -58,7 +58,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Swords size={18} className="text-primary" /> Armamento
@@ -130,7 +130,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             const sellValue = Math.round(model.price * 0.4 * (w.condition / 100));
             const compat = emp ? weaponCompatibility(emp, model) : null;
             return (
-              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="lus-card p-3 shadow-none">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-white">{w.name}</p>
@@ -238,7 +238,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 const locked = state.player.level < m.min_level;
                 const reqAttrs = Object.entries(m.requires_attr || {});
                 return (
-                  <Card key={key} className="flex items-center justify-between border-white/10 bg-white/[0.03] p-3 shadow-none">
+                  <Card key={key} className="flex items-center justify-between lus-card p-3 shadow-none">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-white">
                         {m.name}

@@ -195,7 +195,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   return (
     <Card
       data-testid="opportunity-card"
-      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up lus-panel p-4 shadow-2xl"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -363,7 +363,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                     className={`flex w-full flex-col gap-1 rounded-md border px-2.5 py-1.5 text-left shadow-none transition-colors ${
                       selectedTeamId === t.id
                         ? "border-primary/50 bg-primary/10"
-                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+                        : "lus-card hover:bg-white/[0.07]"
                     } ${r.ok ? "cursor-pointer" : ""}`}
                   >
                     <div className="flex w-full items-center justify-between gap-2">
@@ -448,7 +448,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             }
             const categoryOrder = Object.keys(MODIFIER_CATEGORY_LABELS).filter((cat) => byCategory[cat]?.length);
             return (
-              <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up border-white/10 bg-white/[0.03] p-2.5 shadow-none">
+              <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up lus-card p-2.5 shadow-none">
                 <div className="flex items-baseline justify-between">
                   <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
                   <div className="flex items-center gap-1.5">
@@ -577,7 +577,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
 const Metric = ({ icon: Icon, label, value, color, tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full border-white/10 bg-white/[0.03] p-2 shadow-none">
+    <Card className="h-full lus-card p-2 shadow-none">
       <div className="flex items-center gap-1">
         <Icon size={10} style={{ color }} />
         <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>

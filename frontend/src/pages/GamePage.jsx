@@ -169,35 +169,35 @@ export default function GamePage() {
           testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
           alert={alerts.claimable > 0}
           tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) por reclamar — história, diárias e semanais.` : "Missões de história, diárias, semanais e alertas dinâmicos."}
-          onClick={() => setOpenPanel("quests")}
+          active={openPanel === "quests"} onClick={() => setOpenPanel("quests")}
         />
         <HudButton
           testId="open-empire-button" icon={Building2} label="Império" color="text-red-500"
           alert={empireAlert}
           tip={empireAlert ? `Atenção: ${p.heat >= 70 ? `calor a ${Math.round(p.heat)}%` : ""}${p.heat >= 70 && p.dirty_money >= 15000 ? " · " : ""}${p.dirty_money >= 15000 ? `${fmtMoney(p.dirty_money)} sujos por lavar` : ""} — abre o Império para agir.` : "Visão geral da organização, lavagem de dinheiro e suborno à polícia."}
-          onClick={() => setOpenPanel("empire")}
+          active={openPanel === "empire"} onClick={() => setOpenPanel("empire")}
         />
         <HudButton
           testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400"
           alert={alerts.teams > 0}
           tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Coordenação de membros, veículos e despacho rápido.`}
-          onClick={() => setOpenPanel("teams")}
+          active={openPanel === "teams"} onClick={() => setOpenPanel("teams")}
         />
         <HudButton
           testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400"
           tip={hrAlertCount > 0 ? `Efetivo precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o efetivo leal."}
-          onClick={() => setOpenPanel("employees")}
+          active={openPanel === "employees"} onClick={() => setOpenPanel("employees")}
         />
         <HudButton
           testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400"
           tip={fleetAlertCount > 0 ? `Frota precisa de atenção: ${fleetTipParts.join(" · ")}.` : "Abastecer, reparar, comprar e atribuir veículos às equipas."}
-          onClick={() => setOpenPanel("fleet")}
+          active={openPanel === "fleet"} onClick={() => setOpenPanel("fleet")}
         />
         <HudButton
           testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-purple-300"
           alert={alerts.raidRisk}
           tip={alerts.raidRisk ? "Risco de rusga policial aos laboratórios (calor ≥ 70%) — suborna a polícia ou aguenta o risco." : "Propriedades: capacidade, rendimento passivo e lavagem automática."}
-          onClick={() => setOpenPanel("properties")}
+          active={openPanel === "properties"} onClick={() => setOpenPanel("properties")}
         />
         <HudButton
           testId="open-weapons-button" icon={Swords} label="Armamento" color="text-red-400"
@@ -209,7 +209,7 @@ export default function GamePage() {
               ? `${weaponsUnequipped} arma(s) por atribuir.`
               : "Compra, repara, atribui e vende equipamento operacional."
           }
-          onClick={() => setOpenPanel("weapons")}
+          active={openPanel === "weapons"} onClick={() => setOpenPanel("weapons")}
         />
       </div>
 
@@ -233,13 +233,17 @@ export default function GamePage() {
   );
 }
 
-const HudButton = ({ testId, icon: Icon, label, color, alert, tip, onClick }) => (
+const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onClick }) => (
   <Tip tip={tip} side="top">
     <Button
       data-testid={testId}
       variant="outline"
       onClick={onClick}
-      className="relative h-auto gap-1.5 rounded-full border-white/10 bg-black/80 px-2 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white md:px-3 md:py-2.5"
+      className={`relative h-auto gap-1.5 rounded-full px-2 py-2 text-xs font-bold uppercase tracking-wider shadow-2xl backdrop-blur-xl md:px-3 md:py-2.5 ${
+        active
+          ? "border-primary/60 bg-primary/20 text-white shadow-[0_0_18px_rgba(220,38,38,0.45)] hover:bg-primary/25 hover:text-white"
+          : "border-white/10 bg-black/80 text-white hover:bg-black hover:text-white"
+      }`}
     >
       <Icon size={15} className={color} />
       <span className="hidden md:inline">{label}</span>

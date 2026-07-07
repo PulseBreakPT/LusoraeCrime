@@ -154,7 +154,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm" data-testid="hq-panel">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm" data-testid="hq-panel">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Landmark size={18} className="text-primary" /> Quartel-General
@@ -210,7 +210,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                     const color = SEVERITY_COLOR[t.severity] || "#71717A";
                     const Icon = SEVERITY_ICON[t.severity] || Lightbulb;
                     return (
-                      <Card key={t.id} data-testid={`hq-tip-${t.id}`} className="flex items-center justify-between gap-2 border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
+                      <Card key={t.id} data-testid={`hq-tip-${t.id}`} className="flex items-center justify-between gap-2 lus-card px-3 py-2 shadow-none">
                         <p className="flex min-w-0 items-center gap-1.5 text-[11px] leading-snug text-zinc-300">
                           <Icon size={11} className="shrink-0" style={{ color }} />
                           <span className="min-w-0 truncate">{t.label}</span>
@@ -237,7 +237,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
         {tab === "melhorias" && (
           <div className="mt-3 space-y-3" data-testid="hq-tab-melhorias-content">
-            <Card className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+            <Card className="lus-card p-3 shadow-none">
               <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                 Nível {hq.level} — {"●".repeat(hq.level)}{"○".repeat(Math.max(0, maxLevel - hq.level))}
               </p>
@@ -380,7 +380,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                   const unlocked = hq.level >= unlockLevel;
                   const Icon = DEPARTMENT_ICONS[key] || Lock;
                   return (
-                    <Card key={key} data-testid={`hq-dept-${key}`} className="flex items-center gap-2 border-white/10 bg-white/[0.03] p-2.5 shadow-none">
+                    <Card key={key} data-testid={`hq-dept-${key}`} className="flex items-center gap-2 lus-card p-2.5 shadow-none">
                       <Icon size={16} className={unlocked ? "text-cyan-400" : "text-zinc-600"} />
                       <div className="min-w-0 flex-1">
                         <p className={`text-[12px] font-semibold ${unlocked ? "text-white" : "text-zinc-500"}`}>{dept.name}</p>

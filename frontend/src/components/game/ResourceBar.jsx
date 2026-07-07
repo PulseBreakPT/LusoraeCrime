@@ -35,7 +35,7 @@ export const ResourceBar = () => {
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-lg border border-border bg-card/90 px-2 py-1.5 shadow-2xl backdrop-blur-xl sm:gap-2 sm:px-3">
+      <div className="lus-topbar mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-xl border px-2.5 py-2 sm:gap-2 sm:px-3.5">
         <Tip
           tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
           side="bottom"
@@ -50,7 +50,7 @@ export const ResourceBar = () => {
             </div>
             <div className="hidden sm:block">
               <p className="max-w-[120px] truncate text-xs font-semibold text-white">{p.org_name}</p>
-              <p className="font-mono text-[9px] text-zinc-500">
+              <p className="font-mono text-[10px] text-zinc-500">
                 {nextRespect ? `${p.respect}/${nextRespect} resp.` : "nível máx."}
               </p>
             </div>
@@ -86,10 +86,10 @@ export const ResourceBar = () => {
           <div data-testid="stat-heat" className="flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1">
             <Flame size={14} className="shrink-0" style={{ color: hs.color }} />
             <div className="min-w-0">
-              <p className="hidden text-[8px] uppercase tracking-wider text-zinc-500 md:block">
+              <p className="hidden text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:block">
                 Calor · <span style={{ color: hs.color }}>{hs.label}</span>
               </p>
-              <p className="truncate font-mono text-[11px] font-bold text-white sm:text-xs">{Math.round(p.heat)}%</p>
+              <p className="truncate font-mono text-xs font-bold text-white sm:text-[13px]">{Math.round(p.heat)}%</p>
               <MiniBar value={p.heat} color={hs.color} className="w-7 sm:w-10" height="h-0.5" />
             </div>
           </div>
@@ -122,9 +122,9 @@ const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "ce
     <div data-testid={testId} className={`flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1 ${className}`}>
       <Icon size={14} className="shrink-0" style={{ color }} />
       <div className="min-w-0">
-        <p className="hidden text-[8px] uppercase tracking-wider text-zinc-500 md:block">{label}</p>
-        <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-[11px] font-bold text-white sm:text-xs">{value}</p>
-        {sub && <p title={sub} className="truncate font-mono text-[9px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
+        <p className="hidden text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:block">{label}</p>
+        <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-xs font-bold text-white sm:text-[13px]">{value}</p>
+        {sub && <p title={sub} className="truncate font-mono text-[10px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
       </div>
     </div>
   </Tip>

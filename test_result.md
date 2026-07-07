@@ -267,3 +267,19 @@ agent_communication:
       .env recriados pós-fork (backend + frontend); CORS com origens explícitas. Credenciais em
       /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!). Testar SEMPRE via preview URL
       (localhost:3000 dá CORS por ser cross-origin com credentials).
+frontend:
+  - task: "UI uniformization pass (shared sheet/button/hud/lus-* CSS classes)"
+    implemented: true
+    working: true
+    file: "components/ui/sheet.jsx, components/ui/button.jsx, components/game/hud.jsx, ResourceBar.jsx, GamePage.jsx, App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Global visual pass via shared components: premium panel shell (all 10 sheets), refined button variants, unified lus-card cards, readable topbar/KPIs, active state on bottom nav. Verified via screenshots (map + Empire + Employees panels). No backend changes."
+
+agent_communication:
+    - agent: "main"
+      message: "07/07/2026 — CSS-only/visual uniformization through shared components (sheet.jsx, button.jsx, hud.jsx, App.css lus-panel/lus-card/lus-topbar). No API or logic changes; verified visually with screenshots."

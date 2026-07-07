@@ -47,7 +47,7 @@ const Section = ({ icon: Icon, title, children, testId }) => (
     <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
       <Icon size={12} /> {title}
     </h3>
-    <Card className="space-y-2 border-white/10 bg-white/[0.03] p-3 shadow-none">{children}</Card>
+    <Card className="space-y-2 lus-card p-3 shadow-none">{children}</Card>
   </div>
 );
 
@@ -312,7 +312,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições

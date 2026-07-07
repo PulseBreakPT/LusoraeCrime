@@ -23,7 +23,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Warehouse size={18} className="text-primary" /> Imóveis
@@ -77,7 +77,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const upgrading = p.upgrading_until && Date.parse(p.upgrading_until) > serverNow();
             const upgradeRemaining = upgrading ? Math.max(0, (Date.parse(p.upgrading_until) - serverNow()) / 1000) : 0;
             return (
-              <Card key={p.id} data-testid={`property-card-${p.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+              <Card key={p.id} data-testid={`property-card-${p.id}`} className="lus-card p-3 shadow-none">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -178,7 +178,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do bónus (rendimentos decrescentes).` : ""
                     }`;
                 return (
-                  <Card key={key} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+                  <Card key={key} className="lus-card p-3 shadow-none">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">
                         {pt.name}

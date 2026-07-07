@@ -133,7 +133,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const idle = e.status === "idle";
 
   return (
-    <Card data-testid={`employee-card-${e.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+    <Card data-testid={`employee-card-${e.id}`} className="lus-card p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
@@ -441,7 +441,7 @@ const CandidateCard = ({ c }) => {
   if (lackMoney) blockers.push(`faltam ${fmtMoney(c.cost - state.player.clean_money)}`);
 
   return (
-    <Card data-testid={`candidate-card-${c.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+    <Card data-testid={`candidate-card-${c.id}`} className="lus-card p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">
@@ -543,7 +543,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md" data-testid="employees-panel">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <IdCard size={18} className="text-primary" /> Operacionais
@@ -563,7 +563,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
           </Alert>
         )}
 
-        <Card className="mt-3 flex items-center justify-between border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
+        <Card className="mt-3 flex items-center justify-between lus-card px-3 py-2 shadow-none">
           <div>
             <p className="text-[9px] uppercase tracking-wider text-zinc-500">Ciclo salarial</p>
             <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(state.salary_total)}/ciclo</p>

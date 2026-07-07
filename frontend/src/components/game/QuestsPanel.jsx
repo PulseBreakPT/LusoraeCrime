@@ -75,7 +75,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
       className={`p-3 shadow-none ${
         featured
           ? "border-red-500/40 bg-red-500/[0.06]"
-          : "border-white/10 bg-white/[0.03]"
+          : "lus-card"
       } ${dim || locked ? "opacity-50" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -237,7 +237,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="quests-panel">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md" data-testid="quests-panel">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-primary" /> Missões

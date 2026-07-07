@@ -76,7 +76,7 @@ const RecommendedActions = ({ onNavigate }) => {
       ) : (
         <div className="space-y-1.5">
           {recs.map((r) => (
-            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
+            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 lus-card px-3 py-2 shadow-none">
               <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
               <Button
                 data-testid={`intel-rec-action-${r.id}`}
@@ -120,7 +120,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <BrainCircuit size={18} className="text-primary" /> Central de Inteligência
@@ -221,7 +221,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
           <div className="space-y-1">
             {state.history.map((m) => (
-              <Card key={m.id} className="flex items-center justify-between border-white/10 bg-white/[0.03] px-2.5 py-1.5 shadow-none">
+              <Card key={m.id} className="flex items-center justify-between lus-card px-2.5 py-1.5 shadow-none">
                 <div>
                   <p className="text-xs font-semibold text-white">
                     {m.opportunity.name} <span className="font-mono text-[9px] text-zinc-500">{m.opportunity.district}</span>
@@ -259,7 +259,7 @@ const Grid = ({ children }) => <div className="grid grid-cols-2 gap-2">{children
 
 const Cell = ({ label, value, color = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full border-white/10 bg-white/[0.03] p-2.5 shadow-none">
+    <Card className="h-full lus-card p-2.5 shadow-none">
       <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
     </Card>
