@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton } from "./hud";
+import { Thumb, PanelBanner } from "./GameImage";
+import { propertyImage } from "../../lib/images";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -25,6 +27,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
+        <PanelBanner panelKey="properties" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Warehouse size={18} className="text-primary" /> Imóveis
@@ -79,7 +82,8 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const upgradeRemaining = upgrading ? Math.max(0, (Date.parse(p.upgrading_until) - serverNow()) / 1000) : 0;
             return (
               <Card key={p.id} data-testid={`property-card-${p.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <Thumb src={propertyImage(p.type_key)} alt={pt.name} icon={Warehouse} iconColor="#c4b5fd" className="h-11 w-16" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <InlineRename
@@ -191,6 +195,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     }`;
                 return (
                   <Card key={key} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
+                    <Thumb src={propertyImage(key)} alt={pt.name} icon={Warehouse} iconColor="#c4b5fd" className="mb-2 h-20 w-full" />
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">
                         {pt.name}

@@ -3,6 +3,8 @@ import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
 import { Tip, Chip } from "./hud";
+import { GameImage } from "./GameImage";
+import { districtImage } from "../../lib/images";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -165,8 +167,15 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   return (
     <Card
       data-testid="opportunity-card"
-      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl"
+      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up overflow-hidden border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl"
     >
+      <div className="relative -mx-4 -mt-4 mb-3 h-16" style={{ background: `${color}22` }}>
+        <GameImage src={districtImage(opp.district)} alt={opp.district} className="h-full w-full object-cover opacity-55" fallback={null} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
+        <div className="absolute bottom-1.5 left-3 flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white/90">
+          <MapPin size={10} style={{ color }} /> {opp.district}
+        </div>
+      </div>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-md" style={{ background: `${color}22`, color }}>

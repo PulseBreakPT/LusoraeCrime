@@ -8,6 +8,8 @@ import {
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton } from "./hud";
+import { GameImage, PanelBanner } from "./GameImage";
+import { employeeAvatar } from "../../lib/images";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -140,7 +142,18 @@ const EmployeeCard = ({ e, onNavigate }) => {
   return (
     <Card data-testid={`employee-card-${e.id}`} className="border-white/10 bg-white/[0.03] p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <GameImage
+            src={employeeAvatar(e.id, e.spec)}
+            alt={e.name}
+            className="h-9 w-9 shrink-0 rounded-md border border-white/10 bg-black/40 object-cover"
+            fallback={
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/40">
+                <IdCard size={16} className="text-zinc-600" />
+              </div>
+            }
+          />
+          <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
             <InlineRename
@@ -176,6 +189,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank}
           </p>
+          </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <RarityBadge rarity={e.rarity} rar={rar} />
@@ -526,6 +540,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="employees-panel">
+        <PanelBanner panelKey="employees" />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-white">
             <IdCard size={18} className="text-primary" /> Operacionais
