@@ -28,7 +28,7 @@ const useTick = (active) => {
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
-    renameVehicle, buyProperty, favoriteVehicleIds, toggleFavoriteVehicle,
+    transferVehicle, renameVehicle, startPlacement, favoriteVehicleIds, toggleFavoriteVehicle,
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
@@ -44,9 +44,20 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
     return t && t.status !== "idle";
   };
   const isRefueling = (v) => v.refueling_until && Date.parse(v.refueling_until) > serverNow();
+  const isTransferring = (v) => v.transfer && Date.parse(v.transfer.ends_at) > serverNow();
   const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
+  // Nunca devolve vazio — QG é sempre o fallback quando não há property_id.
+  const baseNameOf = (v) => {
+    if (!v.property_id) return "Quartel-General";
+    return state.properties.find((p) => p.id === v.property_id)?.name || "Quartel-General";
+  };
+  const transferDestNameOf = (v) => {
+    const toId = v.transfer?.to_property_id;
+    if (!toId) return "Quartel-General";
+    return state.properties.find((p) => p.id === toId)?.name || "Quartel-General";
+  };
 
-  const repairableIds = state.vehicles.filter((v) => !vehicleBusy(v) && v.condition < 99.5).map((v) => v.id);
+  const repairableIds = state.vehicles.filter((v) => !vehicleBusy(v) && !isTransferring(v) && v.condition < 99.5).map((v) => v.id);
   const repairAllCost = state.vehicles
     .filter((v) => repairableIds.includes(v.id))
     .reduce((a, v) => a + Math.max(50, Math.round((100 - v.condition) * v.price * 0.002)), 0);
@@ -142,6 +153,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             const mission = busy ? missionOf(team) : null;
             const refueling = isRefueling(v);
             const refuelRemaining = refueling ? Math.max(0, (Date.parse(v.refueling_until) - serverNow()) / 1000) : 0;
+            const transferring = isTransferring(v);
+            const transferRemaining = transferring ? Math.max(0, (Date.parse(v.transfer.ends_at) - serverNow()) / 1000) : 0;
+            const locked = busy || transferring;
             const seats = catalog?.vehicle_models?.[v.model_key]?.seats;
             const fuelPct = (v.fuel_l / v.tank_l) * 100;
             const refuelCost = Math.ceil((v.tank_l - v.fuel_l) * (state.fuel_prices?.[v.fuel_type] || 0));
@@ -210,6 +224,15 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     )}
                   </p>
                 )}
+                {transferring ? (
+                  <p data-testid={`vehicle-transfer-status-${v.id}`} className="mt-1 flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-cyan-400">
+                    <Clock size={10} /> Em transferência para {transferDestNameOf(v)} · {fmtDuration(transferRemaining)}
+                  </p>
+                ) : (
+                  <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-400">
+                    <Warehouse size={10} className="shrink-0 text-zinc-500" /> Base: {baseNameOf(v)}
+                  </p>
+                )}
                 {speedReduced && (
                   <p className="mt-1 font-mono text-[10px] text-amber-400">
                     Velocidade reduzida para {effSpeed.toFixed(1)} m/s — repara o veículo
@@ -237,7 +260,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
                 <Select
                   value={v.team_id || "__none__"}
-                  disabled={busy}
+                  disabled={locked}
                   onValueChange={(tid) => assignVehicle(v.id, tid === "__none__" ? null : tid)}
                 >
                   <SelectTrigger data-testid={`vehicle-team-select-${v.id}`} className="mt-2 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
@@ -249,6 +272,21 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       const label = t.name + " · " + teamMembers(t.id) + " membros";
                       return <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{label}</SelectItem>;
                     })}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={v.property_id || "__hq__"}
+                  disabled={locked}
+                  onValueChange={(pid) => transferVehicle(v.id, pid === "__hq__" ? null : pid)}
+                >
+                  <SelectTrigger data-testid={`vehicle-base-select-${v.id}`} className="mt-1.5 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__hq__" className="font-mono text-xs">Quartel-General</SelectItem>
+                    {state.properties.map((p) => (
+                      <SelectItem key={p.id} value={p.id} className="font-mono text-xs">{p.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {v.team_id && teamMembers(v.team_id) === 0 && (
@@ -274,9 +312,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       testId={`refuel-vehicle-${v.id}`}
                       icon={Fuel}
                       label={fmtMoney(refuelCost)}
-                      can={!busy && fuelPct <= 99 && state.player.clean_money >= refuelCost}
+                      can={!locked && fuelPct <= 99 && state.player.clean_money >= refuelCost}
                       blockedReasons={[
-                        busy ? "Veículo em operação." : null,
+                        transferring ? "Veículo em trânsito para outra base." : busy ? "Veículo em operação." : null,
                         fuelPct > 99 ? "Depósito já cheio." : null,
                         state.player.clean_money < refuelCost ? "Dinheiro insuficiente." : null,
                       ].filter(Boolean)}
@@ -289,9 +327,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     testId={`repair-vehicle-${v.id}`}
                     icon={Wrench}
                     label={fmtMoney(repairCost)}
-                    can={!busy && v.condition <= 99 && state.player.clean_money >= repairCost}
+                    can={!locked && v.condition <= 99 && state.player.clean_money >= repairCost}
                     blockedReasons={[
-                      busy ? "Veículo em operação." : null,
+                      transferring ? "Veículo em trânsito para outra base." : busy ? "Veículo em operação." : null,
                       v.condition > 99 ? "Já está a 100% de condição." : null,
                       state.player.clean_money < repairCost ? "Dinheiro insuficiente." : null,
                     ].filter(Boolean)}
@@ -306,9 +344,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     confirmLabel="Vender?"
                     color="text-red-400"
                     onConfirm={() => sellVehicle(v.id)}
-                    disabled={busy}
+                    disabled={locked}
                     className="flex-1"
-                    tip={`Vender este veículo por ${fmtMoney(sellValue)} (40% do preço × condição). Ação irreversível.`}
+                    tip={
+                      transferring
+                        ? "Não podes vender um veículo em trânsito para outra base."
+                        : `Vender este veículo por ${fmtMoney(sellValue)} (40% do preço × condição). Ação irreversível.`
+                    }
                   />
                 </div>
 
@@ -411,7 +453,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   <Button
                     data-testid="fleet-buy-garage-inline"
                     variant="outline" size="sm"
-                    onClick={() => buyProperty("garagem")}
+                    onClick={() => { startPlacement("garagem"); onOpenChange(false); }}
                     className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
                   >
                     <Warehouse size={10} /> Comprar garagem · {fmtMoney(garagem.price)}

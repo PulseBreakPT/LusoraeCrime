@@ -40,7 +40,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     const withoutVehicle = state.teams.filter((t) => t.status === "idle" && !t.vehicle_id);
     if (withoutVehicle.length === 0) return;
     const assignedIds = new Set(state.teams.map((t) => t.vehicle_id).filter(Boolean));
-    const pool = state.vehicles.filter((v) => !assignedIds.has(v.id));
+    const pool = state.vehicles.filter((v) => !assignedIds.has(v.id) && !v.transfer);
     withoutVehicle.forEach((t) => {
       const candidates = pool.filter((v) => !assignedIds.has(v.id));
       if (candidates.length === 0) return;
@@ -102,7 +102,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
   const enRouteMissionOf = (team) => state.missions.find((m) => m.team_id === team.id && m.phase === "en_route");
   const freeEmployees = state.employees.filter((e) => !e.team_id && e.status === "idle");
-  const freeVehicles = state.vehicles.filter((v) => !v.team_id);
+  const freeVehicles = state.vehicles.filter((v) => !v.team_id && !v.transfer);
   const nav = (p) => onNavigate && onNavigate(p);
 
   const readiness = (t, members, vehicle) => {
@@ -118,6 +118,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
     if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow()) {
       return { ok: false, reason: "A abastecer" };
+    }
+    if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > serverNow()) {
+      return { ok: false, reason: "Veículo em trânsito" };
     }
     if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
     const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
@@ -373,6 +376,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     </button>
                   )}
                 </div>
+                {vehicle && (
+                  <p className="mt-1 pl-5 font-mono text-[10px] text-zinc-500">
+                    Base: {vehicle.property_id ? (state.properties.find((p) => p.id === vehicle.property_id)?.name || "Quartel-General") : "Quartel-General"}
+                  </p>
+                )}
 
                 {vehicle && t.status === "idle" && (
                   <div className="mt-1.5 space-y-1 pl-5">

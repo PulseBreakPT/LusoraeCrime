@@ -18,7 +18,8 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     record_tx, property_stack_ranks, property_stack_mult,
                     dirty_money_cap, grant_quest_rewards,
                     weapon_combat_score,
-                    _unlink_employee_weapon)
+                    _unlink_employee_weapon,
+                    is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage)
 from quests import make_instance, enrich_quest, locked_principals
 from quests_data import QUEST_DEFS
 from models import Player, Team, Employee, Candidate, Vehicle, Weapon, Property, Opportunity, Mission, Event, Quest, Transaction
@@ -26,7 +27,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        RARITY_MIN_RESPECT, RANKS, RANK_REQ_LEVEL, TALENTS, RECRUIT_SOURCES,
                        POOL_REFRESH_MIN, PAYROLL_CYCLE_MIN, TRAINING_COURSES, EMP_LEVEL_XP,
                        VEHICLE_MODELS, FUEL_PRICES, PROPERTY_TYPES, PROPERTY_MAX_LEVEL,
-                       BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES, LISBON_SPOTS,
+                       BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, OPPORTUNITY_TYPES,
                        TEAM_MAX_MEMBERS, REORG_AFTER_ROSTER_CHANGE_S, INCOMPLETE_TEAM_PREP_S,
                        NEWBIE_RAMP_S, RECALL_PENALTY_FRACTION, RECALL_PENALTY_HEAT,
                        RECALL_PENALTY_FATIGUE, HIDEOUT_PREP_REDUCTION_PER_LEVEL,
@@ -38,7 +39,9 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
                        HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER,
-                       LOW_CHANCE_CONFIRM_THRESHOLD)
+                       LOW_CHANCE_CONFIRM_THRESHOLD,
+                       VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
+                       VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S)
 from reward_engine import calculate_full_reward
 
 router = APIRouter(prefix="/api/game", tags=["game"])
@@ -127,6 +130,11 @@ class VehicleAssignInput(BaseModel):
     team_id: Optional[str] = None
 
 
+class VehicleTransferInput(BaseModel):
+    vehicle_id: str
+    to_property_id: Optional[str] = None
+
+
 class WeaponBuyInput(BaseModel):
     model_key: str
 
@@ -146,6 +154,8 @@ class WeaponUnassignInput(BaseModel):
 
 class PropertyBuyInput(BaseModel):
     type_key: str
+    lat: float
+    lng: float
 
 
 class PropertyIdInput(BaseModel):
@@ -316,6 +326,8 @@ async def _prepare_dispatch(player, opp, team):
         raise HTTPException(status_code=400, detail="O veículo precisa de reparação")
     if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
         raise HTTPException(status_code=400, detail="O veículo está a abastecer")
+    if vehicle.get("transfer") and parse_dt(vehicle["transfer"]["ends_at"]) > now_utc():
+        raise HTTPException(status_code=400, detail="O veículo está em trânsito para outra base")
     seats = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("seats")
     if seats is not None and len(members) > seats:
         raise HTTPException(
@@ -327,8 +339,8 @@ async def _prepare_dispatch(player, opp, team):
         names = ", ".join(VEHICLE_MODELS.get(m, {}).get("name", m) for m in required_models)
         raise HTTPException(status_code=400, detail=f"Esta operação exige um destes veículos: {names}")
 
-    hq = player["hq"]
-    dist = haversine_m(hq["lat"], hq["lng"], opp["lat"], opp["lng"])
+    origin = await resolve_mission_origin(db, player, vehicle)
+    dist = haversine_m(origin["lat"], origin["lng"], opp["lat"], opp["lng"])
     round_km = 2 * dist / 1000
     fuel_needed = round_km * vehicle["cons"] / 100
     if vehicle["fuel_l"] < fuel_needed:
@@ -431,7 +443,7 @@ async def _prepare_dispatch(player, opp, team):
         "team_skill": team_skill,
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
         "talents": member_talents, "min_members": opp.get("min_members", 1),
-        "weapon_loud": weapon_loud,
+        "weapon_loud": weapon_loud, "origin": origin,
     }
 
 
@@ -529,7 +541,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "reward_xp": prep.get("reward_xp"),
         "reward_reputation": prep.get("reward_reputation"),
         "reward_difficulty_score": prep.get("reward_difficulty_score"),
-        "origin": {"lat": player["hq"]["lat"], "lng": player["hq"]["lng"]},
+        "origin": {"lat": prep["origin"]["lat"], "lng": prep["origin"]["lng"]},
+        "origin_property_id": prep["origin"]["property_id"],
         "target": {"lat": opp["lat"], "lng": opp["lng"]},
         "phase": "en_route", "outcome": None,
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
@@ -1048,6 +1061,8 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
 
 
 async def _vehicle_free(pid, vehicle):
+    if vehicle.get("transfer"):
+        return False
     if vehicle.get("team_id"):
         team = await db.teams.find_one({"_id": ObjectId(vehicle["team_id"]), "player_id": pid})
         if team and team["status"] != "idle":
@@ -1158,6 +1173,44 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
         await db.teams.update_one({"_id": team["_id"]}, {"$set": {"vehicle_id": str(vehicle["_id"])}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"team_id": body.team_id}})
     return {"ok": True}
+
+
+@router.post("/vehicles/transfer")
+async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    vehicle = await db.vehicles.find_one({"_id": _oid(body.vehicle_id, "Veículo inválido"), "player_id": pid})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    if not await _vehicle_free(pid, vehicle):
+        raise HTTPException(status_code=400, detail="O veículo está em operação")
+    if (vehicle.get("property_id") or None) == (body.to_property_id or None):
+        raise HTTPException(status_code=400, detail="O veículo já está nessa base")
+    to_prop = None
+    if body.to_property_id:
+        to_prop = await db.properties.find_one({"_id": _oid(body.to_property_id, "Propriedade inválida"), "player_id": pid})
+        if not to_prop:
+            raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+    usage = await get_property_vehicle_usage(db, pid, player["hq"]["level"])
+    target_key = body.to_property_id or "hq"
+    if usage[target_key]["used"] >= usage[target_key]["max"]:
+        raise HTTPException(status_code=400, detail="Essa base não tem capacidade para mais veículos")
+    origin = await resolve_mission_origin(db, player, vehicle)
+    to_lat, to_lng = (to_prop["lat"], to_prop["lng"]) if to_prop else (player["hq"]["lat"], player["hq"]["lng"])
+    dist_km = haversine_m(origin["lat"], origin["lng"], to_lat, to_lng) / 1000
+    cost = max(VEHICLE_TRANSFER_COST_MIN, round(dist_km * VEHICLE_TRANSFER_COST_PER_KM))
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    duration_s = VEHICLE_TRANSFER_DURATION_BASE_S + VEHICLE_TRANSFER_DURATION_PER_KM_S * dist_km
+    until = (now_utc() + timedelta(seconds=duration_s)).isoformat()
+    dest_name = to_prop["name"] if to_prop else player["hq"]["name"]
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
+        "transfer": {"to_property_id": body.to_property_id, "ends_at": until},
+    }})
+    await add_event(db, pid, "vehicle", f"{vehicle['name']} a caminho de {dest_name} — chega em {round(duration_s)}s.")
+    await record_tx(db, pid, "vehicle_transfer", -cost, "clean", player["clean_money"] - cost, f"Transferência de {vehicle['name']} para {dest_name}")
+    return {"cost": cost, "transfer_until": until}
 
 
 @router.post("/vehicles/rename")
@@ -1340,6 +1393,8 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
 async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_user)):
     if body.type_key not in PROPERTY_TYPES:
         raise HTTPException(status_code=400, detail="Tipo de propriedade inválido")
+    if not is_on_land(body.lat, body.lng):
+        raise HTTPException(status_code=400, detail="Localização inválida — escolhe um ponto em terra dentro de Lisboa")
     player = await get_player(user)
     pid = str(player["_id"])
     pt = PROPERTY_TYPES[body.type_key]
@@ -1347,16 +1402,15 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {pt['min_level']}")
     if player["clean_money"] < pt["price"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    spot = random.choice(LISBON_SPOTS)
+    district = nearest_district(body.lat, body.lng)
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -pt["price"], "stats.properties_bought": 1}})
     await db.properties.insert_one({
         "player_id": pid, "type_key": body.type_key,
-        "name": f"{pt['name']} — {spot['name']}", "district": spot["name"],
-        "lat": spot["lat"] + random.uniform(-0.006, 0.006),
-        "lng": spot["lng"] + random.uniform(-0.008, 0.008),
+        "name": f"{pt['name']} — {district}", "district": district,
+        "lat": body.lat, "lng": body.lng,
         "level": 1, "bought_at": now_utc().isoformat(),
     })
-    await add_event(db, pid, "property", f"{pt['name']} comprado em {spot['name']} por {pt['price']:,} €.")
+    await add_event(db, pid, "property", f"{pt['name']} comprado em {district} por {pt['price']:,} €.")
     await record_tx(db, pid, "property_buy", -pt["price"], "clean", player["clean_money"] - pt["price"], f"Compra de {pt['name']}")
     return {"ok": True}
 
@@ -1376,11 +1430,18 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
         used = await db.employees.count_documents({"player_id": pid})
         if used > caps["employees"] - pt["cap_employees"] * prop["level"]:
             raise HTTPException(status_code=400, detail="Não podes vender: os teus operacionais ficariam sem espaço")
-    if pt.get("cap_vehicles"):
-        used = await db.vehicles.count_documents({"player_id": pid})
-        if used > caps["vehicles"] - pt["cap_vehicles"] * prop["level"]:
-            raise HTTPException(status_code=400, detail="Não podes vender: os teus veículos ficariam sem espaço")
     value = int(pt["price"] * 0.7 * prop["level"])
+    prop_id_str = str(prop["_id"])
+    if pt.get("cap_vehicles"):
+        stranded = await db.vehicles.find({"player_id": pid, "property_id": prop_id_str}).to_list(100)
+        for v in stranded:
+            await db.vehicles.update_one({"_id": v["_id"]}, {"$set": {"property_id": None}})
+        await db.vehicles.update_many(
+            {"player_id": pid, "transfer.to_property_id": prop_id_str},
+            {"$set": {"transfer.to_property_id": None}},
+        )
+        if stranded:
+            await add_event(db, pid, "property", f"{len(stranded)} veículo(s) realojado(s) no Quartel-General após venda de {prop['name']}.")
     await db.properties.delete_one({"_id": prop["_id"]})
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
     await add_event(db, pid, "property", f"{prop['name']} vendido por {value:,} €.")

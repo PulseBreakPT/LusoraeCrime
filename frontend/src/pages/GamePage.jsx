@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../context/GameContextV2";
 import { useSettings } from "../context/SettingsContext";
-import LiveMap, { MapLegend } from "../components/game/LiveMap";
+import LiveMap, { MapLegend, PlacementControls, MapBaseFilter } from "../components/game/LiveMap";
 import { ResourceBar } from "../components/game/ResourceBar";
 import { OpportunityCard } from "../components/game/OpportunityCard";
 import { TeamsPanel } from "../components/game/TeamsPanel";
@@ -27,6 +27,7 @@ export default function GamePage() {
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
+  const [baseFilter, setBaseFilter] = useState("all");
 
   // Ponto único de navegação a partir de eventos/registos — decide o painel a
   // abrir e, se o evento apontar para uma aba específica (ex.: uma decisão
@@ -118,6 +119,7 @@ export default function GamePage() {
         selectedOppId={selectedOpp?.id}
         onSelectOpp={(opp) => setSelectedOpp(opp)}
         onSelectHQ={() => setOpenPanel("hq")}
+        baseFilter={baseFilter}
       />
 
       <ResourceBar />
@@ -156,6 +158,8 @@ export default function GamePage() {
       {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
 
       <MapLegend />
+      <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />
+      <PlacementControls />
 
       <div
         className="pointer-events-auto absolute left-2 z-30 flex gap-1 md:left-1/2 md:-translate-x-1/2 md:gap-1.5"
