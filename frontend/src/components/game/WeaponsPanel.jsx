@@ -3,12 +3,10 @@ import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, conditionBand, weaponBenefit, weaponCompatibility, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Swords, Wrench, Trash2, Lock, Volume2, Search, ShieldAlert, UserRound, Wand2, CheckCircle2, Brain } from "lucide-react";
-import { IntelligentDashboard } from "./IntelligentDashboard";
+import { Swords, Wrench, Trash2, Lock, Volume2, Search, ShieldAlert, UserRound, Wand2, CheckCircle2 } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -24,7 +22,6 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
     state, catalog, buyWeapon, sellWeapon, repairWeapon, assignWeapon, unassignWeapon, autoAssignWeapon,
   } = useGame();
   const [query, setQuery] = useState("");
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state) return null;
 
@@ -60,7 +57,6 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
   const equippedCount = weapons.filter((w) => w.employee_id).length;
 
   return (
-    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
@@ -294,17 +290,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
               })}
           </div>
         </div>
-        <Button
-          data-testid="weapons-open-intel-dashboard"
-          onClick={() => setDashboardOpen(true)}
-          className="mt-4 w-full gap-1.5 border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-          variant="outline"
-        >
-          <Brain size={14} /> IA Inteligente — Análise Completa
-        </Button>
       </SheetContent>
     </Sheet>
-    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
-    </>
   );
 };

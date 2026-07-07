@@ -3,11 +3,9 @@ import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
-import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock, Brain } from "lucide-react";
-import { IntelligentDashboard } from "./IntelligentDashboard";
+import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -20,12 +18,10 @@ const useTick = (active) => {
 
 export const PropertiesPanel = ({ open, onOpenChange }) => {
   const { state, catalog, serverNow, buyProperty, sellProperty, upgradeProperty, renameProperty } = useGame();
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   useTick(open);
   if (!state) return null;
 
   return (
-    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-sm">
         <SheetHeader>
@@ -221,17 +217,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
               })}
           </div>
         </div>
-        <Button
-          data-testid="properties-open-intel-dashboard"
-          onClick={() => setDashboardOpen(true)}
-          className="mt-4 w-full gap-1.5 border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-          variant="outline"
-        >
-          <Brain size={14} /> IA Inteligente — Análise Completa
-        </Button>
       </SheetContent>
     </Sheet>
-    <IntelligentDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} />
-    </>
   );
 };
