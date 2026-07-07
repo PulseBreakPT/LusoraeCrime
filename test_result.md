@@ -351,3 +351,14 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshots (Equipas c/ dropdown aberto: dark-glass + item vermelho; Definições: switches/inputs). Lint limpo nos ficheiros tocados (calendar/command têm erros stock pré-existentes). Sem alterações de lógica/API."
+  - task: "SSS tier ronda 7 (juice de jogo, CSS-only): entrada do HUD (dock rise-in, topbar fade — sem transform p/ não quebrar -translate-x-1/2), pins do mapa nascem c/ bounce (opp/prop/unit), hover em prop/unit pins, halo dourado pulsante no QG, cascata staggered dos lus-card ao abrir painéis (nth-child delays, fill backwards), fade no lus-opp-card, tudo coberto por prefers-reduced-motion"
+    implemented: true
+    working: true
+    file: "App.css (secção 'SSS ronda 7')"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Verificado por screenshots: topbar centrada sem salto, dock/pins/halo QG corretos no mapa; painel Frota com todos os cartões visíveis pós-cascata. 1 edição CSS, zero JS/lógica."
