@@ -234,6 +234,35 @@ export function pctSigned(v) {
   return `${p > 0 ? "+" : ""}${p}%`;
 }
 
+// Classificação qualitativa da probabilidade final (para o cabeçalho do
+// preview de despacho) — banda mais fina que chanceColor (que só distingue
+// 3 cores para o número agregado); aqui cada banda tem também um rótulo.
+export function chanceQualityLabel(c) {
+  if (c == null || c <= 0) return { label: "Impossível", color: "#71717A" };
+  if (c >= 0.85) return { label: "Excelente", color: "#34D399" };
+  if (c >= 0.65) return { label: "Boa", color: "#22D3EE" };
+  if (c >= 0.45) return { label: "Média", color: "#F59E0B" };
+  if (c >= 0.25) return { label: "Baixa", color: "#FB923C" };
+  return { label: "Crítica", color: "#EF4444" };
+}
+
+// Rótulos das categorias em que o backend agrupa cada modificador de chance
+// (chance_breakdown, engine.py) — usados para organizar o accordion de
+// detalhes do preview de despacho. Uma categoria nova no backend só precisa
+// de uma entrada aqui para ganhar um cabeçalho legível.
+export const MODIFIER_CATEGORY_LABELS = {
+  equipa: "Equipa",
+  moral: "Moral e Lealdade",
+  especializacoes: "Especializações",
+  talentos: "Talentos",
+  veiculos: "Veículos",
+  armamento: "Armas e Equipamento",
+  organizacao: "Quartel-General",
+  mundo: "Modificadores do Mundo",
+  missao: "Condições da Missão",
+  outros: "Outros Bónus e Penalizações",
+};
+
 export function fatigueColor(f) {
   if (f >= 70) return "#EF4444";
   if (f >= 40) return "#F59E0B";
