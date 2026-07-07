@@ -163,9 +163,10 @@ export default function GamePage() {
       <PlacementControls />
 
       <div
-        className="pointer-events-auto absolute left-2 z-30 flex gap-1 md:left-1/2 md:-translate-x-1/2 md:gap-1.5"
+        className="pointer-events-auto absolute left-2 z-30 md:left-1/2 md:-translate-x-1/2"
         style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
       >
+      <div className="lus-dock flex items-center gap-0.5 rounded-2xl border px-1 py-1 md:gap-1 md:px-1.5">
         <HudButton
           testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
           alert={alerts.claimable > 0}
@@ -212,6 +213,7 @@ export default function GamePage() {
           }
           active={openPanel === "weapons"} onClick={() => setOpenPanel("weapons")}
         />
+      </div>
       </div>
 
       <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} />

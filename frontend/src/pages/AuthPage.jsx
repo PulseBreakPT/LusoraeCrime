@@ -33,20 +33,22 @@ export default function AuthPage() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background">
-      <img src={BG} alt="Lisboa à noite" className="absolute inset-0 h-full w-full object-cover opacity-50" />
+      <img src={BG} alt="Lisboa à noite" className="lus-kenburns absolute inset-0 h-full w-full object-cover opacity-60" />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/40" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_50%_at_20%_30%,rgba(220,38,38,0.08),transparent_70%)]" />
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 md:justify-start md:px-16 lg:px-24">
         <div className="w-full max-w-md animate-slide-up">
           <div className="mb-6 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.35em] text-primary">
             <ShieldCheck size={14} /> Lisboa · Rede Criminosa
           </div>
-          <h1 className="font-display text-5xl font-bold tracking-tight text-white sm:text-6xl">LUSORAE</h1>
+          <h1 className="lus-title font-display text-6xl font-bold uppercase leading-none tracking-tight sm:text-7xl">Lusorae</h1>
+          <div className="mt-2 h-0.5 w-24 bg-gradient-to-r from-primary via-primary/60 to-transparent" />
           <p className="mt-3 max-w-sm text-sm text-muted-foreground">
             Não controlas uma personagem. Controlas um império. Gere equipas, veículos e operações num mapa vivo de Lisboa.
           </p>
 
-          <Card className="mt-8 border-white/10 bg-black/75 shadow-2xl backdrop-blur-xl">
+          <Card className="lus-panel relative mt-8 overflow-hidden border-white/10 shadow-2xl">
             <CardHeader className="pb-3">
               <Tabs value={mode} onValueChange={(m) => { setMode(m); setError(""); }}>
                 <TabsList className="grid w-full grid-cols-2 bg-white/5">

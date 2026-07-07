@@ -283,3 +283,16 @@ frontend:
 agent_communication:
     - agent: "main"
       message: "07/07/2026 — CSS-only/visual uniformization through shared components (sheet.jsx, button.jsx, hud.jsx, App.css lus-panel/lus-card/lus-topbar). No API or logic changes; verified visually with screenshots."
+
+frontend:
+  - task: "SSS-tier design overhaul (Noir Tático): Rajdhani display font, film grain global, gradient-border topbar/dock com laser sweep, dock unificado da nav inferior, laser line em todos os lus-panel, pins com glow/anel rotativo, tiles do mapa com color grade, AuthPage cinemático (ken burns + título gradiente), ActivityFeed em lus-panel"
+    implemented: true
+    working: true
+    file: "App.css, index.css, GamePage.jsx, AuthPage.jsx, ActivityFeed.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "07/07/2026 — Frontend-only. .env recriados pós-fork (backend+frontend) e credenciais em /app/memory/test_credentials.md. Verificado por screenshots (auth, mapa, painel Império). Lint limpo. Sem alterações de lógica/API."
