@@ -120,7 +120,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
       return { ok: false, reason: "A abastecer" };
     }
     if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > serverNow()) {
-      return { ok: false, reason: "Veículo em trânsito" };
+      return { ok: false, reason: "Veículo indisponível" };
     }
     if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
     const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;

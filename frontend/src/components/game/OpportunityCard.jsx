@@ -116,6 +116,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     if (ready.length < opp.min_members) return { ok: false, reason: `Mín. ${opp.min_members} membros` };
     const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
     if (!vehicle) return { ok: false, reason: "Sem veículo" };
+    if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > serverNow()) {
+      return { ok: false, reason: "Veículo indisponível" };
+    }
     if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
     if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow()) {
       return { ok: false, reason: "A abastecer" };
@@ -417,7 +420,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                           <SelectContent>
                             <SelectItem value={r.vehicle.id} className="font-mono text-xs">{r.vehicle.name} (atual)</SelectItem>
                             {state.vehicles
-                              .filter((v) => !v.team_id && v.id !== r.vehicle.id)
+                              .filter((v) => !v.team_id && !v.transfer && v.id !== r.vehicle.id)
                               .map((v) => (
                                 <SelectItem key={v.id} value={v.id} className="font-mono text-xs">{v.name}</SelectItem>
                               ))}
