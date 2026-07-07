@@ -623,24 +623,24 @@ def mod_risk_type(ctx):
     base_risk = max(0, ctx["risk"] - bump)
     if base_risk <= 0:
         return None
-    return {"key": "risco_base", "label": "Risco da operação", "pct": -base_risk * 0.07,
-            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão."}
+    return {"key": "risco_base", "category": "missao", "label": "Risco da operação", "pct": -base_risk * 0.07,
+            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão — é intrínseco à operação, não há como reduzi-lo além de escolher outra missão."}
 
 
 def mod_risk_distance(ctx):
     bump = distance_risk_bump(ctx.get("dist_km", 0.0))
     if bump <= 0:
         return None
-    return {"key": "distancia", "label": "Distância excessiva", "pct": -bump * 0.07,
-            "tip": f"Alvo a {ctx.get('dist_km', 0.0):.1f}km do QG — risco adicional por estar longe do QG."}
+    return {"key": "distancia", "category": "missao", "label": "Distância excessiva", "pct": -bump * 0.07,
+            "tip": f"Alvo a {ctx.get('dist_km', 0.0):.1f}km do QG — escolhe uma operação mais próxima para evitar esta penalização."}
 
 
 def mod_heat(ctx):
     heat = ctx["heat"]
     if heat <= 0:
         return None
-    return {"key": "calor", "label": "Calor policial elevado", "pct": -heat * 0.0015,
-            "tip": f"Calor actual: {round(heat)}%. Reduz a probabilidade em qualquer operação."}
+    return {"key": "calor", "category": "mundo", "label": "Calor policial elevado", "pct": -heat * 0.0015,
+            "tip": f"Calor actual: {round(heat)}% — reduz a probabilidade em qualquer operação. Suborna a polícia ou espera o calor baixar antes de despachar."}
 
 
 def mod_team_quality(ctx):
@@ -669,7 +669,7 @@ def mod_team_quality(ctx):
     baseline = (3 * 0.5 + 4 * 0.45)  # recruta nível 3, atributo médio 4, sem match nem bónus
     raw = max(-1.0, min(1.0, (avg_quality - baseline) / max(1.0, baseline)))
     pct = raw * _dim_scale(category, "team")
-    return {"key": "nivel_especializacao", "label": "Nível e especialização da equipa", "pct": pct,
+    return {"key": "nivel_especializacao", "category": "equipa", "label": "Nível e especialização da equipa", "pct": pct,
             "tip": "Nível médio, atributos relevantes para esta categoria e patente dos operacionais."}
 
 
@@ -681,16 +681,16 @@ def mod_team_size(ctx):
     if n < min_members:
         missing = min_members - n
         pct = -min(INCOMPLETE_CREW_PENALTY_MAX, INCOMPLETE_CREW_PENALTY_PER_MISSING * missing)
-        return {"key": "equipa_incompleta", "label": "Equipa incompleta", "pct": pct,
-                "tip": f"Faltam {missing} operacional(is) face ao recomendado ({min_members}) para esta operação."}
+        return {"key": "equipa_incompleta", "category": "equipa", "label": "Equipa incompleta", "pct": pct,
+                "tip": f"Faltam {missing} operacional(is) face ao recomendado ({min_members}) — atribui mais operacionais idle a esta equipa."}
     if n == 1:
-        return {"key": "membro_solo", "label": "A trabalhar sozinho", "pct": -SOLO_MEMBER_PENALTY,
-                "tip": "Um único operacional tem muito menos margem para imprevistos."}
+        return {"key": "membro_solo", "category": "equipa", "label": "A trabalhar sozinho", "pct": -SOLO_MEMBER_PENALTY,
+                "tip": "Um único operacional tem muito menos margem para imprevistos — atribui mais operacionais a esta equipa."}
     raw = min(1.0, (n - 1) * 0.2)
     pct = raw * _dim_scale(category, "team") * 0.5
     if pct < 0.0005:
         return None
-    return {"key": "equipa_completa", "label": "Equipa completa", "pct": pct,
+    return {"key": "equipa_completa", "category": "equipa", "label": "Equipa completa", "pct": pct,
             "tip": "Mais operacionais disponíveis dão mais margem de segurança."}
 
 
@@ -705,8 +705,8 @@ def mod_team_fatigue(ctx):
     pct = raw * _dim_scale(ctx["category"], "team")
     if abs(pct) < 0.0005:
         return None
-    return {"key": "fadiga", "label": "Fadiga elevada", "pct": pct,
-            "tip": f"Fadiga média de {round(avg_fatigue)}% — reduz a atenção e a coordenação da equipa."}
+    return {"key": "fadiga", "category": "moral", "label": "Fadiga elevada", "pct": pct,
+            "tip": f"Fadiga média de {round(avg_fatigue)}% — reduz a atenção e a coordenação da equipa. Manda os operacionais descansar antes de despachar."}
 
 
 def mod_team_morale(ctx):
@@ -719,7 +719,10 @@ def mod_team_morale(ctx):
     if abs(pct) < 0.0005:
         return None
     label = "Moral elevada" if raw > 0 else "Moral baixa"
-    return {"key": "moral", "label": label, "pct": pct, "tip": f"Moral média de {round(avg_morale)}%."}
+    tip = f"Moral média de {round(avg_morale)}%."
+    if raw <= 0:
+        tip += " Dá um bónus aos operacionais ou deixa-os descansar para subir a moral."
+    return {"key": "moral", "category": "moral", "label": label, "pct": pct, "tip": tip}
 
 
 def mod_team_loyalty(ctx):
@@ -731,13 +734,13 @@ def mod_team_loyalty(ctx):
         pct = min(1.0, (avg_loyalty - 70) / 30) * LOYALTY_BONUS_MAX
         if pct < 0.0005:
             return None
-        return {"key": "lealdade", "label": "Lealdade elevada", "pct": pct,
+        return {"key": "lealdade", "category": "moral", "label": "Lealdade elevada", "pct": pct,
                 "tip": f"Lealdade média de {round(avg_loyalty)}% — equipa empenhada."}
     pct = -min(1.0, (70 - avg_loyalty) / 70) * LOYALTY_PENALTY_MAX
     if abs(pct) < 0.0005:
         return None
-    return {"key": "lealdade", "label": "Lealdade baixa", "pct": pct,
-            "tip": f"Lealdade média de {round(avg_loyalty)}% — maior risco de falhas de empenho."}
+    return {"key": "lealdade", "category": "moral", "label": "Lealdade baixa", "pct": pct,
+            "tip": f"Lealdade média de {round(avg_loyalty)}% — maior risco de falhas de empenho. Promoções e bónus aumentam a lealdade."}
 
 
 def mod_team_leader(ctx):
@@ -751,8 +754,8 @@ def mod_team_leader(ctx):
     has_leader = any(RANKS.index(e["rank"]) >= leader_idx for e in members if e.get("rank") in RANKS)
     if has_leader:
         return None
-    return {"key": "sem_lider", "label": "Sem líder presente", "pct": -NO_LEADER_PENALTY,
-            "tip": f"Nenhum operacional tem a patente de {TEAM_LEADER_MIN_RANK} ou superior."}
+    return {"key": "sem_lider", "category": "equipa", "label": "Sem líder presente", "pct": -NO_LEADER_PENALTY,
+            "tip": f"Nenhum operacional tem a patente de {TEAM_LEADER_MIN_RANK} ou superior — atribui um líder à equipa para obter este bónus."}
 
 
 def mod_team_uniform_spec(ctx):
@@ -764,8 +767,10 @@ def mod_team_uniform_spec(ctx):
         return None
     pct = UNIFORM_SPEC_BONUS * fraction
     label = "Especializações todas correctas" if fraction >= 0.999 else "Especializações parcialmente correctas"
-    return {"key": "especializacao", "label": label, "pct": pct,
-            "tip": f"{round(fraction * 100)}% dos operacionais têm a especialização certa para esta operação."}
+    tip = f"{round(fraction * 100)}% dos operacionais têm a especialização certa para esta operação."
+    if fraction < 0.999:
+        tip += " Substitui os restantes por especialistas desta categoria para o bónus completo."
+    return {"key": "especializacao", "category": "especializacoes", "label": label, "pct": pct, "tip": tip}
 
 
 def mod_team_coordination(ctx):
@@ -776,7 +781,7 @@ def mod_team_coordination(ctx):
     pct = COORDINATION_BONUS_MAX * min(1.0, stable_s / COORDINATION_RAMP_S)
     if pct < 0.0005:
         return None
-    return {"key": "coordenacao", "label": "Equipa há muito tempo junta", "pct": pct,
+    return {"key": "coordenacao", "category": "equipa", "label": "Equipa há muito tempo junta", "pct": pct,
             "tip": "Tempo desde a última alteração de membros — mais tempo junto, melhor coordenação."}
 
 
@@ -792,8 +797,8 @@ def mod_vehicle_condition(ctx):
     pct = raw * _dim_scale(ctx["category"], "vehicle") * 2.0
     if abs(pct) < 0.0005:
         return None
-    return {"key": "veiculo_danificado", "label": "Veículo danificado", "pct": pct,
-            "tip": f"Condição do veículo em {round(condition)}%."}
+    return {"key": "veiculo_danificado", "category": "veiculos", "label": "Veículo danificado", "pct": pct,
+            "tip": f"Condição do veículo em {round(condition)}% — repara o veículo para recuperar esta penalização."}
 
 
 def mod_vehicle_fit(ctx):
@@ -815,8 +820,10 @@ def mod_vehicle_fit(ctx):
     if abs(pct) < 0.0005:
         return None
     label = "Veículo ideal" if pct > 0 else "Veículo pouco adequado"
-    return {"key": "veiculo_adequacao", "label": label, "pct": pct,
-            "tip": "Velocidade e discrição do veículo face às exigências desta categoria de operação."}
+    tip = "Velocidade e discrição do veículo face às exigências desta categoria de operação."
+    if pct <= 0:
+        tip += " Utiliza um veículo especializado nesta categoria para aumentar a probabilidade de sucesso."
+    return {"key": "veiculo_adequacao", "category": "veiculos", "label": label, "pct": pct, "tip": tip}
 
 
 def mod_vehicle_capacity(ctx):
@@ -839,8 +846,10 @@ def mod_vehicle_capacity(ctx):
     if abs(pct) < 0.0005:
         return None
     label = "Capacidade do veículo bem aproveitada" if raw > 0 else "Veículo sobredimensionado para a equipa"
-    return {"key": "veiculo_capacidade", "label": label, "pct": pct,
-            "tip": f"{len(members)} operacional(is) para {seats} lugares."}
+    tip = f"{len(members)} operacional(is) para {seats} lugares."
+    if raw <= 0:
+        tip += " Usa um veículo mais pequeno ou leva mais operacionais para aproveitar melhor a capacidade."
+    return {"key": "veiculo_capacidade", "category": "veiculos", "label": label, "pct": pct, "tip": tip}
 
 
 def mod_weapon_score(ctx):
@@ -880,8 +889,10 @@ def mod_weapon_score(ctx):
     if abs(pct) < 0.0005:
         return None
     label = "Armas adequadas" if pct > 0 else "Armas pouco adequadas"
-    return {"key": "armamento", "label": label, "pct": pct,
-            "tip": f"{equipped}/{len(members)} operacional(is) equipados; qualidade e adequação da arma a esta categoria."}
+    tip = f"{equipped}/{len(members)} operacional(is) equipados; qualidade e adequação da arma a esta categoria."
+    if pct <= 0:
+        tip += " Equipa uma arma mais adequada a esta categoria de missão."
+    return {"key": "armamento", "category": "armamento", "label": label, "pct": pct, "tip": tip}
 
 
 def mod_environment_night(ctx):
@@ -894,7 +905,7 @@ def mod_environment_night(ctx):
     pct = _dim_scale(category, "environment")
     if pct < 0.0005:
         return None
-    return {"key": "noite", "label": "Cobertura da noite", "pct": pct,
+    return {"key": "noite", "category": "mundo", "label": "Cobertura da noite", "pct": pct,
             "tip": "Operação de madrugada — mais discrição em categorias que a valorizam."}
 
 
@@ -902,7 +913,7 @@ def mod_hq_level(ctx):
     hq_level = ctx.get("hq_level", 1)
     if hq_level <= 1:
         return None
-    return {"key": "organizacao", "label": "Organização evoluída", "pct": HQ_CHANCE_BONUS_PER_LEVEL * (hq_level - 1),
+    return {"key": "organizacao", "category": "organizacao", "label": "Organização evoluída", "pct": HQ_CHANCE_BONUS_PER_LEVEL * (hq_level - 1),
             "tip": f"Quartel-General nível {hq_level} — competência transversal da organização."}
 
 
@@ -911,7 +922,7 @@ def mod_talents(ctx):
         return None
     if not any("pontaria_letal" in (e.get("talents") or []) for e in ctx["members"]):
         return None
-    return {"key": "talentos", "label": "Talento: Pontaria Letal", "pct": 0.05,
+    return {"key": "talentos", "category": "talentos", "label": "Talento: Pontaria Letal", "pct": 0.05,
             "tip": "Um operacional da equipa tem o talento Pontaria Letal."}
 
 
@@ -932,7 +943,7 @@ def chance_breakdown(ctx):
     de MODIFIERS. Acrescentar um modificador novo no futuro é acrescentar uma
     função a MODIFIERS; a soma é comutativa, a ordem só afecta a exibição, a
     lógica de agregação/clamping nunca muda."""
-    items = [{"key": "base", "label": "Base da missão", "pct": round(BASE_CHANCE, 4),
+    items = [{"key": "base", "category": "base", "label": "Base da missão", "pct": round(BASE_CHANCE, 4),
               "tip": "Ponto de partida antes de qualquer ajuste."}]
     total = BASE_CHANCE
     for mod in MODIFIERS:

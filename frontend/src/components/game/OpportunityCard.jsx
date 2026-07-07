@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
-import { fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed, chanceColor, pctSigned } from "../../lib/game";
+import {
+  fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed,
+  chanceColor, chanceQualityLabel, pctSigned, MODIFIER_CATEGORY_LABELS,
+} from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -9,7 +12,8 @@ import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star } from "lucide-react";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
 import { audio } from "../../lib/audio";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
@@ -24,6 +28,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [busy, setBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [confirmLowChance, setConfirmLowChance] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
 
@@ -48,6 +53,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   useEffect(() => {
     setPreview(null);
     setConfirmLowChance(false);
+    setShowDetails(false);
     if (!selectedTeamId || inProgress) return;
     let cancelled = false;
     previewDispatch(opp.id, selectedTeamId).then((r) => {
@@ -421,52 +427,121 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               Nenhuma equipa operacional — verifica membros, combustível e condição
             </p>
           )}
-          {preview && (
-            <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up border-white/10 bg-white/[0.03] p-2.5 shadow-none">
-              <div className="flex items-baseline justify-between">
-                <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
-                <p className="font-mono text-lg font-bold" style={{ color: chanceColor(preview.chance) }}>
-                  {Math.round(preview.chance * 100)}%
+          {preview && (() => {
+            const quality = chanceQualityLabel(preview.chance);
+            const modifiers = preview.breakdown.filter((item) => item.key !== "base");
+            const topModifiers = [...modifiers].sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 3);
+            const byCategory = {};
+            for (const item of modifiers) {
+              (byCategory[item.category || "outros"] = byCategory[item.category || "outros"] || []).push(item);
+            }
+            const categoryOrder = Object.keys(MODIFIER_CATEGORY_LABELS).filter((cat) => byCategory[cat]?.length);
+            return (
+              <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up border-white/10 bg-white/[0.03] p-2.5 shadow-none">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
+                  <div className="flex items-center gap-1.5">
+                    <Badge
+                      variant="outline"
+                      className="rounded border-transparent px-1.5 py-0 font-mono text-[8px] font-bold uppercase tracking-wider"
+                      style={{ color: quality.color, background: `${quality.color}1a` }}
+                    >
+                      {quality.label}
+                    </Badge>
+                    <p className="font-mono text-lg font-bold" style={{ color: chanceColor(preview.chance) }}>
+                      {Math.round(preview.chance * 100)}%
+                    </p>
+                  </div>
+                </div>
+                {preview.chance < lowSuccessThreshold && (
+                  <p data-testid="low-success-warning" className="mt-1 flex items-center gap-1 font-mono text-[10px] font-bold text-amber-400">
+                    <AlertTriangle size={11} /> Probabilidade abaixo do limite definido ({Math.round(lowSuccessThreshold * 100)}%)
+                  </p>
+                )}
+
+                {topModifiers.length > 0 && (
+                  <div className="mt-1.5 space-y-0.5 border-t border-white/5 pt-1.5" data-testid="dispatch-preview-top-factors">
+                    {topModifiers.map((item) => (
+                      <Tip key={item.key} tip={item.tip} side="left" block>
+                        <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
+                          <span className="truncate text-zinc-400">{item.label}</span>
+                          <span className="shrink-0 font-bold" style={{ color: item.pct >= 0 ? "#34D399" : "#EF4444" }}>
+                            {pctSigned(item.pct)}
+                          </span>
+                        </div>
+                      </Tip>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
+                  <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
+                  {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
+                  {preview.age_decay_pct < 0 && (
+                    <Tip tip="Esta oportunidade está disponível há algum tempo — a recompensa vai encolhendo quanto mais tempo ficar por reclamar.">
+                      <span className="text-amber-400"> ({preview.age_decay_pct}% tempo)</span>
+                    </Tip>
+                  )}
+                  {preview.split_penalty_pct < 0 && (
+                    <Tip tip="Levar mais membros do que o mínimo exigido divide o saque — cada membro extra reduz ligeiramente a recompensa.">
+                      <span className="text-amber-400"> ({preview.split_penalty_pct}% saque dividido)</span>
+                    </Tip>
+                  )}
+                  <span className="text-[#0A84FF]"> · +{opp.respect} resp.</span>
+                  {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
                 </p>
-              </div>
-              {preview.chance < lowSuccessThreshold && (
-                <p data-testid="low-success-warning" className="mt-1 flex items-center gap-1 font-mono text-[10px] font-bold text-amber-400">
-                  <AlertTriangle size={11} /> Probabilidade abaixo do limite definido ({Math.round(lowSuccessThreshold * 100)}%)
-                </p>
-              )}
-              <div className="mt-1.5 space-y-0.5 border-t border-white/5 pt-1.5" data-testid="dispatch-preview-breakdown">
-                {preview.breakdown.map((item) => (
-                  <Tip key={item.key} tip={item.tip} side="left" block>
-                    <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
-                      <span className="truncate text-zinc-400">{item.label}</span>
-                      <span
-                        className="shrink-0 font-bold"
-                        style={{ color: item.key === "base" ? "#A1A1AA" : item.pct >= 0 ? "#34D399" : "#EF4444" }}
-                      >
-                        {item.key === "base" ? `${Math.round(item.pct * 100)}%` : pctSigned(item.pct)}
-                      </span>
+
+                {modifiers.length > 0 && (
+                  <button
+                    data-testid="dispatch-preview-toggle-details"
+                    onClick={() => setShowDetails((v) => !v)}
+                    className="mt-1.5 flex w-full items-center justify-center gap-1 border-t border-white/5 pt-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500 transition-colors hover:text-white"
+                  >
+                    {showDetails ? "Ocultar detalhes" : "Ver detalhes"}
+                    <ChevronDown size={11} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+
+                {showDetails && (
+                  <div className="mt-1.5 animate-slide-up" data-testid="dispatch-preview-details">
+                    <div className="flex items-center justify-between rounded bg-black/40 px-1.5 py-1 font-mono text-[10px]">
+                      <span className="text-zinc-400">Base da missão</span>
+                      <span className="font-bold text-zinc-300">{Math.round(preview.breakdown[0].pct * 100)}%</span>
                     </div>
-                  </Tip>
-                ))}
-              </div>
-              <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
-                <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
-                {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
-                {preview.age_decay_pct < 0 && (
-                  <Tip tip="Esta oportunidade está disponível há algum tempo — a recompensa vai encolhendo quanto mais tempo ficar por reclamar.">
-                    <span className="text-amber-400"> ({preview.age_decay_pct}% tempo)</span>
-                  </Tip>
+                    <Accordion type="multiple" className="mt-1">
+                      {categoryOrder.map((cat) => (
+                        <AccordionItem key={cat} value={cat} className="border-white/5">
+                          <AccordionTrigger className="py-1.5 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-400 hover:no-underline">
+                            {MODIFIER_CATEGORY_LABELS[cat]}
+                            <span className="ml-auto mr-1.5 font-normal normal-case text-zinc-600">{byCategory[cat].length}</span>
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-1 pb-2 pt-0">
+                            {byCategory[cat].map((item) => (
+                              <Tip key={item.key} tip={item.tip} side="left" block>
+                                <div className="flex items-center justify-between gap-2 rounded bg-black/30 px-1.5 py-1 font-mono text-[10px]">
+                                  <span className="truncate text-zinc-400">{item.label}</span>
+                                  <span
+                                    className="shrink-0 font-bold"
+                                    style={{ color: Math.abs(item.pct) < 0.001 ? "#A1A1AA" : item.pct > 0 ? "#34D399" : "#EF4444" }}
+                                  >
+                                    {pctSigned(item.pct)}
+                                  </span>
+                                </div>
+                              </Tip>
+                            ))}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                    <div className="mt-1 flex items-center justify-between rounded bg-black/40 px-1.5 py-1 font-mono text-[10px]">
+                      <span className="font-bold uppercase tracking-wider text-zinc-300">Probabilidade final</span>
+                      <span className="font-bold" style={{ color: chanceColor(preview.chance) }}>{Math.round(preview.chance * 100)}%</span>
+                    </div>
+                  </div>
                 )}
-                {preview.split_penalty_pct < 0 && (
-                  <Tip tip="Levar mais membros do que o mínimo exigido divide o saque — cada membro extra reduz ligeiramente a recompensa.">
-                    <span className="text-amber-400"> ({preview.split_penalty_pct}% saque dividido)</span>
-                  </Tip>
-                )}
-                <span className="text-[#0A84FF]"> · +{opp.respect} resp.</span>
-                {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
-              </p>
-            </Card>
-          )}
+              </Card>
+            );
+          })()}
           <Tip tip={confirmLowChance ? "Probabilidade muito baixa — clica outra vez para confirmar mesmo assim." : null} block>
             <Button
               data-testid="dispatch-team-button"
