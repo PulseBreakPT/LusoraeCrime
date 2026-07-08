@@ -150,11 +150,11 @@ export function AuthProvider({ children }) {
 
   // Register
   const register = useCallback(
-    async (orgName, email, password, acceptTerms = false) => {
+    async (orgName, email, password) => {
       try {
         const res = await api.post(
           "/auth/register",
-          { org_name: orgName, email, password, accept_terms: acceptTerms },
+          { org_name: orgName, email, password },
           { timeout: 10000 }
         );
         if (res.data.access_token) {

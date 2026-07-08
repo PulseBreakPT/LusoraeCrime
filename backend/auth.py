@@ -1,11 +1,10 @@
 import os
-import re
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field
 
 from db import db
 from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
@@ -16,18 +15,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 JWT_ALGORITHM = "HS256"
 MAX_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
-TERMS_VERSION = "1.0"
-
-
-def validate_password_strength(password: str) -> str:
-    """Valida a força da palavra-passe: mínimo 8 caracteres, com letras e números."""
-    if len(password) < 8:
-        raise ValueError("A palavra-passe deve ter pelo menos 8 caracteres")
-    if not re.search(r"[A-Za-z]", password):
-        raise ValueError("A palavra-passe deve conter pelo menos uma letra")
-    if not re.search(r"\d", password):
-        raise ValueError("A palavra-passe deve conter pelo menos um número")
-    return password
 # Única conta autorizada a auto-promover-se a administrador pelo botão do
 # frontend — qualquer outra conta recebe 403 ao chamar /claim-admin.
 SELF_CLAIM_ADMIN_EMAIL = "geral@lusorae.pt"
@@ -89,21 +76,7 @@ async def get_current_user(request: Request) -> dict:
 class RegisterInput(BaseModel):
     org_name: str = Field(min_length=3, max_length=40)
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-    accept_terms: bool = False
-
-    @field_validator("org_name")
-    @classmethod
-    def org_name_clean(cls, v: str) -> str:
-        v = v.strip()
-        if len(v) < 3:
-            raise ValueError("O nome da organização deve ter pelo menos 3 caracteres")
-        return v
-
-    @field_validator("password")
-    @classmethod
-    def password_strong(cls, v: str) -> str:
-        return validate_password_strength(v)
+    password: str = Field(min_length=6, max_length=128)
 
 
 class LoginInput(BaseModel):
@@ -113,12 +86,7 @@ class LoginInput(BaseModel):
 
 class ChangePasswordInput(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8, max_length=128)
-
-    @field_validator("new_password")
-    @classmethod
-    def password_strong(cls, v: str) -> str:
-        return validate_password_strength(v)
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 class DeleteAccountInput(BaseModel):
@@ -164,11 +132,6 @@ async def create_player_for_user(user_id: str, org_name: str):
 
 @router.post("/register")
 async def register(body: RegisterInput, response: Response):
-    if not body.accept_terms:
-        raise HTTPException(
-            status_code=400,
-            detail="Tens de aceitar os Termos e Condições e a Política de Privacidade para criar conta",
-        )
     email = body.email.lower().strip()
     existing = await db.users.find_one({"email": email})
     if existing:
@@ -177,7 +140,6 @@ async def register(body: RegisterInput, response: Response):
     result = await db.users.insert_one({
         "email": email, "password_hash": hash_password(body.password),
         "name": body.org_name, "role": "player", "created_at": now,
-        "terms_accepted_at": now, "terms_version": TERMS_VERSION,
     })
     user_id = str(result.inserted_id)
     await create_player_for_user(user_id, body.org_name)
@@ -196,34 +158,19 @@ async def login(body: LoginInput, request: Request, response: Response):
     attempt = await db.login_attempts.find_one({"identifier": identifier})
     if attempt and attempt.get("count", 0) >= MAX_ATTEMPTS:
         locked_until = datetime.fromisoformat(attempt["locked_until"])
-        now = datetime.now(timezone.utc)
-        if now < locked_until:
-            remaining_s = (locked_until - now).total_seconds()
-            remaining_min = max(1, int(remaining_s // 60) + (1 if remaining_s % 60 else 0))
-            raise HTTPException(
-                status_code=429,
-                detail=f"Demasiadas tentativas falhadas. Conta temporariamente bloqueada — tenta novamente em {remaining_min} min",
-            )
+        if datetime.now(timezone.utc) < locked_until:
+            raise HTTPException(status_code=429, detail="Demasiadas tentativas. Tenta novamente em alguns minutos.")
         await db.login_attempts.delete_one({"identifier": identifier})
-        attempt = None
 
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):
-        new_count = (attempt.get("count", 0) if attempt else 0) + 1
-        update = {"$set": {"count": new_count, "last_attempt_at": datetime.now(timezone.utc).isoformat()}}
-        if new_count >= MAX_ATTEMPTS:
-            update["$set"]["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()
-        await db.login_attempts.update_one({"identifier": identifier}, update, upsert=True)
-        remaining = MAX_ATTEMPTS - new_count
-        if remaining <= 0:
-            raise HTTPException(
-                status_code=429,
-                detail=f"Demasiadas tentativas falhadas. Conta temporariamente bloqueada — tenta novamente em {LOCKOUT_MINUTES} min",
-            )
-        if remaining <= 2:
-            plural = "tentativa restante" if remaining == 1 else "tentativas restantes"
-            raise HTTPException(status_code=401, detail=f"Email ou palavra-passe incorretos — {remaining} {plural} antes do bloqueio temporário")
-        raise HTTPException(status_code=401, detail="Email ou palavra-passe incorretos")
+        await db.login_attempts.update_one(
+            {"identifier": identifier},
+            {"$inc": {"count": 1},
+             "$set": {"locked_until": (datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()}},
+            upsert=True,
+        )
+        raise HTTPException(status_code=401, detail="Email ou password incorretos")
 
     # Verificar se o utilizador está banido
     if user.get("banned"):
