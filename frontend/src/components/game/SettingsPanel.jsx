@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useAuth } from "../../context/AuthContextV2";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
+import { evaluatePassword } from "../../lib/passwordStrength";
 import { ConfirmButton, PanelKicker, PanelWatermark } from "./hud";
 import { haptics } from "../../lib/haptics";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
@@ -106,7 +107,10 @@ const ChangePasswordForm = () => {
 
   const submit = async () => {
     setError("");
-    if (next.length < 6) return setError("A nova palavra-passe precisa de pelo menos 6 caracteres.");
+    const evaluation = evaluatePassword(next);
+    if (!evaluation.meetsPolicy) {
+      return setError("A nova palavra-passe precisa de 8+ caracteres, 1 maiúscula, 1 minúscula e 1 número.");
+    }
     if (next !== confirm) return setError("As palavras-passe novas não coincidem.");
     setBusy(true);
     const res = await changePassword(current, next);

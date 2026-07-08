@@ -103,24 +103,58 @@
 #====================================================================================================
 
 user_problem_statement: >
-  Enriquecer toda a interface do Lusorae com informação útil (centro de comando profissional):
-  tooltips em todos os botões/ícones/ações, badges inteligentes, mini-barras de progresso,
-  strips de resumo agregado em todos os painéis, tooltips nos marcadores do mapa + legenda,
-  fluxo de caixa no Império, autonomia na Frota, impacto salarial no recrutamento — sem peso visual.
-  Alterações 100% frontend; backend intocado (apenas .env recriados após fork: MONGO_URL, JWT, CORS, REACT_APP_BACKEND_URL).
+  Redesenho completo AAA da experiência de Login/Registo/Autenticação do Lusorae:
+  validação em tempo real, força da palavra-passe, Caps Lock, mostrar/esconder password,
+  aceitação obrigatória de Termos/Privacidade com registo de data+hora+versão, páginas
+  públicas Termos/Privacidade/RGPD/Changelog (pt-PT, servidas pelo backend, versionadas),
+  segurança reforçada (validação servidor, sanitização, anti-duplicados, lockout com
+  Retry-After, refresh automático de sessão expirada).
 
 backend:
-  - task: "Backend inalterado — .env recriado (MONGO_URL/DB_NAME/JWT_SECRET/CORS_ORIGINS)"
+  - task: "Documentos legais versionados + changelog data-driven (legal_data.py) e rotas públicas GET /api/legal/meta, /api/legal/documents/{terms|privacy|rgpd}, /api/legal/changelog (routes_legal.py)"
     implemented: true
-    working: true
-    file: "backend/.env"
+    working: NA
+    file: "backend/legal_data.py, backend/routes_legal.py, backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: NA
         agent: "main"
-        comment: "Fork sem .env; recriados. Login/state verificados via curl e UI no preview URL. CORS com origens explícitas (wildcard + credentials falhava)."
+        comment: "08/07/2026 — Novos endpoints. Verificado por curl: meta devolve versões atuais (terms/privacy/rgpd v1.0), changelog devolve 6 versões com categorias. Falta teste formal: 404 para doc inexistente, ?version= específica."
+  - task: "Registo com aceitação obrigatória de termos (accept_terms) + registo de aceitação {accepted_at, terms_version, privacy_version, ip} no doc do utilizador; política de password forte no servidor (8+ chars, minúscula, maiúscula, número); sanitização org_name (whitespace, chars proibidos <>{}[]\\/;`); unicidade case-insensitive do nome da organização; DuplicateKeyError tratado (índice único email)"
+    implemented: true
+    working: NA
+    file: "backend/auth.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "08/07/2026 — Verificado por curl: accept_terms=false → 400; password fraca → 400 com requisitos em falta; '  Cartel   de  Teste ' sanitizado para 'Cartel de Teste'; terms_acceptance guardado no MongoDB com versões 1.0. Login de contas antigas NÃO afetado (política só no registo/alteração)."
+  - task: "POST /api/auth/check-availability {email?, org_name?} → {valid, available} para validação em tempo real no registo"
+    implemented: true
+    working: NA
+    file: "backend/auth.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "08/07/2026 — Verificado por curl com email/org do admin: {valid:true, available:false}. Testar também disponíveis e formatos inválidos."
+  - task: "Login lockout 429 com header Retry-After (segundos restantes) para countdown no frontend; change-password com nova política de password"
+    implemented: true
+    working: NA
+    file: "backend/auth.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
   - task: "Infra HUD partilhada (Tip/MiniBar/Chip/Kpi/SummaryStrip) + CSS tooltips"
@@ -253,7 +287,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "UI enrichment — verificação visual manual concluída; testes automatizados de frontend pendentes de autorização do utilizador"
+    - "Documentos legais versionados + changelog data-driven (legal_data.py) e rotas públicas GET /api/legal/meta, /api/legal/documents/{terms|privacy|rgpd}, /api/legal/changelog (routes_legal.py)"
+    - "Registo com aceitação obrigatória de termos (accept_terms) + registo de aceitação {accepted_at, terms_version, privacy_version, ip} no doc do utilizador; política de password forte no servidor (8+ chars, minúscula, maiúscula, número); sanitização org_name (whitespace, chars proibidos <>{}[]\\/;`); unicidade case-insensitive do nome da organização; DuplicateKeyError tratado (índice único email)"
+    - "POST /api/auth/check-availability {email?, org_name?} → {valid, available} para validação em tempo real no registo"
+    - "Login lockout 429 com header Retry-After (segundos restantes) para countdown no frontend; change-password com nova política de password"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -261,12 +298,19 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: >
-      Enriquecimento completo da UI (frontend-only). Novos test-ids: intel-alert-badge, map-legend-toggle,
-      map-legend-panel, teams-summary, hr-summary, hr-status-chips, fleet-summary, properties-summary,
-      empire-cashflow, stat-teams-ready, stat-active-ops, stat-payroll. Tooltips CSS via .lus-tip (hover).
-      .env recriados pós-fork (backend + frontend); CORS com origens explícitas. Credenciais em
-      /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!). Testar SEMPRE via preview URL
-      (localhost:3000 dá CORS por ser cross-origin com credentials).
+      08/07/2026 — Redesenho AAA da autenticação. BACKEND NOVO: legal_data.py (termos/privacidade/rgpd
+      v1.0 versionados + changelog 6 versões), routes_legal.py (3 GET públicos), auth.py alterado
+      (register exige accept_terms e guarda terms_acceptance; política password 8+/minúscula/maiúscula/número
+      no register e change-password; sanitização e unicidade org_name; check-availability; 429 com
+      Retry-After). Login de contas EXISTENTES não é afetado pela política (admin@lusorae.com /
+      LusoraeAdmin2026! continua válido — ver /app/memory/test_credentials.md). CUIDADO nos testes de
+      lockout: usar email descartável para não bloquear a conta admin (lockout é por ip:email).
+      FRONTEND: AuthPage redesenhada (testids mantidos: auth-tab-login/register, register-org-name-input,
+      auth-email-input, auth-password-input, auth-error-message, auth-submit-button; novos:
+      auth-password-toggle, auth-capslock-indicator, password-strength-meter, register-confirm-password-input,
+      terms-checkbox, terms-error, auth-lockout-countdown, auth-retry-button, auth-expired-banner),
+      rotas públicas /termos /privacidade /rgpd /changelog, interceptor 401→refresh→retry em api.js.
+      Testar backend primeiro; frontend só com autorização do utilizador.
 frontend:
   - task: "UI uniformization pass (shared sheet/button/hud/lus-* CSS classes)"
     implemented: true

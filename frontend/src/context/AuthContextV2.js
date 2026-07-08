@@ -127,6 +127,18 @@ export function AuthProvider({ children }) {
     []
   );
 
+  // Normaliza erros de autenticação para a UI (rede, lockout 429, validação)
+  const buildAuthError = useCallback((err) => {
+    const status = err.response?.status || null;
+    const retryAfterRaw = err.response?.headers?.["retry-after"];
+    const retryAfter = retryAfterRaw ? parseInt(retryAfterRaw, 10) : null;
+    const isNetwork = !err.response;
+    const errorMsg = isNetwork
+      ? "Sem ligação ao servidor. Verifica a tua internet e tenta novamente."
+      : formatApiErrorDetail(err.response?.data?.detail) || err.message;
+    return { ok: false, error: errorMsg, status, retryAfter, isNetwork };
+  }, []);
+
   // Login
   const login = useCallback(
     async (email, password) => {
@@ -141,20 +153,19 @@ export function AuthProvider({ children }) {
         await startBoot(performBoot);
         return { ok: true };
       } catch (err) {
-        const errorMsg = formatApiErrorDetail(err.response?.data?.detail) || err.message;
-        return { ok: false, error: errorMsg };
+        return buildAuthError(err);
       }
     },
-    [startBoot, performBoot]
+    [startBoot, performBoot, buildAuthError]
   );
 
   // Register
   const register = useCallback(
-    async (orgName, email, password) => {
+    async (orgName, email, password, acceptTerms) => {
       try {
         const res = await api.post(
           "/auth/register",
-          { org_name: orgName, email, password },
+          { org_name: orgName, email, password, accept_terms: !!acceptTerms },
           { timeout: 10000 }
         );
         if (res.data.access_token) {
@@ -166,12 +177,22 @@ export function AuthProvider({ children }) {
         await startBoot(performBoot);
         return { ok: true };
       } catch (err) {
-        const errorMsg = formatApiErrorDetail(err.response?.data?.detail) || err.message;
-        return { ok: false, error: errorMsg };
+        return buildAuthError(err);
       }
     },
-    [startBoot, performBoot]
+    [startBoot, performBoot, buildAuthError]
   );
+
+  // Verificação de disponibilidade em tempo real (registo)
+  const checkAvailability = useCallback(async (payload) => {
+    try {
+      const res = await api.post("/auth/check-availability", payload, { timeout: 6000 });
+      return { ok: true, data: res.data };
+    } catch (_err) {
+      // Não-crítico: em caso de falha a UI simplesmente não mostra o estado
+      return { ok: false, data: null };
+    }
+  }, []);
 
   // Logout
   const logout = useCallback(async () => {
@@ -217,6 +238,19 @@ export function AuthProvider({ children }) {
       });
   }, [startBoot, performBoot]);
 
+  // Sessão expirada (emitido pelo interceptor da API quando o refresh falha):
+  // limpa o estado e devolve o utilizador ao ecrã de login com aviso.
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(false);
+      setGameState(null);
+      setCatalog(null);
+      resetBoot();
+    };
+    window.addEventListener("lus:session-expired", onExpired);
+    return () => window.removeEventListener("lus:session-expired", onExpired);
+  }, [resetBoot]);
+
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     try {
       await api.post(
@@ -258,6 +292,7 @@ export function AuthProvider({ children }) {
         catalog,
         login,
         register,
+        checkAvailability,
         logout,
         changePassword,
         deleteAccount,

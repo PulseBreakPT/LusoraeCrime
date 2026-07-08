@@ -14,6 +14,7 @@ from db import client, db
 from auth import router as auth_router, seed_admin
 from routes_game import router as game_router
 from routes_admin import router as admin_router
+from routes_legal import router as legal_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
 
@@ -22,6 +23,7 @@ app = FastAPI(title="Lusorae API")
 app.include_router(auth_router)
 app.include_router(game_router)
 app.include_router(admin_router)
+app.include_router(legal_router)
 
 
 @app.get("/api/")
