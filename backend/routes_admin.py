@@ -5,7 +5,7 @@ from bson.errors import InvalidId
 from datetime import datetime, timezone
 
 from db import db
-from auth import get_current_user
+from auth import get_current_user, VALID_ROLES, STAFF_ROLES, root_admin_email
 from engine import now_utc, default_stats
 from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
 
@@ -13,10 +13,21 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 async def require_admin(user: dict = Depends(get_current_user)):
-    """Verifica se o utilizador é administrador."""
+    """Acesso total — apenas administradores (todas as mutações)."""
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Acesso negado — apenas administradores")
     return user
+
+
+async def require_staff(user: dict = Depends(get_current_user)):
+    """Acesso de leitura — administradores e moderadores (dashboards, listas, logs)."""
+    if user.get("role") not in STAFF_ROLES:
+        raise HTTPException(status_code=403, detail="Acesso negado — apenas equipa de gestão")
+    return user
+
+
+class SetRoleInput(BaseModel):
+    role: str
 
 
 class GrantResourcesInput(BaseModel):
@@ -37,7 +48,7 @@ class ResetPlayerInput(BaseModel):
 
 
 @router.get("/dashboard")
-async def admin_dashboard(admin: dict = Depends(require_admin)):
+async def admin_dashboard(admin: dict = Depends(require_staff)):
     """Dashboard com estatísticas gerais do servidor."""
     user_count = await db.users.count_documents({})
     player_count = await db.players.count_documents({})
@@ -86,7 +97,7 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
 
 
 @router.get("/users")
-async def list_users(admin: dict = Depends(require_admin), page: int = 1, per_page: int = 50):
+async def list_users(admin: dict = Depends(require_staff), page: int = 1, per_page: int = 50):
     """Lista todos os utilizadores registados."""
     skip = (page - 1) * per_page
     users = await db.users.find().skip(skip).limit(per_page).to_list(per_page)
@@ -118,7 +129,7 @@ async def list_users(admin: dict = Depends(require_admin), page: int = 1, per_pa
 
 
 @router.get("/user/{user_id}")
-async def get_user_details(user_id: str, admin: dict = Depends(require_admin)):
+async def get_user_details(user_id: str, admin: dict = Depends(require_staff)):
     """Detalhes completos de um utilizador específico."""
     try:
         user_oid = ObjectId(user_id)
@@ -299,6 +310,15 @@ async def ban_user(user_id: str, body: BanUserInput, admin: dict = Depends(requi
     if not user:
         raise HTTPException(status_code=404, detail="Utilizador não encontrado")
 
+    # Proteções de lógica: nunca banir a própria conta, a conta raiz do
+    # sistema, ou outro administrador (tem de ser despromovido primeiro).
+    if str(user_oid) == str(admin["_id"]):
+        raise HTTPException(status_code=400, detail="Não podes banir a tua própria conta")
+    if user.get("email") == root_admin_email():
+        raise HTTPException(status_code=403, detail="A conta raiz do sistema não pode ser banida")
+    if user.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="Não é possível banir um administrador — remove primeiro a função")
+
     # Marcar como banido
     await db.users.update_one({"_id": user_oid}, {"$set": {
         "banned": True,
@@ -351,6 +371,48 @@ async def unban_user(user_id: str, admin: dict = Depends(require_admin)):
     return {"ok": True, "message": "Utilizador desbanido com sucesso"}
 
 
+@router.post("/user/{user_id}/role")
+async def set_user_role(user_id: str, body: SetRoleInput, admin: dict = Depends(require_admin)):
+    """Definir a função de um utilizador (player/moderator/admin) — só admins.
+
+    Proteções: função inválida → 400; alterar a própria função → 400 (evita
+    lockout); alterar a conta raiz do seed → 403.
+    """
+    if body.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Função inválida — usa uma de: {', '.join(VALID_ROLES)}")
+    try:
+        user_oid = ObjectId(user_id)
+    except (InvalidId, ValueError):
+        raise HTTPException(status_code=400, detail="ID de utilizador inválido")
+
+    user = await db.users.find_one({"_id": user_oid})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+
+    if str(user_oid) == str(admin["_id"]):
+        raise HTTPException(status_code=400, detail="Não podes alterar a tua própria função")
+    if user.get("email") == root_admin_email():
+        raise HTTPException(status_code=403, detail="A conta raiz do sistema não pode ser alterada")
+
+    previous_role = user.get("role", "player")
+    if previous_role == body.role:
+        raise HTTPException(status_code=400, detail=f"Utilizador já tem a função '{body.role}'")
+
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": body.role}})
+
+    await db.admin_logs.insert_one({
+        "admin_id": admin["_id"],
+        "admin_email": admin["email"],
+        "action": "set_role",
+        "target_user_id": str(user_oid),
+        "target_user_email": user.get("email", ""),
+        "details": {"from": previous_role, "to": body.role},
+        "ts": now_utc().isoformat(),
+    })
+
+    return {"ok": True, "message": f"{user.get('email', '')} é agora '{body.role}'", "role": body.role}
+
+
 @router.post("/user/{user_id}/grant-admin")
 async def grant_admin(user_id: str, admin: dict = Depends(require_admin)):
     """Promover um utilizador a administrador."""
@@ -393,6 +455,11 @@ async def revoke_admin(user_id: str, admin: dict = Depends(require_admin)):
     if not user:
         raise HTTPException(status_code=404, detail="Utilizador não encontrado")
 
+    if str(user_oid) == str(admin["_id"]):
+        raise HTTPException(status_code=400, detail="Não podes remover a tua própria função de administrador")
+    if user.get("email") == root_admin_email():
+        raise HTTPException(status_code=403, detail="A conta raiz do sistema não pode ser alterada")
+
     if user.get("role") != "admin":
         raise HTTPException(status_code=400, detail="Utilizador não é administrador")
 
@@ -412,7 +479,7 @@ async def revoke_admin(user_id: str, admin: dict = Depends(require_admin)):
 
 
 @router.get("/logs")
-async def get_admin_logs(admin: dict = Depends(require_admin), limit: int = 100):
+async def get_admin_logs(admin: dict = Depends(require_staff), limit: int = 100):
     """Últimas ações administrativas."""
     logs = await db.admin_logs.find().sort("ts", -1).limit(limit).to_list(limit)
 
@@ -432,7 +499,7 @@ async def get_admin_logs(admin: dict = Depends(require_admin), limit: int = 100)
 
 
 @router.get("/server-stats")
-async def get_server_stats(admin: dict = Depends(require_admin)):
+async def get_server_stats(admin: dict = Depends(require_staff)):
     """Estatísticas avançadas do servidor."""
     now = now_utc()
 

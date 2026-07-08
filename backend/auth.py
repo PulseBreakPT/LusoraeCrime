@@ -88,6 +88,19 @@ def terms_acceptance_record(ip: str) -> dict:
 # frontend — qualquer outra conta recebe 403 ao chamar /claim-admin.
 SELF_CLAIM_ADMIN_EMAIL = "geral@lusorae.pt"
 
+# Sistema de funções (roles) da plataforma:
+#   player    — jogador normal, sem acesso a ferramentas de gestão
+#   moderator — acesso de LEITURA ao painel de administração (dashboard,
+#               utilizadores, registos, estatísticas); nunca pode alterar nada
+#   admin     — acesso total, incluindo mutações e gestão de funções
+VALID_ROLES = ("player", "moderator", "admin")
+STAFF_ROLES = ("moderator", "admin")
+
+
+def root_admin_email() -> str:
+    """Conta raiz criada pelo seed — protegida contra despromoção/banimento."""
+    return os.environ.get("ADMIN_EMAIL", "admin@lusorae.com")
+
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -133,6 +146,10 @@ async def get_current_user(request: Request) -> dict:
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="Utilizador não encontrado")
+        # Contas banidas perdem o acesso imediatamente, mesmo com sessão válida —
+        # sem isto, um banido manteria acesso até o refresh token expirar (7 dias).
+        if user.get("banned"):
+            raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'sem motivo indicado')}")
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user

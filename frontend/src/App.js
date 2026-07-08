@@ -70,7 +70,8 @@ const AdminRoute = ({ children }) => {
     );
   }
   if (user === false) return <Navigate to="/auth" replace />;
-  if (user.role !== "admin") return <Navigate to="/" replace />;
+  // Administradores têm acesso total; moderadores entram em modo de leitura.
+  if (user.role !== "admin" && user.role !== "moderator") return <Navigate to="/" replace />;
   return children;
 };
 
