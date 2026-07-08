@@ -56,14 +56,6 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Intel: fortuna total, valor frota, salários/ciclo, tooltips em todas as células; Quests: badges de contagem nas tabs; ActivityFeed: tempo relativo + nº registos
 - NOTA infra: .env recriados pós-fork; CORS exige origens explícitas (não "*" c/ credentials); testar via preview URL
 
-### Autenticação 2.0 + Legal + Changelog (08/07/2026)
-- Registo exige accept_terms (400 sem aceitação); guarda terms_accepted_at + terms_version "1.0"; password forte (>=8, letras+números) no registo/change-password; lockout inteligente (tentativas restantes <=2 no 401, minutos restantes no 429)
-- AuthPage redesenhada: 2 colunas c/ feature pills, toggle password, medidor de força live, validação inline, checkbox termos c/ links, footer Termos·Privacidade·Changelog (test-ids antigos mantidos + auth-terms-checkbox/auth-password-toggle/password-strength)
-- Páginas públicas /termos (15 secções PT-PT), /privacidade (RGPD c/ tabelas de dados), /changelog (timeline 8 versões/63 alterações do histórico git real, filtros por tipo, versão atual destacada) — LegalLayout partilhado (header c/ nav ativa, hero gradiente, secções numeradas c/ hover, footer editorial)
-- Dados: src/data/changelog.js (CURRENT_VERSION 1.0.0); AuthContextV2.register(+acceptTerms)
-- Smoke test backend OK (400/422/200); teste completo do backend por agente ficou PENDENTE (interrompido)
-- NOTA fork: .env recriados (backend: MONGO_URL/DB_NAME=lusorae/JWT_SECRET/CORS_ORIGINS/ADMIN_*; frontend: REACT_APP_BACKEND_URL); DB começou vazia, admin re-seeded
-
 ## Backlog priorizado
 ### P0 (próxima fase)
 - Territórios/influência: conquistar bairros de Lisboa, controlo gera rendimento, ataques a territórios ligados ao mapa
