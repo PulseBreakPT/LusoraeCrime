@@ -9,7 +9,7 @@ import requests
 from datetime import datetime
 
 # Base URL from frontend/.env
-BASE_URL = "https://website-showcase-20.preview.emergentagent.com/api"
+BASE_URL = "https://visual-hierarchy-12.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@lusorae.com"
