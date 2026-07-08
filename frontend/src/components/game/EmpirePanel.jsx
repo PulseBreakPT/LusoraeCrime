@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
-import { Tip, MiniBar } from "./hud";
+import { Tip, MiniBar, PanelKicker, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -63,10 +63,12 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
         <SheetHeader>
+          <PanelWatermark icon={Building2} />
+          <PanelKicker>Rede · Visão Geral</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Building2 size={18} className="text-primary" /> {p.org_name}
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Visão geral do império e economia.</SheetDescription>
+          <SheetDescription className="text-zinc-500">O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -322,7 +324,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           {showLedger && (
             <div className="mt-2" data-testid="ledger-list">
               {transactions.length === 0 ? (
-                <p className="font-mono text-[10px] text-zinc-600">Sem transações registadas ainda.</p>
+                <p className="font-mono text-[10px] text-zinc-600">Livro-razão em branco — o primeiro golpe ainda está por escrever.</p>
               ) : (
                 <Table>
                   <TableBody>

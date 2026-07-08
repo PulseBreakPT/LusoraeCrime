@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -25,11 +25,13 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
         <SheetHeader>
+          <PanelWatermark icon={Warehouse} />
+          <PanelKicker>Património · Território</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Warehouse size={18} className="text-primary" /> Imóveis
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="properties-count">{state.properties.length}</span>
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Compra, melhora e vende propriedades do império.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Cada esquina comprada é uma esquina controlada — expande o território.</SheetDescription>
         </SheetHeader>
 
         {(() => {

@@ -146,7 +146,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     setBusy(true);
     const res = await dispatchTeam(opp.id, selectedTeamId);
     setBusy(false);
-    if (res.ok) onClose();
+    if (res.ok) {
+      const teamName = state.teams.find((t) => t.id === selectedTeamId)?.name;
+      window.dispatchEvent(new CustomEvent("lus:dispatch-stamp", { detail: { team: teamName } }));
+      onClose();
+    }
   };
 
   const anyReady = state.teams.some((t) => readiness(t).ok);

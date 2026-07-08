@@ -46,6 +46,16 @@ const hqIcon = () => {
   return makeDivIcon(html, 36);
 };
 
+// Radar tático não-interativo por baixo do QG — varrimento cónico contínuo
+// que dá vida ao centro de operações no mapa (puro CSS, sem lógica).
+const hqRadarIcon = () =>
+  L.divIcon({
+    html: '<div class="lus-radar-hq"></div>',
+    className: "lus-marker",
+    iconSize: [170, 170],
+    iconAnchor: [85, 85],
+  });
+
 const unitIcon = (phase, chased) => {
   const color = chased ? "#EF4444" : phase === "operating" ? "#EF4444" : "#22D3EE";
   const classes = ["unit-pin"];
@@ -380,6 +390,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
   const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state.player.hq;
   const hqMarkerIcon = useMemo(() => hqIcon(), []);
+  const hqRadarMarkerIcon = useMemo(() => hqRadarIcon(), []);
   const level = state.player.level;
 
   return (
@@ -396,6 +407,14 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
       {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
+      <Marker
+        position={[hq.lat, hq.lng]}
+        icon={hqRadarMarkerIcon}
+        interactive={false}
+        keyboard={false}
+        zIndexOffset={100}
+        opacity={baseFilter === "all" || baseFilter === "hq" ? 1 : 0.15}
+      />
       <Marker
         position={[hq.lat, hq.lng]}
         icon={hqMarkerIcon}

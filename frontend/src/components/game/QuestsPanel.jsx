@@ -6,7 +6,7 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { MiniBar } from "./hud";
+import { MiniBar, PanelKicker, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -239,6 +239,8 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md" data-testid="quests-panel">
         <SheetHeader>
+          <PanelWatermark icon={Target} />
+          <PanelKicker>Contratos · Objetivos</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-primary" /> Missões
             {claimable > 0 && (
@@ -259,7 +261,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
             )}
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            Há sempre algo importante para fazer em Lisboa.
+            Lisboa paga bem a quem cumpre — reclama o que é teu.
           </SheetDescription>
         </SheetHeader>
 
@@ -315,7 +317,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
               Novas diárias em <span className="text-white">{dailyMs !== null ? fmtDuration(Math.max(0, dailyMs / 1000)) : "—"}</span>
             </p>
             <div className="space-y-2">
-              {dailies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Sem missões diárias de momento.</p>}
+              {dailies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Contratos diários esgotados — novos ao nascer do dia.</p>}
               {dailies.map((q) => (
                 <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
               ))}
@@ -329,7 +331,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
               Novas semanais em <span className="text-white">{weeklyMs !== null ? fmtDuration(Math.max(0, weeklyMs / 1000)) : "—"}</span>
             </p>
             <div className="space-y-2">
-              {weeklies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Sem missões semanais de momento.</p>}
+              {weeklies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Contratos semanais fechados — a próxima leva chega com a semana.</p>}
               {weeklies.map((q) => (
                 <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
               ))}
@@ -341,7 +343,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
           <div className="mt-3 space-y-2" data-testid="quests-alertas">
             {alerts.length === 0 && (
               <p className="font-mono text-[11px] text-zinc-600">
-                Sem alertas ativos. Missões sugeridas, eventos e decisões aparecem aqui conforme o estado do teu império.
+                Silêncio nos alertas. Missões sugeridas, eventos e decisões aparecem aqui quando o império mexer.
               </p>
             )}
             {alerts.map((q) => (

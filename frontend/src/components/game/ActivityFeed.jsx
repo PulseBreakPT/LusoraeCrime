@@ -4,6 +4,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { parseActivityMessage, classifyEvent } from "../../lib/game";
+import { useFlash } from "./hud";
 
 const KIND_LABELS = {
   success: "Sucesso",
@@ -36,6 +37,10 @@ const PANEL_LABELS = {
 
 export const ActivityFeed = ({ onNavigate }) => {
   const { state, serverNow } = useGame();
+  // Flash vermelho no registo mais recente quando chega um novo — o feed é a
+  // "voz" da rede; a entrada tem de se sentir. (Hook antes do early-return.)
+  const firstId = state?.events?.[0]?.id;
+  const newFlash = useFlash(firstId);
   if (!state) return null;
 
   return (
@@ -55,7 +60,7 @@ export const ActivityFeed = ({ onNavigate }) => {
       <ScrollArea className="h-44 p-2">
         <div className="space-y-1.5">
           {state.events.length === 0 && (
-            <p className="px-1 font-mono text-[11px] text-zinc-600">Sem atividade registada.</p>
+            <p className="px-1 font-mono text-[11px] text-zinc-600">Silêncio na rede. Por agora.</p>
           )}
           {state.events.map((e) => {
             const dest = classifyEvent(e.kind, e.message);
@@ -65,7 +70,7 @@ export const ActivityFeed = ({ onNavigate }) => {
                 type="button"
                 onClick={() => onNavigate && onNavigate(dest.panel, dest)}
                 title={`${KIND_LABELS[e.kind] || e.kind} — clica para abrir ${PANEL_LABELS[dest.panel] || dest.panel}`}
-                className="flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5"
+                className={`flex w-full items-start gap-1.5 rounded px-1 text-left transition-colors hover:bg-white/5 ${e.id === firstId && newFlash ? "lus-feed-new" : ""}`}
               >
                 <span className="shrink-0 pt-0.5" style={{ color: dest.color }}>▸</span>
                 <div className="min-w-0 flex-1">
@@ -86,6 +91,8 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
   const { state, serverNow } = useGame();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const firstId = state?.events?.[0]?.id;
+  const newFlash = useFlash(firstId);
 
   // Clicar fora fecha a lista, tal como um popover/dropdown normal — e Escape
   // também, para consistência com o resto da interface (desktop).
@@ -141,7 +148,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
         data-testid="activity-feed-mobile-toggle"
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-white/10 bg-black/85 px-3 py-1.5 text-left shadow-2xl backdrop-blur-xl"
+        className={`pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-white/10 bg-black/85 px-3 py-1.5 text-left shadow-2xl backdrop-blur-xl ${newFlash ? "lus-feed-new" : ""}`}
       >
         <span className="shrink-0" style={{ color: classifyEvent(latest.kind, latest.message).color }}>▸</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">{parseActivityMessage(latest.message)}</span>

@@ -1,6 +1,6 @@
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
-import { Tip } from "./hud";
+import { Tip, PanelKicker, PanelWatermark, EmptyState } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -122,10 +122,12 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
         <SheetHeader>
+          <PanelWatermark icon={BrainCircuit} />
+          <PanelKicker>Informação · Análise</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <BrainCircuit size={18} className="text-primary" /> Central de Inteligência
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Toda a informação da organização, num só lugar.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Quem sabe primeiro, age primeiro — números, alertas e histórico da rede.</SheetDescription>
         </SheetHeader>
 
         <RecommendedActions onNavigate={onNavigate} />
@@ -217,7 +219,11 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Section title="Registo de operações" testId="intel-history">
           {state.history.length === 0 && (
-            <p className="font-mono text-[11px] text-zinc-600">Nenhuma operação concluída ainda.</p>
+            <EmptyState
+              title="Historial em branco"
+              sub="As primeiras operações concluídas escrevem-se aqui — seleciona um alvo no mapa e despacha uma equipa."
+              testId="intel-history-empty"
+            />
           )}
           <div className="space-y-1">
             {state.history.map((m) => (

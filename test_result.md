@@ -351,7 +351,18 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshots (Equipas c/ dropdown aberto: dark-glass + item vermelho; Definições: switches/inputs). Lint limpo nos ficheiros tocados (calendar/command têm erros stock pré-existentes). Sem alterações de lógica/API."
-  - task: "SSS tier ronda 7 (juice de jogo, CSS-only): entrada do HUD (dock rise-in, topbar fade — sem transform p/ não quebrar -translate-x-1/2), pins do mapa nascem c/ bounce (opp/prop/unit), hover em prop/unit pins, halo dourado pulsante no QG, cascata staggered dos lus-card ao abrir painéis (nth-child delays, fill backwards), fade no lus-opp-card, tudo coberto por prefers-reduced-motion"
+  - task: "SSS tier ronda 8 (Cockpit Cinemático + Voz Noir): radar tático a emanar do QG (marcador CSS não-interativo), grelha tática nas bordas do viewport, moldura HUD com 4 cantos, relógio da rede na topbar (hora servidor + coordenadas Lisboa), flashes âmbar/azul em sujo/respeito, toasts sonner redesenhados (transmissão tática c/ barra lateral por tipo), flash vermelho no registo mais recente do feed (desktop+mobile), carimbo de celebração 'EQUIPA DESTACADA' no despacho (CustomEvent lus:dispatch-stamp), headers de todos os 10 painéis com PanelKicker (micro-etiqueta laser) + PanelWatermark (ícone marca de água) + títulos com gradiente metálico (lus-sheet-title) + taglines noir reescritas, EmptyState tático partilhado (Operacionais/Intel), copy noir em todos os empty states e AuthPage"
+    implemented: true
+    working: true
+    file: "App.css, hud.jsx, sheet.jsx, App.js, GamePage.jsx, LiveMap.jsx, ResourceBar.jsx, ActivityFeed.jsx, OpportunityCard.jsx, 10 painéis, AuthPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "08/07/2026 — Fork: .env recriados (backend+frontend, preview 881ea282...), credenciais em /app/memory/test_credentials.md. Verificado em live por screenshots: header Operacionais (kicker+watermark+gradiente+tagline), despacho real com carimbo+toast+flash no feed+relógio. Lint limpo (só warnings pré-existentes). Sem alterações de lógica/API. prefers-reduced-motion coberto."
+  - task: "SSS tier ronda 7 (juice de jogo, CSS-only): entrada do HUD, pins com bounce, halo QG, cascata staggered dos lus-card, prefers-reduced-motion"
     implemented: true
     working: true
     file: "App.css (secção 'SSS ronda 7')"

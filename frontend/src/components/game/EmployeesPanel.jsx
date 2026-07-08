@@ -7,7 +7,7 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, EmptyState } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -545,12 +545,14 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md" data-testid="employees-panel">
         <SheetHeader>
+          <PanelWatermark icon={IdCard} />
+          <PanelKicker>Recursos · Efetivo</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <IdCard size={18} className="text-primary" /> Operacionais
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            O motor da organização — recruta, forma e mantém o efetivo leal.
+            O coração da organização — recruta bem, paga a horas e vigia a lealdade.
           </SheetDescription>
         </SheetHeader>
 
@@ -653,7 +655,12 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         {tab === "roster" && (
           <div className="mt-3">
             {state.employees.length === 0 ? (
-              <p className="font-mono text-[11px] text-zinc-600">Sem operacionais. Vai à aba Recrutar.</p>
+              <EmptyState
+                icon={IdCard}
+                title="Plantel vazio"
+                sub="As ruas de Lisboa estão cheias de talento à espera de patrão — abre a aba Recrutar."
+                testId="employees-empty"
+              />
             ) : (
               <>
                 <div className="flex items-center gap-1.5">
@@ -693,7 +700,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                 </div>
                 <div className="mt-2 space-y-2" data-testid="employees-list">
                   {sortedEmployees.length === 0 && (
-                    <p className="font-mono text-[11px] text-zinc-600">Nenhum operacional corresponde aos filtros.</p>
+                    <p className="font-mono text-[11px] text-zinc-600">Ninguém no plantel bate certo com esses filtros — limpa-os e tenta de novo.</p>
                   )}
                   {sortedEmployees.map((e) => (
                     <EmployeeCard key={e.id} e={e} onNavigate={onNavigate} />

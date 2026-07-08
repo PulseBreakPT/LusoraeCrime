@@ -54,8 +54,7 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Império: fluxo de caixa passivo c/ balanço €/h, calor c/ thresholds 70/90, quick-nav c/ alertas
 - Frota: autonomia km por veículo e no stand; RH: impacto na folha salarial ao contratar, tooltips raridade/atributos/estados; Imóveis: preview do benefício no próximo nível
 - Intel: fortuna total, valor frota, salários/ciclo, tooltips em todas as células; Quests: badges de contagem nas tabs; ActivityFeed: tempo relativo + nº registos
-### Botões SSS (07/07/2026)
-- `button.jsx`: variantes enriquecidas (gradientes com via-stops, sombras em camadas, focus ring vermelho, disabled dessaturado) + classe base `lus-btn`
+### Botões SSS (07/07/2026)- `button.jsx`: variantes enriquecidas (gradientes com via-stops, sombras em camadas, focus ring vermelho, disabled dessaturado) + classe base `lus-btn`
 - `App.css`: física de interação (spring easing, press-down translateY+scale+brightness), sheen sweep no hover via background-position (não corta badges externos), orla metálica mask-ring 1px em primary/success (branco→dourado→sombra), icon glow currentColor nos `lus-hud-btn`, indicador luminoso sob o separador ativo do dock, tudo coberto por prefers-reduced-motion
 - `tabs.jsx`: TabsTrigger ativo com gradiente rico + ring inset + inner shadow; hover nos inativos; active:scale
 - Fixes de intenção de cor (bg-color tapado pelo gradiente do variant default): OpportunityCard dispatch→success (corrigida regressão via-red-600), EmpirePanel lavar/subornar→outline, SettingsPanel claim-admin→âmbar sólido, LiveMap placement-confirm→success, AdminPanel 5 botões→variants corretos
@@ -91,3 +90,10 @@ Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
 - button.jsx: default/success c/ glow + border, outline elevado, active:scale press effect — afeta todos os botões
 - hud.jsx: Kpi (lus-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
 - ResourceBar: lus-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)
+
+### SSS Ronda 8 — Cockpit Cinemático + Voz Noir (08/07/2026)
+- Mapa: radar tático CSS a emanar do QG (marcador não-interativo 170px), grelha tática visível nas bordas (mask radial), moldura HUD com 4 cantos vermelhos no viewport
+- Topbar: relógio da rede (hora do servidor + "Lisboa · 38.72N 9.14W"), flashes âmbar (dinheiro sujo) e azul (respeito) quando os valores sobem
+- Juice: toasts sonner redesenhados (.lus-toast — vidro escuro, barra lateral por tipo success/error/warning/info, mono), flash vermelho no registo mais recente do feed (lus-feed-new, desktop+mobile), carimbo de celebração "EQUIPA DESTACADA" (lus-stamp, CustomEvent lus:dispatch-stamp disparado pelo OpportunityCard, GamePage renderiza 1.7s)
+- Textos/Títulos: PanelKicker (micro-etiqueta laser vermelha) + PanelWatermark (ícone marca de água) em todos os 10 painéis, títulos com gradiente metálico (lus-sheet-title), taglines noir reescritas (ex. Império: "O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe."), EmptyState tático partilhado (hud.jsx), copy noir em empty states (feed "Silêncio na rede. Por agora.", quests "Contratos diários esgotados — novos ao nascer do dia.") e AuthPage
+- NOTA infra: fork 08/07 — .env recriados (preview 881ea282-260f-4851-99f8-c7e53f1369fd), credenciais em /app/memory/test_credentials.md

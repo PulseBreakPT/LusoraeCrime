@@ -4,7 +4,7 @@ import {
   fmtMoney, fmtDuration, hqBenefitsAt, hqBenefitDesc, hqAdvisorTips, hqPerformanceMetrics,
   CATEGORY_COLORS, SPEC_LABELS,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, PurchaseButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
@@ -156,6 +156,8 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm" data-testid="hq-panel">
         <SheetHeader>
+          <PanelWatermark icon={Landmark} />
+          <PanelKicker>Base · Operações</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Landmark size={18} className="text-primary" /> Quartel-General
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="hq-level">Nível {hq.level}/{maxLevel}</span>
@@ -201,7 +203,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
               {tips.length === 0 ? (
                 <Alert className="border-emerald-500/20 bg-emerald-500/5 py-2">
                   <AlertDescription className="font-mono text-[11px] text-emerald-400">
-                    Tudo sob controlo. Nenhuma ação urgente de momento.
+                    Tudo sob controlo. Lisboa está calma — aproveita enquanto dura.
                   </AlertDescription>
                 </Alert>
               ) : (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, STATUS_LABELS, SPEC_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -83,11 +83,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
         <SheetHeader>
+          <PanelWatermark icon={Car} />
+          <PanelKicker>Logística · Garagem</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Car size={18} className="text-primary" /> Frota
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="vehicle-caps">{caps.used}/{caps.max}</span>
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Abastece, repara, atribui e abate veículos.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Sem rodas não há golpes — abastece, repara e mantém tudo pronto a sair.</SheetDescription>
         </SheetHeader>
 
         {(() => {
@@ -143,7 +145,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
           {state.vehicles.length > 0 && sortedVehicles.length === 0 && (
             <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
-              Nenhum veículo corresponde à pesquisa.
+              Nenhum veículo com esse nome na garagem.
             </p>
           )}
           {sortedVehicles.map((v) => {

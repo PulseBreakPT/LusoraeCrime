@@ -90,6 +90,38 @@ export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => 
   </div>
 );
 
+// Micro-etiqueta acima do título dos painéis — dá contexto de secção com um
+// traço laser vermelho, no estilo dos kickers de HUD militar.
+export const PanelKicker = ({ children, className = "" }) => (
+  <p className={`flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-red-500/90 ${className}`}>
+    <span className="inline-block h-px w-4 bg-red-500 shadow-[0_0_6px_rgba(220,38,38,0.8)]" aria-hidden="true" />
+    {children}
+  </p>
+);
+
+// Ícone gigante e quase invisível no canto do header — identidade da secção
+// sem peso visual (marca de água).
+export const PanelWatermark = ({ icon: Icon }) => (
+  <span className="lus-watermark" aria-hidden="true">
+    <Icon strokeWidth={1.5} />
+  </span>
+);
+
+// Empty state tático partilhado — moldura tracejada, ícone com glow e voz noir.
+// Substitui os <p> soltos "Sem X" espalhados pelos painéis.
+export const EmptyState = ({ icon: Icon, title, sub, testId, className = "", children }) => (
+  <div data-testid={testId} className={`lus-empty ${className}`}>
+    {Icon && (
+      <span className="lus-empty-icon">
+        <Icon size={17} />
+      </span>
+    )}
+    {title && <p className="font-display text-sm font-bold uppercase tracking-wider text-zinc-300">{title}</p>}
+    {sub && <p className="max-w-[280px] font-mono text-[10px] leading-relaxed text-zinc-500">{sub}</p>}
+    {children}
+  </div>
+);
+
 // Nome de um item (veículo/operacional/propriedade) com um lápis ao lado que troca
 // para um input inline + guardar/cancelar. Substitui o <p>{item.name}</p> estático.
 export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassName = "" }) => {

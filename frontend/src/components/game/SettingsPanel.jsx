@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useAuth } from "../../context/AuthContextV2";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
-import { ConfirmButton } from "./hud";
+import { ConfirmButton, PanelKicker, PanelWatermark } from "./hud";
 import { haptics } from "../../lib/haptics";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -315,6 +315,8 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
         <SheetHeader>
+          <PanelWatermark icon={Settings} />
+          <PanelKicker>Sistema · Preferências</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições
           </SheetTitle>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -132,11 +132,13 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
         <SheetHeader>
+          <PanelWatermark icon={Users} />
+          <PanelKicker>Comando · Operações</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Users size={18} className="text-primary" /> Equipas
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            Centro de comando: membros, veículos e despacho num só lugar.
+            Quem executa as tuas ordens nas ruas — monta, equipa e despacha.
           </SheetDescription>
         </SheetHeader>
 

@@ -19,8 +19,17 @@ export const ResourceBar = () => {
   const prevCleanRef = useRef(null);
   const moneyIn = state && prevCleanRef.current != null && state.player.clean_money > prevCleanRef.current;
   const moneyFlash = useFlash(moneyIn ? state.player.clean_money : null);
+  const prevDirtyRef = useRef(null);
+  const dirtyIn = state && prevDirtyRef.current != null && state.player.dirty_money > prevDirtyRef.current;
+  const dirtyFlash = useFlash(dirtyIn ? state.player.dirty_money : null);
+  const prevRespectRef = useRef(null);
+  const respectIn = state && prevRespectRef.current != null && state.player.respect > prevRespectRef.current;
+  const respectFlash = useFlash(respectIn ? state.player.respect : null);
   useEffect(() => {
-    if (state) prevCleanRef.current = state.player.clean_money;
+    if (!state) return;
+    prevCleanRef.current = state.player.clean_money;
+    prevDirtyRef.current = state.player.dirty_money;
+    prevRespectRef.current = state.player.respect;
   }, [state]);
   if (!state) return null;
   const p = state.player;
@@ -74,6 +83,7 @@ export const ResourceBar = () => {
               value={<AnimatedNumber value={p.dirty_money} format={fmtMoney} />}
               sub={nearCap ? "cofre quase cheio!" : dirtyPerH > 0 ? `+${fmtMoney(dirtyPerH)}/h` : null}
               subColor={nearCap ? "#EF4444" : "#F59E0B"}
+              className={dirtyFlash ? "lus-flash-amber rounded" : ""}
               tip={`Dinheiro sujo vindo do crime — lava-o no Império para o poderes gastar. Capacidade do cofre: ${fmtMoney(p.dirty_money)}/${fmtMoney(dirtyCap)}${nearCap ? " — produção dos laboratórios acima do limite é DESPERDIÇADA. Lava dinheiro já!" : ". Produção acima do limite é desperdiçada; montantes altos atraem atenção."}`}
             />
           );
@@ -111,6 +121,14 @@ export const ResourceBar = () => {
               ? `Não tens dinheiro limpo suficiente para o próximo ciclo salarial (${fmtMoney(state.salary_total)}) — os operacionais vão perder moral e lealdade, e quem estiver disponível pode abandonar a organização.`
               : `Ciclo salarial pago a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia.`}
           />
+          <Tip tip="Hora da rede — sincronizada com o servidor. Lisboa nunca dorme; tu também não devias." side="bottom" align="end" className="hidden lg:inline-flex">
+            <div data-testid="stat-clock" className="flex min-w-0 flex-col items-end justify-center border-l border-border pl-2">
+              <p className="lus-clock font-mono text-xs font-bold text-zinc-200 sm:text-[13px]">
+                {new Date(serverNow()).toLocaleTimeString("pt-PT")}
+              </p>
+              <p className="text-[8px] font-medium uppercase tracking-[0.22em] text-zinc-600">Lisboa · 38.72N 9.14W</p>
+            </div>
+          </Tip>
         </div>
       </div>
     </div>

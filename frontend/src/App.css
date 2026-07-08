@@ -1089,3 +1089,246 @@ kbd {
         display: none;
     }
 }
+
+/* ============================================================
+   SSS ronda 8 — Cockpit Cinemático + Voz Noir
+   Moldura HUD, grelha tática, radar do QG, toasts "transmissão",
+   carimbo de despacho, flashes de valor e empty states táticos.
+   ============================================================ */
+
+/* ---------- Moldura HUD do viewport (4 cantos táticos) ---------- */
+.lus-hud-frame {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.lus-hud-frame span {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid rgba(220, 38, 38, 0.5);
+    opacity: 0.75;
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.35));
+}
+
+.lus-hud-frame .c-tl { top: 8px; left: 8px; border-right: none; border-bottom: none; border-top-left-radius: 4px; }
+.lus-hud-frame .c-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; border-top-right-radius: 4px; }
+.lus-hud-frame .c-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; border-bottom-left-radius: 4px; }
+.lus-hud-frame .c-br { bottom: 8px; right: 8px; border-left: none; border-top: none; border-bottom-right-radius: 4px; }
+
+/* ---------- Grelha tática — visível só perto das bordas ---------- */
+.lus-grid {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0.55;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
+    background-size: 96px 96px;
+    -webkit-mask-image: radial-gradient(115% 85% at 50% 50%, transparent 42%, #000 95%);
+    mask-image: radial-gradient(115% 85% at 50% 50%, transparent 42%, #000 95%);
+}
+
+/* ---------- Radar tático a emanar do QG (marcador no mapa) ---------- */
+.lus-radar-hq {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 9999px;
+    overflow: hidden;
+    pointer-events: none;
+    border: 1px solid rgba(220, 38, 38, 0.16);
+    background: radial-gradient(circle, rgba(220, 38, 38, 0.045) 25%, transparent 70%);
+}
+
+.lus-radar-hq::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: conic-gradient(from 0deg, rgba(220, 38, 38, 0.25) 0deg, rgba(220, 38, 38, 0.06) 55deg, transparent 80deg);
+    animation: lus-spin 7s linear infinite;
+}
+
+.lus-radar-hq::after {
+    content: "";
+    position: absolute;
+    inset: 31%;
+    border-radius: 9999px;
+    border: 1px dashed rgba(220, 38, 38, 0.22);
+}
+
+/* ---------- Flash do registo mais recente do feed ---------- */
+@keyframes lus-feed-flash {
+    0% {
+        background-color: rgba(220, 38, 38, 0.22);
+        box-shadow: inset 2px 0 0 rgba(239, 68, 68, 0.9);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: inset 2px 0 0 transparent;
+    }
+}
+
+.lus-feed-new {
+    animation: lus-feed-flash 2.4s ease-out;
+    border-radius: 4px;
+}
+
+/* ---------- Flashes de valor (topbar) — âmbar (sujo) e azul (respeito) ---------- */
+@keyframes lus-flash-amber {
+    0% { background-color: rgba(245, 158, 11, 0.2); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4); }
+    100% { background-color: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+
+.lus-flash-amber { animation: lus-flash-amber 2.2s ease-out; }
+
+@keyframes lus-flash-blue {
+    0% { background-color: rgba(10, 132, 255, 0.2); box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.4); }
+    100% { background-color: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+
+.lus-flash-blue { animation: lus-flash-blue 2.2s ease-out; }
+
+/* ---------- Empty states táticos ---------- */
+.lus-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    text-align: center;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 22px 16px;
+    background:
+        repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.013) 0 8px, transparent 8px 16px),
+        rgba(255, 255, 255, 0.015);
+}
+
+.lus-empty-icon {
+    display: flex;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    background: rgba(220, 38, 38, 0.08);
+    color: #f87171;
+    box-shadow: 0 0 18px rgba(220, 38, 38, 0.15);
+}
+
+/* ---------- Watermark do ícone da secção nos headers dos painéis ---------- */
+.lus-watermark {
+    position: absolute;
+    right: 46px;
+    top: -8px;
+    opacity: 0.05;
+    pointer-events: none;
+    color: #ffffff;
+    transform: rotate(-8deg);
+}
+
+.lus-watermark svg {
+    width: 68px;
+    height: 68px;
+}
+
+/* ---------- Título dos painéis com gradiente metálico ---------- */
+.lus-sheet-title {
+    background: linear-gradient(180deg, #ffffff 30%, #e4e4e7 65%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* ---------- Toasts "transmissão tática" (sonner) ---------- */
+.lus-toast {
+    background: linear-gradient(180deg, rgba(26, 26, 30, 0.97) 0%, rgba(9, 9, 11, 0.98) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-left: 3px solid #dc2626 !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+        0 18px 44px rgba(0, 0, 0, 0.72),
+        0 0 24px rgba(220, 38, 38, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+}
+
+.lus-toast [data-title] {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.lus-toast [data-description] {
+    color: #a1a1aa !important;
+    font-size: 11px;
+}
+
+.lus-toast[data-type="success"] { border-left-color: #10b981 !important; }
+.lus-toast[data-type="error"] { border-left-color: #ef4444 !important; }
+.lus-toast[data-type="warning"] { border-left-color: #f59e0b !important; }
+.lus-toast[data-type="info"] { border-left-color: #0a84ff !important; }
+
+/* ---------- Carimbo de despacho — celebração breve no centro do ecrã ---------- */
+.lus-stamp {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.lus-stamp-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 34px;
+    border: 2px solid rgba(16, 185, 129, 0.8);
+    border-radius: 8px;
+    background: rgba(4, 10, 8, 0.74);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+        0 0 44px rgba(16, 185, 129, 0.28),
+        inset 0 0 26px rgba(16, 185, 129, 0.08);
+    transform: rotate(-4deg);
+    animation: lus-stamp-in 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes lus-stamp-in {
+    0% { opacity: 0; transform: rotate(-4deg) scale(1.9); }
+    14% { opacity: 1; transform: rotate(-4deg) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(-4deg) scale(0.98); }
+}
+
+/* ---------- Relógio da rede (topbar) ---------- */
+.lus-clock {
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px rgba(220, 38, 38, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-radar-hq::before,
+    .lus-feed-new,
+    .lus-flash-amber,
+    .lus-flash-blue {
+        animation: none !important;
+    }
+    .lus-stamp-box {
+        animation: lus-stamp-in 1.6s step-end both;
+    }
+}

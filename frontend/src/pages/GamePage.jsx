@@ -28,6 +28,21 @@ export default function GamePage() {
   const [openPanel, setOpenPanel] = useState(null);
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
   const [baseFilter, setBaseFilter] = useState("all");
+  const [stamp, setStamp] = useState(null);
+
+  // Carimbo de confirmação de despacho — celebração breve (1.7s) no centro do
+  // ecrã quando uma equipa é destacada. Disparado por CustomEvent para não
+  // acoplar o OpportunityCard ao estado desta página.
+  useEffect(() => {
+    const onStamp = (ev) => setStamp({ team: ev.detail?.team || "Equipa", key: Date.now() });
+    window.addEventListener("lus:dispatch-stamp", onStamp);
+    return () => window.removeEventListener("lus:dispatch-stamp", onStamp);
+  }, []);
+  useEffect(() => {
+    if (!stamp) return;
+    const id = setTimeout(() => setStamp(null), 1700);
+    return () => clearTimeout(id);
+  }, [stamp]);
 
   // Ponto único de navegação a partir de eventos/registos — decide o painel a
   // abrir e, se o evento apontar para uma aba específica (ex.: uma decisão
@@ -122,6 +137,18 @@ export default function GamePage() {
         baseFilter={baseFilter}
       />
       <div className="lus-vignette" aria-hidden="true" />
+      <div className="lus-grid" aria-hidden="true" />
+      <div className="lus-hud-frame" aria-hidden="true">
+        <span className="c-tl" /><span className="c-tr" /><span className="c-bl" /><span className="c-br" />
+      </div>
+      {stamp && (
+        <div key={stamp.key} className="lus-stamp" aria-hidden="true" data-testid="dispatch-stamp">
+          <div className="lus-stamp-box">
+            <p className="font-display text-2xl font-bold uppercase tracking-[0.25em] text-emerald-400">Equipa destacada</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-emerald-200/70">{stamp.team} · em rota para o alvo</p>
+          </div>
+        </div>
+      )}
 
       <ResourceBar />
       <Tip

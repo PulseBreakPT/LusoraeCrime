@@ -70,7 +70,7 @@ export default function AuthPage() {
               </Tabs>
               <CardTitle className="sr-only">{mode === "login" ? "Entrar" : "Criar organização"}</CardTitle>
               <CardDescription className="text-zinc-500">
-                {mode === "login" ? "Volta a assumir o controlo da tua organização." : "Funda uma organização de raiz em Lisboa."}
+                {mode === "login" ? "A cidade não parou enquanto estiveste fora. Retoma o comando." : "Escolhe um nome. Lisboa trata de o pôr à prova."}
               </CardDescription>
             </CardHeader>
 
