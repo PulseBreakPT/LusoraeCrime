@@ -11,6 +11,9 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
 import GamePage from "./pages/GamePage";
 import AdminPanel from "./pages/AdminPanel";
+import TermsPage from "./pages/legal/TermsPage";
+import PrivacyPage from "./pages/legal/PrivacyPage";
+import ChangelogPage from "./pages/ChangelogPage";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { Loader2 } from "lucide-react";
 
@@ -81,6 +84,9 @@ function App() {
             <BootScreen />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
+              <Route path="/termos" element={<TermsPage />} />
+              <Route path="/privacidade" element={<PrivacyPage />} />
+              <Route path="/changelog" element={<ChangelogPage />} />
               <Route
                 path="/"
                 element={
