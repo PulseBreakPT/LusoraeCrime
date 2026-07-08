@@ -6,7 +6,7 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { MiniBar, PanelKicker, PanelWatermark } from "./hud";
+import { MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -237,7 +237,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md" data-testid="quests-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel" data-testid="quests-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
           <PanelKicker>Contratos · Objetivos</PanelKicker>
@@ -298,9 +298,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
           <div className="mt-3 space-y-4" data-testid="quests-historia">
             {Object.entries(chapters).map(([ch, qs]) => (
               <div key={ch}>
-                <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  {CHAPTER_LABELS[ch] || `Capítulo ${ch}`}
-                </h3>
+                <SectionHeader title={CHAPTER_LABELS[ch] || `Capítulo ${ch}`} meta={`${qs.length}`} />
                 <div className="space-y-2">
                   {qs.map((q) => (
                     <QuestCard key={q.id || q.quest_key} q={q} onClose={close} onNavigate={onNavigate} />

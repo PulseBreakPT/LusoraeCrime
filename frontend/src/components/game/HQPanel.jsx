@@ -4,7 +4,7 @@ import {
   fmtMoney, fmtDuration, hqBenefitsAt, hqBenefitDesc, hqAdvisorTips, hqPerformanceMetrics,
   CATEGORY_COLORS, SPEC_LABELS,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
@@ -154,7 +154,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm" data-testid="hq-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel" data-testid="hq-panel">
         <SheetHeader>
           <PanelWatermark icon={Landmark} />
           <PanelKicker>Base · Operações</PanelKicker>

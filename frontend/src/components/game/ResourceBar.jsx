@@ -44,7 +44,7 @@ export const ResourceBar = () => {
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="lus-topbar mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-xl border px-2.5 py-2 sm:gap-2 sm:px-3.5">
+      <div className="lus-topbar mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-xl border px-3 py-2 sm:gap-2 sm:px-4 sm:py-2.5">
         <Tip
           tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
           side="bottom"
@@ -93,14 +93,14 @@ export const ResourceBar = () => {
           tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."
         />
         <Tip tip={`Calor policial: ${hs.label}. ${hs.desc} Baixa naturalmente com o tempo ou com subornos no Império.`} side="bottom" className="min-w-0">
-          <div data-testid="stat-heat" className="flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1">
-            <Flame size={14} className="shrink-0" style={{ color: hs.color }} />
+          <div data-testid="stat-heat" className="flex min-w-0 items-center gap-1.5 px-1 sm:gap-2 sm:px-1.5">
+            <Flame size={15} className="shrink-0" style={{ color: hs.color }} />
             <div className="min-w-0">
-              <p className="hidden text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:block">
+              <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">
                 Calor · <span style={{ color: hs.color }}>{hs.label}</span>
               </p>
-              <p className="truncate font-mono text-xs font-bold text-white sm:text-[13px]">{Math.round(p.heat)}%</p>
-              <MiniBar value={p.heat} color={hs.color} className="w-7 sm:w-10" height="h-0.5" />
+              <p className="truncate font-mono text-[13px] font-bold leading-tight text-white sm:text-sm">{Math.round(p.heat)}%</p>
+              <MiniBar value={p.heat} color={hs.color} className="w-8 sm:w-11" height="h-0.5" />
             </div>
           </div>
         </Tip>
@@ -137,11 +137,11 @@ export const ResourceBar = () => {
 
 const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "center", testId, className = "" }) => (
   <Tip tip={tip} side="bottom" align={align} className="min-w-0">
-    <div data-testid={testId} className={`flex min-w-0 items-center gap-1 px-0.5 sm:gap-1.5 sm:px-1 ${className}`}>
-      <Icon size={14} className="shrink-0" style={{ color }} />
+    <div data-testid={testId} className={`flex min-w-0 items-center gap-1.5 px-1 sm:gap-2 sm:px-1.5 ${className}`}>
+      <Icon size={15} className="shrink-0" style={{ color }} />
       <div className="min-w-0">
-        <p className="hidden text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:block">{label}</p>
-        <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-xs font-bold text-white sm:text-[13px]">{value}</p>
+        <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">{label}</p>
+        <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-[13px] font-bold leading-tight text-white sm:text-sm">{value}</p>
         {sub && <p title={sub} className="truncate font-mono text-[10px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
       </div>
     </div>

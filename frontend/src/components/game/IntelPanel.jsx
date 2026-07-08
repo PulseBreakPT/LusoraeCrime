@@ -1,6 +1,6 @@
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
-import { Tip, PanelKicker, PanelWatermark, EmptyState } from "./hud";
+import { Tip, PanelKicker, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -64,9 +64,7 @@ const RecommendedActions = ({ onNavigate }) => {
 
   return (
     <div className="mt-4" data-testid="intel-recommendations">
-      <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-        <Lightbulb size={12} className="text-amber-400" /> Ações recomendadas
-      </h3>
+      <SectionHeader icon={Lightbulb} title="Ações recomendadas" meta={recs.length > 0 ? `${recs.length}` : null} />
       {recs.length === 0 ? (
         <Alert className="border-emerald-500/20 bg-emerald-500/5 py-2">
           <AlertDescription className="font-mono text-[11px] text-emerald-400">
@@ -120,7 +118,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={BrainCircuit} />
           <PanelKicker>Informação · Análise</PanelKicker>

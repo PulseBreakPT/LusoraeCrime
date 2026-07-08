@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -130,7 +130,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={Users} />
           <PanelKicker>Comando · Operações</PanelKicker>
@@ -523,16 +523,17 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 flex items-center justify-between font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <span>Formar nova equipa · {catalog && fmtMoney(catalog.team_create_cost)}</span>
-            {state.caps?.teams && (
+          <SectionHeader
+            icon={Users}
+            title={`Formar nova equipa · ${catalog ? fmtMoney(catalog.team_create_cost) : "—"}`}
+            meta={state.caps?.teams ? (
               <Tip tip="Nº de equipas vs. o limite atual — sobe de nível da organização para desbloquear mais.">
                 <span className={state.caps.teams.used >= state.caps.teams.max ? "text-amber-400" : "text-zinc-500"}>
                   {state.caps.teams.used}/{state.caps.teams.max}
                 </span>
               </Tip>
-            )}
-          </h3>
+            ) : null}
+          />
           {state.caps?.teams && state.caps.teams.used >= state.caps.teams.max && (
             <p className="mb-2 font-mono text-[10px] text-amber-400">
               Limite de equipas atingido para o nível {state.player.level} — sobe de nível para desbloquear mais.

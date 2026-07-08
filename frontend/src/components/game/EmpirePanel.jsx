@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
-import { Tip, MiniBar, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -61,7 +61,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={Building2} />
           <PanelKicker>Rede · Visão Geral</PanelKicker>
@@ -72,15 +72,28 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
         </SheetHeader>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <StatBox label="Nível" value={p.level} tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo.` : "Nível máximo."} />
-          <StatBox label="Respeito" value={p.respect} tip="Ganho em operações bem-sucedidas — determina o nível e o que está desbloqueado." />
           <StatBox label="€ Limpo" value={fmtMoney(p.clean_money)} accent="#10B981" tip="Pronto a gastar: compras, salários, reparações e subornos." />
           <StatBox label="€ Sujo" value={fmtMoney(p.dirty_money)} accent="#F59E0B" tip="Precisa de ser lavado antes de poder ser gasto. Lava abaixo ou usa empresas de fachada." />
         </div>
 
+        <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : "Nível máximo alcançado — domínio total de Lisboa."} block>
+          <Card className="mt-2 lus-card p-3 shadow-none" data-testid="empire-level-card">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+                Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+                Respeito <span className="ml-1 font-mono text-sm font-bold text-white">{p.respect}</span>
+                {p.next_level_respect && <span className="text-zinc-600">/{p.next_level_respect}</span>}
+              </p>
+            </div>
+            <MiniBar value={p.next_level_respect ? (p.respect / p.next_level_respect) * 100 : 100} color="#DC2626" className="mt-2" height="h-1.5" />
+          </Card>
+        </Tip>
+
         {dirtyCap && (
-          <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de operações são desperdiçadas — lava regularmente para abrir espaço.`}>
-            <div className="mt-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+          <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de operações são desperdiçadas — lava regularmente para abrir espaço.`} block>
+            <div className="mt-2 flex w-full items-center justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
               <span>Armazenamento sujo</span>
               <span className={dirtyCap.used >= dirtyCap.max * 0.9 ? "text-red-400" : "text-zinc-400"}>
                 {fmtMoney(dirtyCap.used)} / {fmtMoney(dirtyCap.max)}
@@ -113,23 +126,23 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <TrendingUp size={11} className="text-emerald-400" /> Fluxo de caixa passivo
           </p>
-          <div className="mt-2 grid grid-cols-3 gap-2">
+          <div className="mt-2.5 grid grid-cols-3 gap-2">
             <Tip tip="Dinheiro sujo gerado por hora pelos laboratórios." block>
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-zinc-600">Produção</p>
-                <p className="font-mono text-[11px] font-bold text-amber-400">+{fmtMoney(dirtyPerH)}/h</p>
+                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Produção</p>
+                <p className="mt-0.5 font-mono text-xs font-bold text-amber-400">+{fmtMoney(dirtyPerH)}/h</p>
               </div>
             </Tip>
             <Tip tip="Lavagem passiva por hora das empresas de fachada (sem taxa)." block>
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-zinc-600">Lavagem</p>
-                <p className="font-mono text-[11px] font-bold text-emerald-400">+{fmtMoney(launderPerH)}/h</p>
+                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Lavagem</p>
+                <p className="mt-0.5 font-mono text-xs font-bold text-emerald-400">+{fmtMoney(launderPerH)}/h</p>
               </div>
             </Tip>
             <Tip tip={`Ciclo salarial: ${fmtMoney(state.salary_total || 0)} a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} (${fmtMoney(salaryPerH)}/h).`} block>
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-zinc-600">Salários</p>
-                <p className="font-mono text-[11px] font-bold text-red-400">-{fmtMoney(salaryPerH)}/h</p>
+                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Salários</p>
+                <p className="mt-0.5 font-mono text-xs font-bold text-red-400">-{fmtMoney(salaryPerH)}/h</p>
               </div>
             </Tip>
           </div>
@@ -159,28 +172,16 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           </div>
         </Card>
 
-        {p.next_level_respect && (
-          <Card className="mt-3 lus-card p-3 shadow-none">
-            <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-              <span>Progresso nível {p.level + 1}</span>
-              <span>{p.respect}/{p.next_level_respect}</span>
-            </div>
-            <MiniBar value={(p.respect / p.next_level_respect) * 100} color="#DC2626" className="mt-1.5" height="h-1.5" />
+        <div className="mt-6">
+          <SectionHeader icon={MapPin} title="Quartel-general" />
+          <Card className="lus-card p-3 shadow-none">
+            <p className="text-sm font-semibold text-white">{p.hq.name}</p>
+            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
           </Card>
-        )}
+        </div>
 
-        <Card className="mt-3 lus-card p-3 shadow-none">
-          <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-            <MapPin size={11} className="text-primary" /> Quartel-general
-          </p>
-          <p className="mt-1 text-sm font-semibold text-white">{p.hq.name}</p>
-          <p className="font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
-        </Card>
-
-        <div className="mt-3">
-          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <LayoutGrid size={12} /> Acesso rápido
-          </h3>
+        <div className="mt-6">
+          <SectionHeader icon={LayoutGrid} title="Acesso rápido" />
           <div className="grid grid-cols-2 gap-2">
             <QuickNav testId="empire-nav-employees" label="Operacionais"
               value={`${state.caps.employees.used}/${state.caps.employees.max} · ${fmtMoney(state.salary_total || 0)}/ciclo`}
@@ -206,9 +207,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <Banknote size={12} /> Lavagem de dinheiro
-          </h3>
+          <SectionHeader icon={Banknote} title="Lavagem de dinheiro" />
           <Card className="lus-card p-3 shadow-none">
             <div className="flex items-baseline justify-between">
               <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Taxa de 25%.</p>
@@ -274,10 +273,8 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           </Card>
         </div>
 
-        <div className="mt-4">
-          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <Siren size={12} /> Polícia
-          </h3>
+        <div className="mt-6">
+          <SectionHeader icon={Siren} title="Polícia" meta={`${Math.round(p.heat)}%`} />
           <Card className="lus-card p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <Tip tip={hs.desc}>
@@ -312,13 +309,14 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           </Card>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-6 pb-2">
           <button
             data-testid="ledger-toggle"
             onClick={() => setShowLedger(!showLedger)}
-            className="flex w-full items-center justify-between font-mono text-xs font-bold uppercase tracking-wider text-zinc-400 transition-colors hover:text-white"
+            className="flex w-full items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:text-white"
           >
-            <span className="flex items-center gap-1.5"><History size={12} /> Extrato</span>
+            <span className="flex items-center gap-1.5"><History size={12} className="text-red-500/90" /> Extrato</span>
+            <span className="h-px min-w-3 flex-1 bg-gradient-to-r from-white/[0.14] via-white/[0.06] to-transparent" aria-hidden="true" />
             <ChevronDown size={13} className={`transition-transform ${showLedger ? "rotate-180" : ""}`} />
           </button>
           {showLedger && (
@@ -358,8 +356,8 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
 const StatBox = ({ label, value, accent = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
     <Card className="h-full lus-card p-3 shadow-none">
-      <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-0.5 font-mono text-sm font-bold" style={{ color: accent }}>{value}</p>
+      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">{label}</p>
+      <p className="mt-1 truncate font-mono text-lg font-bold leading-tight" style={{ color: accent }}>{value}</p>
     </Card>
   </Tip>
 );
@@ -371,10 +369,10 @@ const QuickNav = ({ testId, label, value, alert, alertText, tip, onClick }) => (
       onClick={onClick}
       className="group relative h-full w-full rounded-xl border lus-card p-3 text-left transition-colors hover:bg-white/[0.08]"
     >
-      <p className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+      <p className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">
         {label} <ChevronRight size={11} className="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
       </p>
-      <p className="mt-0.5 font-mono text-[11px] font-bold text-white">{value}</p>
+      <p className="mt-1 truncate font-mono text-xs font-bold text-white">{value}</p>
       {alertText && <p className="mt-0.5 font-mono text-[9px] text-amber-400">{alertText}</p>}
       {alert && (
         <span

@@ -16,7 +16,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/70 backdrop-blur-[3px]",
+      "fixed inset-0 z-50 bg-black/70 backdrop-blur-[3px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
       className
     )}
     {...props}
@@ -24,17 +24,20 @@ const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
+// Largura ÚNICA e consistente para todos os painéis laterais do jogo:
+// full-width em mobile, 27rem em tablet, 30rem em desktop — os painéis
+// não devem sobrepor larguras próprias (organização > improviso).
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg",
+  "fixed z-50 gap-4 bg-background p-4 pt-5 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-300 data-[state=closed]:duration-200 sm:p-6",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b",
+        top: "inset-x-0 top-0 border-b data-[state=open]:slide-in-from-top data-[state=closed]:slide-out-to-top",
         bottom:
-          "inset-x-0 bottom-0 border-t",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+          "inset-x-0 bottom-0 border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+        left: "inset-y-0 left-0 h-full w-full border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
         right:
-          "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
+          "inset-y-0 right-0 h-full w-full border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
       },
     },
     defaultVariants: {
@@ -64,7 +67,7 @@ const SheetHeader = ({
 }) => (
   <div
     className={cn(
-      "relative -mx-6 mb-1 flex flex-col space-y-1.5 border-b border-white/[0.07] bg-gradient-to-b from-white/[0.025] to-transparent px-6 pb-4 pl-[27px] text-left before:absolute before:left-4 before:top-1 before:h-[calc(100%-1.5rem)] before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-red-500 before:to-red-800 before:shadow-[0_0_10px_rgba(220,38,38,0.6)] before:content-['']",
+      "relative -mx-4 mb-1 flex flex-col space-y-1.5 border-b border-white/[0.07] bg-gradient-to-b from-white/[0.025] to-transparent px-4 pb-4 pl-[19px] text-left before:absolute before:left-2.5 before:top-1 before:h-[calc(100%-1.5rem)] before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-red-500 before:to-red-800 before:shadow-[0_0_10px_rgba(220,38,38,0.6)] before:content-[''] sm:-mx-6 sm:px-6 sm:pl-[27px] sm:before:left-4",
       className
     )}
     {...props} />

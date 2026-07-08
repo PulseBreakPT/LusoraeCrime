@@ -163,7 +163,7 @@ export default function GamePage() {
           onClick={() => setOpenPanel("intel")}
           className="lus-hud-btn relative h-auto gap-1.5 rounded-full p-2.5 text-white backdrop-blur-xl hover:text-white md:px-3"
         >
-          <BrainCircuit size={16} className="text-primary" />
+          <BrainCircuit size={16} className="h-[18px] w-[18px] text-primary md:h-4 md:w-4" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
           {alerts.total > 0 && (
             <Badge data-testid="intel-alert-badge" className="rounded-full px-1.5 py-0 font-mono text-[10px] font-bold" style={{ background: NOTIFY_COLOR }}>{alerts.total}</Badge>
@@ -177,7 +177,7 @@ export default function GamePage() {
           onClick={() => setOpenPanel("settings")}
           className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white backdrop-blur-xl hover:text-white md:px-3"
         >
-          <Settings size={16} className="text-zinc-400" />
+          <Settings size={16} className="h-[18px] w-[18px] text-zinc-400 md:h-4 md:w-4" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
         </Button>
       </Tip>
@@ -269,13 +269,13 @@ const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onCli
       data-testid={testId}
       variant="outline"
       onClick={onClick}
-      className={`lus-hud-btn relative h-auto gap-1.5 rounded-full px-2 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur-xl md:px-3 md:py-2.5 ${
+      className={`lus-hud-btn relative h-auto gap-1.5 rounded-full px-2.5 py-2.5 text-xs font-bold uppercase tracking-wider backdrop-blur-xl md:px-3 ${
         active
           ? "lus-hud-btn-active text-white hover:text-white"
           : "text-white hover:text-white"
       }`}
     >
-      <Icon size={15} className={color} />
+      <Icon size={15} className={`${color} h-[17px] w-[17px] md:h-[15px] md:w-[15px]`} />
       <span className="hidden md:inline">{label}</span>
       {alert && (
         <span

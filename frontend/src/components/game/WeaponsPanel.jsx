@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, conditionBand, weaponBenefit, weaponCompatibility, matchesSearch, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -58,7 +58,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={Swords} />
           <PanelKicker>Arsenal · Equipamento</PanelKicker>
@@ -233,7 +233,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">Arsenal</h3>
+          <SectionHeader icon={Swords} title="Arsenal" />
           <div className="space-y-2">
             {catalog &&
               Object.entries(catalog.weapon_models).map(([key, m]) => {

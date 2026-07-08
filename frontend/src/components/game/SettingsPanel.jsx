@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import { useAuth } from "../../context/AuthContextV2";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
 import { evaluatePassword } from "../../lib/passwordStrength";
-import { ConfirmButton, PanelKicker, PanelWatermark } from "./hud";
+import { ConfirmButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { haptics } from "../../lib/haptics";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -317,7 +317,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-md">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={Settings} />
           <PanelKicker>Sistema · Preferências</PanelKicker>

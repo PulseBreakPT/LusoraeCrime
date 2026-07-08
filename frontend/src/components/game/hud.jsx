@@ -69,13 +69,13 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <Card data-testid={testId} className="h-full rounded-lg lus-card p-2 shadow-none">
-      <p className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-500">
+    <Card data-testid={testId} className="h-full rounded-lg lus-card p-2.5 shadow-none">
+      <p className="flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
         {Icon && <Icon size={10} style={{ color }} />} <span className="truncate">{label}</span>
       </p>
-      <p className="mt-0.5 truncate font-mono text-xs font-bold leading-tight" style={{ color }}>{value}</p>
-      {sub != null && <p className="truncate font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
-      {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1" height="h-0.5" />}
+      <p className="mt-1 truncate font-mono text-sm font-bold leading-tight" style={{ color }}>{value}</p>
+      {sub != null && <p className="mt-0.5 truncate font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
+      {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1.5" height="h-0.5" />}
     </Card>
   </Tip>
 );
@@ -87,6 +87,23 @@ export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => 
     style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
   >
     {children}
+  </div>
+);
+
+// Cabeçalho de secção padronizado de TODOS os painéis — título tático com
+// traço divisor que se estende até à margem (hierarquia + organização),
+// meta opcional à direita (contagens, totais) e slot de ação.
+export const SectionHeader = ({ icon: Icon, title, meta, action, tip, className = "", testId }) => (
+  <div data-testid={testId} className={`mb-2.5 flex items-center gap-2 ${className}`}>
+    <Tip tip={tip}>
+      <h3 className="flex min-w-0 shrink-0 items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300">
+        {Icon && <Icon size={12} className="shrink-0 text-red-500/90" />}
+        <span className="truncate">{title}</span>
+      </h3>
+    </Tip>
+    <span className="h-px min-w-3 flex-1 bg-gradient-to-r from-white/[0.14] via-white/[0.06] to-transparent" aria-hidden="true" />
+    {meta != null && <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">{meta}</span>}
+    {action}
   </div>
 );
 

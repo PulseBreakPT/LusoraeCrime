@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -23,7 +23,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto lus-panel sm:max-w-sm">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={Warehouse} />
           <PanelKicker>Património · Território</PanelKicker>
@@ -165,7 +165,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">Mercado imobiliário</h3>
+          <SectionHeader icon={TrendingUp} title="Mercado imobiliário" />
           <div className="space-y-2">
             {catalog &&
               Object.entries(catalog.property_types).map(([key, pt]) => {
