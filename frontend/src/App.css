@@ -1684,6 +1684,70 @@ html:has(.lus-page-bg) {
     background-color: rgba(34, 211, 238, 0.28);
 }
 
+/* ============================================================
+   SSS — Cartões de missão (QuestsPanel)
+   ============================================================ */
+
+/* Laser lateral com a cor da dificuldade (--mk) */
+.lus-quest-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12%;
+    bottom: 12%;
+    width: 3px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, transparent, var(--mk, #71717a) 30%, var(--mk, #71717a) 70%, transparent);
+    box-shadow: 0 0 10px var(--mk, transparent);
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* Contrato em destaque — tratamento hero vermelho/ouro */
+.lus-quest-featured {
+    border-color: rgba(239, 68, 68, 0.45) !important;
+    background-color: rgba(12, 7, 7, 0.7);
+    background-image:
+        radial-gradient(130% 90px at 18% 0%, rgba(220, 38, 38, 0.16) 0%, transparent 70%),
+        linear-gradient(165deg, rgba(255, 255, 255, 0.05) 0%, rgba(220, 38, 38, 0.045) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.09),
+        0 10px 30px rgba(0, 0, 0, 0.5),
+        0 0 28px rgba(220, 38, 38, 0.12);
+}
+
+.lus-quest-featured::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 2%, rgba(239, 68, 68, 0.9) 30%, rgba(212, 168, 83, 0.6) 70%, transparent 98%);
+    pointer-events: none;
+}
+
+/* Missão concluída por reclamar — respiração esmeralda */
+@keyframes lus-quest-glow {
+    0%, 100% {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 12px rgba(16, 185, 129, 0.1);
+    }
+    50% {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 26px rgba(16, 185, 129, 0.32);
+    }
+}
+
+.lus-quest-completed {
+    border-color: rgba(16, 185, 129, 0.45) !important;
+    animation: lus-quest-glow 2.2s ease-in-out infinite;
+}
+
+/* Bloqueada — dossier selado */
+.lus-quest-locked {
+    border-style: dashed !important;
+    filter: grayscale(0.45);
+}
+
 @media (prefers-reduced-motion: reduce) {
     html:has(.lus-page-bg) {
         scroll-behavior: auto;
