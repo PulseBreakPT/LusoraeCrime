@@ -665,6 +665,101 @@ NIGHT_STEALTH_BONUS = 0.04
 EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
 
 # ============================================================================
+# SSS-TIER FORMULA ENGINE (v2) — curvas, sinergias e rendimentos decrescentes
+# Reformulação de TODAS as fórmulas para curvas não-lineares calibradas para
+# manter a dificuldade média actual: cenários típicos rendem ~o mesmo, mas os
+# extremos (stacking de bónus, calor máximo, fadiga extrema, armas na mão de
+# amadores) passam a comportar-se de forma inteligente e justa.
+# ============================================================================
+
+# --- Agregação de chance com rendimentos decrescentes -----------------------
+# Acima do "joelho", cada ponto extra de bónus vale menos (curva exponencial
+# assimptótica) — é impossível "encher" 100% empilhando bónus. O tecto real é
+# CHANCE_SOFT_KNEE + CHANCE_SOFT_SPAN (assimptótico), nunca a certeza absoluta.
+CHANCE_FLOOR = 0.02              # nunca 0% — há sempre uma réstia de sorte
+CHANCE_CEILING = 0.97            # nunca 100% — há sempre risco residual
+CHANCE_SOFT_KNEE = 0.90          # a partir daqui, bónus rendem cada vez menos
+CHANCE_SOFT_SPAN = 0.07          # amplitude assimptótica acima do joelho
+
+# --- Curva de risco convexa (substitui o linear -7%/risco) ------------------
+# penalização(r) = LINEAR*r + QUADRATIC*r² → r1..r5: 5.6/12.4/20.4/29.6/40.0%
+# (antes: 7/14/21/28/35). Média preservada (~21% no risco mediano 3); operações
+# de baixo risco ficam ligeiramente mais acessíveis, as de topo exigem
+# investimento real em equipa/equipamento.
+RISK_PENALTY_LINEAR = 0.05
+RISK_PENALTY_QUADRATIC = 0.006
+
+# --- Atributos primários ponderados (0.6/0.4 em vez de média simples) -------
+# O 1º atributo da categoria (ex: tiro no assalto) pesa mais que o 2º (força).
+PRIMARY_ATTR_WEIGHT_MAIN = 0.6
+PRIMARY_ATTR_WEIGHT_SECONDARY = 0.4
+
+# --- Mentoria: veteranos aceleram a adaptação de novatos ---------------------
+MENTOR_MIN_RANK = "veterano"     # patente mínima para contar como mentor
+MENTOR_NEWBIE_RELIEF = 0.5       # multiplicador da penalização de novato com mentor presente
+
+# --- Curvas de estado da equipa ----------------------------------------------
+FATIGUE_CURVE_EXP = 1.35         # fadiga moderada penaliza menos, extrema penaliza mais
+MORALE_PENALTY_ASYMMETRY = 1.25  # moral baixa dói mais do que moral alta ajuda
+
+# --- Sinergia e química da equipa --------------------------------------------
+# Cobertura dos atributos-chave da categoria pelos MELHORES membros (60%) +
+# diversidade de papéis (40%), centrada num baseline neutro para uma equipa
+# típica — só composições genuinamente complementares ganham o bónus.
+TEAM_SYNERGY_MAX = 0.03          # oscilação máxima (±3%)
+TEAM_SYNERGY_BASELINE = 0.62     # score neutro de uma equipa mediana
+TEAM_SYNERGY_SPREAD = 0.38       # amplitude de normalização do desvio
+
+# --- Sinergia furtiva arma+veículo (categorias discretas) --------------------
+STEALTH_SYNERGY_BONUS = 0.03     # veículo discreto + só armas silenciosas
+STEALTH_SYNERGY_PENALTY = 0.025  # arma "loud" ou veículo espalhafatoso
+STEALTH_VEHICLE_DISCRETION_MIN = 70
+NOISY_VEHICLE_DISCRETION_MAX = 30
+
+# --- Armas na mão certa -------------------------------------------------------
+# A eficácia da arma escala com a habilidade real do operacional no atributo
+# relevante (requires_attr, senão tiro para armas de fogo / discrição para
+# silenciosas): um recruta com Rifle de Precisão rende WEAPON_SKILL_FLOOR do
+# potencial; um especialista (atributo >= CAP) extrai 100%.
+WEAPON_SKILL_FLOOR = 0.55
+WEAPON_SKILL_ATTR_CAP = 8
+
+# --- Frota: física contínua ---------------------------------------------------
+# Velocidade efetiva contínua (sem o degrau nos 50%): floor + span*(c/100)^exp.
+VEHICLE_SPEED_FLOOR = 0.6
+VEHICLE_SPEED_CURVE_EXP = 0.9
+# Desgaste por missão re-derivado: componente fixa + risco + km reais
+# percorridos — operações próximas desgastam menos, expedições longas mais
+# (média calibrada para igualar o desgaste antigo numa missão típica).
+VEHICLE_WEAR_BASE = 1.2          # antes: 2.0 fixo
+VEHICLE_WEAR_PER_RISK = 1.2      # antes: 1.5
+VEHICLE_WEAR_PER_KM = 0.10       # novo: proporcional à ida-e-volta real
+
+# --- Perseguições conscientes do veículo --------------------------------------
+ESCAPE_SPEED_BASELINE = 12       # velocidade a partir da qual o veículo ajuda a fugir
+ESCAPE_SPEED_BONUS_PER_UNIT = 0.011
+ESCAPE_SPEED_BONUS_MAX = 0.15    # supercarro em bom estado ≈ +15% de fuga
+CHASE_DISCRETION_RELIEF = 0.05   # em op. discretas, veículo discreto atrai menos perseguição
+CHASE_HEAT_SPAN = 0.25           # contribuição máxima do calor para a perseguição
+CHASE_HEAT_EXP = 1.2             # convexa: calor baixo quase não conta, alto conta muito
+ESCAPE_HEAT_SPAN = 0.12
+ESCAPE_HEAT_EXP = 1.2
+
+# --- Polícia: probabilidade de interceção convexa -----------------------------
+# prob = BASE + SPAN*(heat/100)^EXP, capada — a calor 0: 16% (antes 20%);
+# a calor 100: 65% (igual). Principiantes menos punidos, calor alto igual.
+POLICE_PROB_BASE = 0.16
+POLICE_PROB_SPAN = 0.49
+POLICE_PROB_EXP = 1.3
+POLICE_PROB_CAP = 0.65
+
+# --- Decaimento de calor não-linear --------------------------------------------
+# taxa/min = BASE − SLOPE*(heat/100) → calor 50: 1.2/min (igual à média antiga),
+# calor baixo dissipa mais depressa, calor alto "cola-se" — picos têm peso real.
+HEAT_DECAY_BASE_PER_MIN = 1.45
+HEAT_DECAY_SLOPE = 0.5
+
+# ============================================================================
 # SUMMARY OF REDESIGNED VALUES
 # ============================================================================
 #

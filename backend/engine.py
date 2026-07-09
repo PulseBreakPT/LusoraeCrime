@@ -54,7 +54,23 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        VEHICLE_MISMATCH_PENALTY, WEAPON_MISMATCH_PENALTY_MAX,
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S,
-                       PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT)
+                       PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT,
+                       CHANCE_FLOOR, CHANCE_CEILING, CHANCE_SOFT_KNEE, CHANCE_SOFT_SPAN,
+                       RISK_PENALTY_LINEAR, RISK_PENALTY_QUADRATIC,
+                       PRIMARY_ATTR_WEIGHT_MAIN, PRIMARY_ATTR_WEIGHT_SECONDARY,
+                       MENTOR_MIN_RANK, MENTOR_NEWBIE_RELIEF,
+                       FATIGUE_CURVE_EXP, MORALE_PENALTY_ASYMMETRY,
+                       TEAM_SYNERGY_MAX, TEAM_SYNERGY_BASELINE, TEAM_SYNERGY_SPREAD,
+                       STEALTH_SYNERGY_BONUS, STEALTH_SYNERGY_PENALTY,
+                       STEALTH_VEHICLE_DISCRETION_MIN, NOISY_VEHICLE_DISCRETION_MAX,
+                       WEAPON_SKILL_FLOOR, WEAPON_SKILL_ATTR_CAP,
+                       VEHICLE_SPEED_FLOOR, VEHICLE_SPEED_CURVE_EXP,
+                       VEHICLE_WEAR_BASE, VEHICLE_WEAR_PER_RISK, VEHICLE_WEAR_PER_KM,
+                       ESCAPE_SPEED_BASELINE, ESCAPE_SPEED_BONUS_PER_UNIT, ESCAPE_SPEED_BONUS_MAX,
+                       CHASE_DISCRETION_RELIEF, CHASE_HEAT_SPAN, CHASE_HEAT_EXP,
+                       ESCAPE_HEAT_SPAN, ESCAPE_HEAT_EXP,
+                       POLICE_PROB_BASE, POLICE_PROB_SPAN, POLICE_PROB_EXP, POLICE_PROB_CAP,
+                       HEAT_DECAY_BASE_PER_MIN, HEAT_DECAY_SLOPE)
 from quests import process_quests, make_instance
 from quests_data import QUEST_DEFS
 
@@ -593,10 +609,13 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
 # ---------------- Combate / resolução ----------------
 
 def effective_speed(vehicle):
-    c = vehicle["condition"]
-    if c >= 50:
-        return vehicle["speed"]
-    return vehicle["speed"] * (0.6 + 0.4 * c / 50)
+    """Física contínua (SSS v2): a condição afeta a velocidade em curva suave
+    em vez do antigo degrau nos 50% — um veículo a 65% já se ressente, um a
+    100% rende o máximo. floor + span*(condição/100)^exp, com o mesmo mínimo
+    de sempre (60%) a condição 0."""
+    c = max(0.0, min(100.0, vehicle["condition"]))
+    factor = VEHICLE_SPEED_FLOOR + (1 - VEHICLE_SPEED_FLOOR) * (c / 100) ** VEHICLE_SPEED_CURVE_EXP
+    return vehicle["speed"] * factor
 
 
 BASE_CHANCE = 0.92
@@ -614,20 +633,40 @@ def _dim_scale(category, dim):
     return DIMENSION_SWING_CAP.get(dim, 0.0) * weights.get(dim, 0.0)
 
 
+def _weighted_category_attr(attrs, aks):
+    """Atributo relevante ponderado (SSS v2): o 1º atributo da categoria pesa
+    PRIMARY_ATTR_WEIGHT_MAIN, o 2º PRIMARY_ATTR_WEIGHT_SECONDARY — um
+    assaltante vive do tiro, a força é apoio. Fallback para média simples em
+    categorias sem exatamente 2 atributos definidos."""
+    if aks and len(aks) == 2:
+        return attrs.get(aks[0], 2) * PRIMARY_ATTR_WEIGHT_MAIN + attrs.get(aks[1], 2) * PRIMARY_ATTR_WEIGHT_SECONDARY
+    if aks:
+        return sum(attrs.get(a, 2) for a in aks) / len(aks)
+    return sum(attrs.values()) / max(1, len(attrs)) if attrs else 2
+
+
+def _has_mentor(members):
+    """Há um veterano (ou superior) na equipa? Mentores encurtam a adaptação
+    dos recém-contratados (ver MENTOR_NEWBIE_RELIEF)."""
+    try:
+        mentor_idx = RANKS.index(MENTOR_MIN_RANK)
+    except ValueError:
+        return False
+    return any(RANKS.index(e["rank"]) >= mentor_idx for e in members if e.get("rank") in RANKS)
+
+
 def team_effectiveness(members, category, now=None):
     """Score de competência da equipa usado pela mecânica de perseguição
     policial pós-sucesso (_compute_chase_chance/_compute_escape_chance) —
     NÃO alimenta chance_breakdown (que decompõe a equipa nos seus próprios
     modificadores nomeados, mod_team_*, para dar transparência ao jogador)."""
     now = now or now_utc()
+    mentor = _has_mentor(members)
 
     def eff(e):
         attrs = e.get("attrs") or {}
         aks = CATEGORY_ATTRS.get(category)
-        if aks:
-            attr = sum(attrs.get(a, 2) for a in aks) / len(aks)
-        else:
-            attr = sum(attrs.values()) / max(1, len(attrs)) if attrs else 2
+        attr = _weighted_category_attr(attrs, aks)
         match = e.get("spec") == category or category == "especial"
         morale = e.get("morale", 70)
         morale_f = 0.75 + morale / 400
@@ -638,12 +677,13 @@ def team_effectiveness(members, category, now=None):
         except ValueError:
             rank_f = 1.0
         # Recém-contratados ainda se estão a adaptar — pequena penalização que
-        # desvanece nas primeiras horas ao serviço.
+        # desvanece nas primeiras horas ao serviço (mais depressa com mentor).
         newbie_f = 1.0
         hired_at = e.get("hired_at")
         if hired_at:
             elapsed_s = max(0.0, (now - parse_dt(hired_at)).total_seconds())
-            newbie_f -= NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            newbie_pen = NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            newbie_f -= newbie_pen * (MENTOR_NEWBIE_RELIEF if mentor else 1.0)
         return (e["level"] * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * (1 - e["fatigue"] / 250) * morale_f * rank_f * newbie_f
     return sum(eff(e) for e in members) / len(members) + 0.3 * (len(members) - 1)
 
@@ -711,20 +751,33 @@ def weapon_compatibility_factor(emp, model):
 # só afecta a ordem de exibição (a soma é comutativa), nunca a lógica de
 # agregação/clamping em chance_breakdown.
 
+def _risk_penalty(risk):
+    """Curva de risco convexa (SSS v2): linear + quadrática — r1..r5 penaliza
+    5.6/12.4/20.4/29.6/40.0% (antes: 7/14/21/28/35, linear). A mediana (r3)
+    mantém-se; operações fáceis ficam mais acessíveis, as de topo exigem
+    investimento real."""
+    return RISK_PENALTY_LINEAR * risk + RISK_PENALTY_QUADRATIC * risk * risk
+
+
 def mod_risk_type(ctx):
     bump = distance_risk_bump(ctx.get("dist_km", 0.0))
     base_risk = max(0, ctx["risk"] - bump)
     if base_risk <= 0:
         return None
-    return {"key": "risco_base", "category": "missao", "label": "Risco da operação", "pct": -base_risk * 0.07,
-            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão — é intrínseco à operação, não há como reduzi-lo além de escolher outra missão."}
+    return {"key": "risco_base", "category": "missao", "label": "Risco da operação", "pct": -_risk_penalty(base_risk),
+            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão — a penalização cresce em curva (operações de topo exigem preparação de topo)."}
 
 
 def mod_risk_distance(ctx):
     bump = distance_risk_bump(ctx.get("dist_km", 0.0))
     if bump <= 0:
         return None
-    return {"key": "distancia", "category": "missao", "label": "Distância excessiva", "pct": -bump * 0.07,
+    risk = ctx["risk"]
+    base_risk = max(0, risk - bump)
+    # Custo marginal real: penalização(risco total) - penalização(risco base) —
+    # na curva convexa, a distância dói mais em operações já arriscadas.
+    pct = -( _risk_penalty(risk) - _risk_penalty(base_risk) )
+    return {"key": "distancia", "category": "missao", "label": "Distância excessiva", "pct": pct,
             "tip": f"Alvo a {ctx.get('dist_km', 0.0):.1f}km do QG — escolhe uma operação mais próxima para evitar esta penalização."}
 
 
@@ -741,11 +794,12 @@ def mod_team_quality(ctx):
     if not members:
         return None
     category, now = ctx["category"], ctx["now"]
+    mentor = _has_mentor(members)
 
     def quality(e):
         attrs = e.get("attrs") or {}
         aks = CATEGORY_ATTRS.get(category)
-        attr = (sum(attrs.get(a, 2) for a in aks) / len(aks)) if aks else (sum(attrs.values()) / max(1, len(attrs)) if attrs else 2)
+        attr = _weighted_category_attr(attrs, aks)
         match = e.get("spec") == category or category == "especial"
         try:
             rank_f = 1 + 0.02 * RANKS.index(e.get("rank", "recruta"))
@@ -755,15 +809,21 @@ def mod_team_quality(ctx):
         hired_at = e.get("hired_at")
         if hired_at:
             elapsed_s = max(0.0, (now - parse_dt(hired_at)).total_seconds())
-            newbie_f -= NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            newbie_pen = NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            # Mentoria (SSS v2): um veterano na equipa acelera a adaptação
+            # dos recém-contratados — a penalização de novato é reduzida.
+            newbie_f -= newbie_pen * (MENTOR_NEWBIE_RELIEF if mentor else 1.0)
         return (e.get("level", 1) * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * rank_f * newbie_f
 
     avg_quality = sum(quality(e) for e in members) / len(members)
     baseline = (3 * 0.5 + 4 * 0.45)  # recruta nível 3, atributo médio 4, sem match nem bónus
     raw = max(-1.0, min(1.0, (avg_quality - baseline) / max(1.0, baseline)))
     pct = raw * _dim_scale(category, "team")
+    tip = "Nível médio, atributos relevantes (o principal da categoria pesa mais) e patente dos operacionais."
+    if mentor:
+        tip += " Um veterano presente acelera a adaptação dos novatos."
     return {"key": "nivel_especializacao", "category": "equipa", "label": "Nível e especialização da equipa", "pct": pct,
-            "tip": "Nível médio, atributos relevantes para esta categoria e patente dos operacionais."}
+            "tip": tip}
 
 
 def mod_team_size(ctx):
@@ -794,12 +854,14 @@ def mod_team_fatigue(ctx):
     avg_fatigue = sum(e.get("fatigue", 0) for e in members) / len(members)
     if avg_fatigue <= 30:
         return None
-    raw = -min(1.0, (avg_fatigue - 30) / 70)
+    # Curva convexa (SSS v2): fadiga moderada penaliza pouco, extrema penaliza
+    # desproporcionalmente — equipas exaustas são um risco real.
+    raw = -min(1.0, ((avg_fatigue - 30) / 70) ** FATIGUE_CURVE_EXP)
     pct = raw * _dim_scale(ctx["category"], "team")
     if abs(pct) < 0.0005:
         return None
     return {"key": "fadiga", "category": "moral", "label": "Fadiga elevada", "pct": pct,
-            "tip": f"Fadiga média de {round(avg_fatigue)}% — reduz a atenção e a coordenação da equipa. Manda os operacionais descansar antes de despachar."}
+            "tip": f"Fadiga média de {round(avg_fatigue)}% — a penalização cresce em curva; perto do limite a equipa torna-se um perigo. Manda os operacionais descansar antes de despachar."}
 
 
 def mod_team_morale(ctx):
@@ -809,12 +871,16 @@ def mod_team_morale(ctx):
     avg_morale = sum(e.get("morale", 70) for e in members) / len(members)
     raw = max(-1.0, min(1.0, (avg_morale - 70) / 30))
     pct = raw * _dim_scale(ctx["category"], "team") * 0.6
+    # Assimetria psicológica (SSS v2): moral baixa mina a operação mais do que
+    # moral alta a impulsiona — o lado negativo pesa mais.
+    if pct < 0:
+        pct *= MORALE_PENALTY_ASYMMETRY
     if abs(pct) < 0.0005:
         return None
     label = "Moral elevada" if raw > 0 else "Moral baixa"
     tip = f"Moral média de {round(avg_morale)}%."
     if raw <= 0:
-        tip += " Dá um bónus aos operacionais ou deixa-os descansar para subir a moral."
+        tip += " Moral baixa pesa mais do que moral alta ajuda — dá um bónus aos operacionais ou deixa-os descansar."
     return {"key": "moral", "category": "moral", "label": label, "pct": pct, "tip": tip}
 
 
@@ -876,6 +942,64 @@ def mod_team_coordination(ctx):
         return None
     return {"key": "coordenacao", "category": "equipa", "label": "Equipa há muito tempo junta", "pct": pct,
             "tip": "Tempo desde a última alteração de membros — mais tempo junto, melhor coordenação."}
+
+
+def mod_team_synergy(ctx):
+    """Química da equipa (SSS v2): cobertura dos atributos-chave da categoria
+    pelos MELHORES membros (60%) + diversidade de papéis (40%), centrada num
+    baseline neutro — uma equipa mediana fica a ~0%, só composições
+    genuinamente complementares ganham o bónus (e monoculturas fracas perdem)."""
+    members, category = ctx["members"], ctx["category"]
+    if len(members) < 2:
+        return None
+    aks = CATEGORY_ATTRS.get(category)
+    if aks:
+        coverage = sum(max(e.get("attrs", {}).get(a, 2) for e in members) for a in aks) / (len(aks) * 10)
+    else:
+        # "especial": cobertura dos 3 melhores atributos globais da equipa.
+        best = sorted((max(e.get("attrs", {}).get(a, 2) for e in members) for a in ATTR_KEYS), reverse=True)
+        coverage = sum(best[:3]) / 30
+    diversity = len({e.get("role_key") for e in members}) / len(members)
+    raw = 0.6 * coverage + 0.4 * diversity - TEAM_SYNERGY_BASELINE
+    pct = max(-1.0, min(1.0, raw / TEAM_SYNERGY_SPREAD)) * TEAM_SYNERGY_MAX
+    if abs(pct) < 0.0005:
+        return None
+    label = "Boa química de equipa" if pct > 0 else "Composição pouco complementar"
+    tip = "Cobertura dos atributos-chave desta categoria pelos melhores membros e diversidade de papéis."
+    if pct <= 0:
+        tip += " Junta especialistas complementares (papéis diferentes, atributos fortes na categoria) para o bónus."
+    return {"key": "sinergia", "category": "equipa", "label": label, "pct": pct, "tip": tip}
+
+
+def mod_stealth_synergy(ctx):
+    """Sinergia furtiva arma+veículo (SSS v2): em operações discretas, um
+    perfil TOTALMENTE silencioso (veículo discreto + nenhuma arma 'loud')
+    ganha bónus; qualquer elemento ruidoso no conjunto penaliza — as duas
+    dimensões deixam de ser avaliadas em silos."""
+    if ctx["category"] not in DISCREET_CATEGORIES:
+        return None
+    vehicle = ctx.get("vehicle")
+    model = VEHICLE_MODELS.get(vehicle.get("model_key")) if vehicle else None
+    if not model:
+        return None
+    weapons = [WEAPON_MODELS.get(w.get("model_key")) for w in (ctx.get("weapons_by_employee_id") or {}).values()]
+    weapons = [w for w in weapons if w]
+    any_loud = any(w.get("loud") for w in weapons)
+    disc = model.get("discretion", 50)
+    if disc >= STEALTH_VEHICLE_DISCRETION_MIN and not any_loud:
+        return {"key": "furtividade", "category": "especializacoes", "label": "Perfil totalmente furtivo",
+                "pct": STEALTH_SYNERGY_BONUS,
+                "tip": "Veículo discreto e nenhuma arma ruidosa — o conjunto passa despercebido nesta operação."}
+    if any_loud or disc <= NOISY_VEHICLE_DISCRETION_MAX:
+        reasons = []
+        if any_loud:
+            reasons.append("armas ruidosas")
+        if disc <= NOISY_VEHICLE_DISCRETION_MAX:
+            reasons.append("veículo espalhafatoso")
+        return {"key": "furtividade", "category": "especializacoes", "label": "Perfil ruidoso em operação discreta",
+                "pct": -STEALTH_SYNERGY_PENALTY,
+                "tip": f"{' e '.join(reasons).capitalize()} numa operação que exige discrição — troca por equipamento silencioso."}
+    return None
 
 
 def mod_vehicle_condition(ctx):
@@ -945,6 +1069,18 @@ def mod_vehicle_capacity(ctx):
     return {"key": "veiculo_capacidade", "category": "veiculos", "label": label, "pct": pct, "tip": tip}
 
 
+def _weapon_skill_factor(emp, model):
+    """A arma certa na mão errada rende pouco (SSS v2): a eficácia escala com
+    o atributo relevante do operacional — o 1º requisito da arma (requires_attr),
+    senão tiro para armas de fogo / discrição para silenciosas. Um recruta com
+    Rifle de Precisão extrai WEAPON_SKILL_FLOOR do potencial; um especialista
+    (atributo >= WEAPON_SKILL_ATTR_CAP) extrai 100%."""
+    reqs = model.get("requires_attr") or {}
+    skill_attr = next(iter(reqs), None) or ("tiro" if model.get("loud") else "discricao")
+    attr_val = (emp.get("attrs") or {}).get(skill_attr, 2)
+    return WEAPON_SKILL_FLOOR + (1 - WEAPON_SKILL_FLOOR) * min(1.0, attr_val / WEAPON_SKILL_ATTR_CAP)
+
+
 def mod_weapon_score(ctx):
     members = ctx["members"]
     weapons_by_employee_id = ctx.get("weapons_by_employee_id") or {}
@@ -968,9 +1104,12 @@ def mod_weapon_score(ctx):
         condition_factor = weapon.get("condition", 100) / 100
         reliability_factor = model.get("reliability", 100) / 100
         compat = weapon_compatibility_factor(e, model)
+        skill = _weapon_skill_factor(e, model)
         proficiency = e.get("weapon_proficiency", {}).get(model["category"], 0)
-        proficiency_bonus = (proficiency / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
-        total += score * best_for_mult * condition_factor * reliability_factor * compat * WEAPON_COMBAT_SCORE_SCALE
+        # Curva de proficiência com raiz quadrada (SSS v2): ganhos rápidos no
+        # início, rendimentos decrescentes perto da mestria — mais realista.
+        proficiency_bonus = math.sqrt(max(0.0, proficiency) / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
+        total += score * best_for_mult * condition_factor * reliability_factor * compat * skill * WEAPON_COMBAT_SCORE_SCALE
         total += proficiency_bonus
     if equipped == 0:
         return None
@@ -982,9 +1121,9 @@ def mod_weapon_score(ctx):
     if abs(pct) < 0.0005:
         return None
     label = "Armas adequadas" if pct > 0 else "Armas pouco adequadas"
-    tip = f"{equipped}/{len(members)} operacional(is) equipados; qualidade e adequação da arma a esta categoria."
+    tip = f"{equipped}/{len(members)} operacional(is) equipados; qualidade da arma, adequação à categoria e habilidade de quem a usa."
     if pct <= 0:
-        tip += " Equipa uma arma mais adequada a esta categoria de missão."
+        tip += " Equipa uma arma mais adequada — e nas mãos de quem tem o atributo certo para a dominar."
     return {"key": "armamento", "category": "armamento", "label": label, "pct": pct, "tip": tip}
 
 
@@ -1022,20 +1161,23 @@ def mod_talents(ctx):
 MODIFIERS = [
     mod_risk_type, mod_risk_distance, mod_heat,
     mod_team_quality, mod_team_size, mod_team_fatigue, mod_team_morale, mod_team_loyalty,
-    mod_team_leader, mod_team_uniform_spec, mod_team_coordination,
+    mod_team_leader, mod_team_uniform_spec, mod_team_coordination, mod_team_synergy,
     mod_vehicle_condition, mod_vehicle_fit, mod_vehicle_capacity,
-    mod_weapon_score, mod_environment_night, mod_hq_level, mod_talents,
+    mod_weapon_score, mod_stealth_synergy, mod_environment_night, mod_hq_level, mod_talents,
 ]
 
 
 def chance_breakdown(ctx):
-    """Sistema modular de probabilidade de sucesso: soma o ponto de partida
-    (BASE_CHANCE) com cada modificador aplicável de MODIFIERS, todos lidos do
-    mesmo `ctx`. Devolve (chance 0-1, items[]) — items começa sempre por
-    "base" e só inclui modificadores com efeito real (não-zero), pela ordem
-    de MODIFIERS. Acrescentar um modificador novo no futuro é acrescentar uma
-    função a MODIFIERS; a soma é comutativa, a ordem só afecta a exibição, a
-    lógica de agregação/clamping nunca muda."""
+    """Sistema modular de probabilidade de sucesso (SSS v2): soma o ponto de
+    partida (BASE_CHANCE) com cada modificador aplicável de MODIFIERS, todos
+    lidos do mesmo `ctx`, e aplica no fim uma compressão de rendimentos
+    decrescentes — acima de CHANCE_SOFT_KNEE cada ponto extra de bónus vale
+    exponencialmente menos (assimptota em CHANCE_CEILING), e a chance nunca
+    desce abaixo de CHANCE_FLOOR (há sempre uma réstia de sorte) nem atinge a
+    certeza absoluta. A compressão, quando aplicada, aparece como um item
+    próprio no breakdown ("rendimentos_decrescentes") para manter a soma dos
+    itens igual à chance final — transparência total para o jogador.
+    Devolve (chance 0-1, items[])."""
     items = [{"key": "base", "category": "base", "label": "Base da missão", "pct": round(BASE_CHANCE, 4),
               "tip": "Ponto de partida antes de qualquer ajuste."}]
     total = BASE_CHANCE
@@ -1048,7 +1190,17 @@ def chance_breakdown(ctx):
             continue
         total += pct
         items.append({**result, "pct": round(pct, 4)})
-    chance = max(0.0, min(1.0, total))
+    # Rendimentos decrescentes acima do joelho: compressão exponencial suave.
+    if total > CHANCE_SOFT_KNEE:
+        excess = total - CHANCE_SOFT_KNEE
+        softened = CHANCE_SOFT_KNEE + CHANCE_SOFT_SPAN * (1 - math.exp(-excess / CHANCE_SOFT_SPAN))
+        delta = softened - total
+        if delta <= -0.0005:
+            items.append({"key": "rendimentos_decrescentes", "category": "base",
+                          "label": "Rendimentos decrescentes", "pct": round(delta, 4),
+                          "tip": "Acima de ~90%, cada bónus extra vale cada vez menos — nenhuma operação é uma certeza absoluta."})
+        total = softened
+    chance = max(CHANCE_FLOOR, min(CHANCE_CEILING, total))
     return chance, items
 
 
@@ -1065,9 +1217,10 @@ def _roll_outcome(player, m):
     if random.random() <= chance:
         return "success"
     # Numa falha, o calor atual decide se foi só azar ou se a polícia estava
-    # mesmo à espera: mais calor, mais provável que a falha vire interceção
-    # (prisão + multa) em vez de um falhanço sem consequências extra.
-    police_prob = min(0.65, 0.20 + player.get("heat", 0) * 0.0045)
+    # mesmo à espera (SSS v2, curva convexa): com calor baixo a polícia quase
+    # não conta (16% base); com calor alto a probabilidade dispara até ao cap.
+    heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
+    police_prob = min(POLICE_PROB_CAP, POLICE_PROB_BASE + POLICE_PROB_SPAN * heat_frac ** POLICE_PROB_EXP)
     return "police" if random.random() < police_prob else "failure"
 
 
