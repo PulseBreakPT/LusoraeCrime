@@ -1872,35 +1872,162 @@ kbd {
     color: transparent;
 }
 
-/* ---------- Toasts "transmissão tática" (sonner) ---------- */
+/* ============================================================
+   Toasts SSS — "transmissão tática" (sonner)
+   Vidro de consola + orla metálica mask-ring + espinha luminosa
+   por tipo + sheen de entrada + barra de vida sincronizada (4s).
+   NOTA: nunca usar ::after no root — o sonner usa-o como ponte
+   invisível de hover entre toasts empilhados.
+   ============================================================ */
 .lus-toast {
-    background: linear-gradient(180deg, rgba(26, 26, 30, 0.98) 0%, rgba(9, 9, 11, 0.99) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-left: 3px solid #dc2626 !important;
-    border-radius: 10px !important;
+    --lt-rgb: 220 38 38;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 12px !important;
     color: #fff !important;
-    box-shadow:
-        0 18px 44px rgba(0, 0, 0, 0.72),
-        0 0 24px rgba(220, 38, 38, 0.07),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-size: 12px;
+    backdrop-filter: blur(14px) saturate(1.25);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    /* Camadas: sheen de entrada / scanlines / espinha lateral / brilho ambiente do tipo / corpo */
+    background:
+        linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.05) 46%, rgba(255, 255, 255, 0.13) 50%, rgba(255, 255, 255, 0.05) 54%, transparent 62%) no-repeat,
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, rgb(var(--lt-rgb) / 0) 0%, rgb(var(--lt-rgb) / 0.9) 22%, rgb(var(--lt-rgb) / 0.9) 78%, rgb(var(--lt-rgb) / 0) 100%) no-repeat,
+        radial-gradient(130% 160% at 0% 0%, rgb(var(--lt-rgb) / 0.14) 0%, transparent 52%),
+        linear-gradient(180deg, rgba(30, 30, 36, 0.93) 0%, rgba(13, 13, 16, 0.97) 55%, rgba(7, 7, 9, 0.98) 100%) !important;
+    background-size: 250% 100%, auto, 3px calc(100% - 18px), 100% 100%, 100% 100% !important;
+    background-position: 160% 0, 0 0, 0 9px, 0 0, 0 0 !important;
+    box-shadow:
+        0 22px 56px rgba(0, 0, 0, 0.78),
+        0 6px 18px rgba(0, 0, 0, 0.55),
+        0 0 30px rgb(var(--lt-rgb) / 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09) !important;
+    animation: lus-toast-sheen 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
 }
 
+/* Sheen de entrada: banda de luz varre uma vez via background-position */
+@keyframes lus-toast-sheen {
+    0% { background-position: 165% 0, 0 0, 0 9px, 0 0, 0 0; }
+    100% { background-position: -85% 0, 0 0, 0 9px, 0 0, 0 0; }
+}
+
+/* Orla metálica 1px (luz no topo → tinta do tipo → dourado → sombra) */
+.lus-toast::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 3;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.5) 0%, rgb(var(--lt-rgb) / 0.32) 32%, rgba(212, 168, 83, 0.32) 60%, rgba(0, 0, 0, 0.55) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+/* Cores por tipo (rgb triplets para alphas compostos) */
+.lus-toast[data-type="success"] { --lt-rgb: 16 185 129; }
+.lus-toast[data-type="error"] { --lt-rgb: 239 68 68; }
+.lus-toast[data-type="warning"] { --lt-rgb: 245 158 11; }
+.lus-toast[data-type="info"] { --lt-rgb: 10 132 255; }
+.lus-toast[data-type="loading"] { --lt-rgb: 161 161 170; }
+
+/* Título com gradiente metálico (linguagem dos painéis SSS) */
 .lus-toast [data-title] {
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-weight: 800;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    background: linear-gradient(180deg, #ffffff 30%, #e4e4e7 65%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
 }
 
 .lus-toast [data-description] {
-    color: #a1a1aa !important;
+    color: #9f9fa8 !important;
     font-size: 11px;
+    letter-spacing: 0.01em;
 }
 
-.lus-toast[data-type="success"] { border-left-color: #10b981 !important; }
-.lus-toast[data-type="error"] { border-left-color: #ef4444 !important; }
-.lus-toast[data-type="warning"] { border-left-color: #f59e0b !important; }
-.lus-toast[data-type="info"] { border-left-color: #0a84ff !important; }
+/* Ícone: cor do tipo + glow + pop com mola */
+.lus-toast [data-icon] {
+    color: rgb(var(--lt-rgb));
+    filter: drop-shadow(0 0 7px rgb(var(--lt-rgb) / 0.55));
+}
+
+.lus-toast-ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: lus-toast-ico-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.12s both;
+}
+
+@keyframes lus-toast-ico-pop {
+    0% { transform: scale(0.35) rotate(-12deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Barra de vida: esvazia em 4s (= duration), pausa no hover.
+   Vive em [data-content]::after para não tocar no ::after do root. */
+.lus-toast [data-content]::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    right: 13px;
+    bottom: 5px;
+    height: 2px;
+    border-radius: 2px;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgb(var(--lt-rgb) / 0.95), rgb(var(--lt-rgb) / 0.4));
+    box-shadow: 0 0 8px rgb(var(--lt-rgb) / 0.5);
+    transform-origin: left center;
+    animation: lus-toast-life 4s linear 0.1s both;
+}
+
+@keyframes lus-toast-life {
+    0% { transform: scaleX(1); }
+    100% { transform: scaleX(0); }
+}
+
+.lus-toast:hover [data-content]::after {
+    animation-play-state: paused;
+}
+
+.lus-toast[data-type="loading"] [data-content]::after {
+    display: none;
+}
+
+/* Botão de fecho: chip metálico escuro, hover na cor do tipo */
+.lus-toast [data-close-button] {
+    z-index: 4;
+    background: linear-gradient(180deg, #232329, #101013) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    color: #c9c9d1 !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lus-toast [data-close-button]:hover {
+    background: linear-gradient(180deg, #2c2c33, #131316) !important;
+    border-color: rgb(var(--lt-rgb) / 0.7) !important;
+    color: #ffffff !important;
+    transform: scale(1.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65), 0 0 10px rgb(var(--lt-rgb) / 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-toast,
+    .lus-toast-ico {
+        animation: none !important;
+    }
+    .lus-toast [data-content]::after {
+        display: none;
+    }
+}
 
 /* ---------- Carimbo de despacho — celebração breve no centro do ecrã ---------- */
 .lus-stamp {

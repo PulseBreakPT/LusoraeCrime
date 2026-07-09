@@ -9,7 +9,7 @@ import requests
 from datetime import datetime
 
 # Base URL from frontend/.env
-BASE_URL = "https://game-logic-analyzer.preview.emergentagent.com/api"
+BASE_URL = "https://top-toast-redesign.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@lusorae.com"

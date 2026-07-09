@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContextV2";
 import { GameProvider } from "./context/GameContextV2";
 import { BootProvider, useBoot } from "./context/BootContext";
@@ -15,7 +15,21 @@ import LegalPage from "./pages/LegalPage";
 import ChangelogPage from "./pages/ChangelogPage";
 import DevLoadingPreview from "./pages/DevLoadingPreview";
 import { LoadingScreen } from "./components/LoadingScreen";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2, OctagonAlert, TriangleAlert, Info } from "lucide-react";
+
+const toastIcon = (Icon, spin = false) => (
+  <span className="lus-toast-ico">
+    <Icon className={spin ? "h-[17px] w-[17px] animate-spin" : "h-[17px] w-[17px]"} strokeWidth={2.4} />
+  </span>
+);
+
+const TOAST_ICONS = {
+  success: toastIcon(CheckCircle2),
+  error: toastIcon(OctagonAlert),
+  warning: toastIcon(TriangleAlert),
+  info: toastIcon(Info),
+  loading: toastIcon(Loader2, true),
+};
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -121,8 +135,10 @@ function App() {
               position="top-center"
               theme="dark"
               closeButton
+              gap={10}
               swipeDirections={["up", "left", "right"]}
-              toastOptions={{ className: "lus-toast" }}
+              icons={TOAST_ICONS}
+              toastOptions={{ className: "lus-toast", duration: 4000 }}
             />
           </BrowserRouter>
         </LoadingProvider>
