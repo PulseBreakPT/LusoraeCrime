@@ -37,6 +37,8 @@ class Player(BaseDocument):
     pool_refresh_at: Optional[str] = None
     quests_daily_at: Optional[str] = None
     quests_weekly_at: Optional[str] = None
+    quest_streak: dict = {}
+    quest_perf: dict = {}
     temp_bonus: Optional[dict] = None
     stats: dict = {}
     hq: dict

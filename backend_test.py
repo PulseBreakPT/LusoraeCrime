@@ -9,7 +9,7 @@ import requests
 from datetime import datetime
 
 # Base URL from frontend/.env
-BASE_URL = "https://qi-mission-improve.preview.emergentagent.com/api"
+BASE_URL = "https://tier-formula-quest.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@lusorae.com"

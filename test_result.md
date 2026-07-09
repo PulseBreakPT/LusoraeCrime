@@ -473,3 +473,63 @@ frontend:
 agent_communication:
   - agent: "main"
     message: "09/07/2026 — Ronda 'Mapa SSS' concluída e verificada em live por automação de screenshots (login admin, despacho de equipa, follow cam). Nenhuma rota/API alterada."
+
+backend:
+  - task: "SSS v3 Missões — fórmulas de recompensa dinâmicas: effective_quest_rewards (nível × dificuldade × tier adaptativo × série diária × execução rápida, cap ×4, arredondamentos 25€/5 respeito), preview no /state (reward_mult + mult_note em quests ativas/concluídas), claim manual e auto-claim usam a mesma fórmula e persistem quest_streak/quest_perf"
+    implemented: true
+    working: NA
+    file: "backend/quests.py, backend/routes_game.py, backend/engine.py, backend/models.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Corrigido crash de arranque (import effective_quest_rewards em falta — trabalho anterior interrompido). Verificado por curl: claim de d_bribe1 deu 1.375€ (base 1.200 ×1.14 série 1d + execução rápida), quest_streak {count:1, best:1} e quest_perf {momentum:10, claims:1} persistidos; /state devolve reward_mult/mult_note nas quests ativas."
+  - task: "SSS v3 Missões — QI de ofertas: seleção ponderada de diárias/semanais (viabilidade — nunca oferece impossíveis; relevância ao estado do jogo — frota danificada/combustível baixo/fadiga/moral/calor/dinheiro sujo; dificuldade adequada ao tier; anti-repetição via quest_offer_history; variedade de categorias no lote), 4.ª diária no tier≥2 e 3.ª semanal no tier 3, momentum/tier com penalizações por expiração, cooldown de 30 min nas dinâmicas, eventos com anti-repetição 6h, decisões filtradas por min_level e menos recentes primeiro"
+    implemented: true
+    working: NA
+    file: "backend/quests.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Diárias/semanais geradas com _select_offers (amostragem ponderada sem reposição). Verificado que a conta admin recebeu 3 diárias + 2 semanais de categorias variadas."
+  - task: "SSS v3 Missões — novos triggers dinâmicos (dyn_fuel fleet_fuel_low, dyn_dirty_cap dirty_near_cap com dirty_cap no ctx, dyn_arrested arrested_employees + métrica de estado arrested_count) e cadeias de consequências: decisões novas dec_carga/dec_rival + chain em dec_informador.eliminar agendam pending_chains → process_quests spawna ev_carga_marcada/ev_represalia/ev_vinganca com evento 'CONSEQUÊNCIA'"
+    implemented: true
+    working: NA
+    file: "backend/quests.py, backend/quests_data.py, backend/routes_game.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Verificado por curl: dyn_arrested spawna com 1 preso e completa ao libertar (lte 0); pending_chains plantada spawna ev_carga_marcada com evento CONSEQUÊNCIA e é consumida; POST /quests/choose dec_carga 'comprar' cobra 4.000€ e credita dirty (ramo 60%)."
+
+test_plan:
+  current_focus:
+    - "SSS v3 Missões — fórmulas de recompensa dinâmicas"
+    - "SSS v3 Missões — QI de ofertas"
+    - "SSS v3 Missões — novos triggers dinâmicos e cadeias de consequências"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: >
+      10/07/2026 — SSS v3 das Missões (continuação de trabalho interrompido que deixara o backend
+      a crashar no arranque: engine.py importava effective_quest_rewards inexistente). Implementado
+      em quests.py: fórmula de recompensas dinâmicas, quest_streak (série diária), quest_perf
+      (momentum→tier 0-3), quest_offer_history (anti-repetição), seleção inteligente de ofertas,
+      novos triggers dinâmicos, pending_chains (consequências de decisões). routes_game.py: claim
+      usa a fórmula e persiste streak/perf; choose agenda chains; /state passa player a enrich_quest
+      (rewards escaladas + reward_mult + mult_note). models.py: Player += quest_streak/quest_perf.
+      engine.py: ctx += dirty_cap (e removidos 2 imports duplicados F811 pré-existentes).
+      NOTA fork: .env backend/frontend recriados (preview 5bfcc453-92df-4b92-9380-684ba8dc5a8f),
+      credenciais em /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!).
+      CUIDADO: lockout de login é por ip:email — usar emails descartáveis em testes de lockout.
+      Frontend ainda NÃO atualizado (próxima fase) — testar apenas backend.

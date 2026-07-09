@@ -20,7 +20,7 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     weapon_combat_score,
                     _unlink_employee_weapon,
                     is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage)
-from quests import make_instance, enrich_quest, locked_principals
+from quests import make_instance, enrich_quest, locked_principals, effective_quest_rewards
 from quests_data import QUEST_DEFS
 from models import Player, Team, Employee, Candidate, Vehicle, Weapon, Property, Opportunity, Mission, Event, Quest, Transaction
 from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS, RARITIES,
@@ -270,7 +270,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         d["betrayal_risk"] = betrayal_risk_of(e)
         emp_dumps.append(d)
 
-    quests_out = [enrich_quest(Quest.from_mongo(q).model_dump()) for q in quest_docs]
+    quests_out = [enrich_quest(Quest.from_mongo(q).model_dump(), player) for q in quest_docs]
     quests_out += locked_principals({q["quest_key"] for q in quest_docs}, player["level"])
 
     return {
@@ -1632,14 +1632,24 @@ async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_us
     d = QUEST_DEFS.get(q["quest_key"])
     if not d:
         raise HTTPException(status_code=400, detail="Missão desconhecida")
-    parts = await grant_quest_rewards(db, player, d.get("rewards", {}))
+    # Recompensas dinâmicas SSS v3 — nível × dificuldade × tier adaptativo ×
+    # série diária × execução rápida (mesma fórmula do auto-reclamar).
+    rewards, mult_note = effective_quest_rewards(player, q, d, now_utc())
+    parts = await grant_quest_rewards(db, player, rewards)
+    if mult_note:
+        parts.append(mult_note)
+    # effective_quest_rewards mutou série/desempenho — persistir já.
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "quest_streak": player.get("quest_streak", {}),
+        "quest_perf": player.get("quest_perf", {}),
+    }})
     await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}})
     if q["quest_key"] == "c2_front":
         await db.quests.insert_one(make_instance(pid, "dec_informador", now_utc(), player.get("stats", {}), expires_s=3600))
         await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
     msg = f"Recompensa reclamada — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada."
     await add_event(db, pid, "success", msg)
-    return {"ok": True, "rewards": parts, "unlocks": d.get("unlocks_text")}
+    return {"ok": True, "rewards": parts, "unlocks": d.get("unlocks_text"), "mult_note": mult_note}
 
 
 @router.post("/quests/choose")
@@ -1678,6 +1688,15 @@ async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_
         inc["respect"] = eff["respect"]
     if eff.get("heat"):
         sets["heat"] = max(0.0, min(100.0, player["heat"] + eff["heat"]))
+    # Cadeias de consequências (SSS v3): certas escolhas plantam um evento
+    # futuro — o mundo lembra-se do que fizeste e responde com atraso.
+    chain = res.get("chain")
+    if chain and QUEST_DEFS.get(chain.get("key")) and random.random() <= chain.get("p", 1.0):
+        lo, hi = chain.get("delay_s", [120, 480])
+        due = (now_utc() + timedelta(seconds=random.randint(int(lo), int(hi)))).isoformat()
+        chains = list(player.get("pending_chains") or [])
+        chains.append({"key": chain["key"], "at": due})
+        sets["pending_chains"] = chains
     update = {}
     if inc:
         update["$inc"] = inc

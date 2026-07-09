@@ -40,8 +40,8 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
                        RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
                        PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
-                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN,
-                       FUEL_PRICES, random_employee_name,
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
+                       FUEL_PRICES,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS,
                        WEAPON_MODELS, WEAPON_CATEGORY_WEIGHTS,
                        WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX,
@@ -2479,7 +2479,8 @@ async def advance(db, player):
     await _complete_refuels(db, player, vehicles, now)
     await _complete_vehicle_transfers(db, player, vehicles, {str(p["_id"]): p for p in props}, now)
     await process_quests(db, player, {"employees": employees, "props": props,
-                                      "vehicles": vehicles, "minutes": minutes})
+                                      "vehicles": vehicles, "minutes": minutes,
+                                      "dirty_cap": dirty_money_cap(player["level"])})
     await process_automations(db, player, employees, vehicles, props, bonuses, now)
 
     # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
