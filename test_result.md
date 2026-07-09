@@ -417,3 +417,37 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshots: topbar centrada sem salto, dock/pins/halo QG corretos no mapa; painel Frota com todos os cartões visíveis pós-cascata. 1 edição CSS, zero JS/lógica."
+
+frontend:
+  - task: "SSS ronda 5 — páginas de documento (Termos/Privacidade/RGPD/Changelog) alinhadas com identidade Noir Tático: fundo grelha tática + glows (lus-page-grid/glow), header vidro com laser sweep (lus-page-header) e wordmark gradiente, nav ativa com sublinhado laser, TOC vidro numerado (lus-toc), headings com marcador laser (lus-sec-heading), sumário com cantos HUD (lus-doc-summary), changelog em cartões vidro com nó pulsante e realce da versão atual (lus-version-card/current, lus-node-current), hairlines gradiente, prefers-reduced-motion coberto. Pós-fork: .env backend/frontend recriados e test_credentials.md reposto."
+    implemented: true
+    working: true
+    file: "App.css, components/legal/LegalShell.jsx, pages/LegalPage.jsx, pages/ChangelogPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "09/07/2026 — Frontend-only, zero mudanças de lógica/API/testids. Verificado por screenshots (/termos e /changelog). Lint limpo. Jogo não afetado (apenas classes CSS novas)."
+
+agent_communication:
+  - agent: "main"
+    message: "09/07/2026 — SSS ronda 5 (design-only) nas páginas legais/changelog. Sem alterações de backend; .env recriados pós-fork (MONGO_URL/DB_NAME/JWT_SECRET/ADMIN_*, REACT_APP_BACKEND_URL) e login admin verificado por curl."
+
+frontend:
+  - task: "Mapa SSS (design+lógica): controlos de câmara (zoom +/−, centrar QG, enquadrar atividade — testids map-zoom-in/out, map-center-hq, map-fit-all), modo seguir unidade (clique na equipa segue, drag/X/seleção cancela; chip map-follow-chip/map-follow-stop), rotação por rumo real da rota no ícone da unidade, anel de urgência pulsante em oportunidades <2 min (opp-pin-urgent), fly-to inteligente na seleção, cache de divIcons das oportunidades (elimina setIcon churn a cada poll), legenda atualizada"
+    implemented: true
+    working: true
+    file: "components/game/LiveMap.jsx, App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "09/07/2026 — Frontend-only. Verificado em live: controlos presentes e funcionais (fit+zoom), seleção de oportunidade abre cartão, despacho OK, clique na unidade ativa follow (chip visível, câmara acompanha). Lint limpo (1 warning pré-existente). Sem alterações de backend."
+
+agent_communication:
+  - agent: "main"
+    message: "09/07/2026 — Ronda 'Mapa SSS' concluída e verificada em live por automação de screenshots (login admin, despacho de equipa, follow cam). Nenhuma rota/API alterada."

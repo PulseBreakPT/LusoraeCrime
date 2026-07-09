@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check } from "lucide-react";
+import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check, Plus, Minus, Crosshair, Scan } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
@@ -24,18 +24,32 @@ const PROP_ICONS = {
 const makeDivIcon = (html, size, className = "") =>
   L.divIcon({ html, className: `lus-marker ${className}`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 
-const oppIcon = (opp, selected, favorite) => {
+const oppIcon = (opp, selected, favorite, urgent) => {
   const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
   const color = CATEGORY_COLORS[opp.category] || "#fff";
   const initial = (SPEC_LABELS[opp.category] || "?").charAt(0);
   const taken = opp.status === "taken";
   const html = `
     <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""}" style="--mk:${color}">
+      ${urgent && !taken ? '<span class="opp-pin-urgent"></span>' : ""}
       ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
       <span class="opp-pin-type" style="background:${color}">${initial}</span>
       ${favorite ? `<span style="position:absolute;top:-4px;right:-4px;color:#FBBF24;filter:drop-shadow(0 0 2px rgba(0,0,0,0.8))">${renderToStaticMarkup(<Star size={11} fill="#FBBF24" />)}</span>` : ""}
     </div>`;
   return makeDivIcon(html, 34);
+};
+
+// Cache de ícones por assinatura visual — evita recriar divIcons (e o churn de
+// DOM do setIcon) a cada poll de estado, para todos os pins de oportunidade.
+const oppIconCache = new Map();
+const oppIconCached = (opp, selected, favorite, urgent) => {
+  const key = `${opp.type_key}|${opp.category}|${opp.status === "taken" ? 1 : 0}|${selected ? 1 : 0}|${favorite ? 1 : 0}|${urgent ? 1 : 0}`;
+  let icon = oppIconCache.get(key);
+  if (!icon) {
+    icon = oppIcon(opp, selected, favorite, urgent);
+    oppIconCache.set(key, icon);
+  }
+  return icon;
 };
 
 const hqIcon = () => {
@@ -135,12 +149,85 @@ const PlacementPreview = ({ placement, onPick }) => {
   );
 };
 
+// Câmara inteligente na seleção: se o zoom estiver longe, voa até um zoom de
+// leitura confortável; caso contrário, só desloca suavemente.
 const PanTo = ({ target }) => {
   const map = useMap();
   useEffect(() => {
-    if (target) map.panTo([target.lat, target.lng], { animate: true, duration: 0.6 });
+    if (!target) return;
+    if (map.getZoom() < 13) map.flyTo([target.lat, target.lng], 13.5, { duration: 0.7 });
+    else map.panTo([target.lat, target.lng], { animate: true, duration: 0.6 });
   }, [target, map]);
   return null;
+};
+
+// Controlos de câmara do mapa: zoom, centrar no QG e enquadrar toda a
+// atividade (QG + propriedades + oportunidades + alvos de missão).
+const MapControls = ({ hq, state }) => {
+  const map = useMap();
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      L.DomEvent.disableClickPropagation(ref.current);
+      L.DomEvent.disableScrollPropagation(ref.current);
+    }
+  }, []);
+
+  const fitAll = () => {
+    const pts = [[hq.lat, hq.lng]];
+    (state.properties || []).forEach((p) => pts.push([p.lat, p.lng]));
+    (state.opportunities || []).forEach((o) => pts.push([o.lat, o.lng]));
+    (state.missions || []).forEach((m) => { if (m.target) pts.push([m.target.lat, m.target.lng]); });
+    map.flyToBounds(L.latLngBounds(pts).pad(0.15), { duration: 0.8, maxZoom: 14 });
+  };
+
+  return (
+    <div ref={ref} className="lus-map-ctrl" style={{ bottom: "calc(3.6rem + env(safe-area-inset-bottom, 0px))" }}>
+      <button type="button" data-testid="map-zoom-in" title="Aproximar" aria-label="Aproximar" onClick={() => map.zoomIn()}>
+        <Plus size={14} strokeWidth={2.5} />
+      </button>
+      <button type="button" data-testid="map-zoom-out" title="Afastar" aria-label="Afastar" onClick={() => map.zoomOut()}>
+        <Minus size={14} strokeWidth={2.5} />
+      </button>
+      <span className="lus-map-ctrl-sep" aria-hidden="true" />
+      <button
+        type="button"
+        data-testid="map-center-hq"
+        title="Centrar no QG"
+        aria-label="Centrar no quartel-general"
+        onClick={() => map.flyTo([hq.lat, hq.lng], Math.max(map.getZoom(), 14), { duration: 0.7 })}
+      >
+        <Crosshair size={14} strokeWidth={2.5} />
+      </button>
+      <button type="button" data-testid="map-fit-all" title="Enquadrar toda a atividade" aria-label="Enquadrar toda a atividade" onClick={fitAll}>
+        <Scan size={14} strokeWidth={2.5} />
+      </button>
+    </div>
+  );
+};
+
+// Arrastar o mapa liberta a câmara do modo seguir — comportamento standard
+// de qualquer "follow cam".
+const FollowManager = ({ onCancel }) => {
+  useMapEvents({ dragstart: () => onCancel() });
+  return null;
+};
+
+const FollowChip = ({ name, onStop }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) L.DomEvent.disableClickPropagation(ref.current);
+  }, []);
+  return (
+    <div ref={ref} className="lus-follow-chip" data-testid="map-follow-chip">
+      <span className="lus-follow-dot" aria-hidden="true" />
+      A seguir {name}
+      <button type="button" data-testid="map-follow-stop" title="Parar de seguir" aria-label="Parar de seguir" onClick={onStop}>
+        <X size={12} strokeWidth={2.5} />
+      </button>
+    </div>
+  );
 };
 
 // Closes the opportunity/mission modal when the user clicks on the map background.
@@ -159,11 +246,13 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   </div>
 );
 
-const MissionUnit = ({ mission, serverNow, dim = false }) => {
+const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow }) => {
+  const map = useMap();
   const [route, setRoute] = useState(null);
   const cumRef = useRef(null);
   const glowRef = useRef(null);
   const lineRef = useRef(null);
+  const markerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,24 +271,35 @@ const MissionUnit = ({ mission, serverNow, dim = false }) => {
     const finish = Date.parse(mission.finish_at);
     const ret = Date.parse(mission.return_at);
     // If route not loaded yet, fallback to straight-line lerp.
-    if (!route || !cumRef.current) return { ...missionPosition(mission, now), progress: 0 };
+    if (!route || !cumRef.current) return { ...missionPosition(mission, now), progress: 0, bearing: null };
     const latlngs = route.latlngs;
     const cum = cumRef.current;
+    // Rumo (graus, 0 = norte, sentido horário) na fração `frac` da rota,
+    // olhando na direção do deslocamento (dirSign +1 avança, -1 recua).
+    const bearingAt = (frac, dirSign) => {
+      const eps = 0.004;
+      const a = pointOnRoute(latlngs, cum, frac);
+      const b = pointOnRoute(latlngs, cum, Math.min(1, Math.max(0, frac + dirSign * eps)));
+      if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) return null;
+      const dLng = (b.lng - a.lng) * Math.cos(((a.lat + b.lat) * Math.PI) / 360);
+      const dLat = b.lat - a.lat;
+      return (Math.atan2(dLng, dLat) * 180) / Math.PI;
+    };
     if (now <= arrive) {
       const t = Math.min(1, Math.max(0, (now - depart) / Math.max(1, arrive - depart)));
       const p = pointOnRoute(latlngs, cum, t);
-      return { ...p, phase: "en_route", progress: t };
+      return { ...p, phase: "en_route", progress: t, bearing: bearingAt(t, 1) };
     }
     if (now <= finish) {
       const last = latlngs[latlngs.length - 1];
-      return { lat: last[0], lng: last[1], phase: "operating", progress: 1 };
+      return { lat: last[0], lng: last[1], phase: "operating", progress: 1, bearing: null };
     }
     if (now <= ret) {
       const t = Math.min(1, Math.max(0, (now - finish) / Math.max(1, ret - finish)));
       const p = pointOnRoute(latlngs, cum, 1 - t);
-      return { ...p, phase: "returning", progress: t };
+      return { ...p, phase: "returning", progress: t, bearing: bearingAt(1 - t, -1) };
     }
-    return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1 };
+    return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1, bearing: null };
   };
 
   const [pos, setPos] = useState(() => computePos());
@@ -222,6 +322,21 @@ const MissionUnit = ({ mission, serverNow, dim = false }) => {
     if (glowRef.current) glowRef.current.setLatLngs(arr);
     if (lineRef.current) lineRef.current.setLatLngs(arr);
   }, [pos.progress, pos.phase, route]);
+
+  // Follow cam: a câmara acompanha a unidade em cada tick de posição.
+  useEffect(() => {
+    if (!followed || pos.phase === "done") return;
+    map.panTo([pos.lat, pos.lng], { animate: true, duration: 0.32, easeLinearity: 0.6 });
+  }, [followed, pos.lat, pos.lng, pos.phase, map]);
+
+  // Roda o ícone da unidade segundo o rumo real da rota (o glifo Navigation
+  // aponta para NE por defeito, daí o offset de -45°).
+  useEffect(() => {
+    const el = markerRef.current?.getElement?.();
+    if (!el) return;
+    const svg = el.querySelector(".unit-pin svg");
+    if (svg) svg.style.transform = pos.bearing != null ? `rotate(${Math.round(pos.bearing - 45)}deg)` : "";
+  }, [pos.bearing, pos.phase]);
 
   // Imperatively update style (dash) only when phase actually changes.
   useEffect(() => {
@@ -278,7 +393,14 @@ const MissionUnit = ({ mission, serverNow, dim = false }) => {
           />
         </>
       )}
-      <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={500} opacity={dim ? 0.25 : 1}>
+      <Marker
+        ref={markerRef}
+        position={[pos.lat, pos.lng]}
+        icon={icon}
+        zIndexOffset={500}
+        opacity={dim ? 0.25 : 1}
+        eventHandlers={{ click: () => onToggleFollow && onToggleFollow() }}
+      >
         <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
           <div className="min-w-[150px]">
             <p className="text-[11px] font-bold text-white">{mission.team_name}</p>
@@ -302,6 +424,9 @@ const MissionUnit = ({ mission, serverNow, dim = false }) => {
             {route && !route.fallback && (
               <TipRow label="rota" value={`${(route.distance / 1000).toFixed(1)} km`} color="#22D3EE" />
             )}
+            <p className="mt-1 text-[9px] text-cyan-500/80">
+              {followed ? "A câmara está a segui-la — clica para largar" : "Clica para a câmara seguir esta unidade"}
+            </p>
           </div>
         </LTooltip>
       </Marker>
@@ -393,6 +518,20 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
   const hqRadarMarkerIcon = useMemo(() => hqRadarIcon(), []);
   const level = state.player.level;
 
+  // Modo seguir: id da missão cuja unidade a câmara acompanha.
+  const [followId, setFollowId] = useState(null);
+  const followedMission = followId ? state.missions.find((m) => m.id === followId) : null;
+
+  // Selecionar uma oportunidade liberta a câmara.
+  useEffect(() => {
+    if (selectedOppId) setFollowId(null);
+  }, [selectedOppId]);
+
+  // Missão terminou/desapareceu do estado → deixa de haver o que seguir.
+  useEffect(() => {
+    if (followId && !state.missions.some((m) => m.id === followId)) setFollowId(null);
+  }, [state.missions, followId]);
+
   return (
     <MapContainer
       center={[38.7223, -9.1393]}
@@ -406,6 +545,9 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
       />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
+      <FollowManager onCancel={() => setFollowId(null)} />
+      <MapControls hq={hq} state={state} />
+      {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
       {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
       <Marker
         position={[hq.lat, hq.lng]}
@@ -469,13 +611,14 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           missionPhaseLabel = STATUS_LABELS[activeMission.phase] || activeMission.phase;
         }
         const isFavorite = (state.player.favorite_types || []).includes(opp.type_key);
+        const urgent = !taken && !locked && expiresS > 0 && expiresS < 120;
         return (
           <Marker
             key={opp.id}
             position={[opp.lat, opp.lng]}
-            icon={oppIcon(opp, opp.id === selectedOppId, isFavorite)}
-            zIndexOffset={isFavorite ? 400 : 0}
-            eventHandlers={{ click: () => onSelectOpp(opp) }}
+            icon={oppIconCached(opp, opp.id === selectedOppId, isFavorite, urgent)}
+            zIndexOffset={isFavorite ? 400 : urgent ? 350 : 0}
+            eventHandlers={{ click: () => { setFollowId(null); onSelectOpp(opp); } }}
           >
             <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">
               <div className="min-w-[150px]">
@@ -516,6 +659,8 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           mission={m}
           serverNow={serverNow}
           dim={baseFilter !== "all" && (m.origin_property_id || "hq") !== baseFilter}
+          followed={m.id === followId}
+          onToggleFollow={() => setFollowId((cur) => (cur === m.id ? null : m.id))}
         />
       ))}
       {state.vehicles
@@ -590,6 +735,8 @@ export const MapLegend = () => {
               Equipa a caminho / a regressar
             </span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Equipa em operação</span>
+            <span className="flex items-center gap-1.5"><span className="flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[7px] font-extrabold text-white">!</span> Carro-patrulha em perseguição</span>
+            <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;2 min)</span>
           </div>
           <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
@@ -597,7 +744,9 @@ export const MapLegend = () => {
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-violet-400" /> Regresso — falta chegar</span>
           </div>
           <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
-            Passa o rato sobre qualquer marcador para veres os detalhes. Clica numa oportunidade para despachar uma equipa.
+            Passa o rato sobre qualquer marcador para veres os detalhes. Clica numa oportunidade para
+            despachar uma equipa, ou numa equipa em movimento para a câmara a seguir. Usa os controlos
+            à direita para centrar no QG ou enquadrar toda a atividade.
           </p>
         </Card>
       )}

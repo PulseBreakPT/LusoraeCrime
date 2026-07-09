@@ -62,45 +62,47 @@ export default function ChangelogPage() {
           </p>
 
           {/* Linha temporal */}
-          <div className="relative mt-12 space-y-12 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-px before:bg-white/[0.08] sm:before:left-[11px]">
+          <div className="relative mt-12 space-y-10 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-px before:bg-gradient-to-b before:from-red-500/50 before:via-white/[0.09] before:to-transparent sm:before:left-[11px]">
             {data.versions.map((v) => (
               <section key={v.version} data-testid={`changelog-version-${v.version}`} className="relative pl-8 sm:pl-12">
                 {/* Marcador */}
-                <span aria-hidden="true" className={`absolute left-0 top-1.5 flex h-[15px] w-[15px] items-center justify-center rounded-full border sm:h-[23px] sm:w-[23px] ${v.tag === "atual" ? "border-red-500/60 bg-red-500/20" : "border-white/15 bg-[#0d0d0d]"}`}>
+                <span aria-hidden="true" className={`absolute left-0 top-5 flex h-[15px] w-[15px] items-center justify-center rounded-full border sm:h-[23px] sm:w-[23px] ${v.tag === "atual" ? "lus-node-current border-red-500/60 bg-red-500/20" : "border-white/15 bg-[#0d0d0d]"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${v.tag === "atual" ? "bg-red-500" : "bg-zinc-600"}`} />
                 </span>
 
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <span className="font-mono text-xl font-bold tracking-tight text-white">v{v.version}</span>
-                  {v.tag === "atual" && (
-                    <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-red-400">
-                      Atual
-                    </span>
-                  )}
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-600">{formatDate(v.date)}</span>
-                </div>
-                <h2 className="mt-1.5 font-display text-lg font-bold uppercase tracking-wide text-zinc-100">{v.title}</h2>
+                <div className={`lus-version-card rounded-lg p-5 sm:p-6 ${v.tag === "atual" ? "lus-version-current" : ""}`}>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <span className="font-display text-2xl font-bold tracking-tight text-white">v{v.version}</span>
+                    {v.tag === "atual" && (
+                      <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
+                        Atual
+                      </span>
+                    )}
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-600">{formatDate(v.date)}</span>
+                  </div>
+                  <h2 className="mt-1.5 font-display text-lg font-bold uppercase tracking-wide text-zinc-100">{v.title}</h2>
 
-                <div className="mt-4 space-y-5">
-                  {CATEGORY_ORDER.filter((c) => v.sections?.[c]?.length).map((cat) => {
-                    const style = CATEGORY_STYLE[cat];
-                    const Icon = style.icon;
-                    return (
-                      <div key={cat}>
-                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ${style.badge}`}>
-                          <Icon size={11} aria-hidden="true" /> {data.categories?.[cat] || cat}
-                        </span>
-                        <ul className="mt-2.5 space-y-1.5">
-                          {v.sections[cat].map((item, i) => (
-                            <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-400">
-                              <span className="mt-[8px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" aria-hidden="true" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
+                  <div className="mt-4 space-y-5">
+                    {CATEGORY_ORDER.filter((c) => v.sections?.[c]?.length).map((cat) => {
+                      const style = CATEGORY_STYLE[cat];
+                      const Icon = style.icon;
+                      return (
+                        <div key={cat}>
+                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ${style.badge}`}>
+                            <Icon size={11} aria-hidden="true" /> {data.categories?.[cat] || cat}
+                          </span>
+                          <ul className="mt-2.5 space-y-1.5">
+                            {v.sections[cat].map((item, i) => (
+                              <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-400">
+                                <span className="mt-[8px] h-1 w-1 shrink-0 rounded-full bg-red-500/50" aria-hidden="true" />
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </section>
             ))}

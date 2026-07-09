@@ -24,11 +24,12 @@ export function LegalShell({ children, active }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#070707] text-zinc-200">
-      {/* Fundo ambiente */}
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(60%_40%_at_50%_0%,rgba(220,38,38,0.06),transparent_70%)]" />
+    <div className="lus-page-bg min-h-screen text-zinc-200">
+      {/* Fundo ambiente tático: grelha + glows */}
+      <div className="lus-page-grid" aria-hidden="true" />
+      <div className="lus-page-glow" aria-hidden="true" />
 
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#070707]/90 backdrop-blur-md">
+      <header className="lus-page-header top-0 z-40">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
           <button
             type="button"
@@ -39,8 +40,16 @@ export function LegalShell({ children, active }) {
             <ArrowLeft size={14} aria-hidden="true" /> Voltar
           </button>
 
-          <Link to={backTarget} className="flex items-center gap-2 font-display text-lg font-bold uppercase tracking-tight text-white transition-opacity hover:opacity-80">
-            <ShieldCheck size={16} className="text-red-500" aria-hidden="true" /> Lusorae
+          <Link
+            to={backTarget}
+            className="group flex items-center gap-2 font-display text-lg font-bold uppercase tracking-tight text-white transition-opacity hover:opacity-90"
+          >
+            <ShieldCheck
+              size={16}
+              className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.65)] transition-transform group-hover:scale-110"
+              aria-hidden="true"
+            />
+            <span className="lus-title">Lusorae</span>
           </Link>
 
           <nav aria-label="Documentos" className="hidden items-center gap-1 sm:flex">
@@ -50,7 +59,9 @@ export function LegalShell({ children, active }) {
                 to={l.to}
                 aria-current={active === l.to ? "page" : undefined}
                 className={`rounded-md px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 ${
-                  active === l.to ? "bg-red-500/10 text-red-400" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
+                  active === l.to
+                    ? "lus-doc-nav-active bg-red-500/10 text-red-400"
+                    : "text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
                 }`}
               >
                 {l.label}
@@ -64,13 +75,14 @@ export function LegalShell({ children, active }) {
 
       <main className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-20 pt-10 sm:px-6">{children}</main>
 
-      <footer className="relative z-10 border-t border-white/[0.06] py-8">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4">
+      <footer className="relative z-10 py-8">
+        <div className="lus-hairline mx-auto max-w-5xl" aria-hidden="true" />
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pt-8">
           <nav aria-label="Documentos legais" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
             {NAV_LINKS.map((l, i) => (
               <span key={l.to} className="flex items-center gap-3">
                 {i > 0 && <span className="text-zinc-800">·</span>}
-                <Link to={l.to} className="transition-colors hover:text-zinc-300">{l.label}</Link>
+                <Link to={l.to} className="transition-colors hover:text-red-400">{l.label}</Link>
               </span>
             ))}
           </nav>

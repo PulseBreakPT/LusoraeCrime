@@ -63,17 +63,23 @@ export default function LegalPage() {
         <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
           {/* Índice (desktop) */}
           <aside className="hidden lg:block">
-            <nav aria-label="Índice" className="sticky top-24 space-y-1 border-l border-white/[0.08] pl-4">
-              <p className="mb-3 font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-600">Índice</p>
-              {toc.map((t) => (
-                <a
-                  key={t.id}
-                  href={`#${t.id}`}
-                  className="block truncate py-1 text-xs text-zinc-500 transition-colors hover:text-red-400"
-                >
-                  {t.label}
-                </a>
-              ))}
+            <nav aria-label="Índice" className="lus-toc sticky top-24 rounded-lg p-4">
+              <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                <span className="h-1 w-1 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" aria-hidden="true" />
+                Índice
+              </p>
+              <div className="space-y-0.5">
+                {toc.map((t, i) => (
+                  <a
+                    key={t.id}
+                    href={`#${t.id}`}
+                    className="flex items-baseline gap-2 truncate rounded-r py-1.5 pl-3 text-xs text-zinc-500 hover:text-zinc-100"
+                  >
+                    <span className="shrink-0 font-mono text-[9px] font-bold text-zinc-700">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="truncate">{t.label}</span>
+                  </a>
+                ))}
+              </div>
             </nav>
           </aside>
 
@@ -97,7 +103,7 @@ export default function LegalPage() {
             </div>
 
             {doc.summary && (
-              <p className="mt-6 rounded-md border border-white/[0.07] bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-zinc-400">
+              <p className="lus-doc-summary mt-6 rounded-md px-4 py-3.5 text-sm leading-relaxed text-zinc-300">
                 {doc.summary}
               </p>
             )}
@@ -105,7 +111,7 @@ export default function LegalPage() {
             <div className="mt-10 space-y-10">
               {doc.sections.map((section) => (
                 <section key={section.heading} id={slugify(section.heading)} className="scroll-mt-24">
-                  <h2 className="font-display text-lg font-bold uppercase tracking-wide text-white">
+                  <h2 className="lus-sec-heading font-display text-lg font-bold uppercase tracking-wide text-white">
                     {section.heading}
                   </h2>
                   <div className="mt-3 space-y-3">
@@ -131,13 +137,15 @@ export default function LegalPage() {
             </div>
 
             {doc.available_versions?.length > 0 && (
-              <div className="mt-14 border-t border-white/[0.06] pt-5">
+              <div className="mt-14 pt-1">
+                <div className="lus-hairline mb-5" aria-hidden="true" />
                 <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-600">Histórico de versões</p>
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-2.5 space-y-1.5">
                   {doc.available_versions.slice().reverse().map((v) => (
-                    <li key={v.version} className="text-xs text-zinc-500">
+                    <li key={v.version} className="flex items-center gap-2.5 text-xs text-zinc-500">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${v.version === doc.version ? "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" : "bg-zinc-700"}`} aria-hidden="true" />
                       Versão {v.version} — em vigor desde {formatDate(v.effective_date)}
-                      {v.version === doc.version && <span className="ml-2 rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-red-400">Atual</span>}
+                      {v.version === doc.version && <span className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-red-400">Atual</span>}
                     </li>
                   ))}
                 </ul>
