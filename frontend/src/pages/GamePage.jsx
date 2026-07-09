@@ -15,6 +15,7 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
+import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -23,7 +24,7 @@ import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2
 
 export default function GamePage() {
   const { state, stateError, refresh, serverNow, autoOpenReportSignal } = useGame();
-  const { hideImpossibleMissions } = useSettings();
+  const { hideImpossibleMissions, showFps } = useSettings();
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
@@ -151,6 +152,7 @@ export default function GamePage() {
       )}
 
       <ResourceBar />
+      {showFps && <FpsMeter />}
       <Tip
         tip={alerts.total > 0 ? `Central de Inteligência — ${alerts.total} alerta(s) e ações recomendadas, estatísticas e registo de missões.` : "Central de Inteligência — estatísticas, ações recomendadas e registo de missões."}
         side="bottom"
@@ -161,7 +163,7 @@ export default function GamePage() {
           data-testid="open-intel-button"
           variant="outline"
           onClick={() => setOpenPanel("intel")}
-          className="lus-hud-btn relative h-auto gap-1.5 rounded-full p-2.5 text-white backdrop-blur-xl hover:text-white md:px-3"
+          className="lus-hud-btn relative h-auto gap-1.5 rounded-full p-2.5 text-white hover:text-white md:px-3"
         >
           <BrainCircuit size={16} className="h-[18px] w-[18px] text-primary md:h-4 md:w-4" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
@@ -175,7 +177,7 @@ export default function GamePage() {
           data-testid="open-settings-button"
           variant="outline"
           onClick={() => setOpenPanel("settings")}
-          className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white backdrop-blur-xl hover:text-white md:px-3"
+          className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white hover:text-white md:px-3"
         >
           <Settings size={16} className="h-[18px] w-[18px] text-zinc-400 md:h-4 md:w-4" />
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
@@ -269,7 +271,7 @@ const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onCli
       data-testid={testId}
       variant="outline"
       onClick={onClick}
-      className={`lus-hud-btn relative h-auto gap-1.5 rounded-full px-2.5 py-2.5 text-xs font-bold uppercase tracking-wider backdrop-blur-xl md:px-3 ${
+      className={`lus-hud-btn relative h-auto gap-1.5 rounded-full px-2.5 py-2.5 text-xs font-bold uppercase tracking-wider md:px-3 ${
         active
           ? "lus-hud-btn-active text-white hover:text-white"
           : "text-white hover:text-white"

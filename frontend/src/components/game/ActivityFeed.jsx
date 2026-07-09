@@ -46,7 +46,7 @@ export const ActivityFeed = ({ onNavigate }) => {
   return (
     <div
       data-testid="activity-feed"
-      className="lus-panel pointer-events-auto absolute bottom-20 left-2 z-20 hidden w-80 animate-slide-up overflow-hidden rounded-xl border shadow-2xl md:block"
+      className="lus-panel lus-hud-solid pointer-events-auto absolute bottom-20 left-2 z-20 hidden w-80 animate-slide-up overflow-hidden rounded-xl border shadow-2xl md:block"
     >
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
@@ -119,7 +119,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
       {open && (
         <Card
           data-testid="activity-feed-mobile-list"
-          className="pointer-events-auto absolute inset-x-0 bottom-full mb-2 max-h-64 animate-slide-up overflow-y-auto border-border bg-card/95 p-2 shadow-2xl backdrop-blur-xl"
+          className="pointer-events-auto absolute inset-x-0 bottom-full mb-2 max-h-64 animate-slide-up overflow-y-auto border-border bg-[#0a0a0c]/95 p-2 shadow-2xl"
         >
           <p className="mb-1.5 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">Últimos registos</p>
           <div className="space-y-1.5">
@@ -148,7 +148,7 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
         data-testid="activity-feed-mobile-toggle"
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-white/10 bg-black/85 px-3 py-1.5 text-left shadow-2xl backdrop-blur-xl ${newFlash ? "lus-feed-new" : ""}`}
+        className={`pointer-events-auto flex w-full items-center gap-1.5 rounded-md border border-white/10 bg-[#0a0a0c]/95 px-3 py-1.5 text-left shadow-2xl ${newFlash ? "lus-feed-new" : ""}`}
       >
         <span className="shrink-0" style={{ color: classifyEvent(latest.kind, latest.message).color }}>▸</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">{parseActivityMessage(latest.message)}</span>

@@ -253,6 +253,10 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   const glowRef = useRef(null);
   const lineRef = useRef(null);
   const markerRef = useRef(null);
+  const chaseRef = useRef(null);
+  const svgRef = useRef(null);
+  const bearingRef = useRef(null);
+  const posRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,58 +306,112 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1, bearing: null };
   };
 
-  const [pos, setPos] = useState(() => computePos());
-  useEffect(() => {
-    const id = setInterval(() => setPos(computePos()), 350);
-    return () => clearInterval(id);
-  }, [mission, serverNow, route]);
+  // PERF: o movimento é 100% imperativo num loop requestAnimationFrame —
+  // marker.setLatLng por frame (deslize real a 60fps) sem passar pelo React.
+  // O React só re-renderiza quando a FASE muda (ícone/estilo/dash) e a 1 Hz
+  // para manter os countdowns do tooltip frescos. Antes: setState a cada
+  // 350ms (movimento aos saltos + reconciliação constante do tooltip).
+  const [phase, setPhase] = useState(() => computePos().phase);
+  const [, setClockTick] = useState(0);
 
-  // Imperatively update the polyline positions via ref — avoids React reconciling
-  // the SVG element on every tick, which is what makes zoom feel laggy.
   useEffect(() => {
-    if (!route?.latlngs || !cumRef.current) return;
-    let latlngs = null;
-    if (pos.phase === "en_route") {
-      latlngs = sliceRoute(route.latlngs, cumRef.current, pos.progress, 1);
-    } else if (pos.phase === "returning") {
-      latlngs = sliceRoute(route.latlngs, cumRef.current, 1 - pos.progress, 0);
-    }
-    const arr = latlngs && latlngs.length > 1 ? latlngs : [];
-    if (glowRef.current) glowRef.current.setLatLngs(arr);
-    if (lineRef.current) lineRef.current.setLatLngs(arr);
-  }, [pos.progress, pos.phase, route]);
+    let raf;
+    let lastLine = 0;
+    let lastTick = 0;
 
-  // Follow cam: a câmara acompanha a unidade em cada tick de posição.
+    const loop = (now) => {
+      const p = computePos();
+      posRef.current = p;
+
+      // 1) Marcador — deslize por frame.
+      const mk = markerRef.current;
+      if (mk && p.phase !== "done") mk.setLatLng([p.lat, p.lng]);
+
+      // 2) Rumo com lerp angular (wrap 360°) aplicado diretamente ao <svg>
+      //    (o glifo Navigation aponta para NE por defeito, daí o offset -45°).
+      if (mk && p.bearing != null) {
+        let el = svgRef.current;
+        if (!el || !el.isConnected) {
+          el = mk.getElement?.()?.querySelector(".unit-pin svg") || null;
+          svgRef.current = el;
+        }
+        if (el) {
+          const cur = bearingRef.current == null ? p.bearing : bearingRef.current;
+          const diff = ((p.bearing - cur + 540) % 360) - 180;
+          const next = cur + diff * 0.18;
+          bearingRef.current = next;
+          el.style.transform = `rotate(${(next - 45).toFixed(1)}deg)`;
+        }
+      }
+
+      // 3) Trajeto restante — o <path> SVG é mais caro; 3x/s chega.
+      if (now - lastLine > 320) {
+        lastLine = now;
+        if (route?.latlngs && cumRef.current) {
+          let latlngs = null;
+          if (p.phase === "en_route") {
+            latlngs = sliceRoute(route.latlngs, cumRef.current, p.progress, 1);
+          } else if (p.phase === "returning") {
+            latlngs = sliceRoute(route.latlngs, cumRef.current, 1 - p.progress, 0);
+          }
+          const arr = latlngs && latlngs.length > 1 ? latlngs : [];
+          if (glowRef.current) glowRef.current.setLatLngs(arr);
+          if (lineRef.current) lineRef.current.setLatLngs(arr);
+        }
+      }
+
+      // 4) Carro-patrulha ~220m atrás na mesma rota.
+      if (chaseRef.current && route?.latlngs && cumRef.current && p.phase === "returning") {
+        const total = cumRef.current[cumRef.current.length - 1] || 0;
+        if (total > 0) {
+          const lag = Math.min(0.35, 220 / Math.max(1, total));
+          const cp = pointOnRoute(route.latlngs, cumRef.current, Math.min(1, 1 - p.progress + lag));
+          if (cp) chaseRef.current.setLatLng([cp.lat, cp.lng]);
+        }
+      }
+
+      // 5) Follow cam — sem animação: o próprio rAF é a animação.
+      if (followed && p.phase !== "done") map.panTo([p.lat, p.lng], { animate: false });
+
+      // 6) Fase mudou → re-render (ícone, dash, tooltip). setState com o mesmo
+      //    valor não re-renderiza, por isso isto é grátis em regime normal.
+      setPhase((prev) => (prev === p.phase ? prev : p.phase));
+
+      // 7) Countdown do tooltip a 1 Hz.
+      if (now - lastTick > 1000) {
+        lastTick = now;
+        setClockTick((t) => t + 1);
+      }
+
+      raf = requestAnimationFrame(loop);
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, mission, followed, map]);
+
+  // Dash do trajeto de regresso — só quando a fase realmente muda.
   useEffect(() => {
-    if (!followed || pos.phase === "done") return;
-    map.panTo([pos.lat, pos.lng], { animate: true, duration: 0.32, easeLinearity: 0.6 });
-  }, [followed, pos.lat, pos.lng, pos.phase, map]);
+    if (lineRef.current) lineRef.current.setStyle({ dashArray: phase === "returning" ? "6 6" : null });
+  }, [phase]);
 
-  // Roda o ícone da unidade segundo o rumo real da rota (o glifo Navigation
-  // aponta para NE por defeito, daí o offset de -45°).
+  const chased = phase === "returning" && !!mission.chase_active;
+  const icon = useMemo(() => unitIcon(phase, chased), [phase, chased]);
+  // Ícone novo = elemento DOM novo — invalida a cache do <svg> rodado.
   useEffect(() => {
-    const el = markerRef.current?.getElement?.();
-    if (!el) return;
-    const svg = el.querySelector(".unit-pin svg");
-    if (svg) svg.style.transform = pos.bearing != null ? `rotate(${Math.round(pos.bearing - 45)}deg)` : "";
-  }, [pos.bearing, pos.phase]);
+    svgRef.current = null;
+  }, [icon]);
+  if (phase === "done") return null;
 
-  // Imperatively update style (dash) only when phase actually changes.
-  useEffect(() => {
-    const dashArray = pos.phase === "returning" ? "6 6" : null;
-    if (lineRef.current) lineRef.current.setStyle({ dashArray });
-  }, [pos.phase]);
-
-  const chased = pos.phase === "returning" && !!mission.chase_active;
-  const icon = useMemo(() => unitIcon(pos.phase, chased), [pos.phase, chased]);
-  if (pos.phase === "done") return null;
+  const pos = posRef.current || computePos();
 
   const nowMs = serverNow();
-  const nextAt = pos.phase === "en_route" ? mission.arrive_at : pos.phase === "operating" ? mission.finish_at : mission.return_at;
-  const nextLabel = pos.phase === "en_route" ? "chega em" : pos.phase === "operating" ? "conclui em" : "regressa em";
+  const nextAt = phase === "en_route" ? mission.arrive_at : phase === "operating" ? mission.finish_at : mission.return_at;
+  const nextLabel = phase === "en_route" ? "chega em" : phase === "operating" ? "conclui em" : "regressa em";
   const remaining = Math.max(0, (Date.parse(nextAt) - nowMs) / 1000);
 
-  const carryingReward = (pos.phase === "operating" || pos.phase === "returning") && mission.outcome === "success"
+  const carryingReward = (phase === "operating" || phase === "returning") && mission.outcome === "success"
     ? Number(mission.pending_reward || 0)
     : 0;
   const carryingPays = mission.pending_pays || mission.opportunity?.pays || "dirty";
@@ -708,7 +766,7 @@ export const MapLegend = () => {
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {open && (
-        <Card data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up border-white/10 bg-black/85 p-3 shadow-2xl backdrop-blur-xl">
+        <Card data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up border-white/10 bg-[#0a0a0c]/95 p-3 shadow-2xl">
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Legenda do mapa</p>
           <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Oportunidades (cor + inicial = categoria)</p>
           <div className="mb-2 grid grid-cols-2 gap-x-2 gap-y-1">
@@ -755,7 +813,7 @@ export const MapLegend = () => {
         variant="outline" size="icon"
         onClick={() => setOpen(!open)}
         title="Legenda do mapa"
-        className="rounded-full border-white/10 bg-black/80 text-zinc-400 shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white"
+        className="rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-400 shadow-2xl hover:bg-black hover:text-white"
       >
         {open ? <X size={15} /> : <MapIcon size={15} />}
       </Button>
@@ -775,7 +833,7 @@ export const PlacementControls = () => {
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {!placement.point && (
-        <span className="rounded-full border border-white/10 bg-black/80 px-3 py-1.5 font-mono text-[10px] text-zinc-300 shadow-2xl backdrop-blur-xl">
+        <span className="rounded-full border border-white/10 bg-[#0a0a0c]/95 px-3 py-1.5 font-mono text-[10px] text-zinc-300 shadow-2xl">
           Toca no mapa para escolher a localização
         </span>
       )}
@@ -792,7 +850,7 @@ export const PlacementControls = () => {
         data-testid="placement-cancel"
         variant="outline"
         onClick={cancelPlacement}
-        className="gap-1.5 rounded-full border-white/10 bg-black/80 text-zinc-300 shadow-2xl backdrop-blur-xl hover:bg-black hover:text-white"
+        className="gap-1.5 rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-300 shadow-2xl hover:bg-black hover:text-white"
       >
         <X size={15} /> Cancelar
       </Button>
@@ -813,7 +871,7 @@ export const MapBaseFilter = ({ value, onChange }) => {
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <Tabs value={value} onValueChange={onChange}>
-        <TabsList className="bg-black/80 backdrop-blur-xl">
+        <TabsList className="bg-[#0a0a0c]/95">
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="hq">QG</TabsTrigger>
           {state.properties.map((p) => (

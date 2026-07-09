@@ -302,7 +302,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
     showSeconds, setShowSeconds, compactNumbers, setCompactNumbers,
     showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
     rememberFilters, setRememberFilters, rememberSort, setRememberSort,
-    confirmIrreversible, setConfirmIrreversible,
+    confirmIrreversible, setConfirmIrreversible, showFps, setShowFps,
     autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
     hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
     autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
@@ -369,6 +369,9 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           </Row>
           <Row label="Confirmar apenas ações irreversíveis" hint="Desliga para executar de imediato, sem confirmação" testId="settings-row-confirm-irreversible">
             <ToggleSwitch testId="settings-toggle-confirm-irreversible" checked={confirmIrreversible} onChange={setConfirmIrreversible} />
+          </Row>
+          <Row label="Mostrar contador de FPS" hint="Indicador de fluidez no canto do ecrã" testId="settings-row-show-fps">
+            <ToggleSwitch testId="settings-toggle-show-fps" checked={showFps} onChange={setShowFps} />
           </Row>
         </Section>
 

@@ -13,9 +13,22 @@ const useTick = () => {
   }, []);
 };
 
+// PERF: o relógio e o countdown dos salários vivem em componentes próprios com
+// o seu tick de 1 Hz — antes, a barra inteira (≈10 tooltips, KPIs, minibars)
+// re-renderizava a cada segundo só para atualizar estes dois textos.
+const NetworkClock = ({ serverNow }) => {
+  useTick();
+  return <>{new Date(serverNow()).toLocaleTimeString("pt-PT")}</>;
+};
+
+const PayrollCountdown = ({ targetAt, serverNow }) => {
+  useTick();
+  const s = Math.max(0, (Date.parse(targetAt) - serverNow()) / 1000);
+  return <>em {fmtDuration(s)}</>;
+};
+
 export const ResourceBar = () => {
   const { state, catalog, serverNow } = useGame();
-  useTick();
   const prevCleanRef = useRef(null);
   const moneyIn = state && prevCleanRef.current != null && state.player.clean_money > prevCleanRef.current;
   const moneyFlash = useFlash(moneyIn ? state.player.clean_money : null);
@@ -39,7 +52,6 @@ export const ResourceBar = () => {
   const { dirtyPerH, launderPerH } = passiveRates(state, catalog, serverNow());
   const tr = teamsReadiness(state, serverNow());
   const activeOps = state.missions.length;
-  const payrollS = p.next_payroll_at ? Math.max(0, (Date.parse(p.next_payroll_at) - serverNow()) / 1000) : null;
   const payrollShort = (state.salary_total || 0) > 0 && p.clean_money < state.salary_total;
 
   return (
@@ -116,7 +128,7 @@ export const ResourceBar = () => {
           />
           <Stat
             testId="stat-payroll" icon={HandCoins} color={payrollShort ? "#EF4444" : "#F59E0B"} label="Salários" value={fmtMoney(state.salary_total || 0)}
-            sub={payrollShort ? "fundos insuficientes!" : payrollS != null ? `em ${fmtDuration(payrollS)}` : null} subColor={payrollShort ? "#EF4444" : "#F59E0B"} align="end"
+            sub={payrollShort ? "fundos insuficientes!" : p.next_payroll_at ? <PayrollCountdown targetAt={p.next_payroll_at} serverNow={serverNow} /> : null} subColor={payrollShort ? "#EF4444" : "#F59E0B"} align="end"
             tip={payrollShort
               ? `Não tens dinheiro limpo suficiente para o próximo ciclo salarial (${fmtMoney(state.salary_total)}) — os operacionais vão perder moral e lealdade, e quem estiver disponível pode abandonar a organização.`
               : `Ciclo salarial pago a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia.`}
@@ -142,7 +154,7 @@ const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "ce
       <div className="min-w-0">
         <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">{label}</p>
         <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-[13px] font-bold leading-tight text-white sm:text-sm">{value}</p>
-        {sub && <p title={sub} className="truncate font-mono text-[10px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
+        {sub && <p title={typeof sub === "string" ? sub : undefined} className="truncate font-mono text-[10px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
       </div>
     </div>
   </Tip>

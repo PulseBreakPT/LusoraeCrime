@@ -107,10 +107,9 @@
 }
 
 .leaflet-control-attribution {
-    background: rgba(5, 5, 5, 0.7) !important;
+    background: rgba(5, 5, 5, 0.78) !important;
     color: #52525b !important;
     font-size: 9px !important;
-    backdrop-filter: blur(6px);
 }
 
 .leaflet-control-attribution a {
@@ -169,6 +168,7 @@
     opacity: 0.85;
     animation: lus-spin 7s linear infinite;
     pointer-events: none;
+    will-change: transform;
 }
 
 .opp-pin-taken {
@@ -273,24 +273,51 @@
     box-shadow: 0 0 12px var(--mk, #22d3ee);
 }
 
+/* PERF: animar box-shadow diretamente força repaint a cada frame. O pulso
+   passa a viver num pseudo-elemento com o glow pré-rasterizado, animando só
+   a opacity — corre inteiramente no compositor (GPU). */
 .unit-operating {
-    animation: unit-blink 1s ease-in-out infinite alternate;
+    position: relative;
+    box-shadow: 0 0 10px var(--mk, #ef4444);
 }
 
-@keyframes unit-blink {
-    from {
-        box-shadow: 0 0 8px var(--mk, #ef4444);
-    }
-    to {
-        box-shadow: 0 0 20px var(--mk, #ef4444);
-    }
+.unit-operating::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    box-shadow: 0 0 18px 3px var(--mk, #ef4444);
+    animation: lus-glow-breathe 1s ease-in-out infinite alternate;
+    pointer-events: none;
+    will-change: opacity;
 }
 
 .unit-chased {
-    animation: unit-alarm 0.7s ease-in-out infinite alternate;
+    position: relative;
     background: #ef4444 !important;
     color: #fff !important;
     border-color: #050505 !important;
+    box-shadow: 0 0 10px #ef4444, 0 0 20px rgba(239, 68, 68, 0.65);
+}
+
+.unit-chased::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 9999px;
+    box-shadow: 0 0 24px 4px rgba(239, 68, 68, 0.9);
+    animation: lus-glow-breathe 0.7s ease-in-out infinite alternate;
+    pointer-events: none;
+    will-change: opacity;
+}
+
+@keyframes lus-glow-breathe {
+    from {
+        opacity: 0.25;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .unit-siren {
@@ -300,6 +327,7 @@
     border: 2px solid #ef4444;
     animation: siren-ring 1s ease-out infinite;
     pointer-events: none;
+    will-change: transform, opacity;
 }
 
 .unit-pulse {
@@ -309,15 +337,7 @@
     border: 1.5px solid #fff;
     animation: pulse-ring 2s ease-out infinite;
     pointer-events: none;
-}
-
-@keyframes unit-alarm {
-    from {
-        box-shadow: 0 0 6px #ef4444, 0 0 16px rgba(239, 68, 68, 0.6);
-    }
-    to {
-        box-shadow: 0 0 14px #ef4444, 0 0 28px rgba(239, 68, 68, 0.9);
-    }
+    will-change: transform, opacity;
 }
 
 @keyframes siren-ring {
@@ -397,12 +417,21 @@
         radial-gradient(100% 60px at 100% 0%, rgba(212, 168, 83, 0.05) 0%, transparent 100%),
         linear-gradient(180deg, rgba(28, 28, 32, 0.9) 0%, rgba(8, 8, 10, 0.95) 180px);
     border-color: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(26px) saturate(1.4);
-    -webkit-backdrop-filter: blur(26px) saturate(1.4);
+    /* PERF: blur moderado (os painéis abrem por instantes); o HUD permanente
+       usa .lus-hud-solid, sem qualquer backdrop-filter. */
+    backdrop-filter: blur(14px) saturate(1.35);
+    -webkit-backdrop-filter: blur(14px) saturate(1.35);
     box-shadow:
         0 28px 80px rgba(0, 0, 0, 0.8),
         0 0 40px rgba(220, 38, 38, 0.05),
         inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* HUD permanente sobre o mapa (feed, chips) — nunca desfoca o fundo. */
+.lus-hud-solid {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(9, 9, 11, 0.96);
 }
 
 /* Linha laser no topo de cada painel */
@@ -437,15 +466,17 @@
 }
 
 /* ---------- Barra de recursos no topo do mapa ---------- */
+/* PERF: sem backdrop-filter — desfocar o fundo sobre um mapa em movimento
+   obrigava a GPU a re-desfocar a cada frame. O "vidro" é agora sólido, em
+   camadas (obsidiana + glows vermelho/ouro + realce interior). */
 .lus-topbar {
     position: relative;
     border-color: rgba(255, 255, 255, 0.06);
-    background-color: rgba(8, 8, 10, 0.88);
+    background-color: rgba(9, 9, 11, 0.97);
     background-image:
-        radial-gradient(80% 130% at 50% 0%, rgba(220, 38, 38, 0.09) 0%, transparent 60%),
-        linear-gradient(180deg, rgba(36, 36, 40, 0.82) 0%, rgba(8, 8, 10, 0.94) 100%);
-    backdrop-filter: blur(22px) saturate(1.45);
-    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+        radial-gradient(80% 130% at 50% 0%, rgba(220, 38, 38, 0.11) 0%, transparent 60%),
+        radial-gradient(38% 100% at 94% 0%, rgba(212, 168, 83, 0.07) 0%, transparent 70%),
+        linear-gradient(180deg, rgba(38, 38, 42, 0.94) 0%, rgba(9, 9, 11, 0.98) 100%);
     box-shadow:
         0 18px 50px rgba(0, 0, 0, 0.7),
         0 2px 16px rgba(220, 38, 38, 0.1),
@@ -467,7 +498,8 @@
     pointer-events: none;
 }
 
-/* Linha de acento com varrimento luminoso por baixo da topbar */
+/* Linha de acento laser sob a topbar — estática (PERF: o varrimento animado
+   por background-position pintava a barra a cada frame, para sempre). */
 .lus-topbar::after {
     content: "";
     position: absolute;
@@ -475,9 +507,7 @@
     right: 10%;
     bottom: -1px;
     height: 1px;
-    background: linear-gradient(90deg, transparent 15%, rgba(220, 38, 38, 0.9) 50%, transparent 85%);
-    background-size: 200% 100%;
-    animation: lus-sweep 7s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent 8%, rgba(220, 38, 38, 0.8) 50%, transparent 92%);
     pointer-events: none;
 }
 
@@ -529,15 +559,14 @@
 /* ============================================================
    Dock de navegação inferior — consola tática flutuante
    ============================================================ */
+/* PERF: sem backdrop-filter (ver .lus-topbar) — vidro sólido em camadas. */
 .lus-dock {
     position: relative;
     border-color: rgba(255, 255, 255, 0.05);
-    background-color: rgba(8, 8, 10, 0.88);
+    background-color: rgba(9, 9, 11, 0.97);
     background-image:
-        radial-gradient(70% 140% at 50% 100%, rgba(220, 38, 38, 0.08) 0%, transparent 60%),
-        linear-gradient(0deg, rgba(30, 30, 34, 0.85) 0%, rgba(8, 8, 10, 0.94) 100%);
-    backdrop-filter: blur(22px) saturate(1.45);
-    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+        radial-gradient(70% 140% at 50% 100%, rgba(220, 38, 38, 0.1) 0%, transparent 60%),
+        linear-gradient(0deg, rgba(32, 32, 36, 0.94) 0%, rgba(9, 9, 11, 0.98) 100%);
     box-shadow:
         0 18px 50px rgba(0, 0, 0, 0.7),
         0 2px 16px rgba(220, 38, 38, 0.08),
@@ -558,6 +587,7 @@
     pointer-events: none;
 }
 
+/* Linha de acento laser no topo do dock — estática (PERF, ver .lus-topbar) */
 .lus-dock::after {
     content: "";
     position: absolute;
@@ -565,9 +595,7 @@
     right: 12%;
     top: -1px;
     height: 1px;
-    background: linear-gradient(90deg, transparent 15%, rgba(220, 38, 38, 0.8) 50%, transparent 85%);
-    background-size: 200% 100%;
-    animation: lus-sweep 8s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent 8%, rgba(220, 38, 38, 0.7) 50%, transparent 92%);
     pointer-events: none;
 }
 
@@ -1748,6 +1776,7 @@ kbd {
     border-radius: 9999px;
     background: conic-gradient(from 0deg, rgba(220, 38, 38, 0.25) 0deg, rgba(220, 38, 38, 0.06) 55deg, transparent 80deg);
     animation: lus-spin 7s linear infinite;
+    will-change: transform;
 }
 
 .lus-radar-hq::after {
@@ -1845,13 +1874,11 @@ kbd {
 
 /* ---------- Toasts "transmissão tática" (sonner) ---------- */
 .lus-toast {
-    background: linear-gradient(180deg, rgba(26, 26, 30, 0.97) 0%, rgba(9, 9, 11, 0.98) 100%) !important;
+    background: linear-gradient(180deg, rgba(26, 26, 30, 0.98) 0%, rgba(9, 9, 11, 0.99) 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
     border-left: 3px solid #dc2626 !important;
     border-radius: 10px !important;
     color: #fff !important;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     box-shadow:
         0 18px 44px rgba(0, 0, 0, 0.72),
         0 0 24px rgba(220, 38, 38, 0.07),
@@ -1894,9 +1921,7 @@ kbd {
     padding: 16px 34px;
     border: 2px solid rgba(16, 185, 129, 0.8);
     border-radius: 8px;
-    background: rgba(4, 10, 8, 0.74);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(4, 10, 8, 0.9);
     box-shadow:
         0 0 44px rgba(16, 185, 129, 0.28),
         inset 0 0 26px rgba(16, 185, 129, 0.08);
@@ -1919,6 +1944,8 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
     .lus-radar-hq::before,
+    .unit-operating::after,
+    .unit-chased::after,
     .lus-feed-new,
     .lus-flash-amber,
     .lus-flash-blue {
@@ -2165,10 +2192,8 @@ html:has(.lus-page-bg) {
     overflow: hidden;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    background-color: rgba(8, 8, 10, 0.9);
-    background-image: linear-gradient(180deg, rgba(36, 36, 40, 0.85) 0%, rgba(8, 8, 10, 0.95) 100%);
-    backdrop-filter: blur(14px) saturate(1.4);
-    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    background-color: rgba(9, 9, 11, 0.96);
+    background-image: linear-gradient(180deg, rgba(36, 36, 40, 0.9) 0%, rgba(8, 8, 10, 0.97) 100%);
     box-shadow:
         0 12px 34px rgba(0, 0, 0, 0.65),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -2217,9 +2242,10 @@ html:has(.lus-page-bg) {
     50% { opacity: 1; transform: scale(1.06); }
 }
 
-/* Rotação suave do ícone da unidade segundo o rumo da rota */
+/* Rotação do ícone da unidade — aplicada por rAF (lerp em JS); a transição
+   CSS antiga atrasava-se atrás do rumo real. */
 .unit-pin svg {
-    transition: transform 0.35s linear;
+    will-change: transform;
 }
 
 /* Chip "a seguir unidade" no topo do mapa */
@@ -2235,9 +2261,7 @@ html:has(.lus-page-bg) {
     padding: 6px 8px 6px 12px;
     border-radius: 9999px;
     border: 1px solid rgba(34, 211, 238, 0.35);
-    background: rgba(6, 10, 12, 0.88);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(6, 10, 12, 0.95);
     box-shadow:
         0 10px 30px rgba(0, 0, 0, 0.6),
         0 0 18px rgba(34, 211, 238, 0.15);
@@ -2278,6 +2302,46 @@ html:has(.lus-page-bg) {
 
 .lus-follow-chip button:hover {
     background-color: rgba(34, 211, 238, 0.28);
+}
+
+/* ============================================================
+   PERF/SSS — Contador de FPS (Definições → Interface)
+   ============================================================ */
+.lus-fps {
+    position: fixed;
+    right: 8px;
+    top: calc(12rem + env(safe-area-inset-top, 0px));
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 7px 11px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(26, 26, 30, 0.96), rgba(9, 9, 11, 0.98));
+    box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: "JetBrains Mono", monospace;
+    pointer-events: none;
+    contain: content;
+}
+
+.lus-fps-value {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1;
+    color: #34d399;
+    font-variant-numeric: tabular-nums;
+}
+
+.lus-fps-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #71717a;
 }
 
 /* ============================================================
@@ -2323,19 +2387,13 @@ html:has(.lus-page-bg) {
     pointer-events: none;
 }
 
-/* Missão concluída por reclamar — respiração esmeralda */
-@keyframes lus-quest-glow {
-    0%, 100% {
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 12px rgba(16, 185, 129, 0.1);
-    }
-    50% {
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 26px rgba(16, 185, 129, 0.32);
-    }
-}
-
+/* Missão concluída por reclamar — glow esmeralda estático (PERF: animar
+   box-shadow em loop repaintava o cartão a cada frame com o painel aberto). */
 .lus-quest-completed {
     border-color: rgba(16, 185, 129, 0.45) !important;
-    animation: lus-quest-glow 2.2s ease-in-out infinite;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 22px rgba(16, 185, 129, 0.26);
 }
 
 /* Bloqueada — dossier selado */

@@ -31,6 +31,7 @@ export function SettingsProvider({ children }) {
   const [rememberFilters, setRememberFilters] = usePersistedState("set.rememberFilters", true);
   const [rememberSort, setRememberSort] = usePersistedState("set.rememberSort", true);
   const [confirmIrreversible, setConfirmIrreversible] = usePersistedState("set.confirmIrreversible", true);
+  const [showFps, setShowFps] = usePersistedState("set.showFps", false);
 
   const [autoSelectBestTeam, setAutoSelectBestTeam] = usePersistedState("set.autoSelectBestTeam", true);
   const [autoSelectBestVehicle, setAutoSelectBestVehicle] = usePersistedState("set.autoSelectBestVehicle", true);
@@ -79,6 +80,7 @@ export function SettingsProvider({ children }) {
         showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
         rememberFilters, setRememberFilters, rememberSort, setRememberSort,
         confirmIrreversible, setConfirmIrreversible,
+        showFps, setShowFps,
         autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
         hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
         autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
