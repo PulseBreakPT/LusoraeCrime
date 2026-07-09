@@ -253,8 +253,8 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 };
 
 const Section = ({ title, testId, children }) => (
-  <div className="mt-5" data-testid={testId}>
-    <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">{title}</h3>
+  <div className="mt-6" data-testid={testId}>
+    <SectionHeader title={title} />
     {children}
   </div>
 );
