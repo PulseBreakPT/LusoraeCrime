@@ -564,6 +564,27 @@ QUEST_DEFS = {
         "trigger": {"kind": "avg_morale_below", "value": 50},
         "rewards": {"respect": 100},
     },
+    "dyn_fuel": {
+        "name": "Depósitos no Vermelho", "type": "dinamica", "category": "frota", "difficulty": "facil",
+        "desc": "Metade da frota anda a fumos. Abastece 2 veículos antes que uma fuga morra na estrada.",
+        "objective": {"kind": "counter", "metric": "vehicles_refueled", "target": 2, "label": "Abastecer 2 veículos"},
+        "trigger": {"kind": "fleet_fuel_low", "count": 2, "below_pct": 25},
+        "rewards": {"dirty": 1800},
+    },
+    "dyn_dirty_cap": {
+        "name": "Cofre a Transbordar", "type": "dinamica", "category": "economia", "difficulty": "normal",
+        "desc": "O cofre de dinheiro sujo está quase no limite — tudo o que entrar a mais evapora. Lava 8.000 € já.",
+        "objective": {"kind": "counter", "metric": "laundered_total", "target": 8000, "label": "Lavar 8.000 €"},
+        "trigger": {"kind": "dirty_near_cap", "fraction": 0.85},
+        "rewards": {"clean": 2500, "respect": 40},
+    },
+    "dyn_arrested": {
+        "name": "Ninguém Fica Para Trás", "type": "dinamica", "category": "funcionarios", "difficulty": "dificil",
+        "desc": "Tens gente atrás das grades. Liberta todos os operacionais presos — advogado ou suborno, mas ninguém apodrece na cela.",
+        "objective": {"kind": "state", "metric": "arrested_count", "target": 0, "label": "Nenhum operacional preso", "direction": "lte"},
+        "trigger": {"kind": "arrested_employees", "count": 1},
+        "rewards": {"respect": 120, "dirty": 2500},
+    },
 
     # ---------- Eventos ----------
     "ev_santo_antonio": {
@@ -589,6 +610,29 @@ QUEST_DEFS = {
         "desc": "Chuva torrencial esvazia as ruas — perfeito para trabalho técnico. 2 operações técnicas.",
         "objective": {"kind": "counter", "metric": "success_by_category.tecnica", "target": 2, "label": "2 operações técnicas"},
         "rewards": {"clean": 5000},
+    },
+
+    # ---------- Eventos-consequência (só ativados por cadeias de decisões) ----------
+    "ev_carga_marcada": {
+        "name": "Carga Marcada", "type": "evento", "category": "economia", "difficulty": "dificil",
+        "duration_s": 3600, "chain_only": True,
+        "desc": "As notas da carga que compraste estavam marcadas pela polícia. Lava 5.000 € depressa para apagar o rasto.",
+        "objective": {"kind": "counter", "metric": "laundered_total", "target": 5000, "label": "Lavar 5.000 €"},
+        "rewards": {"heat": -10, "respect": 60},
+    },
+    "ev_represalia": {
+        "name": "Represália", "type": "evento", "category": "operacao", "difficulty": "dificil",
+        "duration_s": 3600, "chain_only": True,
+        "desc": "O gang rival respondeu à tua provocação — mostraram-se nas tuas ruas. Conclui 2 operações para provar quem manda.",
+        "objective": {"kind": "counter", "metric": "missions_success", "target": 2, "label": "Concluir 2 operações"},
+        "rewards": {"respect": 120, "dirty": 3000},
+    },
+    "ev_vinganca": {
+        "name": "A Vingança do Morto", "type": "evento", "category": "operacao", "difficulty": "elite",
+        "duration_s": 2700, "chain_only": True,
+        "desc": "A crew do informador que eliminaste quer sangue. Mantém a máquina a rolar: 2 operações concluídas sem vacilar.",
+        "objective": {"kind": "counter", "metric": "missions_success", "target": 2, "label": "Concluir 2 operações"},
+        "rewards": {"respect": 100, "dirty": 2500},
     },
 
     # ---------- Decisões ----------

@@ -71,12 +71,27 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        ESCAPE_HEAT_SPAN, ESCAPE_HEAT_EXP,
                        POLICE_PROB_BASE, POLICE_PROB_SPAN, POLICE_PROB_EXP, POLICE_PROB_CAP,
                        HEAT_DECAY_BASE_PER_MIN, HEAT_DECAY_SLOPE)
-from quests import process_quests, make_instance
+from economy_constants import (
+    DISTRICT_ATTENTION_MAX, DISTRICT_ATTENTION_SUCCESS, DISTRICT_ATTENTION_PARTIAL,
+    DISTRICT_ATTENTION_FAILURE, DISTRICT_ATTENTION_POLICE, DISTRICT_ATTENTION_PER_RISK,
+    DISTRICT_ATTENTION_DECAY_PER_MIN, DISTRICT_ATTENTION_PENALTY_MAX,
+    DISTRICT_ATTENTION_CHASE_MAX, DISTRICT_ATTENTION_SPAWN_MIN_W, DISTRICT_ATTENTION_HOT,
+    TEAM_MOMENTUM_BONUS_PER_WIN, TEAM_MOMENTUM_BONUS_MAX,
+    TEAM_MOMENTUM_PENALTY_PER_LOSS, TEAM_MOMENTUM_PENALTY_MAX,
+    TEAM_MOMENTUM_ESCAPE_BONUS_MAX,
+    PARTIAL_SUCCESS_WINDOW, PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX,
+    PARTIAL_RESPECT_FRACTION, PARTIAL_HEAT_MULT, PARTIAL_XP_FRACTION, PARTIAL_CHASE_MULT,
+    RARE_PITY_PER_SPAWN, RARE_PITY_CAP, SPAWN_DEMAND_SPEC_BOOST, SPAWN_DEMAND_BOOST_MAX,
+    SPAWN_ANTIFARM_PENALTY_PER, SPAWN_ANTIFARM_PENALTY_MAX,
+    STREAK_SPECIAL_THRESHOLD, STREAK_SPECIAL_REWARD_MULT,
+)
+from quests import process_quests, make_instance, effective_quest_rewards
 from quests_data import QUEST_DEFS
 
 logger = logging.getLogger(__name__)
 
-OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
+OUTCOME_PT = {"success": "sucesso", "partial": "sucesso parcial", "failure": "falhou",
+              "police": "intercetado pela polícia"}
 REST_DURATION_S = 90
 
 
@@ -553,26 +568,55 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
     ]
     if not keys:
         return
-    weights = [OPPORTUNITY_TYPES[k]["weight"] for k in keys]
+    # Spawn Director (SSS v3): o mix de tipos deixa de ser cego —
+    # 1) procura: categorias em que o jogador TEM equipas especializadas pesam
+    #    mais (conteúdo acionável), sem nunca zerar as restantes (exploração);
+    # 2) anti-farm: tipos despachados repetidamente há pouco tempo perdem peso.
+    teams = await db.teams.find({"player_id": pid}).to_list(50)
+    spec_counts = {}
+    for tm in teams:
+        sp = tm.get("spec")
+        if sp:
+            spec_counts[sp] = spec_counts.get(sp, 0) + 1
+    recent_counts = {}
+    for k in (player.get("recent_type_keys") or []):
+        recent_counts[k] = recent_counts.get(k, 0) + 1
+    weights = []
+    for k in keys:
+        w = float(OPPORTUNITY_TYPES[k]["weight"])
+        n_spec = spec_counts.get(OPPORTUNITY_TYPES[k]["category"], 0)
+        if n_spec:
+            w *= 1 + min(SPAWN_DEMAND_BOOST_MAX, SPAWN_DEMAND_SPEC_BOOST * n_spec)
+        if recent_counts.get(k):
+            w *= 1 - min(SPAWN_ANTIFARM_PENALTY_MAX, SPAWN_ANTIFARM_PENALTY_PER * recent_counts[k])
+        weights.append(max(0.05, w))
     hq = player["hq"]
     # Centros candidatos: os 16 spots fixos de Lisboa (peso base) mais um
     # centro sintético por propriedade possuída (peso maior, atenuado por
-    # densidade local) — sem propriedades, a distribuição é idêntica à de
-    # sempre; à medida que o jogador expande, a densidade desloca-se para
-    # as suas bases.
-    centers = [(spot, LISBON_SPOT_WEIGHT, None) for spot in LISBON_SPOTS]
+    # densidade local). Zonas com atenção policial acumulada recebem menos
+    # oportunidades — o crime desloca-se para onde a polícia não está.
+    att_map = player.get("district_attention") or {}
+
+    def _att_weight(name):
+        att = float(att_map.get(attention_key(name), 0.0))
+        return max(DISTRICT_ATTENTION_SPAWN_MIN_W,
+                   1 - (att / DISTRICT_ATTENTION_MAX) * (1 - DISTRICT_ATTENTION_SPAWN_MIN_W))
+
+    centers = [(spot, LISBON_SPOT_WEIGHT * _att_weight(spot["name"]), None) for spot in LISBON_SPOTS]
     for p in props:
         centers.append(({"name": p["name"], "lat": p["lat"], "lng": p["lng"]},
-                         _property_spawn_weight(p, props), str(p["_id"])))
+                         _property_spawn_weight(p, props) * _att_weight(p["name"]), str(p["_id"])))
     center_weights = [w for _, w, _ in centers]
-    docs = []
-    for _ in range(max(0, target - active)):
-        key = random.choices(keys, weights=weights)[0]
+    # Pity de raras (SSS v3): cada spawn sem uma oportunidade rara acumula um
+    # pequeno bónus de probabilidade — a sorte nunca seca indefinidamente.
+    spawns_since_rare = int(player.get("spawns_since_rare", 0) or 0)
+    eff_rare_chance = min(RARE_PITY_CAP, rare_chance + RARE_PITY_PER_SPAWN * spawns_since_rare)
+
+    def _build_doc(key, rare, extra_mult=1.0, special=False, expires_range=(240, 600)):
         t = OPPORTUNITY_TYPES[key]
         spot, _, origin_prop_id = random.choices(centers, weights=center_weights)[0]
         duration_s = random.randint(*t["duration_s"])
-        mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s)
-        rare = random.random() < rare_chance
+        mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s) * extra_mult
         if rare:
             mult *= 2.0
         if origin_prop_id:
@@ -585,8 +629,9 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         dist_km = haversine_m(hq["lat"], hq["lng"], lat, lng) / 1000
         risk = min(5, t["risk"] + distance_risk_bump(dist_km))
         mult *= distance_reward_mult(dist_km)
-        docs.append({
-            "player_id": pid, "type_key": key, "name": t["name"],
+        return {
+            "player_id": pid, "type_key": key,
+            "name": (f"Golpe de Oportunidade: {t['name']}" if special else t["name"]),
             "category": t["category"], "district": spot["name"],
             "lat": lat,
             "lng": lng,
@@ -594,14 +639,43 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             "reward": int(t["base_reward"] * mult),
             "respect": int(t["respect"] * (1 + 0.15 * (level - 1)) * (1.5 if rare else 1.0)),
             "risk": risk, "heat": t["heat"], "pays": t["pays"], "rare": rare,
+            "special": special,
             "required_models": t.get("required_models", []),
             "duration_s": duration_s,
             "min_level": t["min_level"], "min_members": min_members_for(risk),
             "status": "active",
-            "expires_at": (now + timedelta(seconds=random.randint(240, 600))).isoformat(),
+            "expires_at": (now + timedelta(seconds=random.randint(*expires_range))).isoformat(),
             "created_at": now.isoformat(),
             "generated_by_property_id": origin_prop_id,
-        })
+        }
+
+    docs = []
+    player_updates = {}
+    # Reação do mundo à série de vitórias: um Golpe de Oportunidade especial —
+    # o tipo mais valioso disponível, rara garantida e recompensa amplificada.
+    if player.get("streak_op_pending"):
+        best_key = max(keys, key=lambda k: OPPORTUNITY_TYPES[k]["base_reward"])
+        special_doc = _build_doc(best_key, rare=True, extra_mult=STREAK_SPECIAL_REWARD_MULT,
+                                 special=True, expires_range=(480, 720))
+        docs.append(special_doc)
+        player["streak_op_pending"] = False
+        player_updates["streak_op_pending"] = False
+        await add_event(db, pid, "intel",
+                        f"GOLPE DE OPORTUNIDADE: {special_doc['name']} em {special_doc['district']} — recompensa excecional, janela curta.")
+    rare_spawned = False
+    for _ in range(max(0, target - active)):
+        key = random.choices(keys, weights=weights)[0]
+        rare = random.random() < eff_rare_chance
+        rare_spawned = rare_spawned or rare
+        docs.append(_build_doc(key, rare))
+    n_regular = max(0, target - active)
+    if n_regular > 0:
+        new_since = 0 if rare_spawned else spawns_since_rare + n_regular
+        if new_since != spawns_since_rare:
+            player["spawns_since_rare"] = new_since
+            player_updates["spawns_since_rare"] = new_since
+    if player_updates:
+        await db.players.update_one({"_id": player["_id"]}, {"$set": player_updates})
     if docs:
         await db.opportunities.insert_many(docs)
 
@@ -1158,10 +1232,52 @@ def mod_talents(ctx):
             "tip": "Um operacional da equipa tem o talento Pontaria Letal."}
 
 
+def attention_key(district):
+    """Chave segura para o mapa de atenção policial (Mongo não aceita '.')."""
+    return (district or "").replace(".", "").strip() or "desconhecido"
+
+
+def district_attention_of(player, district):
+    return float((player.get("district_attention") or {}).get(attention_key(district), 0.0))
+
+
+def mod_district_attention(ctx):
+    """Memória do mundo (SSS v3): operar repetidamente na mesma zona deixa a
+    polícia local em alerta — a atenção acumulada penaliza a chance em curva
+    suave e só arrefece com o tempo. Incentiva a rotação geográfica real."""
+    att = ctx.get("district_attention", 0.0)
+    if att < 5:
+        return None
+    frac = min(1.0, att / DISTRICT_ATTENTION_MAX)
+    pct = -DISTRICT_ATTENTION_PENALTY_MAX * frac ** 1.2
+    if abs(pct) < 0.0005:
+        return None
+    hot = att >= DISTRICT_ATTENTION_HOT
+    label = "Zona sob vigilância apertada" if hot else "Polícia atenta à zona"
+    return {"key": "atencao_distrito", "category": "mundo", "label": label, "pct": pct,
+            "tip": f"Operações recentes em {ctx.get('district', 'esta zona')} deixaram a polícia local em alerta ({round(att)}%) — deixa a zona arrefecer ou opera noutro distrito."}
+
+
+def mod_team_momentum(ctx):
+    """Momentum (SSS v3): séries de vitórias dão confiança operacional (bónus
+    modesto e capado); séries de falhas minam-na. Uma vitória limpa repõe tudo."""
+    streak = ctx.get("team_streak", 0)
+    if streak >= 2:
+        pct = min(TEAM_MOMENTUM_BONUS_MAX, TEAM_MOMENTUM_BONUS_PER_WIN * streak)
+        return {"key": "momentum", "category": "equipa", "label": f"Momentum: {streak} vitórias seguidas", "pct": pct,
+                "tip": "A equipa está confiante — série de operações bem-sucedidas sem falhas. Uma falha apaga a série."}
+    if streak <= -2:
+        pct = -min(TEAM_MOMENTUM_PENALTY_MAX, TEAM_MOMENTUM_PENALTY_PER_LOSS * (-streak))
+        return {"key": "momentum", "category": "moral", "label": "Confiança abalada", "pct": pct,
+                "tip": f"{-streak} falhas consecutivas desta equipa — uma vitória limpa restaura a confiança."}
+    return None
+
+
 MODIFIERS = [
-    mod_risk_type, mod_risk_distance, mod_heat,
+    mod_risk_type, mod_risk_distance, mod_heat, mod_district_attention,
     mod_team_quality, mod_team_size, mod_team_fatigue, mod_team_morale, mod_team_loyalty,
     mod_team_leader, mod_team_uniform_spec, mod_team_coordination, mod_team_synergy,
+    mod_team_momentum,
     mod_vehicle_condition, mod_vehicle_fit, mod_vehicle_capacity,
     mod_weapon_score, mod_stealth_synergy, mod_environment_night, mod_hq_level, mod_talents,
 ]
@@ -1214,14 +1330,22 @@ def _roll_outcome(player, m):
         # uma recomputação parcial e inconsistente.
         logger.warning("Mission %s sem success_chance persistida — a usar valor neutro (0.5).", m.get("id") or m.get("_id"))
         chance = 0.5
-    if random.random() <= chance:
+    r = random.random()
+    if r <= chance:
         return "success"
     # Numa falha, o calor atual decide se foi só azar ou se a polícia estava
     # mesmo à espera (SSS v2, curva convexa): com calor baixo a polícia quase
     # não conta (16% base); com calor alto a probabilidade dispara até ao cap.
     heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
     police_prob = min(POLICE_PROB_CAP, POLICE_PROB_BASE + POLICE_PROB_SPAN * heat_frac ** POLICE_PROB_EXP)
-    return "police" if random.random() < police_prob else "failure"
+    if random.random() < police_prob:
+        return "police"
+    # Near-miss (SSS v3): falhar "por pouco" (dentro da janela acima da chance)
+    # e sem interceção policial vira sucesso parcial — a equipa aborta a meio
+    # mas salva parte do saque. O resultado deixa de ser tudo-ou-nada.
+    if r <= chance + PARTIAL_SUCCESS_WINDOW:
+        return "partial"
+    return "failure"
 
 
 def _apply_outcome(player, m, outcome):
@@ -1229,6 +1353,14 @@ def _apply_outcome(player, m, outcome):
     stats = player.setdefault("stats", default_stats())
     stats["missions_total"] += 1
     stats["by_category"][t["category"]] = stats["by_category"].get(t["category"], 0) + 1
+    # Memória do mundo (SSS v3): a zona onde a operação aconteceu aquece —
+    # quanto pior o desfecho e maior o risco, mais atenção policial acumula.
+    att = player.setdefault("district_attention", {})
+    att_gain = {"success": DISTRICT_ATTENTION_SUCCESS, "partial": DISTRICT_ATTENTION_PARTIAL,
+                "failure": DISTRICT_ATTENTION_FAILURE, "police": DISTRICT_ATTENTION_POLICE}.get(outcome, 0.0)
+    att_gain *= 1 + DISTRICT_ATTENTION_PER_RISK * t.get("risk", 3)
+    akey = attention_key(t.get("district"))
+    att[akey] = round(min(DISTRICT_ATTENTION_MAX, att.get(akey, 0.0) + att_gain), 2)
     heat_mult = 0.5 if ("fantasma_digital" in m.get("talents", []) and t["category"] == "tecnica") else 1.0
     if m.get("vehicle_luxury") and t["category"] in DISCREET_CATEGORIES:
         heat_mult *= LUXURY_HEAT_MULT
@@ -1254,6 +1386,23 @@ def _apply_outcome(player, m, outcome):
             m["chase_active"] = True
             m["escape_chance"] = _compute_escape_chance(player, m)
         m["chase_chance"] = round(chase_chance, 3)
+    elif outcome == "partial":
+        # Sucesso parcial (SSS v3): a equipa abortou a meio mas salvou parte do
+        # saque — paga menos, faz mais barulho e a polícia fica mais desconfiada.
+        stats["missions_partial"] = stats.get("missions_partial", 0) + 1
+        frac = random.uniform(PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX)
+        m["pending_reward"] = int(t["reward"] * frac)
+        m["pending_pays"] = t["pays"]
+        m["partial_fraction"] = round(frac, 2)
+        base_rep = m.get("reward_reputation", t["respect"])
+        player["respect"] += max(1, int(base_rep * PARTIAL_RESPECT_FRACTION))
+        player["heat"] = min(100, player["heat"] + t["heat"] * PARTIAL_HEAT_MULT * heat_mult)
+        # Golpe interrompido = polícia já alertada: perseguição mais provável.
+        chase_chance = min(0.9, _compute_chase_chance(player, m) * PARTIAL_CHASE_MULT)
+        if random.random() < chase_chance:
+            m["chase_active"] = True
+            m["escape_chance"] = _compute_escape_chance(player, m)
+        m["chase_chance"] = round(chase_chance, 3)
     elif outcome == "failure":
         stats["missions_failure"] += 1
         # Reputação por falha: 25% do valor de sucesso (usando novo cálculo se disponível)
@@ -1273,28 +1422,38 @@ def _apply_outcome(player, m, outcome):
 
 
 def _compute_chase_chance(player, m):
-    """Base chance the police tail the crew back to base after a successful heist."""
+    """Probabilidade de a polícia seguir a equipa após o golpe (SSS v3): base
+    por risco, calor em curva convexa (CHASE_HEAT_*), atenção policial da zona
+    (zonas vigiadas têm patrulhas à espera), aliviada por talentos, skill da
+    equipa e — em operações discretas — por um veículo que passa despercebido."""
     t = m["opportunity"]
     risk = t.get("risk", 3)
-    heat = player.get("heat", 0)
-    # Base by risk (0..0.35), heat contribution up to +0.25.
+    heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
     base = 0.05 + (risk / 5) * 0.30
-    heat_bonus = (heat / 100) * 0.25
-    # Talents & skill mitigate: "fantasma_digital" and technical categories are stealthier.
+    # Curva convexa: calor baixo quase não conta, calor alto conta muito.
+    base += CHASE_HEAT_SPAN * heat_frac ** CHASE_HEAT_EXP
+    # Memória do mundo: zonas com atenção acumulada atraem perseguições.
+    att = district_attention_of(player, t.get("district"))
+    base += DISTRICT_ATTENTION_CHASE_MAX * min(1.0, att / DISTRICT_ATTENTION_MAX)
     talents = m.get("talents", []) or []
     reduction = 0.0
     if "fantasma_digital" in talents:
         reduction += 0.10
     if "motorista_fantasma" in talents:
         reduction += 0.05
-    # Team skill matters a bit.
+    # Veículo discreto em operação discreta: menos olhos em cima.
+    if m.get("vehicle_discreet") and t.get("category") in DISCREET_CATEGORIES:
+        reduction += CHASE_DISCRETION_RELIEF
     skill = m.get("team_skill", 3)
     reduction += min(0.10, max(0.0, (skill - 3) * 0.03))
-    return max(0.02, min(0.85, base + heat_bonus - reduction))
+    return max(0.02, min(0.85, base - reduction))
 
 
 def _compute_escape_chance(player, m):
-    """Chance of losing the police tail before reaching HQ."""
+    """Probabilidade de despistar a polícia antes do QG (SSS v3): risco e calor
+    (convexo, ESCAPE_HEAT_*) contra skill, talentos, momentum da equipa e —
+    finalmente — o próprio carro de fuga: velocidade efetiva acima do baseline
+    ajuda a fugir (ESCAPE_SPEED_*), um supercarro em bom estado vale ~+15%."""
     t = m["opportunity"]
     risk = t.get("risk", 3)
     skill = m.get("team_skill", 3)
@@ -1305,8 +1464,17 @@ def _compute_escape_chance(player, m):
         base += 0.08
     if "motorista_fantasma" in talents:
         base += 0.10
-    heat = player.get("heat", 0)
-    base -= (heat / 100) * 0.10
+    # O carro de fuga conta: velocidade efetiva (condição incluída) do despacho.
+    speed = m.get("vehicle_speed_effective")
+    if speed:
+        base += min(ESCAPE_SPEED_BONUS_MAX,
+                    max(0.0, (speed - ESCAPE_SPEED_BASELINE) * ESCAPE_SPEED_BONUS_PER_UNIT))
+    # Momentum: equipas em série de vitórias fogem com mais sangue-frio.
+    streak = m.get("team_streak", 0)
+    if streak > 0:
+        base += min(TEAM_MOMENTUM_ESCAPE_BONUS_MAX, streak * 0.01)
+    heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
+    base -= ESCAPE_HEAT_SPAN * heat_frac ** ESCAPE_HEAT_EXP
     return max(0.10, min(0.95, base))
 
 
@@ -1382,11 +1550,20 @@ async def _pay_pending_reward(db, player, m):
                         f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.")
 
 
+def _failure_cause_suffix(m):
+    """Forense pós-operação (SSS v3): aponta o fator negativo mais pesado do
+    despacho — o jogador aprende PORQUÊ falhou, não apenas QUE falhou."""
+    cause = (m.get("top_negatives") or [None])[0]
+    if not cause:
+        return ""
+    return f" Fator crítico: {cause['label']} ({round(cause['pct'] * 100)}%)."
+
+
 def _outcome_message(m, outcome):
     t = m["opportunity"]
+    symbol = "€ limpos" if t["pays"] == "clean" else "€ sujos"
     if outcome == "success":
         reward = int(m.get("pending_reward", t.get("reward", 0)) or 0)
-        symbol = "€ limpos" if t["pays"] == "clean" else "€ sujos"
         chase = m.get("chase_active")
         base = f"{m['team_name']} concluiu {t['name']} em {t['district']}: leva {reward:,} {symbol}"
         if chase:
@@ -1395,10 +1572,18 @@ def _outcome_message(m, outcome):
             base += ", regressa em segurança"
         base += f", +{t['respect']} respeito."
         return base
+    if outcome == "partial":
+        reward = int(m.get("pending_reward", 0) or 0)
+        frac = int(m.get("partial_fraction", 0.6) * 100)
+        base = f"{m['team_name']} teve de abortar {t['name']} em {t['district']} a meio — salvou {reward:,} {symbol} ({frac}% do saque)"
+        if m.get("chase_active"):
+            base += f" — POLÍCIA em perseguição (escape ≈ {int((m.get('escape_chance', 0.5)) * 100)}%)"
+        base += "."
+        return base
     if outcome == "failure":
-        return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada."
+        return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada.{_failure_cause_suffix(m)}"
     fine = m.get("fine", 0)
-    return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €."
+    return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €.{_failure_cause_suffix(m)}"
 
 
 async def _crew_returns(db, player, m, outcome):
@@ -1425,6 +1610,10 @@ async def _crew_returns(db, player, m, outcome):
         if outcome == "success":
             xp_gain = int(base_xp * (1.5 if match else 1.0))
             d_morale, d_loyal = 2, 1
+        elif outcome == "partial":
+            # Salvar parte do saque ainda ensina — mas deixa um travo amargo.
+            xp_gain = max(1, int(base_xp * PARTIAL_XP_FRACTION * (1.5 if match else 1.0)))
+            d_morale, d_loyal = -1, 0
         elif outcome == "failure":
             xp_gain = max(1, int(base_xp * 0.2))
             d_morale, d_loyal = -4, 0
@@ -1529,7 +1718,11 @@ async def _crew_returns(db, player, m, outcome):
             wear_mult = 1 + (WEAR_KM_MAX_MULT - 1) * min(1.0, veh.get("km_total", 0) / WEAR_KM_RAMP)
             missions_since_repair = veh.get("missions_since_repair", 0)
             wear_mult += WEAR_PER_MISSION_SINCE_REPAIR * min(missions_since_repair, WEAR_MISSIONS_SINCE_REPAIR_CAP)
-            wear = (2 + t["risk"] * 1.5) * wear_mult
+            # Desgaste re-derivado (SSS v3, constantes v2 finalmente ligadas):
+            # componente fixa + risco + km reais percorridos — expedições longas
+            # desgastam mais, operações à porta do QG desgastam menos.
+            wear = (VEHICLE_WEAR_BASE + t["risk"] * VEHICLE_WEAR_PER_RISK
+                    + VEHICLE_WEAR_PER_KM * float(m.get("round_km") or 0.0)) * wear_mult
             # Pequeno imprevisto: avaria inesperada após uma operação arriscada.
             if random.random() < UNEXPECTED_REPAIR_CHANCE_PER_RISK * t["risk"]:
                 wear += UNEXPECTED_REPAIR_CONDITION_HIT
@@ -1559,12 +1752,13 @@ async def _progress_mission(db, player, m, now):
         phase = "returning"
         updates.update({"phase": phase, "outcome": outcome})
         # Persist pending reward and chase state so the front-end can display them.
-        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance", "escape_chance", "fine", "bonus_loot"):
+        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance",
+                  "escape_chance", "fine", "bonus_loot", "partial_fraction"):
             if k in m:
                 updates[k] = m[k]
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
+        stats = player.setdefault("stats", default_stats())
         if outcome == "success":
-            stats = player.setdefault("stats", default_stats())
             stats["missions_success"] = stats.get("missions_success", 0) + 1
             # Métricas usadas pelas missões (quests) de categoria e alto valor —
             # sem estes incrementos, 19 quests ficavam impossíveis de completar.
@@ -1577,12 +1771,31 @@ async def _progress_mission(db, player, m, now):
             # Conquistas permanentes: cada marco de missões bem-sucedidas concede
             # um pequeno bónus passivo de recompensa, para sempre.
             player["achievement_bonus_pct"] = achievement_bonus_pct(stats["missions_success"])
-        await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning"}, "$inc": {"missions_done": 1}})
-        kind = "success" if outcome == "success" else ("police" if outcome == "police" else "failure")
+            # Série de vitórias da organização (SSS v3): ao atingir o marco, o
+            # mundo reage — o próximo tick gera um Golpe de Oportunidade especial.
+            stats["current_success_streak"] = stats.get("current_success_streak", 0) + 1
+            if stats["current_success_streak"] == STREAK_SPECIAL_THRESHOLD and not player.get("streak_op_pending"):
+                player["streak_op_pending"] = True
+                await add_event(db, m["player_id"], "intel",
+                                f"As ruas falam da tua série de {STREAK_SPECIAL_THRESHOLD} vitórias — um Golpe de Oportunidade vai aparecer no mapa.")
+        elif outcome in ("failure", "police"):
+            stats["current_success_streak"] = 0
+        # Momentum da equipa (SSS v3): vitórias somam, falhas invertem o sinal,
+        # sucesso parcial não mexe — nem herói nem culpado.
+        team_doc = await db.teams.find_one({"_id": team_oid})
+        old_streak = int((team_doc or {}).get("streak", 0) or 0)
+        if outcome == "success":
+            new_streak = old_streak + 1 if old_streak >= 0 else 1
+        elif outcome in ("failure", "police"):
+            new_streak = old_streak - 1 if old_streak <= 0 else -1
+        else:
+            new_streak = old_streak
+        await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning", "streak": new_streak}, "$inc": {"missions_done": 1}})
+        kind = "success" if outcome in ("success", "partial") else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))
     if phase == "returning" and now >= parse_dt(m["return_at"]):
         # Resolve chase (if any) and pay pending reward on arrival at HQ.
-        if m.get("outcome") == "success":
+        if m.get("outcome") in ("success", "partial"):
             await _resolve_chase(db, player, m)
             for k in ("pending_reward", "chase_outcome"):
                 if k in m:
@@ -1992,7 +2205,12 @@ async def _auto_claim_quests(db, player, now):
         d = QUEST_DEFS.get(q["quest_key"])
         if not d:
             continue
-        parts = await grant_quest_rewards(db, player, d.get("rewards", {}))
+        # Recompensas dinâmicas (SSS v3): nível × dificuldade × tier adaptativo
+        # × streak — o mesmo cálculo do claim manual, para consistência total.
+        rewards, streak_note = effective_quest_rewards(player, q, d, now)
+        parts = await grant_quest_rewards(db, player, rewards)
+        if streak_note:
+            parts.append(streak_note)
         await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
         if q["quest_key"] == "c2_front":
             await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
@@ -2264,7 +2482,19 @@ async def advance(db, player):
                                       "vehicles": vehicles, "minutes": minutes})
     await process_automations(db, player, employees, vehicles, props, bonuses, now)
 
-    player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 3)
+    # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
+    # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
+    decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
+    player["heat"] = round(max(0.0, player["heat"] - minutes * decay_rate), 3)
+    # A atenção policial por distrito arrefece com o tempo — zonas quentes
+    # voltam gradualmente a ser operáveis.
+    if minutes > 0 and player.get("district_attention"):
+        cooled = {}
+        for k, v in player["district_attention"].items():
+            nv = round(min(DISTRICT_ATTENTION_MAX, float(v)) - minutes * DISTRICT_ATTENTION_DECAY_PER_MIN, 2)
+            if nv > 0.5:
+                cooled[k] = nv
+        player["district_attention"] = cooled
     apply_dirty_money_heat(player, minutes / 60)
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
@@ -2284,6 +2514,12 @@ async def advance(db, player):
         "frac_launder": player.get("frac_launder", 0.0),
         "type_cooldowns": player.get("type_cooldowns", {}),
         "achievement_bonus_pct": player.get("achievement_bonus_pct", 0.0),
+        "district_attention": player.get("district_attention", {}),
+        "streak_op_pending": player.get("streak_op_pending", False),
+        "quest_streak": player.get("quest_streak", {}),
+        "quest_perf": player.get("quest_perf", {}),
+        "quest_offer_history": player.get("quest_offer_history", {}),
+        "pending_chains": player.get("pending_chains", []),
     }})
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player

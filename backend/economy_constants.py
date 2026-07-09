@@ -760,6 +760,69 @@ HEAT_DECAY_BASE_PER_MIN = 1.45
 HEAT_DECAY_SLOPE = 0.5
 
 # ============================================================================
+# SSS-TIER MISSION IQ (v3) — mundo com memória, momentum e resultados nuance
+# ============================================================================
+
+# --- Atenção policial por distrito (memória do mundo) ------------------------
+# Cada operação resolvida aquece a zona onde aconteceu; a atenção decai com o
+# tempo. Zonas quentes penalizam a chance, atraem perseguições e recebem menos
+# oportunidades novas (o crime desloca-se) — repetir a mesma zona tem custo real.
+DISTRICT_ATTENTION_MAX = 100.0
+DISTRICT_ATTENTION_SUCCESS = 5.0      # subida base por sucesso limpo
+DISTRICT_ATTENTION_PARTIAL = 8.0      # golpe interrompido faz mais barulho
+DISTRICT_ATTENTION_FAILURE = 10.0     # falhas deixam rasto
+DISTRICT_ATTENTION_POLICE = 16.0      # interceção = zona marcada
+DISTRICT_ATTENTION_PER_RISK = 0.15    # multiplicador extra por nível de risco
+DISTRICT_ATTENTION_DECAY_PER_MIN = 0.35
+DISTRICT_ATTENTION_PENALTY_MAX = 0.08 # penalização máxima de chance (atenção 100)
+DISTRICT_ATTENTION_CHASE_MAX = 0.10   # contribuição máxima para a perseguição
+DISTRICT_ATTENTION_SPAWN_MIN_W = 0.35 # peso mínimo de spawn numa zona ao rubro
+DISTRICT_ATTENTION_HOT = 40.0         # limiar "zona vigiada" (UI e labels)
+
+# --- Momentum de equipa -------------------------------------------------------
+# Séries de vitórias dão confiança (bónus modesto, capado); séries de falhas
+# minam-na. Uma vitória limpa repõe a confiança a zero+1.
+TEAM_MOMENTUM_BONUS_PER_WIN = 0.012
+TEAM_MOMENTUM_BONUS_MAX = 0.06
+TEAM_MOMENTUM_PENALTY_PER_LOSS = 0.02
+TEAM_MOMENTUM_PENALTY_MAX = 0.06
+TEAM_MOMENTUM_ESCAPE_BONUS_MAX = 0.05
+
+# --- Sucesso parcial (near-miss) ----------------------------------------------
+# Falhar "por pouco" (dentro da janela acima da chance) deixa de ser tudo-ou-
+# -nada: a equipa aborta a meio e salva parte do saque, mas faz barulho.
+PARTIAL_SUCCESS_WINDOW = 0.10
+PARTIAL_REWARD_MIN = 0.55
+PARTIAL_REWARD_MAX = 0.75
+PARTIAL_RESPECT_FRACTION = 0.5
+PARTIAL_HEAT_MULT = 1.2
+PARTIAL_XP_FRACTION = 0.6
+PARTIAL_CHASE_MULT = 1.25
+
+# --- Spawn Director (geração inteligente de oportunidades) --------------------
+RARE_PITY_PER_SPAWN = 0.006           # pity: cada spawn sem rara aumenta a chance
+RARE_PITY_CAP = 0.20
+SPAWN_DEMAND_SPEC_BOOST = 0.30        # peso extra por equipa especializada na categoria
+SPAWN_DEMAND_BOOST_MAX = 0.60
+SPAWN_ANTIFARM_RECENT_N = 10          # janela de type_keys recentes (anti-farm)
+SPAWN_ANTIFARM_PENALTY_PER = 0.06
+SPAWN_ANTIFARM_PENALTY_MAX = 0.40
+STREAK_SPECIAL_THRESHOLD = 5          # vitórias seguidas para o Golpe de Oportunidade
+STREAK_SPECIAL_REWARD_MULT = 1.6
+
+# --- QI das missões (quests): recompensas dinâmicas, streaks e tiers ----------
+QUEST_LEVEL_REWARD_PCT_PER_LEVEL = 0.10  # +10%/nível de organização acima de 1
+QUEST_LEVEL_REWARD_CAP = 1.5             # bónus máximo de nível (+150%)
+QUEST_DIFFICULTY_MULTS = {"facil": 0.9, "normal": 1.0, "dificil": 1.15, "elite": 1.35, "lendaria": 1.6}
+QUEST_STREAK_BONUS_PER_DAY = 0.04        # +4% por dia consecutivo com diária reclamada
+QUEST_STREAK_BONUS_CAP = 0.40
+QUEST_WEEKLY_STREAK_BONUS_PER_WEEK = 0.08
+QUEST_WEEKLY_STREAK_BONUS_CAP = 0.40
+QUEST_PERF_EMA_ALPHA = 0.35              # peso do dia mais recente na taxa de conclusão
+QUEST_MONEY_TARGET_PCT_PER_LEVEL = 0.30  # alvos monetários escalam com o nível
+QUEST_OFFER_REPEAT_PENALTY_H = 48        # oferecer a mesma missão em <48h é penalizado
+
+# ============================================================================
 # SUMMARY OF REDESIGNED VALUES
 # ============================================================================
 #
