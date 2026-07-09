@@ -3,16 +3,17 @@ import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, QUEST_STATUS_LABELS, QUEST_STATUS_COLORS,
   DIFFICULTY_LABELS, DIFFICULTY_COLORS, CHAPTER_LABELS, QUEST_TYPE_LABELS,
+  QUEST_TIER_LABELS, QUEST_TIER_COLORS,
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { MiniBar, PanelKicker, PanelWatermark, SectionHeader, SummaryStrip, Kpi, Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
-import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles } from "lucide-react";
+import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles, Flame, Gauge, Zap } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -114,6 +115,17 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
 
       {chips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
+          {q.reward_mult > 1.01 && (
+            <Tip tip={`Recompensa dinâmica ×${q.reward_mult.toFixed(2)} — ${q.mult_note || "escala com nível, dificuldade, tier e série"}. Concluir na 1.ª metade do prazo dá +10%.`}>
+              <Badge
+                variant="outline"
+                data-testid={`quest-mult-${q.id || q.quest_key}`}
+                className="gap-0.5 border-transparent bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300"
+              >
+                <Zap size={9} /> ×{q.reward_mult.toFixed(2)}
+              </Badge>
+            </Tip>
+          )}
           {chips.map((c, i) => (
             <Badge key={i} variant="outline" className="gap-0.5 border-transparent bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-normal text-emerald-300">
               <Gift size={9} /> {c}
@@ -233,6 +245,17 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
   const dailyMs = state.player.quests_daily_at ? Date.parse(state.player.quests_daily_at) - serverNow() : null;
   const weeklyMs = state.player.quests_weekly_at ? Date.parse(state.player.quests_weekly_at) - serverNow() : null;
 
+  // SSS v3 — desempenho do jogador no sistema de contratos
+  const streak = state.player.quest_streak || {};
+  const perf = state.player.quest_perf || {};
+  const tier = perf.tier || 0;
+  const momentum = Math.round(perf.momentum || 0);
+  const streakBonusPct = Math.min(40, 4 * (streak.count || 0));
+  const activeMults = quests
+    .filter((q) => q.status === "active" || q.status === "completed")
+    .map((q) => q.reward_mult || 1);
+  const bestMult = activeMults.length ? Math.max(...activeMults) : 1;
+
   const chapters = {};
   principals.forEach((q) => {
     (chapters[q.chapter] = chapters[q.chapter] || []).push(q);
@@ -267,6 +290,35 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
             Lisboa paga bem a quem cumpre — reclama o que é teu.
           </SheetDescription>
         </SheetHeader>
+
+        <SummaryStrip cols={3} testId="quests-summary" className="mt-3">
+          <Kpi
+            icon={Flame}
+            label="Série diária"
+            value={`${streak.count || 0} ${(streak.count || 0) === 1 ? "dia" : "dias"}`}
+            sub={`melhor ${streak.best || 0}d · +${streakBonusPct}%`}
+            color={(streak.count || 0) > 0 ? "#F59E0B" : "#A1A1AA"}
+            tip="Reclama pelo menos uma diária por dia para manter a série. Cada dia soma +4% às recompensas de diárias e semanais (máx. +40%). Falhar um dia reinicia a série."
+          />
+          <Kpi
+            icon={Gauge}
+            label="Tier de contratos"
+            value={QUEST_TIER_LABELS[tier]}
+            sub={`momentum ${momentum}/100`}
+            color={QUEST_TIER_COLORS[tier]}
+            bar={momentum}
+            barColor={QUEST_TIER_COLORS[tier]}
+            tip="O momentum sobe ao reclamar contratos e desce quando expiram. Tiers altos pagam +8% por tier, trazem contratos mais exigentes, desbloqueiam uma 4.ª diária (Veterano) e uma 3.ª semanal (Lenda)."
+          />
+          <Kpi
+            icon={Zap}
+            label="Multiplicador"
+            value={`até ×${bestMult.toFixed(2)}`}
+            sub={`nível ×${(1 + 0.15 * Math.max(0, (state.player.level || 1) - 1)).toFixed(2)} base`}
+            color={bestMult > 1.01 ? "#F59E0B" : "#A1A1AA"}
+            tip="Cada contrato mostra o multiplicador real aplicado às recompensas: nível × dificuldade × tier × série × execução rápida (concluir na 1.ª metade do prazo dá +10%). Máximo ×4."
+          />
+        </SummaryStrip>
 
         {featured && (
           <div className="mt-3" data-testid="quest-featured">

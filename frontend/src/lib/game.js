@@ -204,6 +204,10 @@ export const QUEST_STATUS_COLORS = {
 
 export const DIFFICULTY_LABELS = { facil: "Fácil", normal: "Normal", dificil: "Difícil", elite: "Elite", lendaria: "Lendária" };
 
+// SSS v3 — tiers adaptativos do sistema de missões (quest_perf.tier)
+export const QUEST_TIER_LABELS = { 0: "Iniciado", 1: "Profissional", 2: "Veterano", 3: "Lenda" };
+export const QUEST_TIER_COLORS = { 0: "#A1A1AA", 1: "#22D3EE", 2: "#C084FC", 3: "#F59E0B" };
+
 export const DIFFICULTY_COLORS = { facil: "#34D399", normal: "#22D3EE", dificil: "#F59E0B", elite: "#C084FC", lendaria: "#F43F5E" };
 
 export const CHAPTER_LABELS = {
