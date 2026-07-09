@@ -157,6 +157,28 @@ backend:
         comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
+  - task: "Redesign SSS dos ecrãs de loading (BootScreen + LoadingScreen) — chrome partilhado LoadingChrome.jsx: backdrop cinematográfico (grain feTurbulence, CRT, varrimento ambiente, sonar, vinheta, HUD topo/base com réguas+coordenadas+sessão+canal cifrado), moldura de vidro com cantos animados/linha laser/ticks/cabeçalho EM DIRETO, radar com órbita+cardeais+anel de graus+3 blips, wordmark metálico com sheen, barra de uplink angulada com segmentos+ponto incandescente+% grande, terminal 'Registo de sistema' com estados por linha; estados de erro 'Falha de uplink'; scroll seguro em ecrãs baixos; prefers-reduced-motion estendido; rota /dev/loading (+?state=error) para QA visual"
+    implemented: true
+    working: true
+    file: "frontend/src/components/loading/LoadingChrome.jsx, frontend/src/components/LoadingScreen.jsx, frontend/src/components/BootScreen.jsx, frontend/src/pages/DevLoadingPreview.jsx, frontend/src/App.css, frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "09/07/2026 — Verificado por screenshots: /dev/loading (desktop 1920x800 + mobile 390x700 com scroll fix), /dev/loading?state=error, e fluxo real de login via preview URL com BootScreen capturado em ação (20%, 01/07 fases) e jogo carregado depois sem overlay residual. Lógica dos contextos Boot/Loading intocada."
+  - task: "Infra fix: /app/backend/.env e /app/frontend/.env estavam em falta (reset de ambiente) — recriados (MONGO_URL, DB_NAME=test_database, CORS_ORIGINS, JWT_SECRET; REACT_APP_BACKEND_URL da config do supervisor, WDS_SOCKET_PORT=443); backend arrancava com KeyError MONGO_URL"
+    implemented: true
+    working: true
+    file: "backend/.env, frontend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "09/07/2026 — Após recriação + restart: backend 'Application startup complete', login admin@lusorae.com funcional via preview URL, jogo carrega. Credenciais em /app/memory/test_credentials.md."
   - task: "Infra HUD partilhada (Tip/MiniBar/Chip/Kpi/SummaryStrip) + CSS tooltips"
     implemented: true
     working: true

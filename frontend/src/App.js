@@ -13,6 +13,7 @@ import GamePage from "./pages/GamePage";
 import AdminPanel from "./pages/AdminPanel";
 import LegalPage from "./pages/LegalPage";
 import ChangelogPage from "./pages/ChangelogPage";
+import DevLoadingPreview from "./pages/DevLoadingPreview";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { Loader2 } from "lucide-react";
 
@@ -88,6 +89,7 @@ function App() {
               <Route path="/privacidade" element={<LegalPage />} />
               <Route path="/rgpd" element={<LegalPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
+              <Route path="/dev/loading" element={<DevLoadingPreview />} />
               <Route
                 path="/"
                 element={

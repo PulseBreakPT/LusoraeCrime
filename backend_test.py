@@ -9,7 +9,7 @@ import requests
 from datetime import datetime
 
 # Base URL from frontend/.env
-BASE_URL = "https://design-boost-89.preview.emergentagent.com/api"
+BASE_URL = "https://sss-loader-redesign.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@lusorae.com"
