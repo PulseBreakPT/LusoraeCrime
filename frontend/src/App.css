@@ -2360,3 +2360,224 @@ html:has(.lus-page-bg) {
         transition: none;
     }
 }
+
+/* ============================================================
+   Auth SSS — Acesso à rede (login/registo cinematográfico)
+   ============================================================ */
+
+/* Wordmark metálico (estático — o sheen animado causava repaint contínuo) */
+.lus-auth-logo {
+    background: linear-gradient(105deg, #ffffff 18%, #d4d4d8 36%, #ffecec 48%, #9f9fa6 60%, #f4f4f5 78%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 6px 30px rgba(220, 38, 38, 0.4));
+}
+
+/* Régua vermelha pulsante sob o wordmark */
+.lus-auth-rule {
+    height: 2px;
+    background: linear-gradient(90deg, #dc2626, rgba(220, 38, 38, 0.45) 55%, transparent);
+    box-shadow: 0 0 16px rgba(220, 38, 38, 0.55);
+}
+
+/* Ticker de interceção (linhas rotativas) */
+.lus-intel-lines {
+    position: relative;
+    height: 17px;
+    overflow: hidden;
+}
+
+.lus-intel-lines span {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    opacity: 0;
+    animation: lus-intel-cycle 16s infinite;
+}
+
+.lus-intel-lines span:nth-child(2) { animation-delay: 4s; }
+.lus-intel-lines span:nth-child(3) { animation-delay: 8s; }
+.lus-intel-lines span:nth-child(4) { animation-delay: 12s; }
+
+@keyframes lus-intel-cycle {
+    0% { opacity: 0; transform: translateY(8px); }
+    3%, 22% { opacity: 1; transform: translateY(0); }
+    26%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* Cartões de feature com barra laser no hover */
+.lus-auth-feature {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+    overflow: hidden;
+    transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.lus-auth-feature::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14%;
+    bottom: 14%;
+    width: 2px;
+    background: linear-gradient(180deg, transparent, rgba(220, 38, 38, 0.9), transparent);
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.6);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.lus-auth-feature:hover {
+    border-color: rgba(220, 38, 38, 0.3);
+    transform: translateX(3px);
+}
+
+.lus-auth-feature:hover::before { opacity: 1; }
+
+/* Tabs segmentadas com glider deslizante */
+.lus-auth-tabs {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.35));
+    box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.lus-auth-glider {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: linear-gradient(180deg, #ef4444, #b91c1c 55%, #7f1d1d);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 2px 12px rgba(0, 0, 0, 0.5),
+        0 0 22px rgba(220, 38, 38, 0.45);
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-auth-tabs[data-mode="register"] .lus-auth-glider {
+    transform: translateX(100%);
+}
+
+.lus-auth-tab {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 38px;
+    border-radius: 7px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8e8e93;
+    transition: color 0.25s ease;
+}
+
+.lus-auth-tab:hover { color: #d4d4d8; }
+
+.lus-auth-tab[data-active="true"] {
+    color: #ffffff;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+.lus-auth-tab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.45);
+}
+
+/* Campos com ícone que acende no foco */
+.lus-auth-field { position: relative; }
+
+.lus-auth-field-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #52525b;
+    pointer-events: none;
+    transition: color 0.2s ease, filter 0.2s ease;
+}
+
+.lus-auth-field:focus-within .lus-auth-field-icon {
+    color: #f87171;
+    filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.6));
+}
+
+/* Medidor de força — segmentos angulados */
+.lus-seg {
+    height: 6px;
+    flex: 1;
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+    transition: background-color 0.3s ease, filter 0.3s ease;
+}
+
+.lus-seg-on {
+    filter: brightness(1.15) drop-shadow(0 0 6px rgba(255, 255, 255, 0.12));
+}
+
+/* Alertas tipo transmissão tática */
+.lus-auth-alert {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid #ef4444;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(0, 0, 0, 0.28) 62%);
+}
+
+.lus-auth-alert-amber {
+    border-left-color: #f59e0b;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(0, 0, 0, 0.28) 62%);
+}
+
+.lus-auth-alert-kicker {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+/* Transição suave ao alternar Entrar ↔ Criar Império */
+.lus-auth-swap {
+    animation: lus-auth-swap-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes lus-auth-swap-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-intel-lines span,
+    .lus-auth-swap {
+        animation: none !important;
+    }
+
+    .lus-intel-lines span:first-child { opacity: 1; transform: none; }
+    .lus-auth-glider { transition: none; }
+    .lus-auth-feature { transition: none; }
+}
+
