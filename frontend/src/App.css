@@ -927,7 +927,9 @@
 .lus-frame::before,
 .lus-frame::after,
 .lus-corner-tr,
-.lus-corner-bl {
+.lus-corner-bl,
+.lus-corner-tl,
+.lus-corner-br {
     position: absolute;
     width: 30px;
     height: 30px;
@@ -986,6 +988,27 @@
     border-bottom: 2px solid rgba(220, 38, 38, 0.85);
     border-left: 2px solid rgba(220, 38, 38, 0.85);
     filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.55));
+}
+
+/* Cantos standalone (para qualquer contentor relative, ex.: Auth) */
+.lus-corner-tl {
+    top: -5px;
+    left: -5px;
+    --cx: -10px;
+    --cy: -10px;
+    border-top: 2px solid rgba(220, 38, 38, 0.85);
+    border-left: 2px solid rgba(220, 38, 38, 0.85);
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.55));
+}
+
+.lus-corner-br {
+    bottom: -5px;
+    right: -5px;
+    --cx: 10px;
+    --cy: 10px;
+    border-bottom: 2px solid rgba(212, 168, 83, 0.7);
+    border-right: 2px solid rgba(212, 168, 83, 0.7);
+    filter: drop-shadow(0 0 6px rgba(212, 168, 83, 0.4));
 }
 
 /* Ticks laterais da moldura */
