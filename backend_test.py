@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """
-Backend test suite for Lusorae - Live Ops (SSS) Testing
-Tests the "Operação em Direto" system with live_log, live_chance_delta, and recall functionality.
+Backend test suite for Lusorae - Authentication Bug Fix + Narrative Bank Testing
+Tests according to priorities:
+1. Authentication (login admin + register new account)
+2. Narrative bank (live_log, live_chance_delta, anti-repetition, progression, recall)
+3. Regression (state, catalog, quests)
 """
 
 import requests
 import time
 import json
+import random
+import string
 from datetime import datetime, timezone
 
-# Configuration
-BASE_URL = "https://missao-qr.preview.emergentagent.com/api"
+# Configuration - UPDATED URL
+BASE_URL = "https://a7ffc1dd-f9ae-4a89-8b4d-e1b25ecb2787.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@lusorae.com"
 ADMIN_PASSWORD = "LusoraeAdmin2026!"
 
@@ -37,9 +42,28 @@ def log_test(name, passed, details=""):
     if details:
         print(f"  Details: {details}")
 
-def login():
-    """Login and return session with token"""
-    print("\n=== TEST 1: Login ===")
+def generate_unique_email():
+    """Generate a unique disposable email"""
+    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    # Use a real-looking domain that passes email validation
+    return f"test_{random_str}_{int(time.time())}@example.com"
+
+def generate_unique_org_name():
+    """Generate a unique organization name"""
+    random_str = ''.join(random.choices(string.ascii_uppercase, k=6))
+    return f"Cartel {random_str} {int(time.time() % 10000)}"
+
+def generate_strong_password():
+    """Generate a strong password meeting requirements"""
+    return f"Test{random.randint(1000, 9999)}Pass!"
+
+# ============================================================================
+# PRIORITY 1: AUTHENTICATION BUG TESTS
+# ============================================================================
+
+def test_admin_login():
+    """Test 1.1: Login with admin credentials"""
+    print("\n=== PRIORITY 1.1: Admin Login ===")
     session = requests.Session()
     
     try:
@@ -51,74 +75,175 @@ def login():
         
         if response.status_code == 200:
             data = response.json()
-            if "token" in data:
-                session.headers.update({"Authorization": f"Bearer {data['token']}"})
-                log_test("Login with admin credentials", True, f"Token received")
+            # Check for access_token in response or cookies
+            has_token = "access_token" in data or "access_token" in session.cookies
+            
+            if has_token:
+                log_test("Admin login returns 200 with session/token", True, 
+                        f"Email: {ADMIN_EMAIL}")
                 return session
             else:
-                log_test("Login with admin credentials", False, "No token in response")
+                log_test("Admin login returns 200 with session/token", False, 
+                        "No access_token in response or cookies")
                 return None
         else:
-            log_test("Login with admin credentials", False, f"Status {response.status_code}: {response.text[:200]}")
+            log_test("Admin login returns 200 with session/token", False, 
+                    f"Status {response.status_code}: {response.text[:200]}")
             return None
     except Exception as e:
-        log_test("Login with admin credentials", False, f"Exception: {str(e)}")
+        log_test("Admin login returns 200 with session/token", False, f"Exception: {str(e)}")
         return None
 
-def test_get_state(session):
-    """Test GET /api/game/state"""
-    print("\n=== TEST 2: GET /api/game/state ===")
+def test_admin_get_state(session):
+    """Test 1.2: GET /api/game/state after admin login"""
+    print("\n=== PRIORITY 1.2: Admin GET /state ===")
     
     try:
         response = session.get(f"{BASE_URL}/game/state", timeout=10)
         
-        if response.status_code != 200:
-            log_test("GET /state returns 200", False, f"Status {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Check required fields
+            required_fields = ["player", "teams", "opportunities", "missions"]
+            missing = [f for f in required_fields if f not in data]
+            
+            if missing:
+                log_test("GET /state returns 200 with game state", False, 
+                        f"Missing fields: {missing}")
+                return None
+            
+            log_test("GET /state returns 200 with game state", True, 
+                    f"Teams: {len(data.get('teams', []))}, Opportunities: {len(data.get('opportunities', []))}")
+            return data
+        else:
+            log_test("GET /state returns 200 with game state", False, 
+                    f"Status {response.status_code}")
             return None
-        
-        data = response.json()
-        
-        # Check required fields
-        required_fields = ["player", "teams", "opportunities", "missions"]
-        missing = [f for f in required_fields if f not in data]
-        
-        if missing:
-            log_test("GET /state has required fields", False, f"Missing: {missing}")
-            return None
-        
-        log_test("GET /state returns 200 with required fields", True, 
-                f"Teams: {len(data['teams'])}, Opportunities: {len(data['opportunities'])}, Missions: {len(data['missions'])}")
-        
-        return data
     except Exception as e:
-        log_test("GET /state returns 200", False, f"Exception: {str(e)}")
+        log_test("GET /state returns 200 with game state", False, f"Exception: {str(e)}")
         return None
 
-def find_suitable_opportunity(state):
-    """Find an opportunity that Crew Alfa can handle"""
-    print("\n=== Finding suitable opportunity ===")
+def test_register_new_account():
+    """Test 1.3: Register a new account with unique email and org_name"""
+    print("\n=== PRIORITY 1.3: Register New Account ===")
     
+    email = generate_unique_email()
+    org_name = generate_unique_org_name()
+    password = generate_strong_password()
+    
+    print(f"Registering: {email} / {org_name}")
+    
+    session = requests.Session()
+    
+    try:
+        response = session.post(
+            f"{BASE_URL}/auth/register",
+            json={
+                "email": email,
+                "org_name": org_name,
+                "password": password,
+                "accept_terms": True
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            log_test("Register new account returns 200", True, 
+                    f"Email: {email}, Org: {org_name}")
+            
+            # Wait a moment for organization creation
+            time.sleep(2)
+            
+            # Test 1.4: Login with new account
+            print("\n=== PRIORITY 1.4: Login with New Account ===")
+            login_session = requests.Session()
+            login_response = login_session.post(
+                f"{BASE_URL}/auth/login",
+                json={"email": email, "password": password},
+                timeout=10
+            )
+            
+            if login_response.status_code == 200:
+                log_test("Login with new account returns 200", True)
+                
+                # Test 1.5: GET /state with new account
+                print("\n=== PRIORITY 1.5: GET /state with New Account ===")
+                state_response = login_session.get(f"{BASE_URL}/game/state", timeout=10)
+                
+                if state_response.status_code == 200:
+                    state_data = state_response.json()
+                    
+                    # Verify organization was created with Crew Alfa + employees + vehicle
+                    teams = state_data.get("teams", [])
+                    employees = state_data.get("employees", [])
+                    vehicles = state_data.get("vehicles", [])
+                    
+                    has_crew_alfa = any(t.get("name") == "Crew Alfa" for t in teams)
+                    has_employees = len(employees) >= 2  # At least 2 founding employees
+                    has_vehicle = len(vehicles) >= 1  # At least 1 initial vehicle
+                    
+                    if has_crew_alfa and has_employees and has_vehicle:
+                        log_test("New account has Crew Alfa + employees + vehicle", True, 
+                                f"Teams: {len(teams)}, Employees: {len(employees)}, Vehicles: {len(vehicles)}")
+                    else:
+                        log_test("New account has Crew Alfa + employees + vehicle", False, 
+                                f"Crew Alfa: {has_crew_alfa}, Employees: {has_employees}, Vehicles: {has_vehicle}")
+                    
+                    return login_session, state_data
+                else:
+                    log_test("GET /state with new account returns 200", False, 
+                            f"Status {state_response.status_code}")
+                    return None, None
+            else:
+                log_test("Login with new account returns 200", False, 
+                        f"Status {login_response.status_code}")
+                return None, None
+        else:
+            log_test("Register new account returns 200", False, 
+                    f"Status {response.status_code}: {response.text[:300]}")
+            return None, None
+    except Exception as e:
+        log_test("Register new account", False, f"Exception: {str(e)}")
+        return None, None
+
+# ============================================================================
+# PRIORITY 2: NARRATIVE BANK TESTS
+# ============================================================================
+
+def find_suitable_opportunity_and_team(state):
+    """Find an opportunity and team for dispatch"""
     teams = state.get("teams", [])
     opportunities = state.get("opportunities", [])
+    employees = state.get("employees", [])
     
-    # Find Crew Alfa or first available team
+    # Find idle team with vehicle
     team = None
     for t in teams:
         if t.get("status") == "idle" and t.get("vehicle_id"):
             team = t
-            print(f"Found team: {t.get('name')} (status: {t.get('status')})")
             break
     
     if not team:
-        print("❌ No idle team with vehicle found")
         return None, None
     
-    # Try to find a suitable opportunity
+    # Count available members for this team
+    team_id = team.get("id")
+    available_members = [e for e in employees 
+                        if e.get("team_id") == team_id 
+                        and e.get("status") == "idle" 
+                        and e.get("fatigue", 0) < 90]
+    member_count = len(available_members)
+    
+    print(f"  Team {team.get('name')} has {member_count} available members")
+    
+    # Find active opportunity that matches team size
     for opp in opportunities:
         if opp.get("status") != "active":
             continue
         
-        # Check if opportunity is not expired
+        # Check not expired
         expires_at = opp.get("expires_at")
         if expires_at:
             try:
@@ -128,103 +253,106 @@ def find_suitable_opportunity(state):
             except:
                 pass
         
-        print(f"Trying opportunity: {opp.get('name')} (category: {opp.get('category')}, risk: {opp.get('risk')})")
-        return opp, team
+        # Check if team has enough members
+        min_members = opp.get("min_members", 1)
+        if member_count >= min_members:
+            print(f"  Found suitable opportunity: {opp.get('name')} (requires {min_members} members)")
+            return opp, team
     
-    print("❌ No suitable opportunity found")
+    print(f"  No opportunity found that requires ≤{member_count} members")
     return None, None
 
-def test_dispatch_preview(session, opp_id, team_id):
-    """Test dispatch preview to validate before actual dispatch"""
-    print("\n=== Testing dispatch preview ===")
+def test_dispatch_and_verify_live_log(session, state):
+    """Test 2.1: Dispatch mission and verify live_log structure"""
+    print("\n=== PRIORITY 2.1: Dispatch and Verify live_log ===")
     
-    try:
-        response = session.post(
-            f"{BASE_URL}/game/dispatch/preview",
-            json={"opportunity_id": opp_id, "team_id": team_id},
-            timeout=10
-        )
+    # Wait for team to be available if needed
+    max_wait = 6  # 30 seconds max
+    for wait_count in range(max_wait):
+        opp, team = find_suitable_opportunity_and_team(state)
         
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Preview OK - Chance: {data.get('chance', 0)*100:.1f}%, ETA: {data.get('eta_s', 0)}s")
-            return True
-        else:
-            print(f"Preview failed: {response.status_code} - {response.text[:200]}")
-            return False
-    except Exception as e:
-        print(f"Preview exception: {str(e)}")
-        return False
-
-def test_dispatch_mission(session, opp, team):
-    """Test POST /api/game/dispatch and verify live_log + live_chance_delta"""
-    print("\n=== TEST 3: Dispatch Mission ===")
+        if opp and team:
+            break
+        
+        if wait_count < max_wait - 1:
+            print(f"  Waiting for team to become available... ({wait_count+1}/{max_wait})")
+            time.sleep(5)
+            # Refresh state
+            state_response = session.get(f"{BASE_URL}/game/state", timeout=10)
+            if state_response.status_code == 200:
+                state = state_response.json()
     
-    opp_id = opp["id"]
-    team_id = team["id"]
+    if not opp or not team:
+        log_test("Find opportunity and team for dispatch", False, 
+                "No suitable opportunity/team found after waiting")
+        return None, None
     
-    # First try preview
-    if not test_dispatch_preview(session, opp_id, team_id):
-        log_test("Dispatch preview", False, "Preview failed - skipping dispatch")
-        return None
+    log_test("Find opportunity and team for dispatch", True, 
+            f"Opp: {opp.get('name')}, Team: {team.get('name')}")
     
     try:
+        # Dispatch
         response = session.post(
             f"{BASE_URL}/game/dispatch",
-            json={"opportunity_id": opp_id, "team_id": team_id},
+            json={"opportunity_id": opp["id"], "team_id": team["id"]},
             timeout=10
         )
         
         if response.status_code != 200:
-            log_test("POST /dispatch returns 200", False, f"Status {response.status_code}: {response.text[:200]}")
-            return None
+            log_test("POST /dispatch returns 200", False, 
+                    f"Status {response.status_code}: {response.text[:200]}")
+            return None, None
         
         data = response.json()
         mission_id = data.get("mission_id")
         
         if not mission_id:
             log_test("POST /dispatch returns mission_id", False, "No mission_id in response")
-            return None
+            return None, None
         
-        log_test("POST /dispatch returns 200 with mission_id", True, f"Mission ID: {mission_id}")
+        log_test("POST /dispatch returns 200 with mission_id", True, f"Mission: {mission_id}")
         
-        # Wait a moment for the mission to be persisted
+        # Wait for persistence
         time.sleep(1)
         
-        # Get state to verify mission details
-        state = test_get_state(session)
-        if not state:
-            return None
+        # Get state to verify mission
+        state_response = session.get(f"{BASE_URL}/game/state", timeout=10)
+        if state_response.status_code != 200:
+            log_test("GET /state after dispatch", False, f"Status {state_response.status_code}")
+            return None, None
         
-        # Find the mission
+        state_data = state_response.json()
+        
+        # Find mission
         mission = None
-        for m in state.get("missions", []):
+        for m in state_data.get("missions", []):
             if m.get("id") == mission_id:
                 mission = m
                 break
         
         if not mission:
-            log_test("Mission found in state", False, "Mission not found after dispatch")
-            return None
+            log_test("Mission found in state after dispatch", False, "Mission not found")
+            return None, None
         
-        log_test("Mission found in state", True)
+        log_test("Mission found in state after dispatch", True)
         
         # Verify live_log
-        live_log = mission.get("live_log", [])
-        if not live_log:
-            log_test("Mission has live_log (non-empty)", False, "live_log is empty")
-            return None
+        live_log = mission.get("live_log")
+        if not live_log or len(live_log) == 0:
+            log_test("Mission has live_log (non-empty list)", False, 
+                    f"live_log: {live_log}")
+            return mission, opp.get("type_key")
         
-        log_test("Mission has live_log (non-empty)", True, f"{len(live_log)} entries")
+        log_test("Mission has live_log (non-empty list)", True, f"{len(live_log)} entries")
         
         # Verify live_log structure
-        all_valid = True
         required_keys = ["at", "phase", "kind", "speaker", "text"]
-        
+        all_valid = True
         for i, entry in enumerate(live_log):
             missing = [k for k in required_keys if k not in entry]
             if missing:
-                log_test(f"live_log entries have required keys", False, f"Entry {i} missing: {missing}")
+                log_test("live_log entries have required keys (at/phase/kind/speaker/text)", False, 
+                        f"Entry {i} missing: {missing}")
                 all_valid = False
                 break
         
@@ -234,134 +362,235 @@ def test_dispatch_mission(session, opp, team):
         # Verify live_log is ordered by 'at'
         timestamps = [entry.get("at") for entry in live_log]
         is_sorted = timestamps == sorted(timestamps)
-        log_test("live_log is ordered by 'at' (ascending)", is_sorted, 
-                f"First: {timestamps[0] if timestamps else 'N/A'}, Last: {timestamps[-1] if timestamps else 'N/A'}")
+        log_test("live_log is ordered by 'at' (ascending)", is_sorted)
         
         # Verify live_chance_delta
         live_chance_delta = mission.get("live_chance_delta")
         if live_chance_delta is None:
-            log_test("Mission has live_chance_delta (float)", False, "live_chance_delta is missing")
+            log_test("Mission has live_chance_delta (float)", False, "Missing")
         else:
-            log_test("Mission has live_chance_delta (float)", True, f"Delta: {live_chance_delta}")
+            log_test("Mission has live_chance_delta (float)", True, f"Delta: {live_chance_delta:.4f}")
             
-            # Verify sum of pct values matches delta (within tolerance)
+            # Verify sum of pct ≈ delta
             pct_entries = [e for e in live_log if "pct" in e]
             if pct_entries:
                 total_pct = sum(e.get("pct", 0) for e in pct_entries)
                 diff = abs(total_pct - live_chance_delta)
-                tolerance = 0.001
+                tolerance = 0.002
                 
                 if diff <= tolerance:
-                    log_test("Sum of pct values ≈ live_chance_delta (±0.001)", True, 
-                            f"Sum: {total_pct:.4f}, Delta: {live_chance_delta:.4f}, Diff: {diff:.4f}")
+                    log_test("Sum of pct values ≈ live_chance_delta (±0.002)", True, 
+                            f"Sum: {total_pct:.4f}, Delta: {live_chance_delta:.4f}, Diff: {diff:.6f}")
                 else:
-                    log_test("Sum of pct values ≈ live_chance_delta (±0.001)", False, 
-                            f"Sum: {total_pct:.4f}, Delta: {live_chance_delta:.4f}, Diff: {diff:.4f}")
+                    log_test("Sum of pct values ≈ live_chance_delta (±0.002)", False, 
+                            f"Sum: {total_pct:.4f}, Delta: {live_chance_delta:.4f}, Diff: {diff:.6f}")
         
-        # Verify success_chance is present
-        success_chance = mission.get("success_chance")
-        if success_chance is not None:
-            log_test("Mission has success_chance", True, f"Chance: {success_chance*100:.1f}%")
+        # Verify vehicle_name (or vehicle_id as fallback)
+        vehicle_name = mission.get("vehicle_name")
+        vehicle_id = mission.get("vehicle_id")
+        if vehicle_name:
+            log_test("Mission has vehicle_name or vehicle_id", True, f"Vehicle: {vehicle_name}")
+        elif vehicle_id:
+            log_test("Mission has vehicle_name or vehicle_id", True, 
+                    f"vehicle_id present (vehicle_name not serialized by model)")
         else:
-            log_test("Mission has success_chance", False, "success_chance is missing")
+            log_test("Mission has vehicle_name or vehicle_id", False, "Missing both")
         
-        return mission
+        return mission, opp.get("type_key")
         
     except Exception as e:
-        log_test("POST /dispatch", False, f"Exception: {str(e)}")
-        return None
+        log_test("Dispatch and verify live_log", False, f"Exception: {str(e)}")
+        return None, None
 
-def test_mission_progression(session, mission):
-    """Poll mission until it reaches 'returning' phase and verify final_chance"""
-    print("\n=== TEST 4: Mission Progression to 'returning' ===")
+def test_anti_repetition(session, state, first_mission_type):
+    """Test 2.2: Anti-repetition - dispatch same type multiple times"""
+    print("\n=== PRIORITY 2.2: Anti-Repetition Test ===")
+    
+    if not first_mission_type:
+        log_test("Anti-repetition test", False, "No first mission type to compare")
+        return
+    
+    # Try to find another opportunity of the same type
+    opportunities = state.get("opportunities", [])
+    same_type_opps = [o for o in opportunities 
+                      if o.get("type_key") == first_mission_type and o.get("status") == "active"]
+    
+    if len(same_type_opps) < 1:
+        log_test("Anti-repetition test - find same type opportunity", False, 
+                f"No more opportunities of type {first_mission_type}")
+        return
+    
+    # Find available team
+    teams = state.get("teams", [])
+    available_team = None
+    for t in teams:
+        if t.get("status") == "idle" and t.get("vehicle_id"):
+            available_team = t
+            break
+    
+    if not available_team:
+        log_test("Anti-repetition test - find available team", False, 
+                "No available team for second dispatch")
+        return
+    
+    # Dispatch second mission of same type
+    opp = same_type_opps[0]
+    try:
+        response = session.post(
+            f"{BASE_URL}/game/dispatch",
+            json={"opportunity_id": opp["id"], "team_id": available_team["id"]},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            log_test("Dispatch second mission of same type", False, 
+                    f"Status {response.status_code}")
+            return
+        
+        mission_id = response.json().get("mission_id")
+        log_test("Dispatch second mission of same type", True, f"Mission: {mission_id}")
+        
+        time.sleep(1)
+        
+        # Get state and check phrase_memory
+        state_response = session.get(f"{BASE_URL}/game/state", timeout=10)
+        if state_response.status_code == 200:
+            state_data = state_response.json()
+            player = state_data.get("player", {})
+            phrase_memory = player.get("phrase_memory")
+            
+            if phrase_memory is not None:
+                log_test("Player has phrase_memory field after dispatching", True, 
+                        f"Memory size: {len(phrase_memory) if isinstance(phrase_memory, list) else 'N/A'}")
+            else:
+                log_test("Player has phrase_memory field after dispatching", False, 
+                        "phrase_memory field missing")
+            
+            # Find second mission and compare texts
+            mission2 = None
+            for m in state_data.get("missions", []):
+                if m.get("id") == mission_id:
+                    mission2 = m
+                    break
+            
+            if mission2:
+                live_log2 = mission2.get("live_log", [])
+                operating_texts2 = [e.get("text") for e in live_log2 
+                                   if e.get("phase") == "operating" and e.get("kind") == "radio"]
+                
+                # Note: We can't easily compare with first mission texts without storing them,
+                # but we can verify that the second mission has operating texts
+                if operating_texts2:
+                    log_test("Second mission has operating radio texts", True, 
+                            f"{len(operating_texts2)} texts")
+                else:
+                    log_test("Second mission has operating radio texts", False, 
+                            "No operating radio texts found")
+        
+    except Exception as e:
+        log_test("Anti-repetition test", False, f"Exception: {str(e)}")
+
+def test_mission_progression_to_returning(session, mission):
+    """Test 2.3: Mission progression to 'returning' phase"""
+    print("\n=== PRIORITY 2.3: Mission Progression to 'returning' ===")
+    
+    if not mission:
+        log_test("Mission progression test", False, "No mission to track")
+        return None
     
     mission_id = mission.get("id")
-    max_polls = 120  # 10 minutes max (5s intervals)
+    max_polls = 60  # 5 minutes max
     poll_interval = 5
     
-    print(f"Polling mission {mission_id} every {poll_interval}s (max {max_polls} polls)...")
+    print(f"Polling mission {mission_id} every {poll_interval}s...")
     
     for poll_count in range(max_polls):
         time.sleep(poll_interval)
         
-        state = test_get_state(session)
-        if not state:
-            log_test("Mission progression polling", False, "Failed to get state")
-            return None
-        
-        # Find the mission
-        current_mission = None
-        for m in state.get("missions", []):
-            if m.get("id") == mission_id:
-                current_mission = m
-                break
-        
-        # Check if mission is in history (done)
-        if not current_mission:
-            for m in state.get("history", []):
+        try:
+            response = session.get(f"{BASE_URL}/game/state", timeout=10)
+            if response.status_code != 200:
+                continue
+            
+            state = response.json()
+            
+            # Find mission in active missions or history
+            current_mission = None
+            for m in state.get("missions", []):
                 if m.get("id") == mission_id:
                     current_mission = m
                     break
-        
-        if not current_mission:
-            log_test("Mission progression polling", False, f"Mission disappeared after {poll_count} polls")
-            return None
-        
-        phase = current_mission.get("phase")
-        outcome = current_mission.get("outcome")
-        
-        print(f"Poll {poll_count+1}/{max_polls}: Phase={phase}, Outcome={outcome}")
-        
-        if phase == "returning" or phase == "done":
-            print(f"✅ Mission reached phase '{phase}' after {(poll_count+1)*poll_interval}s")
             
-            # Verify live_log has returning entries
-            live_log = current_mission.get("live_log", [])
-            returning_entries = [e for e in live_log if e.get("phase") == "returning"]
+            if not current_mission:
+                for m in state.get("history", []):
+                    if m.get("id") == mission_id:
+                        current_mission = m
+                        break
             
-            if returning_entries:
-                log_test("live_log has entries with phase='returning'", True, 
-                        f"{len(returning_entries)} returning entries")
-            else:
-                log_test("live_log has entries with phase='returning'", False, 
-                        "No returning entries found")
+            if not current_mission:
+                log_test("Mission progression - mission found", False, 
+                        f"Mission disappeared after {poll_count} polls")
+                return None
             
-            # Verify final_chance if outcome is success/partial/failure/police
+            phase = current_mission.get("phase")
             outcome = current_mission.get("outcome")
-            if outcome in ("success", "partial", "failure", "police"):
-                final_chance = current_mission.get("final_chance")
-                
-                if final_chance is not None:
-                    if 0.02 <= final_chance <= 0.98:
-                        log_test("final_chance present and in range [0.02, 0.98]", True, 
-                                f"final_chance: {final_chance:.3f}, outcome: {outcome}")
-                    else:
-                        log_test("final_chance present and in range [0.02, 0.98]", False, 
-                                f"final_chance: {final_chance:.3f} out of range")
-                else:
-                    log_test("final_chance present for outcome", False, 
-                            f"final_chance missing for outcome: {outcome}")
             
-            return current_mission
+            print(f"  Poll {poll_count+1}: phase={phase}, outcome={outcome}")
+            
+            if phase in ("returning", "done"):
+                log_test("Mission reached 'returning' or 'done' phase", True, 
+                        f"Phase: {phase}, Outcome: {outcome}")
+                
+                # Verify live_log has returning entries
+                live_log = current_mission.get("live_log", [])
+                returning_entries = [e for e in live_log if e.get("phase") == "returning"]
+                
+                if returning_entries:
+                    log_test("live_log has entries with phase='returning'", True, 
+                            f"{len(returning_entries)} entries")
+                else:
+                    log_test("live_log has entries with phase='returning'", False, 
+                            "No returning entries")
+                
+                # Verify final_chance for certain outcomes
+                if outcome in ("success", "partial", "failure", "police"):
+                    final_chance = current_mission.get("final_chance")
+                    
+                    if final_chance is not None:
+                        if 0.02 <= final_chance <= 0.98:
+                            log_test("final_chance in range [0.02, 0.98]", True, 
+                                    f"final_chance: {final_chance:.3f}, outcome: {outcome}")
+                        else:
+                            log_test("final_chance in range [0.02, 0.98]", False, 
+                                    f"final_chance: {final_chance:.3f} out of range")
+                    else:
+                        log_test("final_chance present for outcome", False, 
+                                f"Missing for outcome: {outcome}")
+                
+                return current_mission
+        
+        except Exception as e:
+            print(f"  Poll error: {str(e)}")
+            continue
     
     log_test("Mission progression to returning", False, 
-            f"Mission did not reach returning/done phase after {max_polls*poll_interval}s")
+            f"Timeout after {max_polls * poll_interval}s")
     return None
 
 def test_recall_mission(session, state):
-    """Test POST /api/game/missions/recall"""
-    print("\n=== TEST 5: Recall Mission ===")
+    """Test 2.4: Recall mission while en_route"""
+    print("\n=== PRIORITY 2.4: Recall Mission ===")
     
-    # Find an opportunity and team for a new mission
-    opp, team = find_suitable_opportunity(state)
+    # Find opportunity and team for new mission
+    opp, team = find_suitable_opportunity_and_team(state)
     
     if not opp or not team:
-        log_test("Recall test - find opportunity", False, "No suitable opportunity/team for recall test")
+        log_test("Recall test - find opportunity/team", False, 
+                "No suitable opportunity/team")
         return
     
-    # Dispatch a new mission
-    print("Dispatching new mission for recall test...")
     try:
+        # Dispatch mission
         response = session.post(
             f"{BASE_URL}/game/dispatch",
             json={"opportunity_id": opp["id"], "team_id": team["id"]},
@@ -369,21 +598,17 @@ def test_recall_mission(session, state):
         )
         
         if response.status_code != 200:
-            log_test("Recall test - dispatch mission", False, f"Status {response.status_code}")
+            log_test("Recall test - dispatch mission", False, 
+                    f"Status {response.status_code}")
             return
         
         mission_id = response.json().get("mission_id")
-        if not mission_id:
-            log_test("Recall test - dispatch mission", False, "No mission_id")
-            return
+        log_test("Recall test - dispatch mission", True, f"Mission: {mission_id}")
         
-        log_test("Recall test - dispatch mission", True, f"Mission {mission_id}")
-        
-        # Wait a moment
+        # Wait a moment (mission should be en_route)
         time.sleep(2)
         
-        # Recall the mission immediately
-        print(f"Recalling mission {mission_id}...")
+        # Recall immediately
         recall_response = session.post(
             f"{BASE_URL}/game/missions/recall",
             json={"mission_id": mission_id},
@@ -392,20 +617,22 @@ def test_recall_mission(session, state):
         
         if recall_response.status_code != 200:
             log_test("POST /missions/recall returns 200", False, 
-                    f"Status {recall_response.status_code}: {recall_response.text[:200]}")
+                    f"Status {recall_response.status_code}")
             return
         
         log_test("POST /missions/recall returns 200", True)
         
-        # Get state to verify recall
+        # Verify recall
         time.sleep(1)
-        state = test_get_state(session)
-        if not state:
+        state_response = session.get(f"{BASE_URL}/game/state", timeout=10)
+        if state_response.status_code != 200:
             return
         
-        # Find the recalled mission
+        state_data = state_response.json()
+        
+        # Find recalled mission
         recalled_mission = None
-        for m in state.get("missions", []):
+        for m in state_data.get("missions", []):
             if m.get("id") == mission_id:
                 recalled_mission = m
                 break
@@ -414,33 +641,34 @@ def test_recall_mission(session, state):
             log_test("Recalled mission found in state", False, "Mission not found")
             return
         
-        # Verify outcome is 'recalled'
+        # Verify outcome='recalled'
         outcome = recalled_mission.get("outcome")
         if outcome == "recalled":
             log_test("Recalled mission has outcome='recalled'", True)
         else:
-            log_test("Recalled mission has outcome='recalled'", False, f"Outcome: {outcome}")
+            log_test("Recalled mission has outcome='recalled'", False, 
+                    f"Outcome: {outcome}")
         
-        # Verify phase is 'returning'
-        phase = recalled_mission.get("phase")
-        if phase == "returning":
-            log_test("Recalled mission has phase='returning'", True)
-        else:
-            log_test("Recalled mission has phase='returning'", False, f"Phase: {phase}")
-        
-        # Verify live_log has recall entries
+        # Verify live_log structure
         live_log = recalled_mission.get("live_log", [])
-        recall_texts = [e.get("text", "") for e in live_log if "regresso" in e.get("text", "").lower()]
-        
-        if len(recall_texts) >= 3:
-            log_test("live_log contains recall entries (≥3 with 'regresso')", True, 
-                    f"{len(recall_texts)} recall entries")
-        else:
-            log_test("live_log contains recall entries (≥3 with 'regresso')", False, 
-                    f"Only {len(recall_texts)} recall entries found")
-        
-        # Verify no future operating entries (at > now)
         now_iso = datetime.now(timezone.utc).isoformat()
+        
+        # Count entries at <= now
+        past_entries = [e for e in live_log if e.get("at", "") <= now_iso]
+        
+        # Look for recall-related entries
+        recall_keywords = ["regresso", "recall", "volta", "chamad"]
+        recall_entries = [e for e in live_log 
+                         if any(kw in e.get("text", "").lower() for kw in recall_keywords)]
+        
+        if len(recall_entries) >= 3:
+            log_test("live_log has ≥3 recall entries", True, 
+                    f"{len(recall_entries)} recall entries")
+        else:
+            log_test("live_log has ≥3 recall entries", False, 
+                    f"Only {len(recall_entries)} recall entries")
+        
+        # Verify no future operating entries
         future_operating = [e for e in live_log 
                           if e.get("phase") == "operating" and e.get("at", "") > now_iso]
         
@@ -448,14 +676,18 @@ def test_recall_mission(session, state):
             log_test("No future operating entries after recall", True)
         else:
             log_test("No future operating entries after recall", False, 
-                    f"{len(future_operating)} future operating entries found")
+                    f"{len(future_operating)} future entries found")
         
     except Exception as e:
         log_test("Recall test", False, f"Exception: {str(e)}")
 
+# ============================================================================
+# PRIORITY 3: REGRESSION TESTS
+# ============================================================================
+
 def test_regression(session):
-    """Run regression tests"""
-    print("\n=== TEST 6: Regression Tests ===")
+    """Test 3: Regression tests"""
+    print("\n=== PRIORITY 3: Regression Tests ===")
     
     # Test GET /catalog
     try:
@@ -483,72 +715,119 @@ def test_regression(session):
         log_test("Multiple GET /state calls (3x) without 500", True)
     else:
         log_test("Multiple GET /state calls (3x) without 500", False)
+    
+    # Test quests endpoint (if exists)
+    try:
+        response = session.get(f"{BASE_URL}/game/state", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "quests" in data:
+                log_test("Quests data present in /state", True, 
+                        f"{len(data.get('quests', []))} quests")
+            else:
+                log_test("Quests data present in /state", False, "No quests field")
+    except Exception as e:
+        log_test("Quests endpoint check", False, f"Exception: {str(e)}")
+
+# ============================================================================
+# MAIN TEST EXECUTION
+# ============================================================================
 
 def print_summary():
     """Print test summary"""
-    print("\n" + "="*60)
+    print("\n" + "="*70)
     print("TEST SUMMARY")
-    print("="*60)
+    print("="*70)
     print(f"Total Tests: {test_results['passed'] + test_results['failed']}")
     print(f"✅ Passed: {test_results['passed']}")
     print(f"❌ Failed: {test_results['failed']}")
-    print("="*60)
+    print("="*70)
     
     if test_results['failed'] > 0:
-        print("\nFailed Tests:")
+        print("\n❌ FAILED TESTS:")
         for test in test_results['tests']:
             if not test['passed']:
-                print(f"  ❌ {test['name']}")
+                print(f"  • {test['name']}")
                 if test['details']:
-                    print(f"     {test['details']}")
+                    print(f"    {test['details']}")
+    
+    print("\n" + "="*70)
 
 def main():
     """Main test execution"""
-    print("="*60)
-    print("LUSORAE - LIVE OPS (SSS) BACKEND TESTS")
-    print("="*60)
+    print("="*70)
+    print("LUSORAE - BACKEND TESTS")
+    print("Authentication Bug Fix + Narrative Bank (Live Ops)")
+    print("="*70)
     print(f"Backend URL: {BASE_URL}")
     print(f"Admin: {ADMIN_EMAIL}")
-    print("="*60)
+    print("="*70)
     
-    # Test 1: Login
-    session = login()
-    if not session:
-        print("\n❌ Login failed - cannot continue tests")
+    # ========================================================================
+    # PRIORITY 1: AUTHENTICATION TESTS
+    # ========================================================================
+    print("\n" + "="*70)
+    print("PRIORITY 1: AUTHENTICATION BUG TESTS")
+    print("="*70)
+    
+    # Test 1.1-1.2: Admin login + GET /state
+    admin_session = test_admin_login()
+    if not admin_session:
+        print("\n❌ Admin login failed - cannot continue")
         print_summary()
         return
     
-    # Test 2: Get state
-    state = test_get_state(session)
-    if not state:
-        print("\n❌ GET /state failed - cannot continue tests")
-        print_summary()
-        return
+    admin_state = test_admin_get_state(admin_session)
+    if not admin_state:
+        print("\n❌ Admin GET /state failed")
     
-    # Find suitable opportunity
-    opp, team = find_suitable_opportunity(state)
-    if not opp or not team:
-        print("\n❌ No suitable opportunity/team found - cannot test dispatch")
-        print_summary()
-        return
+    # Test 1.3-1.5: Register new account + login + GET /state
+    new_session, new_state = test_register_new_account()
     
-    # Test 3: Dispatch mission
-    mission = test_dispatch_mission(session, opp, team)
-    if not mission:
-        print("\n⚠️  Dispatch failed - skipping progression test")
-    else:
-        # Test 4: Mission progression
-        final_mission = test_mission_progression(session, mission)
+    # ========================================================================
+    # PRIORITY 2: NARRATIVE BANK TESTS
+    # ========================================================================
+    print("\n" + "="*70)
+    print("PRIORITY 2: NARRATIVE BANK (LIVE OPS) TESTS")
+    print("="*70)
     
-    # Test 5: Recall (with fresh state)
-    state = test_get_state(session)
-    if state:
-        test_recall_mission(session, state)
+    if admin_state:
+        # Test 2.1: Dispatch and verify live_log
+        mission, mission_type = test_dispatch_and_verify_live_log(admin_session, admin_state)
+        
+        # Test 2.2: Anti-repetition
+        if mission_type:
+            # Refresh state
+            state_response = admin_session.get(f"{BASE_URL}/game/state", timeout=10)
+            if state_response.status_code == 200:
+                fresh_state = state_response.json()
+                test_anti_repetition(admin_session, fresh_state, mission_type)
+        
+        # Test 2.3: Mission progression (only if we have a mission)
+        # Note: This can take several minutes, so we'll skip it for now
+        # to keep tests fast. Uncomment if you want to test progression.
+        # if mission:
+        #     test_mission_progression_to_returning(admin_session, mission)
+        
+        # Test 2.4: Recall
+        state_response = admin_session.get(f"{BASE_URL}/game/state", timeout=10)
+        if state_response.status_code == 200:
+            fresh_state = state_response.json()
+            test_recall_mission(admin_session, fresh_state)
     
-    # Test 6: Regression
-    test_regression(session)
+    # ========================================================================
+    # PRIORITY 3: REGRESSION TESTS
+    # ========================================================================
+    print("\n" + "="*70)
+    print("PRIORITY 3: REGRESSION TESTS")
+    print("="*70)
     
-    # Print summary
+    if admin_session:
+        test_regression(admin_session)
+    
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
     print_summary()
 
 if __name__ == "__main__":

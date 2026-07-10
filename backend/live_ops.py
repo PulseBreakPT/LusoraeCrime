@@ -1,4 +1,4 @@
-"""live_ops.py — Guião de operação em direto (SSS).
+"""live_ops.py — Guião de operação em direto (SSS), agora data-driven.
 
 Gera, no momento do despacho, uma timeline determinística de beats narrativos
 (rádio da equipa, marcos da operação) e 0–2 COMPLICAÇÕES dinâmicas com efeito
@@ -6,14 +6,32 @@ REAL na chance final (live_chance_delta, aplicado em engine._roll_outcome).
 Cada entrada tem um timestamp absoluto — o frontend revela as linhas quando o
 relógio do servidor as alcança, sem trabalho extra por tick.
 
+Conteúdo narrativo (751+ frases) vive em:
+  - live_phrases_beats.TYPE_BEATS  → beats de operação únicos por cada um dos 67 tipos
+  - live_phrases.*                 → viagem, complicações, aberturas/fechos, regresso
+
+ANTI-REPETIÇÃO: cada frase tem uma chave estável (ex. "beat:hack:3"). A
+organização guarda em player["phrase_memory"] as chaves usadas nas últimas
+missões; o PhraseDeck evita-as, preferindo sempre voz nova. Assim, missões
+seguidas do mesmo tipo soam diferentes.
+
 Formato de cada entrada do live_log:
   {"at": iso, "phase": "en_route"|"operating"|"returning",
    "kind": "net"|"radio"|"milestone"|"comp_bad"|"comp_good"|"good"|"bad"|"police",
    "speaker": "CENTRAL"|"LÍDER"|"CONDUTOR"|"VIGIA"|<nome próprio>,
-   "text": str, "pct": float (apenas complicações — delta na chance, ex. -0.06)}
+   "text": str, "pct": float (apenas complicações — delta na chance)}
 """
 import random
 from datetime import timedelta
+
+try:
+    from zoneinfo import ZoneInfo
+    _LISBON = ZoneInfo("Europe/Lisbon")
+except Exception:  # pragma: no cover
+    _LISBON = None
+
+from live_phrases_beats import TYPE_BEATS
+import live_phrases as P
 
 # Limites do efeito acumulado das complicações na chance final.
 LIVE_DELTA_MIN = -0.12
@@ -25,9 +43,19 @@ COMPLICATION_2_CHANCE = 0.28
 NEG_BIAS_BASE = 0.45
 NEG_BIAS_PER_RISK = 0.06
 NEG_BIAS_HEAT_MAX = 0.15
+# Acima deste calor, a viagem ganha beats de "cidade cheia de polícia".
+HIGH_HEAT_THRESHOLD = 55
+# Acima deste risco, a abertura da operação pode soar mais tensa.
+HIGH_RISK_THRESHOLD = 4
+# Memória de anti-repetição — nº de chaves recentes guardadas na organização.
+MEMORY_CAP = 280
 
 RANK_ORDER = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"]
 
+
+# ---------------------------------------------------------------------------
+# Utilidades
+# ---------------------------------------------------------------------------
 
 def _iso(dt):
     return dt.isoformat()
@@ -37,8 +65,37 @@ def _first(name):
     return (name or "?").split()[0]
 
 
-def _entry(at, phase, kind, speaker, text, pct=None):
-    e = {"at": _iso(at), "phase": phase, "kind": kind, "speaker": speaker, "text": text}
+def _period_of(dt):
+    """madrugada (0-6) · manha (6-12) · tarde (12-19) · noite (19-24)."""
+    try:
+        local = dt.astimezone(_LISBON) if _LISBON is not None else dt
+        h = local.hour
+    except Exception:
+        h = getattr(dt, "hour", 12)
+    if h < 6:
+        return "madrugada"
+    if h < 12:
+        return "manha"
+    if h < 19:
+        return "tarde"
+    return "noite"
+
+
+class _SafeCtx(dict):
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
+def _fmt(text, ctx):
+    try:
+        return text.format_map(_SafeCtx(ctx))
+    except Exception:
+        return text
+
+
+def _entry(at, phase, kind, speaker, text, ctx=None, pct=None):
+    e = {"at": _iso(at), "phase": phase, "kind": kind, "speaker": speaker,
+         "text": _fmt(text, ctx or {})}
     if pct is not None:
         e["pct"] = round(pct, 4)
     return e
@@ -66,137 +123,83 @@ def _pick_other(members, exclude):
 
 
 # ---------------------------------------------------------------------------
-# Conteúdo narrativo — viagem
+# PhraseDeck — escolha de frases com memória de anti-repetição
 # ---------------------------------------------------------------------------
 
-TRAVEL_FLAVOUR = [
-    ("VIGIA", "Duas patrulhas paradas na rotunda — nada connosco. Seguimos."),
-    ("LÍDER", "Revisão rápida: entradas, tempos, saídas. Toda a gente sabe o que faz."),
-    ("CONDUTOR", "Semáforos a abrir caminho. Alguém lá em cima gosta de nós."),
-    ("VIGIA", "Rádio da polícia calmo. Frequências limpas até ao alvo."),
-    ("LÍDER", "Telemóveis em silêncio a partir de agora. Só rádio."),
-    ("CONDUTOR", "Rota alternativa memorizada, caso a principal feche."),
-]
+class PhraseDeck:
+    """Escolhe frases evitando as usadas recentemente (memória da organização)
+    e as já usadas no guião atual. Regista as chaves escolhidas em `self.used`."""
 
-TRAVEL_INCIDENT = {
-    "trânsito": ("CONDUTOR", "Trânsito pesado na radial — a compensar pelo corredor do rio."),
-    "chuva": ("CONDUTOR", "Chuva miudinha, piso escorregadio. Vou firme mas com calma."),
-}
+    def __init__(self, memory=None):
+        self.recent = set(memory or [])
+        self.used = []          # chaves escolhidas neste guião (para persistir)
+        self._used_set = set()  # evita repetir dentro do mesmo guião
+
+    def _register(self, key):
+        if key not in self._used_set:
+            self._used_set.add(key)
+            self.used.append(key)
+
+    def _choose(self, indexed, prefix):
+        """indexed: lista de (i, item). Devolve item, preferindo chaves inéditas."""
+        if not indexed:
+            return None
+        keyed = [(f"{prefix}:{i}", item) for i, item in indexed]
+        fresh = [(k, it) for k, it in keyed if k not in self.recent and k not in self._used_set]
+        if not fresh:
+            fresh = [(k, it) for k, it in keyed if k not in self._used_set]
+        if not fresh:
+            fresh = keyed
+        key, item = random.choice(fresh)
+        self._register(key)
+        return item
+
+    def pick(self, pool, prefix):
+        """Escolhe um item de uma lista simples (speaker,text) / string / tuplo."""
+        return self._choose(list(enumerate(pool)), prefix)
+
+    def pick_beats(self, type_key, n):
+        """Escolhe n beats de operação de um tipo, respeitando o arco narrativo.
+        Sequência de stages: n=2 → [1,3]; n=3 → [1,2,3]; n=4 → [1,2,2,3]."""
+        beats = TYPE_BEATS.get(type_key) or TYPE_BEATS.get("missao_especial")
+        by_stage = {1: [], 2: [], 3: []}
+        for i, (stage, sp, txt) in enumerate(beats):
+            by_stage.get(stage, by_stage[2]).append((i, (sp, txt)))
+        seq = {2: [1, 3], 3: [1, 2, 3], 4: [1, 2, 2, 3]}.get(n, [1, 2, 3])
+        out = []
+        for stage in seq:
+            pool = by_stage[stage] or by_stage[2] or by_stage[1] or by_stage[3]
+            item = self._choose(pool, f"beat:{type_key}")
+            if item:
+                out.append(item)
+        return out
+
+
+def update_memory(memory, used_keys, cap=MEMORY_CAP):
+    """Anexa as chaves usadas ao histórico e mantém apenas as `cap` mais recentes."""
+    mem = list(memory or [])
+    for k in used_keys:
+        if k in mem:
+            mem.remove(k)
+        mem.append(k)
+    if len(mem) > cap:
+        mem = mem[-cap:]
+    return mem
+
 
 # ---------------------------------------------------------------------------
-# Conteúdo narrativo — operação, por categoria
+# Complicações
 # ---------------------------------------------------------------------------
 
-OP_BEATS = {
-    "assalto": [
-        ("VIGIA", "Entradas cobertas. Perímetro em silêncio."),
-        ("{X}", "Fechadura a ceder... estamos dentro."),
-        ("{X}", "Cofre localizado — a trabalhar. Deem-me espaço."),
-        ("LÍDER", "Sacos a encher. Ritmo, pessoal — dois minutos no relógio."),
-    ],
-    "logistica": [
-        ("{X}", "Mercadoria confirmada no cais. Está tudo."),
-        ("{X}", "Carga a bordo — quase a meio. Sem mirones."),
-        ("{X}", "Documentos trocados, selo aplicado. Parece legítimo."),
-        ("LÍDER", "Última palete. Amarrar e fechar — saímos limpos."),
-    ],
-    "tecnica": [
-        ("{X}", "Ligação ao terminal estabelecida. A mapear a rede."),
-        ("{X}", "Firewall contornada — a extrair os dados."),
-        ("{X}", "Transferência a 60%... ninguém desliga nada."),
-        ("{X}", "Rasto apagado, logs limpos. Como se nunca cá tivéssemos estado."),
-    ],
-    "influencia": [
-        ("VIGIA", "Contacto avistado. Aproximação calma."),
-        ("{X}", "Conversa em curso. Ele está nervoso — bom sinal."),
-        ("{X}", "Números em cima da mesa. A pressionar com elegância."),
-        ("LÍDER", "Aperto de mão. Negócio fechado — a recolher."),
-    ],
-    "especial": [
-        ("VIGIA", "Perímetro analisado. Plano em execução — fase um."),
-        ("{X}", "Fase um concluída sem ruído. A avançar."),
-        ("{X}", "Acesso ao núcleo garantido. Isto é grande."),
-        ("LÍDER", "Pacote seguro. Preparar extração — como treinámos."),
-    ],
-}
-
-OP_OPEN = ("LÍDER", "No local. Posições — operação em curso.")
-OP_CLOSE = ("LÍDER", "Terminar e sair. Contagem à porta — ninguém fica para trás.")
-
-# ---------------------------------------------------------------------------
-# Complicações — (texto, pct_min, pct_max) · pct positivo = ajuda
-# ---------------------------------------------------------------------------
-
-COMPLICATIONS_BAD = {
-    "generic": [
-        ("Patrulha a passar devagar em frente ao alvo — toda a gente quieta.", -0.07, -0.04),
-        ("Curioso de telemóvel na esquina. Vigia a acompanhar.", -0.05, -0.03),
-        ("Movimento no rádio da polícia — unidades a rondar o setor.", -0.06, -0.03),
-        ("Fechadura reforçada. Isto vai custar mais tempo do que o previsto.", -0.06, -0.04),
-    ],
-    "assalto": [
-        ("Segurança extra no turno — não estava nos planos.", -0.08, -0.05),
-        ("Possível alarme silencioso. Acelerar tudo.", -0.08, -0.05),
-        ("Porta blindada atrás do balcão. Improvisar já.", -0.07, -0.04),
-    ],
-    "tecnica": [
-        ("IDS acordou — tráfego a ser inspecionado. Mascarar assinatura.", -0.08, -0.05),
-        ("Encriptação mais dura do que o dossier dizia.", -0.07, -0.04),
-        ("Sessão de admin ativa no sistema — alguém está a trabalhar até tarde.", -0.06, -0.04),
-    ],
-    "logistica": [
-        ("Báscula da alfândega ativa esta noite. Rota interna mais lenta.", -0.07, -0.04),
-        ("Contentor fora do sítio — a procurar na fila errada.", -0.06, -0.04),
-        ("Empilhador bloqueado no corredor B. A desviar à mão.", -0.05, -0.03),
-    ],
-    "influencia": [
-        ("O contacto trouxe companhia inesperada. Dois à esquerda.", -0.07, -0.04),
-        ("O preço subiu — ele quer mais. A renegociar com pressa.", -0.06, -0.04),
-        ("Alguém conhece a nossa cara. Chapéus baixos, conversa curta.", -0.06, -0.03),
-    ],
-    "especial": [
-        ("Rotação de guardas fora do horário previsto. Recalcular janelas.", -0.08, -0.05),
-        ("Sensor de movimento não mapeado no corredor sul.", -0.07, -0.05),
-    ],
-}
-
-COMPLICATIONS_GOOD = {
-    "generic": [
-        ("Rua vazia — nem uma alma. A cidade está do nosso lado.", 0.03, 0.05),
-        ("Contacto interno confirmou o horário do turno. Janela perfeita.", 0.03, 0.05),
-        ("Câmara do quarteirão avariada há uma semana. Sem olhos em cima.", 0.03, 0.06),
-    ],
-    "assalto": [
-        ("Porta de serviço destrancada. Entrada limpa.", 0.04, 0.06),
-        ("Guarda a dormir na guarita. Passámos como fantasmas.", 0.04, 0.06),
-    ],
-    "tecnica": [
-        ("Password de admin num post-it. A sério. Acesso direto.", 0.04, 0.07),
-        ("Porta lógica esquecida aberta na VPN. Obrigado, estagiário.", 0.04, 0.06),
-    ],
-    "logistica": [
-        ("Estivador conhecido fez vista grossa. Doca lateral livre.", 0.04, 0.06),
-        ("Manifesto já vinha adulterado — meio trabalho feito.", 0.03, 0.05),
-    ],
-    "influencia": [
-        ("O alvo já vinha amaciado — alguém falou com ele primeiro.", 0.04, 0.06),
-        ("Testemunha conveniente decidiu mudar de rua.", 0.03, 0.05),
-    ],
-    "especial": [
-        ("Planta do edifício batia certo ao centímetro. Sem surpresas.", 0.04, 0.06),
-    ],
-}
+def _complication_pool(category, want_bad):
+    pool_map = P.COMPLICATIONS_BAD if want_bad else P.COMPLICATIONS_GOOD
+    # Ordem determinística (generic primeiro) → chaves estáveis para a memória.
+    return list(pool_map.get("generic", [])) + list(pool_map.get(category, []))
 
 
-def _pick_complication(category, want_bad):
-    pool_map = COMPLICATIONS_BAD if want_bad else COMPLICATIONS_GOOD
-    pool = list(pool_map.get("generic", [])) + list(pool_map.get(category, []))
-    return random.choice(pool)
-
-
-def _roll_complications(category, risk, heat):
+def _roll_complications(deck, category, risk, heat):
     """0–2 complicações; risco e calor puxam o viés para o lado negativo.
-    Devolve lista [(texto, pct)] com a soma garantida dentro dos limites."""
+    Devolve lista [(texto, pct, kind)] com a soma dentro dos limites."""
     count = 0
     if random.random() < COMPLICATION_1_CHANCE:
         count = 1
@@ -207,44 +210,54 @@ def _roll_complications(category, risk, heat):
         return picked
     neg_bias = min(0.9, NEG_BIAS_BASE + NEG_BIAS_PER_RISK * (risk or 3)
                    + NEG_BIAS_HEAT_MAX * max(0.0, min(1.0, (heat or 0) / 100.0)))
-    used_texts = set()
     for _ in range(count):
         want_bad = random.random() < neg_bias
-        for _attempt in range(6):
-            text, lo, hi = _pick_complication(category, want_bad)
-            if text not in used_texts:
-                break
-        used_texts.add(text)
-        picked.append((text, random.uniform(lo, hi)))
-    total = sum(p for _, p in picked)
-    # Escala proporcional para manter o efeito total dentro dos limites — o
-    # frontend soma os pct revelados e tem de bater certo com live_chance_delta.
-    if total < LIVE_DELTA_MIN:
+        pool = _complication_pool(category, want_bad)
+        prefix = f"c{'bad' if want_bad else 'good'}:{category}"
+        chosen = deck.pick(pool, prefix)
+        if not chosen:
+            continue
+        text, lo, hi = chosen
+        pct = random.uniform(lo, hi)
+        picked.append((text, pct, "comp_bad" if pct < 0 else "comp_good"))
+    total = sum(p for _, p, _ in picked)
+    if total < LIVE_DELTA_MIN and total != 0:
         scale = LIVE_DELTA_MIN / total
-        picked = [(t, p * scale) for t, p in picked]
-    elif total > LIVE_DELTA_MAX:
+        picked = [(t, p * scale, k) for t, p, k in picked]
+    elif total > LIVE_DELTA_MAX and total != 0:
         scale = LIVE_DELTA_MAX / total
-        picked = [(t, p * scale) for t, p in picked]
+        picked = [(t, p * scale, k) for t, p, k in picked]
     return picked
 
 
 # ---------------------------------------------------------------------------
-# Guião do despacho — viagem + operação (gerado uma vez, persistido na missão)
+# Guião do despacho — viagem + operação
 # ---------------------------------------------------------------------------
 
-def build_dispatch_script(*, team_name, opp, members, incidents, depart, arrive, finish, heat, has_leader):
-    """Constrói o live_log da ida + operação e devolve (entries, chance_delta).
+def build_dispatch_script(*, team_name, opp, members, incidents, depart, arrive,
+                          finish, heat, has_leader, vehicle_name=None, memory=None):
+    """Constrói o live_log da ida + operação.
 
-    opp: snapshot da oportunidade (name, district, category, risk).
-    incidents: lista de imprevistos de viagem já rolados no dispatch
-    ("trânsito"/"chuva") — o guião narra-os em vez de os duplicar."""
+    Devolve (entries, chance_delta, used_keys).
+    opp: snapshot (name, district, category, risk, type_key).
+    incidents: imprevistos de viagem já rolados ("trânsito"/"chuva")."""
+    deck = PhraseDeck(memory)
     entries = []
+    type_key = opp.get("type_key", "missao_especial")
     category = opp.get("category", "especial")
     risk = opp.get("risk", 3)
     travel_s = max(1.0, (arrive - depart).total_seconds())
     duration_s = max(1.0, (finish - arrive).total_seconds())
     leader = _leader_name(members) if has_leader else None
     driver = _driver_name(members)
+    period = _period_of(depart)
+
+    ctx = {
+        "team": team_name,
+        "district": opp.get("district", "Lisboa"),
+        "vehicle": vehicle_name or "viatura",
+        "opp": opp.get("name", "o alvo"),
+    }
 
     def who(tag):
         if tag == "LÍDER":
@@ -255,69 +268,86 @@ def build_dispatch_script(*, team_name, opp, members, incidents, depart, arrive,
             return _pick_other(members, {leader, driver})
         return tag
 
-    # --- Partida ---
-    entries.append(_entry(depart + timedelta(seconds=2), "en_route", "net", "CENTRAL",
-                          f"Canal cifrado aberto. {team_name} em rota — alvo: {opp.get('name')} ({opp.get('district')})."))
+    def add(at, phase, kind, speaker_tag, text):
+        entries.append(_entry(at, phase, kind, who(speaker_tag), text, ctx))
+
+    # --- Partida (CENTRAL) ---
+    open_txt = deck.pick(P.DISPATCH_OPEN, "open")
+    add(depart + timedelta(seconds=2), "en_route", "net", "CENTRAL", open_txt)
 
     # --- Viagem ---
     if travel_s >= 20:
-        used = set()
+        # 1º beat: incidente > calor alto > período do dia > sabor genérico.
         if incidents:
             inc = incidents[0]
-            sp, txt = TRAVEL_INCIDENT.get(inc, ("CONDUTOR", f"Apanhámos {inc} — viagem mais lenta."))
-            entries.append(_entry(depart + timedelta(seconds=travel_s * 0.28), "en_route", "radio", who(sp), txt))
+            sp, txt = deck.pick(P.TRAVEL_INCIDENT.get(inc, P.TRAVEL_FLAVOUR), f"tinc:{inc}")
+            add(depart + timedelta(seconds=travel_s * 0.26), "en_route", "radio", sp, txt)
+        elif (heat or 0) >= HIGH_HEAT_THRESHOLD:
+            sp, txt = deck.pick(P.TRAVEL_HIGH_HEAT, "theat")
+            add(depart + timedelta(seconds=travel_s * 0.28), "en_route", "radio", sp, txt)
         else:
-            sp, txt = random.choice(TRAVEL_FLAVOUR)
-            used.add(txt)
-            entries.append(_entry(depart + timedelta(seconds=travel_s * 0.30), "en_route", "radio", who(sp), txt))
-        if travel_s >= 60:
-            for _ in range(6):
-                sp, txt = random.choice(TRAVEL_FLAVOUR)
-                if txt not in used:
-                    break
-            used.add(txt)
-            entries.append(_entry(depart + timedelta(seconds=travel_s * 0.62), "en_route", "radio", who(sp), txt))
-        entries.append(_entry(arrive - timedelta(seconds=min(6, travel_s * 0.1)), "en_route", "radio", who("CONDUTOR"),
-                              f"A entrar em {opp.get('district')}. Zona de largada à vista."))
+            sp, txt = deck.pick(P.TRAVEL_BY_PERIOD[period], f"tper:{period}")
+            add(depart + timedelta(seconds=travel_s * 0.28), "en_route", "radio", sp, txt)
 
-    # --- Operação: abertura, beats por categoria, complicações, retirada ---
-    sp, txt = OP_OPEN
-    entries.append(_entry(arrive + timedelta(seconds=min(4, duration_s * 0.05)), "operating", "milestone", who(sp), txt))
+        if travel_s >= 55:
+            sp, txt = deck.pick(P.TRAVEL_FLAVOUR, "tflav")
+            add(depart + timedelta(seconds=travel_s * 0.55), "en_route", "radio", sp, txt)
+        if travel_s >= 110:
+            sp, txt = deck.pick(P.TRAVEL_FLAVOUR, "tflav")
+            add(depart + timedelta(seconds=travel_s * 0.72), "en_route", "radio", sp, txt)
 
-    beats = OP_BEATS.get(category, OP_BEATS["especial"])
+        sp, txt = deck.pick(P.TRAVEL_ARRIVE, "tarr")
+        add(arrive - timedelta(seconds=min(6, travel_s * 0.1)), "en_route", "radio", sp, txt)
+
+    # --- Operação: abertura ---
+    if risk >= HIGH_RISK_THRESHOLD and random.random() < 0.6:
+        sp, txt = deck.pick(P.OP_OPEN_HIGH_RISK, "openhr")
+    else:
+        sp, txt = deck.pick(P.OP_OPEN, "openop")
+    add(arrive + timedelta(seconds=min(4, duration_s * 0.05)), "operating", "milestone", sp, txt)
+
+    # --- Beats específicos do tipo ---
     n_beats = 2 if duration_s < 60 else (3 if duration_s < 120 else 4)
     fracs = {2: [0.30, 0.62], 3: [0.22, 0.48, 0.72], 4: [0.16, 0.38, 0.58, 0.78]}[n_beats]
-    for i, frac in enumerate(fracs):
-        sp, txt = beats[i if n_beats == 4 else (i + (1 if n_beats == 2 else 0)) % len(beats)]
-        entries.append(_entry(arrive + timedelta(seconds=duration_s * frac), "operating", "radio", who(sp), txt))
+    beats = deck.pick_beats(type_key, n_beats)
+    for i, (sp, txt) in enumerate(beats):
+        frac = fracs[i] if i < len(fracs) else 0.7
+        add(arrive + timedelta(seconds=duration_s * frac), "operating", "radio", sp, txt)
 
-    comps = _roll_complications(category, risk, heat)
+    # --- Complicações (efeito real na chance) ---
+    comps = _roll_complications(deck, category, risk, heat)
     comp_fracs = [0.42, 0.68]
     delta = 0.0
-    for i, (text, pct) in enumerate(comps):
+    for i, (text, pct, kind) in enumerate(comps):
         delta += pct
-        kind = "comp_good" if pct >= 0 else "comp_bad"
         speaker = who("VIGIA") if pct < 0 else who("{X}")
-        entries.append(_entry(arrive + timedelta(seconds=duration_s * comp_fracs[i % 2]), "operating", kind, speaker, text, pct=pct))
+        entries.append(_entry(arrive + timedelta(seconds=duration_s * comp_fracs[i % 2]),
+                              "operating", kind, speaker, text, ctx, pct=pct))
 
-    sp, txt = OP_CLOSE
-    entries.append(_entry(arrive + timedelta(seconds=duration_s * 0.90), "operating", "milestone", who(sp), txt))
+    # --- Fecho ---
+    sp, txt = deck.pick(P.OP_CLOSE, "closeop")
+    add(arrive + timedelta(seconds=duration_s * 0.90), "operating", "milestone", sp, txt)
 
     entries.sort(key=lambda e: e["at"])
-    return entries, round(delta, 4)
+    return entries, round(delta, 4), deck.used
 
 
 # ---------------------------------------------------------------------------
-# Guião do regresso — construído na transição operating→returning (o desfecho
-# e a perseguição só são conhecidos nesse momento)
+# Guião do regresso — construído na transição operating→returning
 # ---------------------------------------------------------------------------
 
-def build_return_script(m, finish_dt, return_dt):
+def build_return_script(m, finish_dt, return_dt, memory=None):
+    deck = PhraseDeck(memory)
     entries = []
-    t = m.get("opportunity", {})
     outcome = m.get("outcome")
     return_s = max(1.0, (return_dt - finish_dt).total_seconds())
     leader = "LÍDER" if m.get("has_leader") else "EQUIPA"
+    ctx = {
+        "team": m.get("team_name", "a equipa"),
+        "district": (m.get("opportunity") or {}).get("district", "Lisboa"),
+        "vehicle": m.get("vehicle_name") or "viatura",
+        "opp": (m.get("opportunity") or {}).get("name", "o alvo"),
+    }
 
     def at(frac, cap=None):
         s = return_s * frac
@@ -325,65 +355,86 @@ def build_return_script(m, finish_dt, return_dt):
             s = min(s, cap)
         return finish_dt + timedelta(seconds=s)
 
+    def money(v):
+        return f"{int(v or 0):,}".replace(",", " ")
+
     if outcome == "success":
-        reward = int(m.get("pending_reward", 0) or 0)
-        entries.append(_entry(at(0.04, 6), "returning", "good", leader,
-                              f"Feito. Saque connosco — {reward:,} € em jogo. A caminho de casa.".replace(",", " ")))
+        ctx["reward"] = money(m.get("pending_reward", 0))
+        txt, kind = deck.pick(P.RETURN_SUCCESS, "rsucc")
+        entries.append(_entry(at(0.04, 6), "returning", kind, leader, txt, ctx))
         if m.get("bonus_loot"):
             entries.append(_entry(at(0.10, 12), "returning", "good", "EQUIPA",
-                                  "Havia mais do que o previsto — levamos tudo."))
+                                  deck.pick(P.RETURN_BONUS, "rbonus"), ctx))
     elif outcome == "partial":
-        frac = int((m.get("partial_fraction") or 0.6) * 100)
+        ctx["frac"] = int((m.get("partial_fraction") or 0.6) * 100)
         if m.get("clutch_save"):
             entries.append(_entry(at(0.04, 6), "returning", "good", leader,
-                                  f"Esteve por um fio — improvisámos e salvámos {frac}% do plano. Saímos com alguma coisa."))
+                                  deck.pick(P.RETURN_PARTIAL_CLUTCH, "rpclutch"), ctx))
         else:
             entries.append(_entry(at(0.04, 6), "returning", "bad", leader,
-                                  f"Não dava — abortámos com o que tínhamos ({frac}% do saque). Metade é melhor que zero."))
+                                  deck.pick(P.RETURN_PARTIAL_ABORT, "rpabort"), ctx))
     elif outcome == "failure":
         entries.append(_entry(at(0.04, 6), "returning", "bad", leader,
-                              "Aborta! Não há condições. Dispersar e voltar — mãos vazias."))
+                              deck.pick(P.RETURN_FAILURE, "rfail"), ctx))
         cause = (m.get("top_negatives") or [None])[0]
         if cause:
+            ctx["cause"] = cause.get("label", "fator desconhecido")
             entries.append(_entry(at(0.12, 14), "returning", "bad", "CENTRAL",
-                                  f"Análise preliminar: {cause.get('label', 'fator desconhecido')} pesou contra a operação."))
+                                  deck.pick(P.RETURN_FAILURE_CAUSE, "rfailc"), ctx))
     elif outcome == "police":
         entries.append(_entry(at(0.03, 5), "returning", "police", "VIGIA",
-                              "PATRULHA EM CIMA DO ALVO — separar e desaparecer, JÁ!"))
+                              deck.pick(P.RETURN_POLICE, "rpol"), ctx))
         fine = int(m.get("fine", 0) or 0)
         if fine > 0:
+            ctx["fine"] = money(fine)
             entries.append(_entry(at(0.14, 16), "returning", "police", "CENTRAL",
-                                  f"Interceção confirmada. Custos imediatos: {fine:,} € para abafar o processo.".replace(",", " ")))
+                                  deck.pick(P.RETURN_FINE, "rfine"), ctx))
 
     jams = m.get("weapon_jams") or []
     if jams:
         j = jams[0]
+        ctx["weapon"] = j.get("weapon_name", "arma")
+        ctx["who"] = j.get("emp_name", "um dos nossos")
         entries.append(_entry(at(0.20, 20), "returning", "bad", "EQUIPA",
-                              f"A {j.get('weapon_name', 'arma')} de {j.get('emp_name', '?')} encravou no pior momento. Precisa de bancada."))
+                              deck.pick(P.RETURN_JAM, "rjam"), ctx))
 
     if m.get("chase_active"):
-        esc = int((m.get("escape_chance") or 0.5) * 100)
-        entries.append(_entry(at(0.18), "returning", "police", "VIGIA", "Sirenes atrás de nós! Temos companhia."))
+        ctx["esc"] = int((m.get("escape_chance") or 0.5) * 100)
+        entries.append(_entry(at(0.18), "returning", "police", "VIGIA",
+                              deck.pick(P.CHASE_START, "chstart"), ctx))
         entries.append(_entry(at(0.48), "returning", "police", "CONDUTOR",
-                              "A cortar por vielas — agarrem-se. Vamos fazê-los perder-nos."))
+                              deck.pick(P.CHASE_MID, "chmid"), ctx))
         entries.append(_entry(at(0.78), "returning", "police", leader,
-                              f"Ainda aí estão... última cartada antes da base. Escape estimado: {esc}%."))
+                              deck.pick(P.CHASE_END, "chend"), ctx))
     elif outcome in ("success", "partial"):
-        entries.append(_entry(at(0.55), "returning", "radio", "VIGIA", "Rota limpa. Ninguém atrás de nós."))
+        entries.append(_entry(at(0.55), "returning", "radio", "VIGIA",
+                              deck.pick(P.RETURN_CLEAN, "rclean"), ctx))
 
-    entries.append(_entry(return_dt - timedelta(seconds=min(6, return_s * 0.08)), "returning", "net", "CENTRAL",
-                          "Unidade em aproximação final à base. Portões abertos."))
+    entries.append(_entry(return_dt - timedelta(seconds=min(6, return_s * 0.08)),
+                          "returning", "net", "CENTRAL",
+                          deck.pick(P.RETURN_ARRIVAL, "rarr"), ctx))
     entries.sort(key=lambda e: e["at"])
-    return entries
+    return entries, deck.used
 
 
-def build_recall_script(m, now_dt, return_dt):
+def build_recall_script(m, now_dt, return_dt, memory=None):
     """Guião curto de regresso antecipado (recall) — corta a narrativa futura."""
-    return [
+    deck = PhraseDeck(memory)
+    return_s = max(1.0, (return_dt - now_dt).total_seconds())
+    ctx = {
+        "team": m.get("team_name", "a equipa"),
+        "district": (m.get("opportunity") or {}).get("district", "Lisboa"),
+        "vehicle": m.get("vehicle_name") or "viatura",
+        "opp": (m.get("opportunity") or {}).get("name", "o alvo"),
+    }
+    entries = [
         _entry(now_dt + timedelta(seconds=1), "returning", "net", "CENTRAL",
-               "Ordem de regresso emitida — abortar aproximação e voltar à base."),
+               deck.pick(P.RECALL_ORDER, "recorder"), ctx),
         _entry(now_dt + timedelta(seconds=5), "returning", "radio", "CONDUTOR",
-               "Recebido. A inverter — sem completar o objetivo."),
-        _entry(return_dt - timedelta(seconds=4), "returning", "net", "CENTRAL",
-               "Unidade em aproximação final à base."),
+               deck.pick(P.RECALL_ACK, "recack"), ctx),
+        _entry(return_dt - timedelta(seconds=min(4, return_s * 0.08)),
+               "returning", "net", "CENTRAL",
+               deck.pick(P.RETURN_ARRIVAL, "rarr"), ctx),
     ]
+    entries.sort(key=lambda e: e["at"])
+    return entries, deck.used

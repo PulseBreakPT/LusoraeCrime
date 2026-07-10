@@ -98,7 +98,7 @@ from economy_constants import (
     CLUTCH_SAVE_MAX, SMART_WARN_HEAT_DELTA,
 )
 from quests import process_quests, make_instance, effective_quest_rewards
-from live_ops import build_return_script
+from live_ops import build_return_script, update_memory
 from quests_data import QUEST_DEFS
 
 logger = logging.getLogger(__name__)
@@ -1956,9 +1956,14 @@ async def _progress_mission(db, player, m, now):
         # Guião de regresso em direto (SSS live ops): o desfecho e a perseguição
         # só são conhecidos agora — anexar os beats do regresso ao live_log.
         try:
-            ret_entries = build_return_script(m, parse_dt(m["finish_at"]), parse_dt(m["return_at"]))
+            ret_entries, ret_used = build_return_script(
+                m, parse_dt(m["finish_at"]), parse_dt(m["return_at"]),
+                memory=player.get("phrase_memory"),
+            )
             if ret_entries:
                 updates["live_log"] = (m.get("live_log") or []) + ret_entries
+            if ret_used:
+                player["phrase_memory"] = update_memory(player.get("phrase_memory"), ret_used)
         except Exception:
             logger.exception("Falha a gerar o guião de regresso da missão %s", m.get("_id"))
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
@@ -2732,6 +2737,7 @@ async def advance(db, player):
         "quest_perf": player.get("quest_perf", {}),
         "quest_offer_history": player.get("quest_offer_history", {}),
         "pending_chains": player.get("pending_chains", []),
+        "phrase_memory": player.get("phrase_memory", []),
     }})
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player

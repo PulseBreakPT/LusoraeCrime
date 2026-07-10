@@ -883,3 +883,73 @@ agent_communication:
       (5) Regressão: dispatch/preview sem 500; quests/state/catalog sem 500.
       CUIDADO: lockout por ip:email — usar emails descartáveis em testes de auth.
       Frontend só com autorização do utilizador.
+
+#====================================================================================================
+# RONDA — Banco narrativo massivo (751 frases) + memória anti-repetição + fix infra .env (09/07/2026)
+#====================================================================================================
+
+backend:
+  - task: "FIX INFRA: backend/.env e frontend/.env em falta (reset de ambiente) — recriados (MONGO_URL, DB_NAME=test_database, CORS_ORIGINS com preview a7ffc1dd + localhost:3000, JWT_SECRET, ADMIN_EMAIL/ADMIN_PASSWORD; REACT_APP_BACKEND_URL preview a7ffc1dd, WDS_SOCKET_PORT=443). Backend rebentava com KeyError MONGO_URL → utilizador não conseguia registar nem entrar."
+    implemented: true
+    working: NA
+    file: "backend/.env, frontend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "09/07/2026 — Após recriar + restart: backend 'Application startup complete', GET /api/ OK. Falta verificar LOGIN admin@lusorae.com e REGISTO de conta nova end-to-end (bug reportado pelo utilizador)."
+  - task: "Banco narrativo data-driven: live_phrases_beats.py (TYPE_BEATS — 469 beats de operação ÚNICOS, 7 por cada um dos 67 tipos, com stages 1/2/3) + live_phrases.py (282 frases partilhadas: abertura, viagem por período do dia/calor/incidente/chegada, aberturas/fechos, complicações por categoria, regresso/perseguição/recall). Total 751 frases."
+    implemented: true
+    working: NA
+    file: "backend/live_phrases_beats.py, backend/live_phrases.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "09/07/2026 — Script local /tmp/test_live.py: 67 tipos geram guião sem placeholders por resolver e com delta dentro de [-0.12,+0.08]; período do dia e calor alto selecionam pools certos; todos os desfechos de regresso gerados."
+  - task: "live_ops.py reescrito: PhraseDeck com anti-repetição por memória (player.phrase_memory, cap 280 chaves), formatação de contexto ({district},{team},{vehicle},{opp},{reward},{fine},{esc},{cause},{weapon},{who}), período do dia (Europe/Lisbon), beats por tipo com arco narrativo. build_dispatch_script→(entries,delta,used_keys); build_return_script/build_recall_script→(entries,used_keys). update_memory()."
+    implemented: true
+    working: NA
+    file: "backend/live_ops.py, backend/routes_game.py, backend/engine.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "09/07/2026 — Dispatch persiste vehicle_name na missão e phrase_memory no player; recall e tick (return) atualizam phrase_memory. Anti-repetição verificada no smoke test (6x mesmo tipo → vozes variadas)."
+
+test_plan:
+  current_focus:
+    - "FIX INFRA .env — login admin + registo de conta nova"
+    - "Banco narrativo — dispatch gera live_log rico e variado"
+    - "phrase_memory persiste e varia entre missões"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: >
+      09/07/2026 — BUG REPORTADO PELO UTILIZADOR: não conseguia registar nem entrar.
+      CAUSA: .env em falta (reset de ambiente) → backend KeyError MONGO_URL. FIX: .env
+      recriados (preview a7ffc1dd-f9ae-4a89-8b4d-e1b25ecb2787). Credenciais admin em
+      /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!).
+      TESTAR BACKEND APENAS (prioridade ao bug de auth):
+      (1) LOGIN admin@lusorae.com / LusoraeAdmin2026! → 200 + sessão; GET /api/game/state OK.
+      (2) REGISTO de conta NOVA (email descartável único, org_name único, accept_terms=true,
+      password forte) → cria org + Crew Alfa + fundadores + veículo; login subsequente OK.
+      (3) Banco narrativo: POST /api/game/dispatch (oportunidade de /state + Crew Alfa) →
+      GET /state → missão tem live_log não-vazio, ordenado por at, com beats de operação;
+      live_chance_delta float; se houver pct, soma ≈ live_chance_delta ±0.001.
+      (4) Despachar o MESMO tipo 2-3x (se houver oportunidades) → verificar que os textos de
+      operação variam (anti-repetição via player.phrase_memory).
+      (5) Esperar returning (polling) → live_log cresce com phase='returning' e final_chance
+      presente (0.02-0.98). Recall numa missão en_route → live_log só at<=now + recall.
+      (6) Regressão: /state, /catalog, quests sem 500.
+      CUIDADO: lockout por ip:email — usar emails descartáveis nos testes de auth para não
+      bloquear o admin. Frontend só com autorização do utilizador.
