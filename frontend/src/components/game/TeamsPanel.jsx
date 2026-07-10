@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
-import { fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, fatigueColor, chanceColor, teamsReadiness, vehicleRangeKm } from "../../lib/game";
+import { cn } from "../../lib/utils";
+import {
+  fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, RANK_LABELS, fatigueColor,
+  chanceColor, goodBarColor, teamsReadiness, vehicleRangeKm,
+  teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES,
+} from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { TeamGlyph } from "./TeamGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2, AlertTriangle, Activity, Target, Clock, PartyPopper } from "lucide-react";
+import {
+  Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2,
+  AlertTriangle, Activity, Target, Clock, PartyPopper, Crown, Gauge, Stethoscope, Scale,
+  Brain, Flame, TrendingDown, Link2, FlaskConical,
+} from "lucide-react";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
 
@@ -19,6 +29,151 @@ const useTick = (active) => {
     const id = setInterval(() => setT((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, [active]);
+};
+
+// Chip do tier da unidade (Recruta/Operacional/Veterana/Lendária) — derivado
+// das operações concluídas; a cor alimenta toda a moldura do cartão.
+const TierChip = ({ tier, missions }) => (
+  <Tip tip={`Unidade ${tier.label} — classificação pela experiência real (${missions} operações concluídas). Os degraus alinham com as rampas do motor: 8 ops = entrosamento em prática, 25 = mestria de categoria, 60 = lenda das ruas.`}>
+    <span
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
+      style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
+    >
+      {tier.label}
+    </span>
+  </Tip>
+);
+
+// Chip de papel a bordo — aceso quando o papel existe na equipa, apagado
+// (com dica de como o obter) quando falta. Os números vêm do team_meta.
+const RoleChip = ({ icon: Icon, label, on, detail, tip, tone = "#34D399" }) => (
+  <Tip tip={tip}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-wide",
+        !on && "border-white/5 bg-black/30 text-zinc-600"
+      )}
+      style={on ? { borderColor: `${tone}44`, color: tone, backgroundColor: `${tone}12` } : undefined}
+    >
+      <Icon size={9} /> {label}
+      {on && detail ? <span className="font-medium normal-case tracking-normal opacity-90">{detail}</span> : null}
+    </span>
+  </Tip>
+);
+
+// Momentum (SSS v3/v4): série de vitórias/derrotas com o bónus/penalização
+// EXATOS do motor (mod_team_momentum).
+const MomentumChip = ({ team, meta, testId }) => {
+  const mo = teamMomentum(team.streak, meta);
+  if (mo.state === "hot") {
+    return (
+      <Tip tip={`Momentum: ${mo.streak} vitórias seguidas → +${(mo.pct * 100).toFixed(1)}% de chance (máx. +${Math.round((meta.momentum_bonus_max ?? 0.06) * 100)}%). Também foge melhor da polícia (+1%/vitória, até +${Math.round((meta.momentum_escape_bonus_max ?? 0.05) * 100)}%). Uma falha apaga a série.`}>
+        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-emerald-400">
+          <Flame size={9} /> {mo.streak} vitórias · +{(mo.pct * 100).toFixed(1)}%
+        </span>
+      </Tip>
+    );
+  }
+  if (mo.state === "cold") {
+    return (
+      <Tip tip={`Confiança abalada: ${-mo.streak} falhas consecutivas → ${(mo.pct * 100).toFixed(1)}% de chance (máx. −${Math.round((meta.momentum_penalty_max ?? 0.06) * 100)}%). Uma vitória limpa restaura tudo — escolhe uma operação segura.`}>
+        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-red-400">
+          <TrendingDown size={9} /> {-mo.streak} falhas · {(mo.pct * 100).toFixed(1)}%
+        </span>
+      </Tip>
+    );
+  }
+  return (
+    <Tip tip={`Sem série ativa. Séries de 2+ vitórias dão +${((meta.momentum_bonus_per_win ?? 0.012) * 100).toFixed(1)}%/vitória (máx. +${Math.round((meta.momentum_bonus_max ?? 0.06) * 100)}%); 2+ falhas penalizam até −${Math.round((meta.momentum_penalty_max ?? 0.06) * 100)}%.`}>
+      <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-600">
+        <Flame size={9} /> sem série
+      </span>
+    </Tip>
+  );
+};
+
+// Entrosamento do plantel (SSS v4): 50% tempo estável + 50% operações juntos —
+// a MESMA fórmula de mod_team_coordination, atualizada ao segundo.
+const CohesionBar = ({ team, meta, nowMs, testId }) => {
+  const co = teamCoordination(team, meta, nowMs);
+  const frac = co.max > 0 ? co.pct / co.max : 0;
+  return (
+    <Tip
+      tip={`Entrosamento do plantel: +${(co.pct * 100).toFixed(1)}% de chance (máx. +${Math.round(co.max * 100)}%). Fórmula do motor: 50% tempo com o plantel estável (${Math.round(co.timeFrac * 100)}%) + 50% operações feitas juntos (${co.missions}/${co.rampMissions}). Mudar membros reinicia ambos os contadores.`}
+      block
+    >
+      <div data-testid={testId}>
+        <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+          <span className="inline-flex items-center gap-1"><Link2 size={9} /> Entrosamento</span>
+          <span className={frac >= 0.999 ? "text-emerald-400" : "text-cyan-400"}>+{(co.pct * 100).toFixed(1)}%</span>
+        </div>
+        <MiniBar value={frac * 100} color={frac >= 0.999 ? "#34D399" : "#22D3EE"} className="mt-0.5" />
+      </div>
+    </Tip>
+  );
+};
+
+// Memória da equipa por categoria de operação (SSS v4): familiaridade com
+// curva sqrt até à mestria — o análogo da "adequação" nos cartões de arma.
+const FamiliarityRow = ({ team, meta, testId }) => (
+  <div data-testid={testId} className="grid grid-cols-5 gap-1">
+    {TEAM_OP_CATEGORIES.map((cat) => {
+      const fam = teamFamiliarity((team.category_missions || {})[cat] || 0, meta);
+      const isSpec = team.spec === cat;
+      const color = fam.mastery ? "#F59E0B" : isSpec ? "#34D399" : fam.active ? "#A1A1AA" : "#52525B";
+      return (
+        <Tip
+          key={cat}
+          tip={`${SPEC_LABELS[cat] || cat}: ${fam.count} operações concluídas — ${fam.active ? `bónus +${(fam.pct * 100).toFixed(1)}%` : `sem bónus (conta a partir da ${fam.min}.ª)`}${fam.mastery ? " · MESTRIA (máximo atingido)" : ` · mestria às ${fam.ramp}`}. ${isSpec ? "Especialidade desta equipa — bónus adicional de match no motor." : "A equipa enquanto unidade aprende cada tipo de trabalho."}`}
+          block
+        >
+          <div className={cn("rounded-sm border px-1 py-0.5", isSpec ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
+            <p className={cn("truncate text-center font-mono text-[8px] uppercase tracking-wide", fam.mastery ? "text-amber-400" : isSpec ? "text-emerald-400" : "text-zinc-600")}>
+              {(SPEC_LABELS[cat] || cat).slice(0, 3)}{fam.mastery ? " ★" : ""}
+            </p>
+            <MiniBar value={fam.frac * 100} color={color} className="mt-0.5" />
+          </div>
+        </Tip>
+      );
+    })}
+  </div>
+);
+
+// Sinais vitais médios do plantel — com as curvas reais do motor nas dicas
+// (assimetria da moral, curva convexa da fadiga, tectos da lealdade).
+const VitalsRow = ({ members, meta, testId }) => {
+  const avg = (fn) => members.reduce((a, e) => a + fn(e), 0) / members.length;
+  const morale = Math.round(avg((e) => e.morale ?? 70));
+  const loyalty = Math.round(avg((e) => e.loyalty ?? 70));
+  const fatigue = Math.round(avg((e) => e.fatigue ?? 0));
+  return (
+    <div data-testid={testId} className="grid grid-cols-3 gap-x-3">
+      <Tip tip={`Moral média ${morale}% — no motor, moral baixa pesa ×${meta.morale_penalty_asymmetry ?? 1.25} mais do que moral alta ajuda. Bónus pagos e vitórias sobem a moral.`} block>
+        <div>
+          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+            <span>Moral</span><span style={{ color: goodBarColor(morale) }}>{morale}%</span>
+          </div>
+          <MiniBar value={morale} color={goodBarColor(morale)} className="mt-0.5" />
+        </div>
+      </Tip>
+      <Tip tip={`Lealdade média ${loyalty}% — acima de 70 dá até +${Math.round((meta.loyalty_bonus_max ?? 0.04) * 100)}% de chance; abaixo penaliza até −${Math.round((meta.loyalty_penalty_max ?? 0.06) * 100)}% e aumenta o risco de traições. Promoções e bónus sobem a lealdade.`} block>
+        <div>
+          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+            <span>Lealdade</span><span style={{ color: goodBarColor(loyalty) }}>{loyalty}%</span>
+          </div>
+          <MiniBar value={loyalty} color={goodBarColor(loyalty)} className="mt-0.5" />
+        </div>
+      </Tip>
+      <Tip tip={`Fadiga média ${fatigue}% — acima de 30% penaliza em curva convexa (exp. ${meta.fatigue_curve_exp ?? 1.35}): moderada custa pouco, extrema é um perigo real. A 90%+ o membro fica indisponível.`} block>
+        <div>
+          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+            <span>Fadiga</span><span style={{ color: fatigueColor(fatigue) }}>{fatigue}%</span>
+          </div>
+          <MiniBar value={fatigue} color={fatigueColor(fatigue)} className="mt-0.5" />
+        </div>
+      </Tip>
+    </div>
+  );
 };
 
 export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
@@ -96,6 +251,8 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   if (!state) return null;
   const money = state.player.clean_money;
   const teamMaxMembers = catalog?.team_max_members || 4;
+  const teamMeta = catalog?.team_meta || {};
+  const ranksList = catalog?.ranks || [];
 
   const membersOf = (teamId) => state.employees.filter((e) => e.team_id === teamId);
   const vehicleOf = (team) => state.vehicles.find((v) => v.id === team.vehicle_id);
@@ -147,16 +304,17 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
           const assigned = state.employees.filter((e) => e.team_id);
           const avgFat = assigned.length ? Math.round(assigned.reduce((a, e) => a + e.fatigue, 0) / assigned.length) : 0;
           const opsDone = state.teams.reduce((a, t) => a + (t.missions_done || 0), 0);
+          const bestStreak = state.teams.reduce((a, t) => Math.max(a, t.streak || 0), 0);
           return (
             <SummaryStrip cols={4} className="mt-3" testId="teams-summary">
               <Kpi icon={CheckCircle2} label="Prontas" value={`${tr.ready}/${tr.total}`} color={tr.ready > 0 ? "#34D399" : "#EF4444"}
                 tip="Equipas prontas a operar já: com membros disponíveis, veículo abastecido e em condições." />
               <Kpi icon={Activity} label="Em operação" value={tr.busy} color={tr.busy > 0 ? "#22D3EE" : "#FFFFFF"}
                 tip="Equipas em viagem ou a executar operações neste momento — acompanha-as no mapa." />
-              <Kpi icon={UserRound} label="Afetos" value={`${assigned.length}/${state.employees.length}`}
-                tip="Operacionais atribuídos a equipas vs. total do efetivo. Só membros de equipas participam em operações." />
+              <Kpi icon={Flame} label="Série" value={bestStreak > 0 ? `${bestStreak}` : "—"} color={bestStreak >= 2 ? "#34D399" : "#FFFFFF"}
+                tip={`Maior série de vitórias ativa entre as equipas. A partir de 2 vitórias seguidas o momentum dá +${((teamMeta.momentum_bonus_per_win ?? 0.012) * 100).toFixed(1)}%/vitória de chance (máx. +${Math.round((teamMeta.momentum_bonus_max ?? 0.06) * 100)}%). Total de operações concluídas: ${opsDone}.`} />
               <Kpi icon={Target} label="Fadiga" value={`${avgFat}%`} color={fatigueColor(avgFat)} bar={avgFat} barColor={fatigueColor(avgFat)}
-                tip={`Fadiga média dos membros das equipas. Acima de 90% ficam indisponíveis. Total de operações concluídas: ${opsDone}.`} />
+                tip={`Fadiga média dos membros das equipas (${assigned.length}/${state.employees.length} afetos). Acima de 90% ficam indisponíveis.`} />
             </SummaryStrip>
           );
         })()}
@@ -205,51 +363,73 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             const refuelCost = vehicle ? Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]) : 0;
             const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
             const justReturned = justReturnedTeamIds.includes(t.id);
+            // QI da equipa (SSS v4): tier, papéis a bordo e química — os mesmos
+            // números que o motor usa na chance, viagem, fuga e consequências.
+            const tier = teamTier(t.missions_done);
+            const roles = teamRoles(members, teamMeta, ranksList);
+            const synergy = teamSynergy(members, t.spec, teamMeta);
+            const leaderRankLabel = RANK_LABELS[teamMeta.leader_min_rank || "chefe_equipa"] || "Chefe de Equipa";
             return (
               <Card
                 key={t.id}
                 data-testid={`team-card-${t.id}`}
-                className={`lus-card p-3 shadow-none ${justReturned ? "lus-flash" : ""}`}
+                className={`lus-card lus-team-card p-2.5 shadow-none ${justReturned ? "lus-flash" : ""}`}
+                style={{ "--ttier": tier.color }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <FavoriteStar testId={`team-favorite-${t.id}`} active={favoriteTeamIds.includes(t.id)} onToggle={() => toggleFavoriteTeam(t.id)} />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-white">
-                        {t.name}
+                {/* Cabeçalho dossier: placa com emblema + identidade da unidade */}
+                <div className="relative z-[1] flex items-stretch gap-2.5">
+                  <div className="lus-team-plate relative flex h-[54px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                    <TeamGlyph spec={t.spec} accent={tier.color} className="h-[44px] w-[82px]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <FavoriteStar testId={`team-favorite-${t.id}`} active={favoriteTeamIds.includes(t.id)} onToggle={() => toggleFavoriteTeam(t.id)} />
+                        <p className="truncate text-sm font-bold text-white">{t.name}</p>
                         {justReturned && (
                           <Tip tip="Esta equipa acabou de regressar ao QG e já está pronta a operar.">
-                            <span className="ml-1.5 inline-flex items-center gap-0.5 font-mono text-[9px] uppercase text-emerald-400">
+                            <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-emerald-400">
                               <PartyPopper size={9} /> regressou
                             </span>
                           </Tip>
                         )}
-                      </p>
-                      <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                        <Tip tip={`Especialização ${SPEC_LABELS[t.spec]} — bónus de sucesso em operações desta categoria.`}>
-                          <span>{SPEC_LABELS[t.spec]}</span>
+                      </div>
+                      <TierChip tier={tier} missions={t.missions_done} />
+                    </div>
+                    <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                      <Tip tip={`Especialização ${SPEC_LABELS[t.spec]} — bónus de sucesso em operações desta categoria.`}>
+                        <span>{SPEC_LABELS[t.spec]}</span>
+                      </Tip>
+                      {" · "}
+                      <Tip tip="Operações concluídas por esta equipa desde a sua formação.">
+                        <span>{t.missions_done} ops</span>
+                      </Tip>
+                      <Tip tip={t.status === "idle" ? "Na base — pronta a receber ordens." : "Em operação — volta a estar disponível quando regressar ao QG."} align="end">
+                        <Badge
+                          variant="outline"
+                          className="ml-1.5 rounded-full border-transparent px-1.5 py-0 font-mono text-[8.5px] font-bold uppercase"
+                          style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
+                        >
+                          {STATUS_LABELS[t.status]}
+                        </Badge>
+                      </Tip>
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <MomentumChip team={t} meta={teamMeta} testId={`team-momentum-${t.id}`} />
+                      {synergy && (
+                        <Tip tip={`Química da equipa: ${synergy.pct >= 0 ? "+" : ""}${(synergy.pct * 100).toFixed(1)}% de chance. Fórmula do motor: 60% cobertura dos atributos-chave da especialidade pelos melhores membros (${Math.round(synergy.coverage * 100)}%) + 40% diversidade de papéis (${Math.round(synergy.diversity * 100)}%). Composições complementares ganham; monoculturas fracas perdem.`}>
+                          <span className={cn("inline-flex items-center gap-0.5 font-mono text-[9px]", synergy.pct >= 0.0005 ? "text-emerald-400" : synergy.pct <= -0.0005 ? "text-amber-400" : "text-zinc-600")}>
+                            <FlaskConical size={9} /> química {synergy.pct >= 0 ? "+" : ""}{(synergy.pct * 100).toFixed(1)}%
+                          </span>
                         </Tip>
-                        {" · "}
-                        <Tip tip="Operações concluídas por esta equipa desde a sua formação.">
-                          <span>{t.missions_done} ops</span>
-                        </Tip>
-                      </p>
+                      )}
                     </div>
                   </div>
-                  <Tip tip={t.status === "idle" ? "Na base — pronta a receber ordens." : "Em operação — volta a estar disponível quando regressar ao QG."} align="end">
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 rounded-full border-transparent px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
-                      style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
-                    >
-                      {STATUS_LABELS[t.status]}
-                    </Badge>
-                  </Tip>
                 </div>
 
                 <p
                   data-testid={`team-readiness-${t.id}`}
-                  className={`mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase ${
+                  className={`relative z-[1] mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase ${
                     r.ok ? "text-emerald-400" : mission || r.reorg ? "text-cyan-400" : "text-amber-400"
                   }`}
                 >
@@ -261,7 +441,64 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     : r.reason}
                 </p>
 
-                <div className="mt-2 flex items-start gap-1.5">
+                {/* Papéis a bordo (SSS v4): quem vai no carro muda o desfecho */}
+                <div data-testid={`team-roles-${t.id}`} className="relative z-[1] mt-2 flex flex-wrap gap-1">
+                  <RoleChip
+                    icon={Crown} label="Líder" tone="#F59E0B"
+                    on={roles.leader.present}
+                    detail={roles.leader.present ? ` · salva ${Math.round(roles.leader.clutchPct * 100)}%` : null}
+                    tip={roles.leader.present
+                      ? `${leaderRankLabel}+ a bordo — evita a penalização de −${Math.round((teamMeta.no_leader_penalty ?? 0.03) * 100)}% e pode salvar uma falha in extremis: ${Math.round(roles.leader.clutchPct * 100)}% de probabilidade (${Math.round((teamMeta.clutch_save_max ?? 0.18) * 100)}% máx. × sangue-frio ${roles.leader.cool}/10). À chegada, avisa se o calor subiu muito desde a partida.`
+                      : `Sem líder (patente ${leaderRankLabel} ou superior) — a equipa perde ${Math.round((teamMeta.no_leader_penalty ?? 0.03) * 100)}% de chance e não tem salvamentos in extremis. Promove um operacional em RH.`}
+                  />
+                  <RoleChip
+                    icon={Gauge} label="Condutor" tone="#22D3EE"
+                    on={roles.driver.active}
+                    detail={roles.driver.active ? ` · −${Math.round(roles.driver.travelPct * 100)}% viagem` : null}
+                    tip={roles.driver.active
+                      ? `Melhor condução da equipa: ${roles.driver.value}/10 — reduz o tempo de viagem em ${Math.round(roles.driver.travelPct * 100)}% (máx. ${Math.round((teamMeta.driver_travel_reduction_max ?? 0.12) * 100)}%) e melhora a fuga à polícia em +${Math.round(roles.driver.escapePct * 100)}% (máx. +${Math.round((teamMeta.driver_escape_bonus_max ?? 0.06) * 100)}%).`
+                      : `Nenhum membro com condução acima de ${teamMeta.driver_attr_baseline ?? 5}/10 — sem redução de viagem nem bónus de fuga. Recruta ou treina um motorista.`}
+                  />
+                  <RoleChip
+                    icon={Stethoscope} label="Médico" tone="#34D399"
+                    on={roles.medic.present}
+                    tip={roles.medic.present
+                      ? `Médico a bordo — em falhas, a probabilidade de ferimento é ×${teamMeta.medic_injury_mult ?? 0.5} e a recuperação ×${teamMeta.medic_recovery_mult ?? 0.7} (estabiliza o ferido no local).`
+                      : "Sem médico — ferimentos em falhas ficam com probabilidade e duração totais. Recruta um médico em RH."}
+                  />
+                  <RoleChip
+                    icon={Scale} label="Advogado" tone="#C084FC"
+                    on={roles.lawyer.present}
+                    tip={roles.lawyer.present
+                      ? `Advogado a bordo — prisões (interceção ou perseguição) duram ×${teamMeta.lawyer_arrest_mult ?? 0.6} e a libertação começa logo a ser tratada.`
+                      : "Sem advogado — prisões duram o tempo total. Recruta um advogado em RH para reduzir o custo das detenções."}
+                  />
+                  <RoleChip
+                    icon={Brain} label="Estratega" tone="#60A5FA"
+                    on={roles.strategist.present}
+                    detail={roles.strategist.present ? ` · INT ${roles.strategist.intel}` : null}
+                    tip={roles.strategist.present
+                      ? `Operacional com inteligência ${roles.strategist.intel}/10 (≥${teamMeta.strategist_min_int ?? 7}) estuda o alvo e planeia rotas — recupera ${Math.round((teamMeta.strategist_relief_frac ?? 0.35) * 100)}% da penalização de risco (até ${Math.round((teamMeta.strategist_relief_max ?? 0.06) * 100)}%). Vale mais em operações arriscadas.`
+                      : `Sem estratega (inteligência ≥${teamMeta.strategist_min_int ?? 7}) — a penalização de risco da operação fica por inteiro.`}
+                  />
+                </div>
+
+                {/* Memória da unidade: entrosamento do plantel + familiaridade por categoria */}
+                <div className="relative z-[1] mt-2">
+                  <CohesionBar team={t} meta={teamMeta} nowMs={serverNow()} testId={`team-cohesion-${t.id}`} />
+                </div>
+                <div className="relative z-[1] mt-1.5">
+                  <FamiliarityRow team={t} meta={teamMeta} testId={`team-familiarity-${t.id}`} />
+                </div>
+
+                {/* Sinais vitais médios do plantel */}
+                {members.length > 0 && (
+                  <div className="relative z-[1] mt-2">
+                    <VitalsRow members={members} meta={teamMeta} testId={`team-vitals-${t.id}`} />
+                  </div>
+                )}
+
+                <div className="relative z-[1] mt-2 flex items-start gap-1.5">
                   <UserRound size={12} className="mt-1 shrink-0 text-zinc-500" />
                   <div className="min-w-0 flex-1">
                     <Tip tip={`Membros atuais na equipa vs. capacidade máxima (${teamMaxMembers}).`}>
@@ -329,7 +566,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   </div>
                 </div>
 
-                <div className="mt-2 flex items-center gap-1.5">
+                <div className="relative z-[1] mt-2 flex items-center gap-1.5">
                   <Car size={12} className="shrink-0 text-cyan-400" />
                   {t.status === "idle" ? (
                     <Select
@@ -379,13 +616,13 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   )}
                 </div>
                 {vehicle && (
-                  <p className="mt-1 pl-5 font-mono text-[10px] text-zinc-500">
+                  <p className="relative z-[1] mt-1 pl-5 font-mono text-[10px] text-zinc-500">
                     Base: {vehicle.property_id ? (state.properties.find((p) => p.id === vehicle.property_id)?.name || "Quartel-General") : "Quartel-General"}
                   </p>
                 )}
 
                 {vehicle && t.status === "idle" && (
-                  <div className="mt-1.5 space-y-1 pl-5">
+                  <div className="relative z-[1] mt-1.5 space-y-1 pl-5">
                     <div className="flex items-center gap-2">
                       <Tip tip={`Combustível: ${vehicle.fuel_l.toFixed(0)}/${vehicle.tank_l.toFixed(0)}L — autonomia ~${Math.round(vehicleRangeKm(vehicle))} km. Sem combustível a equipa não sai do QG.`} block className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -434,7 +671,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 <Tip
                   tip={
                     best && rec
-                      ? `Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por distância, probabilidade e requisitos mínimos cumpridos.`
+                      ? `Melhor operação para esta equipa: ${best.name}, a ${rec.dist_km}km (${fmtDuration(rec.eta_s)} de viagem), ${Math.round(rec.chance * 100)}% de probabilidade de sucesso. Escolhida por valor esperado real (recompensa, chance, perdas e combustível).`
                       : state.player.heat >= 90
                       ? "Polícia em alerta máximo (calor ≥ 90%) — todas as operações estão bloqueadas até o calor baixar. Suborna a polícia no Império ou aguarda."
                       : r.ok
@@ -448,7 +685,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     variant="outline"
                     onClick={() => best && rec && dispatchTeam(best.id, t.id)}
                     disabled={!best || !rec}
-                    className={`mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
+                    className={`relative z-[1] mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
                       best && rec
                         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
                         : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
@@ -481,7 +718,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`team-repeat-last-${t.id}`}
                       variant="outline"
                       onClick={() => dispatchTeam(repeatOpp.id, t.id)}
-                      className="mt-1.5 h-auto w-full flex-col items-start gap-1 border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-cyan-400 hover:bg-cyan-500/20 md:flex-row md:items-center md:text-[10px]"
+                      className="relative z-[1] mt-1.5 h-auto w-full flex-col items-start gap-1 border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-cyan-400 hover:bg-cyan-500/20 md:flex-row md:items-center md:text-[10px]"
                     >
                       <div className="flex items-center gap-1 truncate">
                         <Undo2 size={11} className="shrink-0 rotate-180" /> Repetir última → {repeatOpp.name}
@@ -504,7 +741,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`recall-team-${t.id}`}
                       variant="outline"
                       onClick={() => recallTeam(enRoute.id)}
-                      className={`mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
+                      className={`relative z-[1] mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
                         recallLate
                           ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
                           : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
@@ -558,7 +795,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     layout="card"
                     className="h-full"
                   >
-                    <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
+                    <div className="flex w-full items-center gap-2">
+                      <TeamGlyph spec={key} accent="#A1A1AA" className="h-6 w-[52px] shrink-0 opacity-90" />
+                      <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
+                    </div>
                     <span className="whitespace-normal text-[10px] font-normal normal-case leading-tight text-zinc-500">{ts.desc}</span>
                   </PurchaseButton>
                 );

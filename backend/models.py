@@ -62,6 +62,11 @@ class Team(BaseDocument):
     available_at: Optional[str] = None
     roster_stable_since: Optional[str] = None
     last_type_key: Optional[str] = None
+    # QI das equipas (SSS v4) — campos persistidos pelo motor e agora expostos
+    # no /state para a UI mostrar momentum, entrosamento e familiaridade.
+    streak: int = 0
+    roster_missions: int = 0
+    category_missions: dict = {}
 
 
 class Employee(BaseDocument):

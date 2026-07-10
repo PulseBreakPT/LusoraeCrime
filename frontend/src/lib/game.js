@@ -476,6 +476,128 @@ export function weaponAdequacy(wm, catalog) {
   });
 }
 
+// ============ QI das Equipas (SSS v4) — espelhos EXATOS do engine.py ============
+// Todas as fórmulas replicam os modificadores do motor com as réguas expostas
+// em catalog.team_meta — a UI mostra os MESMOS números que a chance de missão usa.
+
+export const TEAM_TIERS = {
+  recruta: { label: "Recruta", color: "#A1A1AA" },
+  operacional: { label: "Operacional", color: "#22D3EE" },
+  veterana: { label: "Veterana", color: "#C084FC" },
+  lendaria: { label: "Lendária", color: "#F59E0B" },
+};
+
+// Tier da unidade pela experiência real: os degraus alinham com as rampas do
+// motor (8 ops = entrosamento máximo em prática, 25 = mestria de categoria).
+export function teamTier(missionsDone) {
+  const n = missionsDone || 0;
+  const key = n >= 60 ? "lendaria" : n >= 25 ? "veterana" : n >= 8 ? "operacional" : "recruta";
+  return { key, ...TEAM_TIERS[key] };
+}
+
+// Espelho de engine.mod_team_momentum: série de vitórias dá bónus capado,
+// série de falhas penaliza; só conta a partir de |streak| >= 2.
+export function teamMomentum(streak, meta) {
+  const m = meta || {};
+  const s = streak || 0;
+  if (s >= 2) {
+    return { state: "hot", streak: s, pct: Math.min(m.momentum_bonus_max ?? 0.06, (m.momentum_bonus_per_win ?? 0.012) * s) };
+  }
+  if (s <= -2) {
+    return { state: "cold", streak: s, pct: -Math.min(m.momentum_penalty_max ?? 0.06, (m.momentum_penalty_per_loss ?? 0.02) * -s) };
+  }
+  return { state: "neutral", streak: s, pct: 0 };
+}
+
+// Espelho de engine.mod_team_coordination: 50% tempo de plantel estável +
+// 50% operações feitas com este plantel; mudar membros reinicia ambos.
+export function teamCoordination(team, meta, nowMs) {
+  const m = meta || {};
+  const rampS = m.coordination_ramp_s ?? 21600;
+  const rampMissions = m.coordination_ramp_missions ?? 8;
+  let timeFrac = 0;
+  if (team?.roster_stable_since) {
+    const stableS = Math.max(0, (nowMs - Date.parse(team.roster_stable_since)) / 1000);
+    timeFrac = Math.min(1, stableS / rampS);
+  }
+  const missions = team?.roster_missions || 0;
+  const missionFrac = Math.min(1, missions / rampMissions);
+  const max = m.coordination_bonus_max ?? 0.05;
+  const pct = max * (0.5 * timeFrac + 0.5 * missionFrac);
+  return { timeFrac, missionFrac, missions, rampMissions, pct, max };
+}
+
+// Espelho de engine.mod_team_familiarity: a equipa aprende por categoria —
+// curva sqrt (ganhos rápidos no início, mestria lenta), só conta a partir
+// da 3.ª operação, capada na mestria.
+export function teamFamiliarity(count, meta) {
+  const m = meta || {};
+  const min = m.familiarity_min_missions ?? 3;
+  const ramp = m.familiarity_ramp_missions ?? 25;
+  const max = m.familiarity_bonus_max ?? 0.05;
+  const c = count || 0;
+  const frac = Math.min(1, c / ramp);
+  const active = c >= min;
+  return { count: c, frac, pct: active ? max * Math.sqrt(frac) : 0, mastery: c >= ramp, active, min, ramp, max };
+}
+
+// Ordem fixa das 5 categorias de operação para a fila de familiaridade.
+export const TEAM_OP_CATEGORIES = ["assalto", "logistica", "tecnica", "influencia", "especial"];
+
+// Papéis a bordo (SSS v4) — espelho da deteção do dispatch (_prepare_dispatch):
+// líder por patente (clutch save = clutch_max × sangue-frio/10), médico e
+// advogado por role_key, condutor pelo melhor atributo de condução (reduz
+// viagem e melhora a fuga), estratega por inteligência >= limiar.
+export function teamRoles(members, meta, ranks) {
+  const m = meta || {};
+  const list = members || [];
+  const rankList = ranks && ranks.length ? ranks : ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"];
+  const leaderIdx = rankList.indexOf(m.leader_min_rank || "chefe_equipa");
+  const leaders = leaderIdx >= 0 ? list.filter((e) => rankList.indexOf(e.rank) >= leaderIdx) : [];
+  const leaderCool = leaders.reduce((a, e) => Math.max(a, (e.attrs || {}).sangue_frio || 0), 0);
+  const clutchPct = (m.clutch_save_max ?? 0.18) * Math.max(0, Math.min(1, leaderCool / 10));
+  const bestDriver = list.reduce((a, e) => Math.max(a, (e.attrs || {}).conducao || 0), 0);
+  const dBase = m.driver_attr_baseline ?? 5;
+  const driverActive = bestDriver > dBase;
+  const travelPct = driverActive
+    ? Math.min(m.driver_travel_reduction_max ?? 0.12, (bestDriver - dBase) * (m.driver_travel_reduction_per_point ?? 0.024))
+    : 0;
+  const escapePct = driverActive
+    ? Math.min(m.driver_escape_bonus_max ?? 0.06, (bestDriver - dBase) * (m.driver_escape_bonus_per_point ?? 0.012))
+    : 0;
+  const bestInt = list.reduce((a, e) => Math.max(a, (e.attrs || {}).inteligencia || 0), 0);
+  return {
+    leader: { present: leaders.length > 0, cool: leaderCool, clutchPct },
+    medic: { present: list.some((e) => e.role_key === "medico") },
+    lawyer: { present: list.some((e) => e.role_key === "advogado") },
+    driver: { value: bestDriver, active: driverActive, travelPct, escapePct },
+    strategist: { present: bestInt >= (m.strategist_min_int ?? 7), intel: bestInt },
+  };
+}
+
+// Espelho de engine.mod_team_synergy: cobertura dos atributos-chave da
+// categoria pelos melhores membros (60%) + diversidade de papéis (40%),
+// centrada num baseline — só composições complementares ganham.
+export function teamSynergy(members, category, meta) {
+  const list = members || [];
+  if (list.length < 2) return null;
+  const m = meta || {};
+  const catAttrs = (m.category_attrs || {})[category];
+  const bestOf = (k) => list.reduce((mx, e) => Math.max(mx, (e.attrs || {})[k] ?? 2), 0);
+  let coverage;
+  if (catAttrs && catAttrs.length) {
+    coverage = catAttrs.reduce((a, k) => a + bestOf(k), 0) / (catAttrs.length * 10);
+  } else {
+    const best = ["forca", "inteligencia", "discricao", "conducao", "tiro", "hack", "negociacao", "sangue_frio", "resistencia"]
+      .map(bestOf).sort((a, b) => b - a);
+    coverage = (best[0] + best[1] + best[2]) / 30;
+  }
+  const diversity = new Set(list.map((e) => e.role_key)).size / list.length;
+  const raw = 0.6 * coverage + 0.4 * diversity - (m.synergy_baseline ?? 0.62);
+  const pct = Math.max(-1, Math.min(1, raw / (m.synergy_spread ?? 0.38))) * (m.synergy_max ?? 0.03);
+  return { coverage, diversity, pct };
+}
+
 export function parseActivityMessage(message) {
   const React = require('react');
   const parts = [];

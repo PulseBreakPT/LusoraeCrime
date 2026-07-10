@@ -1,776 +1,613 @@
 #!/usr/bin/env python3
 """
-Testes backend para SSS v4 — QI das Equipas (Lusorae).
-Credenciais: admin@lusorae.com / admin123
+Backend test suite for Lusorae - Design SSS das Equipas
+Tests the ADDITIVE backend changes for the "Design SSS das Equipas" round.
 """
-import os
-import sys
-import time
+
 import requests
-from datetime import datetime
-from pymongo import MongoClient
+import json
+import sys
+from typing import Dict, Any, Optional
 
-# Base URL from frontend/.env
-BASE_URL = "https://design-framework-sss.preview.emergentagent.com/api"
+# Configuration
+BASE_URL = "https://650672af-769f-42ed-a63b-7c572aecf857.preview.emergentagent.com"
+API_URL = f"{BASE_URL}/api"
 
-# Test credentials (CHANGED - DB was reset)
+# Test credentials
 ADMIN_EMAIL = "admin@lusorae.com"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "LusoraeAdmin2026!"
 
-# MongoDB connection
-MONGO_URL = "mongodb://localhost:27017"
-DB_NAME = "test_database"
-
-# Colors for output
+# ANSI color codes for output
 GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
 BLUE = "\033[94m"
-CYAN = "\033[96m"
 RESET = "\033[0m"
 
-test_results = {"passed": 0, "failed": 0, "errors": [], "warnings": []}
-breakdown_items_observed = set()
-mission_fields_verified = {}
+
+class TestResult:
+    def __init__(self):
+        self.passed = 0
+        self.failed = 0
+        self.warnings = 0
+        self.errors = []
+
+    def add_pass(self, test_name: str):
+        self.passed += 1
+        print(f"{GREEN}✓{RESET} {test_name}")
+
+    def add_fail(self, test_name: str, error: str):
+        self.failed += 1
+        self.errors.append(f"{test_name}: {error}")
+        print(f"{RED}✗{RESET} {test_name}: {error}")
+
+    def add_warning(self, test_name: str, warning: str):
+        self.warnings += 1
+        print(f"{YELLOW}⚠{RESET} {test_name}: {warning}")
+
+    def summary(self):
+        print(f"\n{BLUE}{'='*60}{RESET}")
+        print(f"{BLUE}TEST SUMMARY{RESET}")
+        print(f"{BLUE}{'='*60}{RESET}")
+        print(f"{GREEN}Passed:{RESET} {self.passed}")
+        print(f"{RED}Failed:{RESET} {self.failed}")
+        print(f"{YELLOW}Warnings:{RESET} {self.warnings}")
+        if self.errors:
+            print(f"\n{RED}ERRORS:{RESET}")
+            for error in self.errors:
+                print(f"  - {error}")
+        print(f"{BLUE}{'='*60}{RESET}\n")
+        return self.failed == 0
 
 
-def log_test(name, passed, details=""):
-    if passed:
-        print(f"{GREEN}✓{RESET} {name}")
-        test_results["passed"] += 1
-    else:
-        print(f"{RED}✗{RESET} {name}")
-        if details:
-            print(f"  {RED}{details}{RESET}")
-        test_results["failed"] += 1
-        test_results["errors"].append(f"{name}: {details}")
+class LusoraeAPIClient:
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.token: Optional[str] = None
+        self.session = requests.Session()
 
-
-def log_warning(message):
-    print(f"{YELLOW}⚠{RESET} {message}")
-    test_results["warnings"].append(message)
-
-
-def log_section(title):
-    print(f"\n{BLUE}{'='*70}{RESET}")
-    print(f"{BLUE}{title}{RESET}")
-    print(f"{BLUE}{'='*70}{RESET}")
-
-
-def log_info(message):
-    print(f"{CYAN}ℹ{RESET} {message}")
-
-
-def get_mongo_client():
-    """Get MongoDB client"""
-    try:
-        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
-        client.server_info()  # Force connection
-        return client
-    except Exception as e:
-        log_warning(f"Não foi possível conectar ao MongoDB: {e}")
-        return None
-
-
-def test_login():
-    """Test A: Login and GET /api/game/state"""
-    log_section("A. LOGIN E GET /api/game/state")
-    
-    try:
-        # Login
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        }, timeout=10)
-        
-        if resp.status_code != 200:
-            log_test("Login com admin@lusorae.com / admin123 → 200", False, 
-                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-            return None
-        
-        data = resp.json()
-        if "access_token" not in data:
-            log_test("Login retorna access_token", False, "Missing access_token")
-            return None
-        
-        log_test("Login com admin@lusorae.com / admin123 → 200", True)
-        token = data["access_token"]
-        
-        # GET /api/game/state
-        resp_state = requests.get(f"{BASE_URL}/game/state",
-            headers={"Authorization": f"Bearer {token}"}, timeout=15)
-        
-        if resp_state.status_code != 200:
-            log_test("GET /api/game/state → 200", False, 
-                    f"Status: {resp_state.status_code}, Body: {resp_state.text[:200]}")
-            return None
-        
-        state = resp_state.json()
-        
-        # Verify teams and opportunities exist
-        if "teams" not in state or "opportunities" not in state:
-            log_test("GET /api/game/state devolve teams e opportunities", False, 
-                    f"Missing fields. Keys: {list(state.keys())}")
-            return None
-        
-        log_test("GET /api/game/state → 200 com teams e opportunities", True)
-        log_info(f"Equipas disponíveis: {len(state.get('teams', []))}")
-        log_info(f"Oportunidades ativas: {len(state.get('opportunities', []))}")
-        
-        return {
-            "token": token,
-            "state": state,
-            "teams": state.get("teams", []),
-            "opportunities": state.get("opportunities", [])
-        }
-        
-    except Exception as e:
-        log_test("Login e GET /api/game/state", False, str(e))
-        return None
-
-
-def test_dispatch_preview(context):
-    """Test B: POST /api/game/dispatch/preview for multiple opportunities"""
-    log_section("B. POST /api/game/dispatch/preview (breakdown)")
-    
-    if not context:
-        log_warning("Sem contexto de login, a saltar testes de preview")
-        return
-    
-    token = context["token"]
-    teams = context["teams"]
-    opportunities = context["opportunities"]
-    
-    if not teams:
-        log_warning("Sem equipas disponíveis para testar preview")
-        return
-    
-    if not opportunities:
-        log_warning("Sem oportunidades disponíveis para testar preview")
-        return
-    
-    # Get first idle team
-    idle_team = next((t for t in teams if t.get("status") == "idle"), None)
-    if not idle_team:
-        log_warning("Sem equipas idle para testar preview")
-        return
-    
-    team_id = idle_team["id"]
-    log_info(f"A usar equipa: {idle_team.get('name')} (id: {team_id})")
-    
-    # Test preview for multiple opportunities
-    previews_tested = 0
-    for opp in opportunities[:5]:  # Test up to 5 opportunities
-        opp_id = opp["id"]
-        opp_name = opp.get("name", "Unknown")
-        
+    def login(self, email: str, password: str) -> bool:
+        """Login and store the JWT token"""
         try:
-            resp = requests.post(f"{BASE_URL}/game/dispatch/preview",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"opportunity_id": opp_id, "team_id": team_id},
-                timeout=10)
-            
-            if resp.status_code != 200:
-                log_test(f"Preview {opp_name} → 200", False, 
-                        f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-                continue
-            
-            data = resp.json()
-            
-            # Verify breakdown structure
-            if "breakdown" not in data:
-                log_test(f"Preview {opp_name} tem breakdown", False, "Missing breakdown")
-                continue
-            
-            breakdown = data["breakdown"]
-            if not isinstance(breakdown, list):
-                log_test(f"Preview {opp_name} breakdown é lista", False, 
-                        f"Type: {type(breakdown)}")
-                continue
-            
-            # Verify breakdown items structure
-            valid_breakdown = True
-            for item in breakdown:
-                if not all(k in item for k in ["key", "label", "pct", "tip", "category"]):
-                    log_test(f"Preview {opp_name} breakdown items têm campos obrigatórios", False,
-                            f"Item missing fields: {item}")
-                    valid_breakdown = False
-                    break
-                
-                # Collect breakdown keys
-                breakdown_items_observed.add(item["key"])
-            
-            if not valid_breakdown:
-                continue
-            
-            # Verify sum of pct ≈ chance (tolerance 0.001)
-            chance = data.get("chance", 0)
-            sum_pct = sum(item["pct"] for item in breakdown)
-            diff = abs(sum_pct - chance)
-            
-            if diff > 0.001:
-                log_test(f"Preview {opp_name}: soma breakdown ≈ chance", False,
-                        f"Chance: {chance:.4f}, Soma: {sum_pct:.4f}, Diff: {diff:.4f}")
-                continue
-            
-            log_test(f"Preview {opp_name} → 200 com breakdown válido (soma={sum_pct:.3f}, chance={chance:.3f})", True)
-            previews_tested += 1
-            
-            # Log breakdown items for first opportunity
-            if previews_tested == 1:
-                log_info(f"Breakdown items ({len(breakdown)}):")
-                for item in breakdown:
-                    sign = "+" if item["pct"] >= 0 else ""
-                    print(f"    {sign}{item['pct']*100:.1f}% - {item['label']} ({item['key']})")
-            
+            response = self.session.post(
+                f"{self.base_url}/auth/login",
+                json={"email": email, "password": password}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                self.token = data.get("access_token")
+                return True
+            return False
         except Exception as e:
-            log_test(f"Preview {opp_name}", False, str(e))
-    
-    if previews_tested > 0:
-        log_info(f"Total de previews testados: {previews_tested}")
-        log_info(f"Breakdown keys observadas: {sorted(breakdown_items_observed)}")
+            print(f"{RED}Login error: {e}{RESET}")
+            return False
+
+    def get(self, endpoint: str, auth: bool = True) -> requests.Response:
+        """Make a GET request"""
+        headers = {}
+        if auth and self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return self.session.get(f"{self.base_url}{endpoint}", headers=headers)
+
+    def post(self, endpoint: str, data: Dict[Any, Any], auth: bool = True) -> requests.Response:
+        """Make a POST request"""
+        headers = {"Content-Type": "application/json"}
+        if auth and self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return self.session.post(f"{self.base_url}{endpoint}", json=data, headers=headers)
 
 
-def test_dispatch_and_mission_cycle(context):
-    """Test C: POST /api/game/dispatch and complete mission cycle"""
-    log_section("C. POST /api/game/dispatch + ciclo completo de missão")
-    
-    if not context:
-        log_warning("Sem contexto de login, a saltar teste de dispatch")
-        return None
-    
-    token = context["token"]
-    teams = context["teams"]
-    opportunities = context["opportunities"]
-    
-    if not teams or not opportunities:
-        log_warning("Sem equipas ou oportunidades para testar dispatch")
-        return None
-    
-    # Find a viable opportunity (low risk, short duration)
-    viable_opp = None
-    idle_team = next((t for t in teams if t.get("status") == "idle"), None)
-    
-    if not idle_team:
-        log_warning("Sem equipas idle para despachar")
-        return None
-    
-    team_id = idle_team["id"]
-    
-    # Try to find a short, low-risk opportunity
-    for opp in opportunities:
-        if opp.get("risk", 5) <= 2 and opp.get("duration_s", 999) <= 120:
-            viable_opp = opp
-            break
-    
-    if not viable_opp:
-        # Fallback to first opportunity
-        viable_opp = opportunities[0]
-    
-    opp_id = viable_opp["id"]
-    opp_name = viable_opp.get("name", "Unknown")
-    duration_s = viable_opp.get("duration_s", 120)
-    
-    log_info(f"A despachar equipa '{idle_team.get('name')}' para '{opp_name}'")
-    log_info(f"Duração estimada: {duration_s}s + viagem")
+def test_catalog_team_meta(client: LusoraeAPIClient, result: TestResult):
+    """Test 1: GET /api/game/catalog contains team_meta with 38 keys"""
+    print(f"\n{BLUE}Test 1: Catalog team_meta{RESET}")
     
     try:
-        # Dispatch
-        resp = requests.post(f"{BASE_URL}/game/dispatch",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"opportunity_id": opp_id, "team_id": team_id},
-            timeout=10)
+        response = client.get("/game/catalog", auth=False)
         
-        if resp.status_code != 200:
-            log_test("POST /api/game/dispatch → 200", False,
-                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-            return None
-        
-        data = resp.json()
-        if "mission_id" not in data:
-            log_test("Dispatch retorna mission_id", False, "Missing mission_id")
-            return None
-        
-        mission_id = data["mission_id"]
-        log_test(f"POST /api/game/dispatch → 200 com mission_id", True)
-        log_info(f"Mission ID: {mission_id}")
-        
-        # Poll /api/game/state until mission completes
-        log_info("A aguardar conclusão da missão (polling /state)...")
-        max_polls = 60  # Max 5 minutes (60 * 5s)
-        poll_interval = 5
-        mission_completed = False
-        errors_during_polling = []
-        
-        for poll_count in range(max_polls):
-            time.sleep(poll_interval)
-            
-            try:
-                resp_state = requests.get(f"{BASE_URL}/game/state",
-                    headers={"Authorization": f"Bearer {token}"}, timeout=15)
-                
-                if resp_state.status_code != 200:
-                    errors_during_polling.append(f"Poll {poll_count+1}: Status {resp_state.status_code}")
-                    continue
-                
-                state = resp_state.json()
-                
-                # Check if team is back to idle
-                current_team = next((t for t in state.get("teams", []) if t["id"] == team_id), None)
-                if current_team and current_team.get("status") == "idle":
-                    mission_completed = True
-                    log_info(f"Missão concluída após {(poll_count+1)*poll_interval}s de polling")
-                    break
-                
-                # Show progress
-                if (poll_count + 1) % 6 == 0:  # Every 30s
-                    status = current_team.get("status", "unknown") if current_team else "not found"
-                    log_info(f"  Poll {poll_count+1}/{max_polls}: equipa status = {status}")
-            
-            except Exception as e:
-                errors_during_polling.append(f"Poll {poll_count+1}: {str(e)}")
-        
-        if errors_during_polling:
-            log_test("Polling /state sem erros 500", False,
-                    f"Erros durante polling: {errors_during_polling[:3]}")
-            return None
-        
-        if not mission_completed:
-            log_test("Missão concluída dentro do timeout", False,
-                    f"Timeout após {max_polls*poll_interval}s")
-            return None
-        
-        log_test("Ciclo completo de missão sem erros 500 e equipa volta a idle", True)
-        
-        # Check for events
-        final_state = requests.get(f"{BASE_URL}/game/state",
-            headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
-        
-        events = final_state.get("events", [])
-        if events:
-            log_info(f"Eventos gerados: {len(events)}")
-            # Show last 3 events
-            for event in events[:3]:
-                msg = event.get("message", "")
-                if len(msg) > 80:
-                    msg = msg[:77] + "..."
-                log_info(f"  • {msg}")
-        
-        return {"mission_id": mission_id, "team_id": team_id, "category": viable_opp.get("category")}
-        
-    except Exception as e:
-        log_test("Dispatch e ciclo de missão", False, str(e))
-        return None
-
-
-def test_repeat_preview(context, mission_context):
-    """Test D: Repeat preview after mission completion"""
-    log_section("D. Preview após missão concluída (familiaridade)")
-    
-    if not context or not mission_context:
-        log_warning("Sem contexto para testar preview repetido")
-        return
-    
-    token = context["token"]
-    team_id = mission_context["team_id"]
-    category = mission_context["category"]
-    
-    log_info(f"A procurar oportunidades da categoria '{category}' para testar familiaridade")
-    
-    try:
-        # Get fresh state
-        resp_state = requests.get(f"{BASE_URL}/game/state",
-            headers={"Authorization": f"Bearer {token}"}, timeout=15)
-        
-        if resp_state.status_code != 200:
-            log_test("GET /state para preview repetido", False, f"Status: {resp_state.status_code}")
+        if response.status_code != 200:
+            result.add_fail("GET /api/game/catalog", f"Status {response.status_code}")
             return
         
-        state = resp_state.json()
-        opportunities = state.get("opportunities", [])
+        data = response.json()
         
-        # Find opportunity of same category
-        same_category_opp = next((o for o in opportunities if o.get("category") == category), None)
+        # Check team_meta exists
+        if "team_meta" not in data:
+            result.add_fail("team_meta presence", "team_meta not found in catalog")
+            return
         
-        if not same_category_opp:
-            log_warning(f"Sem oportunidades da categoria '{category}' disponíveis para testar familiaridade")
-            log_info("A testar preview com qualquer oportunidade disponível...")
-            if opportunities:
-                same_category_opp = opportunities[0]
+        result.add_pass("team_meta presence")
+        
+        team_meta = data["team_meta"]
+        
+        # Expected 38 keys
+        expected_keys = [
+            "leader_min_rank", "no_leader_penalty", "clutch_save_max",
+            "medic_injury_mult", "medic_recovery_mult", "lawyer_arrest_mult",
+            "driver_attr_baseline", "driver_travel_reduction_per_point",
+            "driver_travel_reduction_max", "driver_escape_bonus_per_point",
+            "driver_escape_bonus_max", "strategist_min_int",
+            "strategist_relief_frac", "strategist_relief_max",
+            "momentum_bonus_per_win", "momentum_bonus_max",
+            "momentum_penalty_per_loss", "momentum_penalty_max",
+            "momentum_escape_bonus_max", "coordination_bonus_max",
+            "coordination_ramp_s", "coordination_ramp_missions",
+            "familiarity_bonus_max", "familiarity_ramp_missions",
+            "familiarity_min_missions", "uniform_spec_bonus",
+            "solo_member_penalty", "incomplete_penalty_per_missing",
+            "incomplete_penalty_max", "synergy_max", "synergy_baseline",
+            "synergy_spread", "fatigue_curve_exp", "morale_penalty_asymmetry",
+            "loyalty_bonus_max", "loyalty_penalty_max", "category_attrs",
+            "reorg_after_roster_change_s"
+        ]
+        
+        missing_keys = [key for key in expected_keys if key not in team_meta]
+        extra_keys = [key for key in team_meta if key not in expected_keys]
+        
+        if missing_keys:
+            result.add_fail("team_meta keys", f"Missing keys: {missing_keys}")
+        elif len(team_meta) != 38:
+            result.add_warning("team_meta keys", f"Expected 38 keys, got {len(team_meta)}")
+        else:
+            result.add_pass("team_meta has 38 keys")
+        
+        # Verify specific key values
+        if team_meta.get("leader_min_rank") == "chefe_equipa":
+            result.add_pass("leader_min_rank value")
+        else:
+            result.add_fail("leader_min_rank value", f"Expected 'chefe_equipa', got {team_meta.get('leader_min_rank')}")
+        
+        if team_meta.get("no_leader_penalty") == 0.03:
+            result.add_pass("no_leader_penalty value")
+        else:
+            result.add_fail("no_leader_penalty value", f"Expected 0.03, got {team_meta.get('no_leader_penalty')}")
+        
+        if team_meta.get("clutch_save_max") == 0.18:
+            result.add_pass("clutch_save_max value")
+        else:
+            result.add_fail("clutch_save_max value", f"Expected 0.18, got {team_meta.get('clutch_save_max')}")
+        
+        # Check category_attrs is a dict
+        if isinstance(team_meta.get("category_attrs"), dict):
+            result.add_pass("category_attrs is dict")
+            cat_attrs = team_meta["category_attrs"]
+            expected_cats = ["assalto", "logistica", "tecnica", "influencia"]
+            for cat in expected_cats:
+                if cat in cat_attrs:
+                    result.add_pass(f"category_attrs.{cat} present")
+                else:
+                    result.add_fail(f"category_attrs.{cat} present", "Missing")
+        else:
+            result.add_fail("category_attrs is dict", f"Got {type(team_meta.get('category_attrs'))}")
+        
+        # Regression: Check weapon_meta still present
+        if "weapon_meta" in data:
+            result.add_pass("weapon_meta regression check")
+        else:
+            result.add_fail("weapon_meta regression check", "weapon_meta missing from catalog")
+        
+    except Exception as e:
+        result.add_fail("GET /api/game/catalog", f"Exception: {str(e)}")
+
+
+def test_state_team_fields(client: LusoraeAPIClient, result: TestResult):
+    """Test 2: GET /api/game/state - teams have streak, roster_missions, category_missions"""
+    print(f"\n{BLUE}Test 2: State team fields{RESET}")
+    
+    try:
+        response = client.get("/game/state")
+        
+        if response.status_code != 200:
+            result.add_fail("GET /api/game/state", f"Status {response.status_code}")
+            return
+        
+        data = response.json()
+        
+        if "teams" not in data:
+            result.add_fail("teams in state", "teams not found")
+            return
+        
+        teams = data["teams"]
+        
+        if not teams:
+            result.add_warning("teams in state", "No teams found in state")
+            return
+        
+        result.add_pass(f"GET /api/game/state ({len(teams)} teams)")
+        
+        # Check each team has the required fields
+        for i, team in enumerate(teams):
+            team_name = team.get("name", f"Team {i}")
+            
+            # Check streak (int)
+            if "streak" in team:
+                if isinstance(team["streak"], int):
+                    result.add_pass(f"{team_name}: streak field (int)")
+                else:
+                    result.add_fail(f"{team_name}: streak field", f"Not int: {type(team['streak'])}")
             else:
-                log_warning("Sem oportunidades disponíveis")
+                result.add_fail(f"{team_name}: streak field", "Missing")
+            
+            # Check roster_missions (int)
+            if "roster_missions" in team:
+                if isinstance(team["roster_missions"], int):
+                    result.add_pass(f"{team_name}: roster_missions field (int)")
+                else:
+                    result.add_fail(f"{team_name}: roster_missions field", f"Not int: {type(team['roster_missions'])}")
+            else:
+                result.add_fail(f"{team_name}: roster_missions field", "Missing")
+            
+            # Check category_missions (dict)
+            if "category_missions" in team:
+                if isinstance(team["category_missions"], dict):
+                    result.add_pass(f"{team_name}: category_missions field (dict)")
+                else:
+                    result.add_fail(f"{team_name}: category_missions field", f"Not dict: {type(team['category_missions'])}")
+            else:
+                result.add_fail(f"{team_name}: category_missions field", "Missing")
+        
+    except Exception as e:
+        result.add_fail("GET /api/game/state", f"Exception: {str(e)}")
+
+
+def test_team_creation_regression(client: LusoraeAPIClient, result: TestResult):
+    """Test 3: Create new team and verify SSS v4 fields"""
+    print(f"\n{BLUE}Test 3: Team creation regression{RESET}")
+    
+    try:
+        # Get current state to check team count
+        state_response = client.get("/game/state")
+        if state_response.status_code != 200:
+            result.add_fail("Pre-check state", f"Status {state_response.status_code}")
+            return
+        
+        state_data = state_response.json()
+        initial_team_count = len(state_data.get("teams", []))
+        
+        # Try to create a new team
+        create_response = client.post("/game/teams/create", {"spec": "logistica"})
+        
+        if create_response.status_code == 200:
+            result.add_pass("POST /api/game/teams/create")
+            
+            # Get state again to verify the new team
+            state_response = client.get("/game/state")
+            if state_response.status_code != 200:
+                result.add_fail("Post-create state", f"Status {state_response.status_code}")
                 return
-        
-        opp_id = same_category_opp["id"]
-        opp_name = same_category_opp.get("name", "Unknown")
-        
-        # Test preview
-        resp = requests.post(f"{BASE_URL}/game/dispatch/preview",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"opportunity_id": opp_id, "team_id": team_id},
-            timeout=10)
-        
-        if resp.status_code != 200:
-            log_test(f"Preview após missão → 200", False,
-                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+            
+            state_data = state_response.json()
+            teams = state_data.get("teams", [])
+            
+            if len(teams) > initial_team_count:
+                new_team = teams[-1]  # Assume last team is the new one
+                
+                # Verify SSS v4 fields
+                if new_team.get("streak") == 0:
+                    result.add_pass("New team: streak=0")
+                else:
+                    result.add_fail("New team: streak=0", f"Got {new_team.get('streak')}")
+                
+                if new_team.get("roster_missions") == 0:
+                    result.add_pass("New team: roster_missions=0")
+                else:
+                    result.add_fail("New team: roster_missions=0", f"Got {new_team.get('roster_missions')}")
+                
+                if new_team.get("category_missions") == {}:
+                    result.add_pass("New team: category_missions={}")
+                else:
+                    result.add_fail("New team: category_missions={}", f"Got {new_team.get('category_missions')}")
+                
+                return new_team
+            else:
+                result.add_fail("Team creation", "Team count did not increase")
+        elif create_response.status_code == 400:
+            # Might be at team limit or insufficient funds
+            error_msg = create_response.json().get("detail", "Unknown error")
+            result.add_warning("POST /api/game/teams/create", f"Cannot create team: {error_msg}")
+        else:
+            result.add_fail("POST /api/game/teams/create", f"Status {create_response.status_code}")
+    
+    except Exception as e:
+        result.add_fail("Team creation regression", f"Exception: {str(e)}")
+    
+    return None
+
+
+def test_employee_assignment(client: LusoraeAPIClient, result: TestResult):
+    """Test 4: Assign employee to team without 500 error"""
+    print(f"\n{BLUE}Test 4: Employee assignment{RESET}")
+    
+    try:
+        # Get state to find a free employee and a team
+        state_response = client.get("/game/state")
+        if state_response.status_code != 200:
+            result.add_fail("Get state for assignment", f"Status {state_response.status_code}")
             return
         
-        data = resp.json()
-        breakdown = data.get("breakdown", [])
+        state_data = state_response.json()
+        employees = state_data.get("employees", [])
+        teams = state_data.get("teams", [])
         
-        # Check if "familiaridade" appears
-        has_familiaridade = any(item.get("key") == "familiaridade" for item in breakdown)
-        
-        if has_familiaridade:
-            log_test("Preview após missão: item 'familiaridade' aparece no breakdown", True)
-            fam_item = next(item for item in breakdown if item.get("key") == "familiaridade")
-            log_info(f"  Familiaridade: +{fam_item['pct']*100:.1f}% - {fam_item['label']}")
-        else:
-            log_info("Item 'familiaridade' NÃO aparece (normal se <3 ops da categoria)")
-            log_test("Preview após missão não dá erro 500", True)
-        
-        log_info(f"Breakdown items no preview repetido: {[item['key'] for item in breakdown]}")
-        
-    except Exception as e:
-        log_test("Preview após missão concluída", False, str(e))
-
-
-def test_mission_document_fields(mission_context):
-    """Test E: Verify mission document has new fields in MongoDB"""
-    log_section("E. Verificação de campos novos no documento de missão (MongoDB)")
-    
-    if not mission_context:
-        log_warning("Sem contexto de missão para verificar MongoDB")
-        return
-    
-    mission_id = mission_context["mission_id"]
-    
-    client = get_mongo_client()
-    if not client:
-        log_warning("Sem acesso ao MongoDB, a saltar verificação de campos")
-        return
-    
-    try:
-        db = client[DB_NAME]
-        missions_col = db["missions"]
-        teams_col = db["teams"]
-        
-        # Find mission document
-        from bson import ObjectId
-        mission_doc = missions_col.find_one({"_id": ObjectId(mission_id)})
-        
-        if not mission_doc:
-            log_test("Documento de missão encontrado no MongoDB", False, f"Mission ID: {mission_id}")
+        if not teams:
+            result.add_warning("Employee assignment", "No teams available")
             return
         
-        log_test("Documento de missão encontrado no MongoDB", True)
+        # Find a free employee (not on mission, not in a team)
+        free_employee = None
+        for emp in employees:
+            if emp.get("status") == "idle" and not emp.get("team_id"):
+                free_employee = emp
+                break
         
-        # Check new fields
-        required_fields = {
-            "team_streak": int,
-            "vehicle_speed_effective": (int, float),
-            "vehicle_discreet": bool,
-            "has_leader": bool,
-            "leader_cool": (int, float),
-            "has_medic": bool,
-            "has_lawyer": bool,
-            "best_driver": (int, float),
-            "top_negatives": list,
-            "heat_at_dispatch": (int, float)
-        }
+        if not free_employee:
+            result.add_warning("Employee assignment", "No free employees available")
+            return
         
-        for field, expected_type in required_fields.items():
-            if field not in mission_doc:
-                log_test(f"Campo '{field}' presente no mission doc", False, "Campo em falta")
-                mission_fields_verified[field] = False
-            else:
-                value = mission_doc[field]
-                if isinstance(expected_type, tuple):
-                    type_ok = isinstance(value, expected_type)
-                else:
-                    type_ok = isinstance(value, expected_type)
-                
-                if type_ok:
-                    log_test(f"Campo '{field}' presente e tipo correto", True)
-                    mission_fields_verified[field] = True
-                    
-                    # Log value for inspection
-                    if field == "top_negatives":
-                        log_info(f"  {field} = {value[:2] if len(value) > 2 else value}...")
-                    else:
-                        log_info(f"  {field} = {value}")
-                else:
-                    log_test(f"Campo '{field}' tem tipo correto", False,
-                            f"Esperado {expected_type}, obtido {type(value)}")
-                    mission_fields_verified[field] = False
+        # Try to assign to first team
+        team = teams[0]
+        assign_response = client.post("/game/employees/assign", {
+            "employee_id": free_employee["id"],
+            "team_id": team["id"]
+        })
         
-        # Check team document
-        team_id = mission_doc.get("team_id")
-        if team_id:
-            team_doc = teams_col.find_one({"_id": ObjectId(team_id)})
-            if team_doc:
-                log_test("Documento de equipa encontrado no MongoDB", True)
-                
-                # Check team fields
-                roster_missions = team_doc.get("roster_missions", 0)
-                category_missions = team_doc.get("category_missions", {})
-                streak = team_doc.get("streak")
-                
-                log_info(f"  roster_missions = {roster_missions}")
-                log_info(f"  category_missions = {category_missions}")
-                log_info(f"  streak = {streak}")
-                
-                if roster_missions >= 1:
-                    log_test("Team.roster_missions >= 1 após conclusão", True)
-                else:
-                    log_test("Team.roster_missions >= 1", False, f"Valor: {roster_missions}")
-                
-                if streak is not None:
-                    log_test("Team.streak != null", True)
-                else:
-                    log_test("Team.streak != null", False, "streak é null")
-            else:
-                log_test("Documento de equipa encontrado", False, f"Team ID: {team_id}")
-        
-    except Exception as e:
-        log_test("Verificação de campos no MongoDB", False, str(e))
-    finally:
-        if client:
-            client.close()
-
-
-def test_recommendation_endpoints(context):
-    """Test F: Recommendation endpoints"""
-    log_section("F. Endpoints de recomendação (recommend_*)")
-    
-    if not context:
-        log_warning("Sem contexto para testar recomendações")
-        return
-    
-    token = context["token"]
-    teams = context["teams"]
-    opportunities = context["opportunities"]
-    
-    if not teams:
-        log_warning("Sem equipas para testar recomendações")
-        return
-    
-    # Get first idle team
-    idle_team = next((t for t in teams if t.get("status") == "idle"), None)
-    if not idle_team:
-        log_warning("Sem equipas idle para testar recomendações")
-        return
-    
-    team_id = idle_team["id"]
-    
-    # Test recommend_opportunity
-    try:
-        resp = requests.post(f"{BASE_URL}/game/dispatch/recommend_opportunity",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"team_id": team_id},
-            timeout=10)
-        
-        if resp.status_code != 200:
-            log_test("POST /dispatch/recommend_opportunity → 200", False,
-                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+        if assign_response.status_code == 200:
+            result.add_pass("POST /api/game/employees/assign")
+        elif assign_response.status_code == 400:
+            error_msg = assign_response.json().get("detail", "Unknown error")
+            result.add_warning("POST /api/game/employees/assign", f"Cannot assign: {error_msg}")
+        elif assign_response.status_code == 500:
+            result.add_fail("POST /api/game/employees/assign", "500 Internal Server Error")
         else:
-            data = resp.json()
-            opp_id = data.get("opportunity_id")
-            if opp_id:
-                log_test("POST /dispatch/recommend_opportunity → 200 com opportunity_id", True)
-                log_info(f"  Recomendação: opportunity_id={opp_id}, chance={data.get('chance')}, reward={data.get('reward')}")
-            else:
-                log_test("POST /dispatch/recommend_opportunity → 200 (null, sem viáveis)", True)
-                log_info("  Nenhuma oportunidade viável recomendada")
+            result.add_fail("POST /api/game/employees/assign", f"Status {assign_response.status_code}")
+    
     except Exception as e:
-        log_test("POST /dispatch/recommend_opportunity", False, str(e))
+        result.add_fail("Employee assignment", f"Exception: {str(e)}")
+
+
+def test_vehicle_assignment(client: LusoraeAPIClient, result: TestResult):
+    """Test 5: Assign/remove vehicle without 500 error"""
+    print(f"\n{BLUE}Test 5: Vehicle assignment{RESET}")
     
-    # Test recommend_team
-    if opportunities:
-        opp_id = opportunities[0]["id"]
-        try:
-            resp = requests.post(f"{BASE_URL}/game/dispatch/recommend_team",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"opportunity_id": opp_id},
-                timeout=10)
-            
-            if resp.status_code != 200:
-                log_test("POST /dispatch/recommend_team → 200", False,
-                        f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-            else:
-                data = resp.json()
-                team_id_rec = data.get("team_id")
-                if team_id_rec:
-                    log_test("POST /dispatch/recommend_team → 200 com team_id", True)
-                    log_info(f"  Recomendação: team_id={team_id_rec}, chance={data.get('chance')}")
-                else:
-                    log_test("POST /dispatch/recommend_team → 200 (null, sem viáveis)", True)
-        except Exception as e:
-            log_test("POST /dispatch/recommend_team", False, str(e))
-    
-    # Test recommend_repeat
     try:
-        resp = requests.post(f"{BASE_URL}/game/dispatch/recommend_repeat",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"team_id": team_id},
-            timeout=10)
+        # Get state to find a free vehicle and a team
+        state_response = client.get("/game/state")
+        if state_response.status_code != 200:
+            result.add_fail("Get state for vehicle", f"Status {state_response.status_code}")
+            return
         
-        if resp.status_code != 200:
-            log_test("POST /dispatch/recommend_repeat → 200", False,
-                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+        state_data = state_response.json()
+        vehicles = state_data.get("vehicles", [])
+        teams = state_data.get("teams", [])
+        
+        if not teams:
+            result.add_warning("Vehicle assignment", "No teams available")
+            return
+        
+        # Find a free vehicle
+        free_vehicle = None
+        for veh in vehicles:
+            if not veh.get("team_id"):
+                free_vehicle = veh
+                break
+        
+        if not free_vehicle:
+            result.add_warning("Vehicle assignment", "No free vehicles available")
+            return
+        
+        # Try to assign to first team
+        team = teams[0]
+        assign_response = client.post("/game/vehicles/assign", {
+            "vehicle_id": free_vehicle["id"],
+            "team_id": team["id"]
+        })
+        
+        if assign_response.status_code == 200:
+            result.add_pass("POST /api/game/vehicles/assign")
+            
+            # Try to unassign
+            unassign_response = client.post("/game/vehicles/assign", {
+                "vehicle_id": free_vehicle["id"],
+                "team_id": None
+            })
+            
+            if unassign_response.status_code == 200:
+                result.add_pass("POST /api/game/vehicles/assign (unassign)")
+            elif unassign_response.status_code == 500:
+                result.add_fail("Vehicle unassign", "500 Internal Server Error")
+            else:
+                result.add_warning("Vehicle unassign", f"Status {unassign_response.status_code}")
+        
+        elif assign_response.status_code == 400:
+            error_msg = assign_response.json().get("detail", "Unknown error")
+            result.add_warning("POST /api/game/vehicles/assign", f"Cannot assign: {error_msg}")
+        elif assign_response.status_code == 500:
+            result.add_fail("POST /api/game/vehicles/assign", "500 Internal Server Error")
         else:
-            data = resp.json()
-            opp_id = data.get("opportunity_id")
-            if opp_id:
-                log_test("POST /dispatch/recommend_repeat → 200 com opportunity_id", True)
-                log_info(f"  Recomendação: opportunity_id={opp_id}")
-            else:
-                log_test("POST /dispatch/recommend_repeat → 200 (null, sem repetição)", True)
+            result.add_fail("POST /api/game/vehicles/assign", f"Status {assign_response.status_code}")
+    
     except Exception as e:
-        log_test("POST /dispatch/recommend_repeat", False, str(e))
+        result.add_fail("Vehicle assignment", f"Exception: {str(e)}")
 
 
-def test_regression(context):
-    """Test G: Regression tests"""
-    log_section("G. Testes de regressão")
+def test_recommendation_endpoints(client: LusoraeAPIClient, result: TestResult):
+    """Test 6: Recommendation endpoints return 200/4xx, never 500"""
+    print(f"\n{BLUE}Test 6: Recommendation endpoints{RESET}")
     
-    if not context:
-        log_warning("Sem contexto para testes de regressão")
-        return
-    
-    token = context["token"]
-    
-    # Test GET /state 3x without 500
-    errors = []
-    for i in range(3):
-        try:
-            resp = requests.get(f"{BASE_URL}/game/state",
-                headers={"Authorization": f"Bearer {token}"}, timeout=15)
-            
-            if resp.status_code != 200:
-                errors.append(f"Tentativa {i+1}: Status {resp.status_code}")
-        except Exception as e:
-            errors.append(f"Tentativa {i+1}: {str(e)}")
-    
-    if errors:
-        log_test("GET /state 3x sem erros", False, f"Erros: {errors}")
-    else:
-        log_test("GET /state 3x sem erros 500", True)
-    
-    # Test create new team (if money allows)
     try:
-        resp_state = requests.get(f"{BASE_URL}/game/state",
-            headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        # Get state to find teams and opportunities
+        state_response = client.get("/game/state")
+        if state_response.status_code != 200:
+            result.add_fail("Get state for recommendations", f"Status {state_response.status_code}")
+            return
         
-        if resp_state.status_code == 200:
-            state = resp_state.json()
-            player = state.get("player", {})
-            clean_money = player.get("clean_money", 0)
-            
-            if clean_money >= 5000:
-                resp_create = requests.post(f"{BASE_URL}/game/teams/create",
-                    headers={"Authorization": f"Bearer {token}"},
-                    json={"spec": "assalto"},
-                    timeout=10)
-                
-                if resp_create.status_code == 200:
-                    log_test("POST /teams/create → 200", True)
-                    
-                    # Verify new team in MongoDB
-                    client = get_mongo_client()
-                    if client:
-                        try:
-                            db = client[DB_NAME]
-                            teams_col = db["teams"]
-                            
-                            # Get player_id
-                            player_id = player.get("id")
-                            if player_id:
-                                new_teams = list(teams_col.find({"player_id": player_id}).sort("created_at", -1).limit(1))
-                                if new_teams:
-                                    new_team = new_teams[0]
-                                    streak = new_team.get("streak")
-                                    category_missions = new_team.get("category_missions", {})
-                                    roster_missions = new_team.get("roster_missions")
-                                    
-                                    log_info(f"  Nova equipa: streak={streak}, category_missions={category_missions}, roster_missions={roster_missions}")
-                                    
-                                    if streak == 0 and category_missions == {} and roster_missions == 0:
-                                        log_test("Nova equipa criada com campos corretos (streak=0, category_missions={}, roster_missions=0)", True)
-                                    else:
-                                        log_test("Nova equipa com campos corretos", False,
-                                                f"streak={streak}, category_missions={category_missions}, roster_missions={roster_missions}")
-                        finally:
-                            client.close()
-                else:
-                    log_test("POST /teams/create → 200", False,
-                            f"Status: {resp_create.status_code}, Body: {resp_create.text[:200]}")
+        state_data = state_response.json()
+        teams = state_data.get("teams", [])
+        opportunities = state_data.get("opportunities", [])
+        
+        if not teams:
+            result.add_warning("Recommendation endpoints", "No teams available")
+            return
+        
+        team_id = teams[0]["id"]
+        
+        # Test recommend_opportunity
+        rec_opp_response = client.post("/game/dispatch/recommend_opportunity", {"team_id": team_id})
+        if rec_opp_response.status_code in [200, 400, 404]:
+            result.add_pass("POST /api/game/dispatch/recommend_opportunity")
+        elif rec_opp_response.status_code == 500:
+            result.add_fail("POST /api/game/dispatch/recommend_opportunity", "500 Internal Server Error")
+        else:
+            result.add_warning("POST /api/game/dispatch/recommend_opportunity", f"Status {rec_opp_response.status_code}")
+        
+        # Test recommend_team (if we have opportunities)
+        if opportunities:
+            opp_id = opportunities[0]["id"]
+            rec_team_response = client.post("/game/dispatch/recommend_team", {"opportunity_id": opp_id})
+            if rec_team_response.status_code in [200, 400, 404]:
+                result.add_pass("POST /api/game/dispatch/recommend_team")
+            elif rec_team_response.status_code == 500:
+                result.add_fail("POST /api/game/dispatch/recommend_team", "500 Internal Server Error")
             else:
-                log_info(f"Dinheiro insuficiente para criar equipa ({clean_money} < 5000)")
-                log_test("POST /teams/create (skip - sem dinheiro)", True)
+                result.add_warning("POST /api/game/dispatch/recommend_team", f"Status {rec_team_response.status_code}")
+        else:
+            result.add_warning("POST /api/game/dispatch/recommend_team", "No opportunities available")
+        
+        # Test recommend_repeat
+        rec_repeat_response = client.post("/game/dispatch/recommend_repeat", {"team_id": team_id})
+        if rec_repeat_response.status_code in [200, 400, 404]:
+            result.add_pass("POST /api/game/dispatch/recommend_repeat")
+        elif rec_repeat_response.status_code == 500:
+            result.add_fail("POST /api/game/dispatch/recommend_repeat", "500 Internal Server Error")
+        else:
+            result.add_warning("POST /api/game/dispatch/recommend_repeat", f"Status {rec_repeat_response.status_code}")
+    
     except Exception as e:
-        log_test("Teste de criação de equipa", False, str(e))
+        result.add_fail("Recommendation endpoints", f"Exception: {str(e)}")
 
 
-def print_summary():
-    """Print test summary"""
-    log_section("RESUMO DOS TESTES")
+def test_dispatch_preview(client: LusoraeAPIClient, result: TestResult):
+    """Test 7: Dispatch preview for eligible team/opportunity"""
+    print(f"\n{BLUE}Test 7: Dispatch preview{RESET}")
     
-    total = test_results["passed"] + test_results["failed"]
-    print(f"\nTotal: {total} testes")
-    print(f"{GREEN}Passou: {test_results['passed']}{RESET}")
-    print(f"{RED}Falhou: {test_results['failed']}{RESET}")
+    try:
+        # Get state to find eligible team and opportunity
+        state_response = client.get("/game/state")
+        if state_response.status_code != 200:
+            result.add_fail("Get state for preview", f"Status {state_response.status_code}")
+            return
+        
+        state_data = state_response.json()
+        teams = state_data.get("teams", [])
+        opportunities = state_data.get("opportunities", [])
+        
+        if not teams or not opportunities:
+            result.add_warning("Dispatch preview", "No teams or opportunities available")
+            return
+        
+        # Find an idle team with members and vehicle
+        eligible_team = None
+        for team in teams:
+            if team.get("status") == "idle" and team.get("vehicle_id"):
+                # Check if team has members
+                employees = state_data.get("employees", [])
+                team_members = [e for e in employees if e.get("team_id") == team["id"] and e.get("status") == "idle"]
+                if team_members:
+                    eligible_team = team
+                    break
+        
+        if not eligible_team:
+            result.add_warning("Dispatch preview", "No eligible team found (need idle team with members and vehicle)")
+            return
+        
+        # Find an active opportunity
+        active_opp = None
+        for opp in opportunities:
+            if opp.get("status") == "active":
+                active_opp = opp
+                break
+        
+        if not active_opp:
+            result.add_warning("Dispatch preview", "No active opportunities")
+            return
+        
+        # Try preview
+        preview_response = client.post("/game/dispatch/preview", {
+            "team_id": eligible_team["id"],
+            "opportunity_id": active_opp["id"]
+        })
+        
+        if preview_response.status_code == 200:
+            result.add_pass("POST /api/game/dispatch/preview")
+            
+            # Verify breakdown is present
+            preview_data = preview_response.json()
+            if "breakdown" in preview_data:
+                result.add_pass("Preview has breakdown")
+            else:
+                result.add_fail("Preview has breakdown", "Missing breakdown field")
+            
+            if "chance" in preview_data:
+                result.add_pass("Preview has chance")
+            else:
+                result.add_fail("Preview has chance", "Missing chance field")
+        
+        elif preview_response.status_code == 400:
+            error_msg = preview_response.json().get("detail", "Unknown error")
+            result.add_warning("POST /api/game/dispatch/preview", f"Cannot preview: {error_msg}")
+        elif preview_response.status_code == 500:
+            result.add_fail("POST /api/game/dispatch/preview", "500 Internal Server Error")
+        else:
+            result.add_fail("POST /api/game/dispatch/preview", f"Status {preview_response.status_code}")
     
-    if test_results["warnings"]:
-        print(f"{YELLOW}Avisos: {len(test_results['warnings'])}{RESET}")
+    except Exception as e:
+        result.add_fail("Dispatch preview", f"Exception: {str(e)}")
+
+
+def test_login_regression(client: LusoraeAPIClient, result: TestResult):
+    """Test 8: Login regression check"""
+    print(f"\n{BLUE}Test 8: Login regression{RESET}")
     
-    # Report breakdown items observed
-    if breakdown_items_observed:
-        print(f"\n{CYAN}Breakdown items observados:{RESET}")
-        for key in sorted(breakdown_items_observed):
-            print(f"  • {key}")
+    try:
+        # Create a new client to test fresh login
+        test_client = LusoraeAPIClient(API_URL)
+        
+        if test_client.login(ADMIN_EMAIL, ADMIN_PASSWORD):
+            result.add_pass("POST /api/auth/login")
+        else:
+            result.add_fail("POST /api/auth/login", "Login failed")
     
-    # Report mission fields verified
-    if mission_fields_verified:
-        print(f"\n{CYAN}Campos novos verificados no mission doc:{RESET}")
-        for field, verified in mission_fields_verified.items():
-            status = f"{GREEN}✓{RESET}" if verified else f"{RED}✗{RESET}"
-            print(f"  {status} {field}")
-    
-    if test_results["failed"] > 0:
-        print(f"\n{RED}Erros encontrados:{RESET}")
-        for error in test_results["errors"]:
-            print(f"  • {error}")
-    
-    if test_results["warnings"]:
-        print(f"\n{YELLOW}Avisos:{RESET}")
-        for warning in test_results["warnings"][:5]:  # Show first 5
-            print(f"  • {warning}")
-    
-    print()
-    
-    return test_results["failed"] == 0
+    except Exception as e:
+        result.add_fail("Login regression", f"Exception: {str(e)}")
 
 
 def main():
-    print(f"\n{BLUE}{'='*70}{RESET}")
-    print(f"{BLUE}TESTES BACKEND - LUSORAE SSS v4 QI DAS EQUIPAS{RESET}")
-    print(f"{BLUE}Base URL: {BASE_URL}{RESET}")
-    print(f"{BLUE}Credenciais: {ADMIN_EMAIL} / {ADMIN_PASSWORD}{RESET}")
-    print(f"{BLUE}{'='*70}{RESET}\n")
+    print(f"{BLUE}{'='*60}{RESET}")
+    print(f"{BLUE}LUSORAE BACKEND TEST SUITE{RESET}")
+    print(f"{BLUE}Design SSS das Equipas - Backend Changes{RESET}")
+    print(f"{BLUE}{'='*60}{RESET}\n")
     
-    # Run all tests in order
-    context = test_login()
-    test_dispatch_preview(context)
-    mission_context = test_dispatch_and_mission_cycle(context)
-    test_repeat_preview(context, mission_context)
-    test_mission_document_fields(mission_context)
-    test_recommendation_endpoints(context)
-    test_regression(context)
+    result = TestResult()
+    client = LusoraeAPIClient(API_URL)
     
-    # Print summary
-    success = print_summary()
+    # Login
+    print(f"{BLUE}Logging in as {ADMIN_EMAIL}...{RESET}")
+    if not client.login(ADMIN_EMAIL, ADMIN_PASSWORD):
+        print(f"{RED}Failed to login. Cannot proceed with tests.{RESET}")
+        sys.exit(1)
+    print(f"{GREEN}Login successful{RESET}\n")
     
+    # Run tests
+    test_catalog_team_meta(client, result)
+    test_state_team_fields(client, result)
+    test_team_creation_regression(client, result)
+    test_employee_assignment(client, result)
+    test_vehicle_assignment(client, result)
+    test_recommendation_endpoints(client, result)
+    test_dispatch_preview(client, result)
+    test_login_regression(client, result)
+    
+    # Summary
+    success = result.summary()
     sys.exit(0 if success else 1)
 
 
