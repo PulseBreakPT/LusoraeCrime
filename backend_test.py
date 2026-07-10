@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://living-patrol-engine.preview.emergentagent.com"
+BASE_URL = "https://live-sim-engine.preview.emergentagent.com"
 API_URL = f"{BASE_URL}/api"
 
 # Test credentials
