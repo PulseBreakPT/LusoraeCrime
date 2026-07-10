@@ -455,6 +455,8 @@ export function GameProvider({ children }) {
     action("weapons/unassign", { employee_id: employeeId }, "Arma desatribuída");
   const autoAssignWeapon = (weaponId) =>
     action("weapons/auto_assign", { weapon_id: weaponId }, "Arma atribuída automaticamente");
+  const optimizeWeapons = () =>
+    action("weapons/optimize", {}, "Arsenal redistribuído pela melhor combinação");
   const buyProperty = (typeKey, lat, lng) =>
     action("properties/buy", { type_key: typeKey, lat, lng }, "Propriedade comprada");
   const sellProperty = (propertyId) =>
@@ -545,6 +547,7 @@ export function GameProvider({ children }) {
         assignWeapon,
         unassignWeapon,
         autoAssignWeapon,
+        optimizeWeapons,
         buyProperty,
         sellProperty,
         upgradeProperty,

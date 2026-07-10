@@ -2948,3 +2948,64 @@ html:has(.lus-page-bg) {
     }
 }
 
+/* ---------------- Arsenal SSS — cartões de arma ----------------
+   Cada cartão recebe a cor do tier via --wtier (Rua/Profissional/Militar/
+   Pesado) — alimenta a orla esquerda, o brilho ambiente e a placa da
+   silhueta. Conteúdo interativo fica em z-index 1 acima do ::before. */
+.lus-weapon-card {
+    position: relative;
+    overflow: hidden;
+    border-left: 2px solid color-mix(in srgb, var(--wtier, #a1a1aa) 55%, transparent);
+}
+
+.lus-weapon-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--wtier, #a1a1aa) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--wtier, #a1a1aa) 4%, transparent), transparent 70%);
+    pointer-events: none;
+}
+
+.lus-weapon-card:hover {
+    border-left-color: color-mix(in srgb, var(--wtier, #a1a1aa) 85%, transparent);
+}
+
+/* Placa da silhueta: fundo blindado com grelha diagonal + halo do tier. */
+.lus-weapon-plate {
+    background:
+        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--wtier, #a1a1aa) 15%, transparent), transparent 76%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+}
+
+/* Varrimento de luz sobre a placa quando o cartão recebe hover. */
+.lus-weapon-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
+    background-size: 240% 100%;
+    background-position: 130% 0;
+    pointer-events: none;
+}
+
+.lus-weapon-card:hover .lus-weapon-plate::after {
+    background-position: -80% 0;
+    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-weapon-glyph {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-weapon-card:hover .lus-weapon-plate::after {
+        transition: none;
+        background-position: 130% 0;
+    }
+}
+

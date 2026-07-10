@@ -663,3 +663,59 @@ agent_communication:
       meta), buy/sell/repair/assign/unassign/auto_assign/optimize sem 500, optimize idempotente,
       preview com weapon_alerts (arma degradada), dispatch persiste weapon_jam_profile/weapon_power_avg,
       ciclo de missão sem crash. CUIDADO: lockout de login é por ip:email — usar emails descartáveis.
+
+# ============ RONDA: Design SSS das Armas no frontend (10/07/2026) ============
+
+user_problem_statement: >
+  Melhorar significativamente o design das armas para o SSS tier de acordo com o backend:
+  expor no painel de Armamento toda a inteligência do motor (SSS v5 QI das Armas) — risco de
+  encravamento, curva de condição não-linear, desgaste por missão, habilidade/proficiência do
+  portador, adequação por categoria de operação — com cartões "dossier" (silhuetas SVG por
+  modelo, tiers Rua/Profissional/Militar/Pesado) e botão Otimizar arsenal.
+
+backend:
+  - task: "Catálogo weapon_meta estendido (wear_per_mission, wear_risk_mult, combat_score_scale, bonus_min/max, loud_heat_mult, proficiency_gain_per_mission, jam_chance_penalty(+cap), jam_extra_wear, mismatch_penalty_max, sell_fraction) + constante WEAPON_SELL_FRACTION usada na rota /weapons/sell (antes 0.4 hardcoded)"
+    implemented: true
+    working: NA
+    file: "backend/routes_game.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Aditivo, sem alteração de lógica de jogo. Verificado localmente: /api/game/catalog devolve weapon_meta com 25 chaves (sell_fraction 0.4, wear_per_mission 3.0, combat_score_scale 0.15). Falta teste formal de regressão dos endpoints de armas."
+
+frontend:
+  - task: "WeaponsPanel redesenhado SSS: cartões dossier com silhueta SVG por modelo (WeaponGlyph.jsx, 9 silhuetas), tier por nível (Rua/Profissional/Militar/Pesado com cor na moldura via --wtier), grelha de 6 stats (potência/precisão/alcance/leveza/velocidade/carregador), adequação por operação (5 mini-barras, best_for realçado), chip de encravamento (nunca encrava/[x]% com aviso), condição com eficácia real (curva não-linear), desgaste/missão, bloco do portador (habilidade por atributo + proficiência com bónus %), summary 4 KPIs (equipadas/condição/encravar/revenda), botão Otimizar arsenal (novo optimizeWeapons no GameContextV2 → POST /weapons/optimize), loja Arsenal com o mesmo tratamento + chips fiab./desgaste/discrição/manutenção + 'no arsenal: N'. Helpers em lib/game.js espelham EXATAMENTE engine.py (weaponCombatScore, weaponConditionFactor, weaponJamRisk, weaponSkillInfo, weaponCompatFactor, weaponEffectiveScore, weaponWearPerMission, weaponAdequacy, weaponTier). CSS: .lus-weapon-card/.lus-weapon-plate (orla tier, grelha diagonal, sheen hover, reduced-motion)."
+    implemented: true
+    working: NA
+    file: "frontend/src/components/game/WeaponsPanel.jsx, frontend/src/components/game/WeaponGlyph.jsx, frontend/src/lib/game.js, frontend/src/context/GameContextV2.js, frontend/src/App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Verificado por screenshots (compra faca+pistola, auto-assign, tooltips, KPIs atualizam). Testids antigos preservados (weapons-count/summary/search/repair-all/list, weapon-card/employee-select/auto-assign, repair-weapon, sell-weapon, buy-weapon-{key}, weapons-nav-employees); novos: weapons-optimize, weapon-jam-{id}, weapon-holder-{id}, weapon-adequacy-{id}, arsenal-card-{key}, arsenal-adequacy-{key}."
+
+test_plan:
+  current_focus:
+    - "Catálogo weapon_meta estendido + WEAPON_SELL_FRACTION na rota /weapons/sell"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: >
+      10/07/2026 — Frontend SSS das armas + extensão aditiva do /catalog. NOTA infra: .env de
+      backend/frontend estavam de novo em falta (reset do fork) — recriados; credenciais
+      admin@lusorae.com / LusoraeAdmin2026! (ADMIN_PASSWORD no backend/.env; ver
+      /app/memory/test_credentials.md). TESTAR BACKEND APENAS: (1) GET /api/game/catalog →
+      weapon_meta contém as 25 chaves incl. sell_fraction/wear_per_mission/combat_score_scale/
+      loud_heat_mult/jam_chance_penalty; (2) regressão de /weapons/buy, sell (valor = preço ×
+      sell_fraction × condição), repair, assign, unassign, auto_assign, optimize sem 500;
+      (3) login/registo intactos. A conta admin JÁ TEM 2 armas (faca_taser equipada, pistola em
+      inventário) compradas na verificação visual — não assumir arsenal vazio. CUIDADO: lockout
+      é por ip:email — usar emails descartáveis em testes de auth.

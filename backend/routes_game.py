@@ -46,6 +46,11 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        WEAPON_JAM_RELIABILITY_WEIGHT, WEAPON_JAM_CONDITION_THRESHOLD,
                        WEAPON_JAM_CONDITION_WEIGHT, WEAPON_JAM_MAX, WEAPON_JAM_WARN_RISK,
                        WEAPON_DURABILITY_WEAR_REF,
+                       WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT,
+                       WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX,
+                       WEAPON_LOUD_HEAT_MULT, WEAPON_PROFICIENCY_GAIN_PER_MISSION,
+                       WEAPON_JAM_CHANCE_PENALTY, WEAPON_JAM_CHANCE_PENALTY_CAP,
+                       WEAPON_JAM_EXTRA_WEAR, WEAPON_MISMATCH_PENALTY_MAX,
                        LOW_CHANCE_CONFIRM_THRESHOLD,
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S)
@@ -63,6 +68,10 @@ POOL_REFRESH_COST = 500
 HEAL_BASE_COST = 2500
 RELEASE_BASE_COST = 2000
 REST_DURATION_S = 90
+# Fração do preço de catálogo recuperada ao vender uma arma (antes do fator
+# de condição) — exposta no /catalog (weapon_meta.sell_fraction) para o
+# frontend usar a MESMA régua que a rota /weapons/sell.
+WEAPON_SELL_FRACTION = 0.4
 
 
 async def get_player(user: dict) -> dict:
@@ -258,6 +267,20 @@ async def catalog():
             "jam_warn_risk": WEAPON_JAM_WARN_RISK,
             "durability_wear_ref": WEAPON_DURABILITY_WEAR_REF,
             "repair_cost_multiplier": WEAPON_REPAIR_COST_MULTIPLIER,
+            # SSS — restantes réguas do motor expostas para a UI do arsenal
+            # (desgaste, escala do bónus, penalizações de encravamento, venda).
+            "wear_per_mission": WEAPON_WEAR_PER_MISSION,
+            "wear_risk_mult": WEAPON_WEAR_RISK_MULT,
+            "combat_score_scale": WEAPON_COMBAT_SCORE_SCALE,
+            "bonus_min": WEAPON_BONUS_MIN,
+            "bonus_max": WEAPON_BONUS_MAX,
+            "loud_heat_mult": WEAPON_LOUD_HEAT_MULT,
+            "proficiency_gain_per_mission": WEAPON_PROFICIENCY_GAIN_PER_MISSION,
+            "jam_chance_penalty": WEAPON_JAM_CHANCE_PENALTY,
+            "jam_chance_penalty_cap": WEAPON_JAM_CHANCE_PENALTY_CAP,
+            "jam_extra_wear": WEAPON_JAM_EXTRA_WEAR,
+            "mismatch_penalty_max": WEAPON_MISMATCH_PENALTY_MAX,
+            "sell_fraction": WEAPON_SELL_FRACTION,
         },
         "low_chance_confirm_threshold": LOW_CHANCE_CONFIRM_THRESHOLD,
     }
@@ -1417,7 +1440,7 @@ async def sell_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user
     if not await _weapon_free(pid, weapon):
         raise HTTPException(status_code=400, detail="O funcionário equipado está em operação")
     model = WEAPON_MODELS.get(weapon["model_key"], {})
-    value = int(model.get("price", 0) * 0.4 * weapon.get("condition", 100) / 100)
+    value = int(model.get("price", 0) * WEAPON_SELL_FRACTION * weapon.get("condition", 100) / 100)
     if weapon.get("employee_id"):
         await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
     await db.weapons.delete_one({"_id": weapon["_id"]})
