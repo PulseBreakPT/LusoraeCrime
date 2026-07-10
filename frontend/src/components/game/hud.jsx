@@ -14,19 +14,44 @@ import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
 const SIDE_ALIGN_OFFSET = { top: 6, bottom: 6, left: 6, right: 6 };
 
+// Deteção de ambiente com rato real (hover + ponteiro fino). Em ecrãs táteis o
+// browser emula mouseenter/click no toque, o que fazia os tooltips abrirem e
+// ficarem presos no ecrã sempre que se tocava num botão de ação.
+const hasFinePointer = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
 // Radix Tooltip só abre com hover/foco — em ecrãs táteis (sem hover) isso
 // deixa os ícones/textos informativos sem forma de mostrar a explicação.
 // Popover resolve isto: abre ao clicar/tocar (e continua a abrir com hover
 // no ambiente secretário), fecha ao clicar fora — tal como funcionava antes.
+// Regra tátil: se o conteúdo do Tip for um elemento interativo (botão/link),
+// o toque executa apenas a ação — o tooltip não abre nem fica preso. Chips e
+// células meramente informativas continuam a abrir a explicação com um toque.
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const interactiveRef = useRef(false);
+  useEffect(() => {
+    if (triggerRef.current) {
+      interactiveRef.current = !!triggerRef.current.querySelector(
+        'button, a, [role="button"], input, select, textarea'
+      );
+    }
+  });
   if (!tip || getDisplayPrefs().showTooltips === false) return children;
+  const handleOpenChange = (o) => {
+    if (o && !hasFinePointer() && interactiveRef.current) return;
+    setOpen(o);
+  };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <span
+          ref={triggerRef}
           className={`${block ? "block" : "inline-flex"} ${className}`}
-          onMouseEnter={() => setOpen(true)}
+          onMouseEnter={() => { if (hasFinePointer()) setOpen(true); }}
           onMouseLeave={() => setOpen(false)}
         >
           {children}
@@ -80,11 +105,21 @@ export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor
   </Tip>
 );
 
+// Em mobile as tiras de 4+ KPIs ficavam com células tão estreitas que os
+// rótulos truncavam ("LEALD…", "DISPO…") — abaixo de `sm` passam a grelha 2×N.
+const STRIP_COLS = {
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-2 sm:grid-cols-4",
+  5: "grid-cols-2 sm:grid-cols-5",
+  6: "grid-cols-3 sm:grid-cols-6",
+};
+
 export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => (
   <div
     data-testid={testId}
-    className={`grid gap-1.5 ${className}`}
-    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+    className={`grid gap-1.5 ${STRIP_COLS[cols] || ""} ${className}`}
+    style={STRIP_COLS[cols] ? undefined : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
   >
     {children}
   </div>

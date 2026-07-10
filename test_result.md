@@ -986,3 +986,62 @@ agent_communication:
       (6) Regressão: /state, /catalog, quests sem 500.
       CUIDADO: lockout por ip:email — usar emails descartáveis nos testes de auth para não
       bloquear o admin. Frontend só com autorização do utilizador.
+
+frontend:
+  - task: "Responsividade mobile — remoção dos controlos de câmara do mapa (+/−/centrar QG/enquadrar): componente MapControls eliminado do LiveMap (zoom por gestos/roda), testids map-zoom-in/out/center-hq/fit-all removidos, CSS .lus-map-ctrl apagado"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/LiveMap.jsx, frontend/src/App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Pedido do utilizador. Verificado por screenshot mobile 390px + desktop 1920px: controlos ausentes, pan/zoom do Leaflet intactos."
+  - task: "Legenda do mapa responsiva — painel com max-height min(100dvh-9rem, 34rem) + overflow-y-auto (antes transbordava 140px acima do ecrã em 780px), largura w-60 max-w-[calc(100vw-1.25rem)], parágrafo narrativo gigante do fim removido"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/LiveMap.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Bug do utilizador: 'legendas não aparecem no ecrã'. Antes: box y=-140 h=864 em viewport 780. Depois: y=226 h=498, cabe inteira, texto gigante removido. Verificado mobile+desktop."
+  - task: "Tooltips (Tip/hud.jsx) em ecrãs táteis — tap em elementos interativos (button/a/input) já não abre nem prende o popover (deteção matchMedia hover+pointer:fine e querySelector no trigger); chips informativos mantêm tap-para-ver; hover desktop inalterado"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/hud.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Causa dos tooltips presos no mobile: browsers emulam mouseenter/click no toque e o Popover controlado abria e ficava. Verificado hover desktop OK por Playwright; comportamento touch real só verificável com emulação de touch (testing agent, se o utilizador autorizar)."
+  - task: "ResourceBar mobile — hook useNarrow (matchMedia max-width:639px) troca fmtMoney por novo fmtMoneyShort (75000→'75k €', 5400→'5,4k €', 1.25M→'1,25M €') em Limpo/Sujo e subs /h; SummaryStrip cols=4 → grid-cols-2 sm:grid-cols-4 (rótulos KPI 'LEALD…/DISPO…' deixam de truncar); dock com max-w-[calc(100vw-4rem)] + overflow-x-auto sem scrollbar + shrink-0 nos botões para ecrãs <360px"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/ResourceBar.jsx, frontend/src/lib/game.js, frontend/src/components/game/hud.jsx, frontend/src/pages/GamePage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Verificado por screenshots: 360px mostra '75k €'/'5k €' sem reticências; desktop mantém '75 000 €'; painel Operacionais com KPIs 2×2 em mobile."
+
+agent_communication:
+  - agent: "main"
+    message: >
+      10/07/2026 — Melhorias de responsividade mobile (só frontend, backend intocado).
+      NOTA INFRA: .env backend+frontend recriados de novo (fork; preview
+      850d821d-ead4-4fc5-8681-7ba0dfe1d6cf); password real do admin é admin123
+      (test_credentials.md atualizado — a mensagem antiga referia LusoraeAdmin2026!, inválida).
+      Mudanças: MapControls removido (testids map-zoom-in/out/center-hq/fit-all JÁ NÃO EXISTEM
+      — não testar); legenda com scroll interno e sem parágrafo final; Tip não abre em tap
+      sobre botões em dispositivos táteis; fmtMoneyShort na ResourceBar <640px; SummaryStrip
+      2 colunas em mobile; dock com proteção anti-overflow. Verificado por screenshots
+      390/360/1920. Teste frontend automatizado pendente de autorização do utilizador.

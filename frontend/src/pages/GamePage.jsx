@@ -196,10 +196,10 @@ export default function GamePage() {
 
       {!placement && (
       <div
-        className="pointer-events-auto absolute left-2 z-30 md:left-1/2 md:-translate-x-1/2"
+        className="pointer-events-auto absolute left-2 z-30 max-w-[calc(100vw-4rem)] md:left-1/2 md:max-w-none md:-translate-x-1/2"
         style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
       >
-      <div className="lus-dock flex items-center gap-0.5 rounded-2xl border px-1 py-1 md:gap-1 md:px-1.5">
+      <div className="lus-dock flex items-center gap-0.5 overflow-x-auto rounded-2xl border px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-1 md:overflow-visible md:px-1.5">
         <HudButton
           testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
           alert={alerts.claimable > 0}
@@ -276,7 +276,7 @@ const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onCli
       data-testid={testId}
       variant="outline"
       onClick={onClick}
-      className={`lus-hud-btn relative h-auto gap-1.5 rounded-full px-2.5 py-2.5 text-xs font-bold uppercase tracking-wider md:px-3 ${
+      className={`lus-hud-btn relative h-auto shrink-0 gap-1.5 rounded-full px-2.5 py-2.5 text-xs font-bold uppercase tracking-wider md:px-3 ${
         active
           ? "lus-hud-btn-active text-white hover:text-white"
           : "text-white hover:text-white"

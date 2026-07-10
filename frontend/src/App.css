@@ -2307,50 +2307,8 @@ html:has(.lus-page-bg) {
 }
 
 /* ============================================================
-   SSS — Mapa: controlos de câmara, urgência e modo seguir
+   SSS — Mapa: urgência e modo seguir
    ============================================================ */
-
-/* Pilha de controlos do mapa (zoom, centrar QG, enquadrar) */
-.lus-map-ctrl {
-    position: absolute;
-    right: 8px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background-color: rgba(9, 9, 11, 0.96);
-    background-image: linear-gradient(180deg, rgba(36, 36, 40, 0.9) 0%, rgba(8, 8, 10, 0.97) 100%);
-    box-shadow:
-        0 12px 34px rgba(0, 0, 0, 0.65),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.lus-map-ctrl button {
-    display: flex;
-    width: 34px;
-    height: 32px;
-    align-items: center;
-    justify-content: center;
-    color: #a1a1aa;
-    transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
-}
-
-.lus-map-ctrl button:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: #fff;
-}
-
-.lus-map-ctrl button:active {
-    transform: scale(0.9);
-}
-
-.lus-map-ctrl-sep {
-    height: 1px;
-    margin: 0 6px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
-}
 
 /* Anel de urgência — oportunidade prestes a expirar */
 .opp-pin-urgent {

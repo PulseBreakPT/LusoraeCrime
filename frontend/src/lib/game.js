@@ -700,6 +700,18 @@ export function fmtMoney(n) {
   return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 0 }).format(val) + " €";
 }
 
+// Formato ultra-curto para HUDs estreitos (mobile): 75 000 → "75k €",
+// 5 400 → "5,4k €", 1 250 000 → "1,25M €". Nunca trunca com reticências.
+export function fmtMoneyShort(n) {
+  const val = Math.round(n || 0);
+  const sign = val < 0 ? "-" : "";
+  const abs = Math.abs(val);
+  const trim = (x, d) => x.toFixed(d).replace(".", ",").replace(/,?0+$/, "");
+  if (abs >= 1_000_000) return `${sign}${trim(abs / 1_000_000, 2)}M €`;
+  if (abs >= 1_000) return `${sign}${trim(abs / 1_000, 1)}k €`;
+  return `${sign}${abs} €`;
+}
+
 export function haversineM(lat1, lng1, lat2, lng2) {
   const R = 6371000;
   const p1 = (lat1 * Math.PI) / 180;

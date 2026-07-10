@@ -60,6 +60,12 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Fixes de intenção de cor (bg-color tapado pelo gradiente do variant default): OpportunityCard dispatch→success (corrigida regressão via-red-600), EmpirePanel lavar/subornar→outline, SettingsPanel claim-admin→âmbar sólido, LiveMap placement-confirm→success, AdminPanel 5 botões→variants corretos
 - NOTA infra: .env recriados pós-fork; CORS exige origens explícitas (não "*" c/ credentials); testar via preview URL
 
+### Responsividade mobile (10/07/2026)
+- Controlos de câmara do mapa (+/−/centrar/enquadrar) removidos — zoom por gestos (pinch) / roda do rato; CSS `.lus-map-ctrl` eliminado
+- Legenda do mapa: max-height `min(100dvh-9rem, 34rem)` + scroll interno + largura limitada ao viewport; parágrafo narrativo gigante do fim removido (antes transbordava 140px acima do ecrã)
+- Tooltips `Tip` (hud.jsx): em ecrãs táteis, tap em botões de ação já não abre/prende o popover; chips informativos mantêm tap-para-ver; hover desktop inalterado
+- ResourceBar: `fmtMoneyShort` ("75k €") abaixo de 640px via hook `useNarrow` — sem truncações; `SummaryStrip` cols=4 → 2 colunas em mobile; dock inferior com anti-overflow (max-w + scroll-x invisível)
+
 ## Backlog priorizado
 ### P0 (próxima fase)
 - Territórios/influência: conquistar bairros de Lisboa, controlo gera rendimento, ataques a territórios ligados ao mapa

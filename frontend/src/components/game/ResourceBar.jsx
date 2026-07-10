@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
+import { fmtMoney, fmtMoneyShort, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
 import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
 import { Badge } from "../ui/badge";
 import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins } from "lucide-react";
@@ -11,6 +11,21 @@ const useTick = () => {
     const id = setInterval(() => setT((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+};
+
+// Viewports estreitos (abaixo de `sm`): os montantes passam a formato curto
+// ("75k €") para nunca truncarem com reticências na barra de recursos.
+const useNarrow = () => {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const onChange = (e) => setNarrow(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return narrow;
 };
 
 // PERF: o relógio e o countdown dos salários vivem em componentes próprios com
@@ -29,6 +44,8 @@ const PayrollCountdown = ({ targetAt, serverNow }) => {
 
 export const ResourceBar = () => {
   const { state, catalog, serverNow } = useGame();
+  const narrow = useNarrow();
+  const money = narrow ? fmtMoneyShort : fmtMoney;
   const prevCleanRef = useRef(null);
   const moneyIn = state && prevCleanRef.current != null && state.player.clean_money > prevCleanRef.current;
   const moneyFlash = useFlash(moneyIn ? state.player.clean_money : null);
@@ -80,8 +97,8 @@ export const ResourceBar = () => {
 
         <Stat
           testId="stat-clean-money" icon={Banknote} color="#10B981" label="Limpo"
-          value={<AnimatedNumber value={p.clean_money} format={fmtMoney} />}
-          sub={launderPerH > 0 ? `+${fmtMoney(launderPerH)}/h` : null} subColor="#34D399"
+          value={<AnimatedNumber value={p.clean_money} format={money} />}
+          sub={launderPerH > 0 ? `+${money(launderPerH)}/h` : null} subColor="#34D399"
           tip="Dinheiro limpo — paga compras, reparações, salários e subornos. Cresce com lavagem (taxa 25%) e empresas de fachada."
           className={moneyFlash ? "lus-flash rounded" : ""}
         />
@@ -92,8 +109,8 @@ export const ResourceBar = () => {
           return (
             <Stat
               testId="stat-dirty-money" icon={Coins} color={nearCap ? "#EF4444" : "#F59E0B"} label="Sujo"
-              value={<AnimatedNumber value={p.dirty_money} format={fmtMoney} />}
-              sub={nearCap ? "cofre quase cheio!" : dirtyPerH > 0 ? `+${fmtMoney(dirtyPerH)}/h` : null}
+              value={<AnimatedNumber value={p.dirty_money} format={money} />}
+              sub={nearCap ? "cofre quase cheio!" : dirtyPerH > 0 ? `+${money(dirtyPerH)}/h` : null}
               subColor={nearCap ? "#EF4444" : "#F59E0B"}
               className={dirtyFlash ? "lus-flash-amber rounded" : ""}
               tip={`Dinheiro sujo vindo do crime — lava-o no Império para o poderes gastar. Capacidade do cofre: ${fmtMoney(p.dirty_money)}/${fmtMoney(dirtyCap)}${nearCap ? " — produção dos laboratórios acima do limite é DESPERDIÇADA. Lava dinheiro já!" : ". Produção acima do limite é desperdiçada; montantes altos atraem atenção."}`}

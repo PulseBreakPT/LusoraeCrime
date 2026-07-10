@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X, Star, Check, Plus, Minus, Crosshair, Scan, UserRound } from "lucide-react";
+import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X, Star, Check, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
@@ -220,51 +220,8 @@ const PanTo = ({ target }) => {
   return null;
 };
 
-// Controlos de câmara do mapa: zoom, centrar no QG e enquadrar toda a
-// atividade (QG + propriedades + oportunidades + alvos de missão).
-const MapControls = ({ hq, state }) => {
-  const map = useMap();
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      L.DomEvent.disableClickPropagation(ref.current);
-      L.DomEvent.disableScrollPropagation(ref.current);
-    }
-  }, []);
-
-  const fitAll = () => {
-    const pts = [[hq.lat, hq.lng]];
-    (state.properties || []).forEach((p) => pts.push([p.lat, p.lng]));
-    (state.opportunities || []).forEach((o) => pts.push([o.lat, o.lng]));
-    (state.missions || []).forEach((m) => { if (m.target) pts.push([m.target.lat, m.target.lng]); });
-    map.flyToBounds(L.latLngBounds(pts).pad(0.15), { duration: 0.8, maxZoom: 14 });
-  };
-
-  return (
-    <div ref={ref} className="lus-map-ctrl" style={{ bottom: "calc(3.6rem + env(safe-area-inset-bottom, 0px))" }}>
-      <button type="button" data-testid="map-zoom-in" title="Aproximar" aria-label="Aproximar" onClick={() => map.zoomIn()}>
-        <Plus size={14} strokeWidth={2.5} />
-      </button>
-      <button type="button" data-testid="map-zoom-out" title="Afastar" aria-label="Afastar" onClick={() => map.zoomOut()}>
-        <Minus size={14} strokeWidth={2.5} />
-      </button>
-      <span className="lus-map-ctrl-sep" aria-hidden="true" />
-      <button
-        type="button"
-        data-testid="map-center-hq"
-        title="Centrar no QG"
-        aria-label="Centrar no quartel-general"
-        onClick={() => map.flyTo([hq.lat, hq.lng], Math.max(map.getZoom(), 14), { duration: 0.7 })}
-      >
-        <Crosshair size={14} strokeWidth={2.5} />
-      </button>
-      <button type="button" data-testid="map-fit-all" title="Enquadrar toda a atividade" aria-label="Enquadrar toda a atividade" onClick={fitAll}>
-        <Scan size={14} strokeWidth={2.5} />
-      </button>
-    </div>
-  );
-};
+// Nota: os antigos controlos de câmara (+/−/centrar/enquadrar) foram removidos —
+// em mobile o zoom faz-se com os dedos e em desktop com a roda do rato/duplo clique.
 
 // Arrastar o mapa liberta a câmara do modo seguir — comportamento standard
 // de qualquer "follow cam".
@@ -855,7 +812,6 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
       <FollowManager onCancel={() => setFollowId(null)} />
-      <MapControls hq={hq} state={state} />
       {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
       {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
       <Marker
@@ -1022,7 +978,11 @@ export const MapLegend = () => {
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {open && (
-        <Card data-testid="map-legend-panel" className="absolute bottom-full right-0 mb-2 w-56 animate-slide-up border-white/10 bg-[#0a0a0c]/95 p-3 shadow-2xl">
+        <Card
+          data-testid="map-legend-panel"
+          className="absolute bottom-full right-0 mb-2 w-60 max-w-[calc(100vw-1.25rem)] animate-slide-up overflow-y-auto overscroll-contain border-white/10 bg-[#0a0a0c]/95 p-3 shadow-2xl"
+          style={{ maxHeight: "min(calc(100dvh - 9rem), 34rem)" }}
+        >
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Legenda do mapa</p>
           <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Oportunidades (cor + inicial = categoria)</p>
           <div className="mb-2 grid grid-cols-2 gap-x-2 gap-y-1">
@@ -1086,22 +1046,6 @@ export const MapLegend = () => {
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-violet-400" /> Regresso — falta chegar</span>
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t border-dotted border-zinc-300" /> Trilho a pé veículo ↔ alvo</span>
           </div>
-          <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
-            Cada missão tem um alvo vermelho fixo: o veículo acelera, trava e estaciona na berma
-            (nunca sobre o alvo — e reajusta a posição se encostou mal), as portas abrem, um
-            batedor verifica o perímetro e o líder dá a ordem de avanço por rádio. Os operacionais
-            distribuem-se por papéis conforme a especialização — hacker nos acessos técnicos,
-            negociador junto ao alvo, motorista ao volante — caminham na aproximação e correm
-            apenas na retirada, reagrupam junto ao veículo e o último confirma o perímetro antes
-            de as portas fecharem. Passa o rato sobre o alvo ou o veículo para veres a fase exata
-            (reconhecimento, aproximação, execução, retirada, reagrupamento, embarque,
-            confirmação). Clica numa unidade em movimento para a câmara a seguir. A polícia
-            patrulha a cidade em permanência: viaturas azuis percorrem os bairros por ruas
-            reais e, quando uma operação levanta suspeitas, a patrulha mais próxima acorre
-            com as luzes ligadas, estaciona nas proximidades, desembarca os agentes e monta
-            um perímetro — podendo pedir reforços. Nas fugas, é uma patrulha real que
-            persegue a tua equipa.
-          </p>
         </Card>
       )}
       <Button
