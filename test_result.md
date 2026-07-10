@@ -795,3 +795,91 @@ agent_communication:
       livres para testes de atribuição (conta admin com recursos limitados, mas endpoints
       funcionam). CONCLUSÃO: Implementação SSS v4 das equipas está FUNCIONAL — campos persistidos
       corretamente, endpoints operacionais, sem crashes. Recomendo ao main agent sumarizar e concluir.
+
+# ============================================================================
+# 10/07/2026 — Operação em Direto (SSS): simulação viva de missões
+# ============================================================================
+
+user_problem_statement: >
+  Melhorar significativamente a lógica e o design da simulação de "fazer a missão" para
+  nível SSS — simulação viva e rica em detalhes (dock de transmissão em direto com feed
+  rádio narrativo, complicações dinâmicas com efeito real na chance, guião de regresso
+  com perseguições).
+
+backend:
+  - task: "live_ops.py NOVO — build_dispatch_script (guião viagem+operação com timestamps absolutos, beats por categoria com nomes reais dos membros, 0-2 complicações com pct cuja soma == live_chance_delta, clamp [-0.12,+0.08], viés negativo por risco/calor), build_return_script (beats de desfecho por outcome + perseguição + encravamentos), build_recall_script"
+    implemented: true
+    working: NA
+    file: "backend/live_ops.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Smoke test unitário local OK: entries ordenados por at, soma dos pct == delta, textos por categoria, return script com chase/jam/bonus_loot. Falta teste via API."
+  - task: "Dispatch gera live_log + live_chance_delta no doc da missão; recall corta beats futuros (at <= now) e anexa guião de recall; Mission model serializa live_log/live_chance_delta/final_chance"
+    implemented: true
+    working: NA
+    file: "backend/routes_game.py, backend/models.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — POST /api/game/dispatch persiste live_log (lista de {at,phase,kind,speaker,text,pct?}) e live_chance_delta. GET /state deve devolver estes campos em cada missão ativa."
+  - task: "_roll_outcome aplica live_chance_delta à chance (clamp 0.05-0.97) e persiste final_chance; _progress_mission (operating→returning) anexa build_return_script ao live_log e persiste live_log+final_chance nos updates"
+    implemented: true
+    working: NA
+    file: "backend/engine.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Delta aplicado antes do roll de jams; final_chance = chance efetiva final. Return script gerado no tick lazy quando now >= finish_at."
+
+frontend:
+  - task: "LiveOpsDock — dock inferior 'transmissão em direto' (REC pulsante, tabs multi-operação, timeline Ida/Ação/Volta, chance ao vivo = success_chance + pct revelados, feed rádio com reveal por relógio do servidor + caret terminal, faixa de desfecho/perseguição, cartão de conclusão 8s, colapsável, botão seguir câmara via CustomEvent lus:follow-mission)"
+    implemented: true
+    working: NA
+    file: "frontend/src/components/game/LiveOpsDock.jsx, frontend/src/pages/GamePage.jsx, frontend/src/components/game/LiveMap.jsx, frontend/src/App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Novo componente + integração no GamePage + listener follow no LiveMap + estilos .lus-lo-* com prefers-reduced-motion. Compila sem erros novos."
+
+test_plan:
+  current_focus:
+    - "live_ops.py NOVO — guiões de operação em direto"
+    - "Dispatch gera live_log + live_chance_delta; recall corta beats"
+    - "_roll_outcome aplica delta e persiste final_chance"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: >
+      10/07/2026 — Operação em Direto (SSS). NOTA infra: ambiente RESET pelo fork — .env
+      recriados (preview 737970f5-e984-42c5-af9e-8508f17ae284), credenciais
+      admin@lusorae.com / LusoraeAdmin2026! em /app/memory/test_credentials.md.
+      TESTAR BACKEND APENAS:
+      (1) Login admin → GET /api/game/state OK.
+      (2) POST /api/game/dispatch (usar uma oportunidade de /state + equipa Crew Alfa) →
+      mission criada; GET /state → missão ativa tem live_log (lista não-vazia, ordenada por
+      at, entradas com at/phase/kind/speaker/text) e live_chance_delta (float; se houver
+      entradas com pct, a soma dos pct ≈ live_chance_delta ±0.001).
+      (3) Esperar a missão passar a returning (duração+viagem curtas; fazer polling de /state)
+      → live_log cresceu com entradas phase='returning' e, se outcome in
+      (success,partial,failure,police), final_chance presente (0.02-0.98).
+      (4) POST /api/game/missions/recall numa missão en_route (despachar outra) → live_log
+      só com entradas at<=now + 3 entradas de recall; outcome='recalled'.
+      (5) Regressão: dispatch/preview sem 500; quests/state/catalog sem 500.
+      CUIDADO: lockout por ip:email — usar emails descartáveis em testes de auth.
+      Frontend só com autorização do utilizador.

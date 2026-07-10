@@ -15,6 +15,7 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
+import { LiveOpsDock } from "../components/game/LiveOpsDock";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
@@ -190,6 +191,7 @@ export default function GamePage() {
       <MapLegend />
       <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />
       <PlacementControls />
+      <LiveOpsDock state={state} serverNow={serverNow} />
 
       <div
         className="pointer-events-auto absolute left-2 z-30 md:left-1/2 md:-translate-x-1/2"

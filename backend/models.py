@@ -233,6 +233,13 @@ class Mission(BaseDocument):
     escape_chance: float = 0.0
     chase_outcome: Optional[str] = None
     fine: int = 0
+    # Operação em direto (SSS): guião narrativo com timestamps absolutos —
+    # o frontend revela cada linha quando o relógio do servidor a alcança.
+    # live_chance_delta = efeito acumulado das complicações na chance final
+    # (aplicado em engine._roll_outcome); final_chance = chance efetiva rolada.
+    live_log: List[dict] = []
+    live_chance_delta: float = 0.0
+    final_chance: Optional[float] = None
 
 
 class Event(BaseDocument):

@@ -55,6 +55,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S)
 from reward_engine import calculate_full_reward
+from live_ops import build_dispatch_script, build_recall_script
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
                                DRIVER_TRAVEL_REDUCTION_MAX,
@@ -705,6 +706,18 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     ret = finish + timedelta(seconds=travel_s)
     member_ids = [str(e["_id"]) for e in members]
 
+    # Operação em direto (SSS): guião narrativo da ida+operação com timestamps
+    # absolutos e 0–2 complicações com efeito REAL na chance final (o delta é
+    # aplicado em engine._roll_outcome). Gerado uma única vez e persistido.
+    live_log, live_delta = build_dispatch_script(
+        team_name=team["name"],
+        opp={"name": opp["name"], "district": opp["district"],
+             "category": opp["category"], "risk": opp["risk"]},
+        members=members, incidents=incidents,
+        depart=depart, arrive=arrive, finish=finish,
+        heat=player.get("heat", 0), has_leader=prep.get("has_leader", False),
+    )
+
     mission = {
         "player_id": pid, "team_id": str(team["_id"]), "team_name": team["name"],
         "team_skill": round(prep["team_skill"], 2), "spec_match": prep["spec_match"],
@@ -746,6 +759,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "phase": "en_route", "outcome": None,
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
         "finish_at": finish.isoformat(), "return_at": ret.isoformat(),
+        "live_log": live_log, "live_chance_delta": live_delta,
     }
     result = await db.missions.insert_one(mission)
     await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
@@ -946,10 +960,15 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
     o, tg = m["origin"], m["target"]
     turn_point = {"lat": o["lat"] + (tg["lat"] - o["lat"]) * t, "lng": o["lng"] + (tg["lng"] - o["lng"]) * t}
     ret = now + timedelta(seconds=elapsed)
+    # Live ops: corta a narrativa futura (a operação nunca vai acontecer) e
+    # anexa o guião curto de regresso antecipado.
+    now_iso = now.isoformat()
+    kept_log = [e for e in (m.get("live_log") or []) if e.get("at", "") <= now_iso]
+    kept_log += build_recall_script(m, now, ret)
     await db.missions.update_one({"_id": m["_id"]}, {"$set": {
         "phase": "returning", "outcome": "recalled",
         "target": turn_point, "arrive_at": now.isoformat(), "finish_at": now.isoformat(),
-        "return_at": ret.isoformat(),
+        "return_at": ret.isoformat(), "live_log": kept_log,
     }})
     await db.teams.update_one({"_id": ObjectId(m["team_id"])}, {"$set": {"status": "returning"}})
     if m.get("opportunity_id"):

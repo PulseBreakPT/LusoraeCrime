@@ -3787,3 +3787,148 @@ html:has(.lus-page-bg) {
     }
 }
 
+
+/* ============================================================================
+   Operação em Direto (LiveOpsDock) — dock inferior estilo transmissão
+   ============================================================================ */
+
+.lus-lo-wrap {
+    bottom: calc(7.6rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+    .lus-lo-wrap {
+        bottom: 4.7rem;
+    }
+}
+
+.lus-lo {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(12, 12, 15, 0.93), rgba(7, 7, 9, 0.97));
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Linha laser vermelha no topo — assinatura "em direto" */
+.lus-lo::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.85) 30%, rgba(239, 68, 68, 0.85) 70%, transparent);
+    z-index: 1;
+}
+
+/* Varrimento vertical subtil (scanline) */
+.lus-lo-scan {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.025) 48%, transparent 52%);
+    background-size: 100% 220%;
+    animation: lus-lo-scan 5.5s linear infinite;
+}
+
+@keyframes lus-lo-scan {
+    0% { background-position: 0 -120%; }
+    100% { background-position: 0 120%; }
+}
+
+/* Ponto REC a pulsar */
+.lus-lo-rec {
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    flex-shrink: 0;
+    animation: lus-lo-blink 1.15s steps(2, start) infinite;
+}
+
+@keyframes lus-lo-blink {
+    0%, 55% { opacity: 1; }
+    56%, 100% { opacity: 0.25; }
+}
+
+/* Entrada de cada linha do feed rádio */
+.lus-lo-line {
+    animation: lus-lo-line-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lus-lo-line-in {
+    0% { opacity: 0; transform: translateY(6px); }
+    60% { opacity: 1; }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Cursor de terminal na linha mais recente */
+.lus-lo-caret {
+    display: inline-block;
+    width: 6px;
+    height: 11px;
+    margin-left: 4px;
+    vertical-align: -1px;
+    background: currentColor;
+    animation: lus-lo-caret 0.75s steps(2, start) infinite;
+}
+
+@keyframes lus-lo-caret {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* Segmentos da timeline de fases */
+.lus-lo-seg {
+    height: 4px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+
+.lus-lo-seg-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* Pulso do número da chance quando uma complicação acaba de ser revelada */
+.lus-lo-chance-pulse {
+    animation: lus-lo-chance 0.9s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+@keyframes lus-lo-chance {
+    0% { transform: scale(1); filter: brightness(1); }
+    100% { transform: scale(1.12); filter: brightness(1.35); }
+}
+
+/* Scrollbar fina no feed */
+.lus-lo-feed {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.lus-lo-feed::-webkit-scrollbar {
+    width: 4px;
+}
+
+.lus-lo-feed::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-lo-scan,
+    .lus-lo-rec,
+    .lus-lo-caret,
+    .lus-lo-chance-pulse,
+    .lus-lo-line {
+        animation: none;
+    }
+}

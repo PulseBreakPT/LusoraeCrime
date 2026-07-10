@@ -98,6 +98,7 @@ from economy_constants import (
     CLUTCH_SAVE_MAX, SMART_WARN_HEAT_DELTA,
 )
 from quests import process_quests, make_instance, effective_quest_rewards
+from live_ops import build_return_script
 from quests_data import QUEST_DEFS
 
 logger = logging.getLogger(__name__)
@@ -1435,6 +1436,12 @@ def _roll_outcome(player, m):
         # uma recomputação parcial e inconsistente.
         logger.warning("Mission %s sem success_chance persistida — a usar valor neutro (0.5).", m.get("id") or m.get("_id"))
         chance = 0.5
+    # Operação em direto (SSS): as complicações reveladas durante a operação
+    # têm efeito REAL — o delta acumulado (pré-rolado no despacho e mostrado
+    # ao jogador em tempo real) ajusta a chance antes do roll.
+    live_delta = float(m.get("live_chance_delta", 0) or 0)
+    if live_delta:
+        chance = max(0.05, min(0.97, chance + live_delta))
     # Encravamento (SSS v5): cada arma leva um risco por missão (fiabilidade ×
     # condição, persistido no despacho em weapon_jam_profile). Uma arma que
     # encrava a meio da ação custa pontos de chance — e o relatório final diz
@@ -1449,6 +1456,9 @@ def _roll_outcome(player, m):
         ]
         penalty = min(WEAPON_JAM_CHANCE_PENALTY_CAP, WEAPON_JAM_CHANCE_PENALTY * len(jams))
         chance = max(0.02, chance - penalty)
+    # Chance efetiva (base + complicações + encravamentos) — persistida para o
+    # relatório e para o painel de operação em direto.
+    m["final_chance"] = round(chance, 3)
     r = random.random()
     if r <= chance:
         return "success"
@@ -1940,9 +1950,17 @@ async def _progress_mission(db, player, m, now):
         # Persist pending reward and chase state so the front-end can display them.
         for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance",
                   "escape_chance", "fine", "bonus_loot", "partial_fraction", "clutch_save",
-                  "weapon_jams"):
+                  "weapon_jams", "final_chance"):
             if k in m:
                 updates[k] = m[k]
+        # Guião de regresso em direto (SSS live ops): o desfecho e a perseguição
+        # só são conhecidos agora — anexar os beats do regresso ao live_log.
+        try:
+            ret_entries = build_return_script(m, parse_dt(m["finish_at"]), parse_dt(m["return_at"]))
+            if ret_entries:
+                updates["live_log"] = (m.get("live_log") or []) + ret_entries
+        except Exception:
+            logger.exception("Falha a gerar o guião de regresso da missão %s", m.get("_id"))
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
         stats = player.setdefault("stats", default_stats())
         if outcome == "success":

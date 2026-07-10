@@ -834,6 +834,13 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
     if (followId && !state.missions.some((m) => m.id === followId)) setFollowId(null);
   }, [state.missions, followId]);
 
+  // O dock "Operação em Direto" pode pedir para a câmara seguir uma unidade.
+  useEffect(() => {
+    const onFollow = (ev) => setFollowId(ev.detail?.id || null);
+    window.addEventListener("lus:follow-mission", onFollow);
+    return () => window.removeEventListener("lus:follow-mission", onFollow);
+  }, []);
+
   return (
     <MapContainer
       center={[38.7223, -9.1393]}
