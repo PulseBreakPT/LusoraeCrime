@@ -11,7 +11,7 @@ from datetime import datetime
 from pymongo import MongoClient
 
 # Base URL from frontend/.env
-BASE_URL = "https://tier-weapon-upgrade.preview.emergentagent.com/api"
+BASE_URL = "https://design-framework-sss.preview.emergentagent.com/api"
 
 # Test credentials (CHANGED - DB was reset)
 ADMIN_EMAIL = "admin@lusorae.com"
