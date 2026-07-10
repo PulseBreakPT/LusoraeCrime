@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://650672af-769f-42ed-a63b-7c572aecf857.preview.emergentagent.com"
+BASE_URL = "https://mission-flow-7.preview.emergentagent.com"
 API_URL = f"{BASE_URL}/api"
 
 # Test credentials
