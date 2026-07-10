@@ -135,10 +135,14 @@ function App() {
               position="top-center"
               theme="dark"
               closeButton
-              gap={10}
+              gap={8}
+              visibleToasts={3}
+              duration={3500}
+              mobileOffset={{ top: 10, left: 10, right: 10 }}
               swipeDirections={["up", "left", "right"]}
               icons={TOAST_ICONS}
-              toastOptions={{ className: "lus-toast", duration: 4000 }}
+              style={{ "--width": "330px" }}
+              toastOptions={{ className: "lus-toast", duration: 3500 }}
             />
           </BrowserRouter>
         </LoadingProvider>
