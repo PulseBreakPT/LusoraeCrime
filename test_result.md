@@ -157,6 +157,17 @@ backend:
         comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
+  - task: "Botão 'Otimizar equipas' no painel Equipas (data-testid teams-optimize) — usa optimizeTeams já existente (compõe /api/employees/optimize + /api/vehicles/optimize), tooltip dinâmico com contagens, estilo cyan Sparkles igual aos outros painéis, desativado quando nada há para otimizar"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/TeamsPanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Lógica canOptimize/optimizeTeams já existia (linhas 266-277) mas o botão nunca era renderizado; adicionado entre o SummaryStrip e a lista de equipas. Verificado por screenshot no preview: botão visível, tooltip dinâmico correto, clique dispara otimização com toast 'A frota já está na distribuição ótima.'. NOTA infra: fork 10/07 — .env de backend+frontend recriados (preview 3aa9b74b-e9aa-4239-b583-92d6420afc1b), credenciais repostas em /app/memory/test_credentials.md."
   - task: "Redesign SSS dos ecrãs de loading (BootScreen + LoadingScreen) — chrome partilhado LoadingChrome.jsx: backdrop cinematográfico (grain feTurbulence, CRT, varrimento ambiente, sonar, vinheta, HUD topo/base com réguas+coordenadas+sessão+canal cifrado), moldura de vidro com cantos animados/linha laser/ticks/cabeçalho EM DIRETO, radar com órbita+cardeais+anel de graus+3 blips, wordmark metálico com sheen, barra de uplink angulada com segmentos+ponto incandescente+% grande, terminal 'Registo de sistema' com estados por linha; estados de erro 'Falha de uplink'; scroll seguro em ecrãs baixos; prefers-reduced-motion estendido; rota /dev/loading (+?state=error) para QA visual"
     implemented: true
     working: true

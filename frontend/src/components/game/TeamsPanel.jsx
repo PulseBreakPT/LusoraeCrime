@@ -333,6 +333,29 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
           );
         })()}
 
+        <div className="mt-3">
+          <Tip
+            block
+            tip={canOptimize
+              ? `Um clique, duas otimizações: ${canOptEmployees ? `coloca os ${freeEmployees.length} operacional(is) livre(s) nas ${openSlotTeams} equipa(s) com vagas, maximizando a aptidão à especialização` : ""}${canOptEmployees && canOptVehicles ? "; " : ""}${canOptVehicles ? `redistribui os veículos pelas ${idleTeamsList.length} equipa(s) disponível(is) pela melhor adequação (best-for, condição, combustível, lugares)` : ""}. Equipas em operação não são tocadas e membros já colocados nunca são movidos entre equipas.`
+              : "Nada para otimizar agora — sem operacionais livres para vagas nem veículos para redistribuir. Equipas em operação não são tocadas."}
+          >
+            <button
+              data-testid="teams-optimize"
+              onClick={() => canOptimize && optimizeTeams()}
+              disabled={!canOptimize}
+              className={cn(
+                "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                canOptimize
+                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
+                  : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+              )}
+            >
+              <Sparkles size={11} /> Otimizar equipas
+            </button>
+          </Tip>
+        </div>
+
         <div className="mt-4 space-y-3" data-testid="teams-list">
           {state.teams.length === 0 && (
             <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">

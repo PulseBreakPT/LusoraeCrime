@@ -91,6 +91,10 @@ Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
 - hud.jsx: Kpi (lus-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
 - ResourceBar: lus-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)
 
+### Botão Otimizar no painel Equipas (10/07/2026)
+- TeamsPanel: botão "Otimizar equipas" (teams-optimize) entre o SummaryStrip e a lista — a lógica optimizeTeams/canOptimize já existia mas nunca era renderizada; um clique compõe /employees/optimize (preenche vagas por aptidão) + /vehicles/optimize (redistribui frota), tooltip dinâmico com contagens, desativado com razão quando nada há para otimizar
+- NOTA infra: fork 10/07 — .env recriados (preview 3aa9b74b-e9aa-4239-b583-92d6420afc1b), credenciais em /app/memory/test_credentials.md
+
 ### SSS Ronda 8 — Cockpit Cinemático + Voz Noir (08/07/2026)
 - Mapa: radar tático CSS a emanar do QG (marcador não-interativo 170px), grelha tática visível nas bordas (mask radial), moldura HUD com 4 cantos vermelhos no viewport
 - Topbar: relógio da rede (hora do servidor + "Lisboa · 38.72N 9.14W"), flashes âmbar (dinheiro sujo) e azul (respeito) quando os valores sobem
