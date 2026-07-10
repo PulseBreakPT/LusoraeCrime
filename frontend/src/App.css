@@ -3167,6 +3167,168 @@ html:has(.lus-page-bg) {
     box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
 }
 
+/* ============================================================
+   Veículo top-down (unit-car) — corpo rodado pelo rumo da via
+   ============================================================ */
+.unit-car {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+}
+
+/* Corpo do carro visto de cima — a rotação (rumo) é aplicada pelo loop rAF
+   diretamente a este elemento (compositor, sem repaints). A frente é o topo. */
+.unit-car-body {
+    position: relative;
+    display: block;
+    width: 11px;
+    height: 21px;
+    border-radius: 5px 5px 4px 4px / 7px 7px 4px 4px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--mk, #22d3ee) 80%, #fff) 0%,
+        var(--mk, #22d3ee) 42%,
+        color-mix(in srgb, var(--mk, #22d3ee) 62%, #000) 100%
+    );
+    border: 1px solid rgba(5, 5, 5, 0.92);
+    box-shadow: 0 0 10px var(--mk, #22d3ee);
+    will-change: transform;
+}
+
+/* Para-brisas + vidro traseiro */
+.unit-car-glass {
+    position: absolute;
+    left: 1.5px;
+    right: 1.5px;
+    top: 4px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(6, 16, 24, 0.85);
+}
+
+.unit-car-glass::after {
+    content: "";
+    position: absolute;
+    left: 0.5px;
+    right: 0.5px;
+    top: 10px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(6, 16, 24, 0.6);
+}
+
+/* Estacionado — mais discreto, badge P por cima (sem rodar com o corpo) */
+.unit-car-parked .unit-car-body {
+    box-shadow: 0 0 6px rgba(34, 211, 238, 0.4);
+}
+
+.unit-car .unit-parked-badge {
+    top: 0;
+    right: 1px;
+    z-index: 2;
+}
+
+/* Em perseguição — carro a vermelho com glow pulsante (compositor) */
+.unit-car-chased .unit-car-body {
+    background: linear-gradient(180deg, #fca5a5 0%, #ef4444 42%, #7f1d1d 100%);
+    box-shadow: 0 0 10px #ef4444, 0 0 20px rgba(239, 68, 68, 0.65);
+}
+
+/* ============================================================
+   Alvo físico da missão — marcador vermelho persistente
+   ============================================================ */
+.mission-target {
+    position: relative;
+    width: 30px;
+    height: 30px;
+}
+
+.mission-target-ring {
+    position: absolute;
+    inset: 4px;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(239, 68, 68, 0.55);
+    box-shadow: inset 0 0 8px rgba(239, 68, 68, 0.18);
+}
+
+.mission-target-cross {
+    position: absolute;
+    inset: 0;
+}
+
+/* Ticks de mira (topo/base e esquerda/direita) */
+.mission-target-cross::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    transform: translateX(-0.5px);
+    background: linear-gradient(
+        180deg,
+        rgba(239, 68, 68, 0.85) 0 5px,
+        transparent 5px calc(100% - 5px),
+        rgba(239, 68, 68, 0.85) calc(100% - 5px) 100%
+    );
+}
+
+.mission-target-cross::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    transform: translateY(-0.5px);
+    background: linear-gradient(
+        90deg,
+        rgba(239, 68, 68, 0.85) 0 5px,
+        transparent 5px calc(100% - 5px),
+        rgba(239, 68, 68, 0.85) calc(100% - 5px) 100%
+    );
+}
+
+.mission-target-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 9999px;
+    background: #ef4444;
+    border: 1px solid rgba(5, 5, 5, 0.9);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    animation: target-beat 1.8s ease-in-out infinite;
+    will-change: transform, opacity;
+}
+
+/* Em execução — bate mais depressa e o anel acende */
+.mission-target-hot .mission-target-dot {
+    animation-duration: 0.9s;
+}
+
+.mission-target-hot .mission-target-ring {
+    border-color: rgba(239, 68, 68, 0.95);
+    box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.3), 0 0 12px rgba(239, 68, 68, 0.35);
+}
+
+@keyframes target-beat {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.35);
+        opacity: 0.72;
+    }
+}
+
 .unit-parked-badge {
     position: absolute;
     top: -5px;

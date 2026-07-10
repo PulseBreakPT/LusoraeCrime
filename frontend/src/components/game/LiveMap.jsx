@@ -3,11 +3,11 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check, Plus, Minus, Crosshair, Scan, Car, UserRound } from "lucide-react";
+import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check, Plus, Minus, Crosshair, Scan, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
-import { buildChoreography, opStateAt, choreoKind, CHOREO_LABELS, offsetM } from "../../lib/choreo";
+import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, CHOREO_LABELS } from "../../lib/choreo";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -71,31 +71,28 @@ const hqRadarIcon = () =>
     iconAnchor: [85, 85],
   });
 
+// Veículo top-down — o corpo (<span data-car>) é rodado pelo loop rAF para o
+// rumo real da via: em movimento segue a estrada, estacionado fica orientado
+// no sentido em que chegou (encostado à berma, nunca sobre o alvo).
 const unitIcon = (phase, chased) => {
-  // Veículo estacionado junto ao alvo enquanto a equipa opera no terreno —
-  // a "ação" vermelha passa a viver nos operacionais e no halo do alvo.
-  if (phase === "operating" && !chased) {
-    const html = `
-    <div class="unit-pin unit-parked" style="--mk:#0E7490">
-      <span class="unit-parked-badge">P</span>
-      ${renderToStaticMarkup(<Car size={13} strokeWidth={2.5} />)}
-    </div>`;
-    return makeDivIcon(html, 26);
-  }
-  const color = chased ? "#EF4444" : phase === "operating" ? "#EF4444" : "#22D3EE";
-  const classes = ["unit-pin"];
-  if (phase === "operating") classes.push("unit-operating");
-  if (chased) classes.push("unit-chased");
-  // Só a equipa a caminho ou a regressar pulsa (em branco) — não a operar no alvo
-  // (que já tem o próprio "blink") nem em perseguição (que já tem a sirene).
+  const parked = phase === "operating" && !chased;
+  const color = chased ? "#EF4444" : parked ? "#0E7490" : phase === "returning" ? "#F59E0B" : "#22D3EE";
+  const classes = ["unit-car"];
+  if (parked) classes.push("unit-car-parked");
+  if (chased) classes.push("unit-car-chased");
+  // Só a equipa a caminho ou a regressar pulsa (em branco) — não a estacionada
+  // (que já tem o badge P) nem em perseguição (que já tem a sirene).
   const traveling = (phase === "en_route" || phase === "returning") && !chased;
   const html = `
     <div class="${classes.join(" ")}" style="--mk:${color}">
       ${chased ? '<span class="unit-siren"></span>' : ''}
       ${traveling ? '<span class="unit-pulse"></span>' : ''}
-      ${renderToStaticMarkup(<Navigation size={13} strokeWidth={2.5} />)}
+      <span class="unit-car-body" data-car>
+        <span class="unit-car-glass"></span>
+      </span>
+      ${parked ? '<span class="unit-parked-badge">P</span>' : ""}
     </div>`;
-  return makeDivIcon(html, chased ? 30 : 26);
+  return makeDivIcon(html, 30);
 };
 
 // ---------- Execução visual das missões: operacionais + halo do alvo ----------
@@ -132,6 +129,25 @@ const siteFxIconCached = (kind) => {
 };
 
 const TRANSFER_COLOR = "#A78BFA";
+
+// Alvo físico da missão — marcador vermelho persistente, visível do despacho
+// ao fim da operação. Variante "hot" (execução) pulsa mais depressa.
+const missionTargetIconCache = new Map();
+const missionTargetIconCached = (hot) => {
+  const key = hot ? "hot" : "idle";
+  let icon = missionTargetIconCache.get(key);
+  if (!icon) {
+    const html = `
+      <div class="mission-target ${hot ? "mission-target-hot" : ""}">
+        <span class="mission-target-ring"></span>
+        <span class="mission-target-cross"></span>
+        <span class="mission-target-dot"></span>
+      </div>`;
+    icon = L.divIcon({ html, className: "lus-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
+    missionTargetIconCache.set(key, icon);
+  }
+  return icon;
+};
 
 const transferIcon = () => {
   const html = `
@@ -306,22 +322,11 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     let cancelled = false;
     fetchRoute(mission.origin, mission.target).then((info) => {
       if (cancelled) return;
-      const cum = buildCumulative(info.latlngs);
-      cumRef.current = cum;
-      // Estacionamento: o veículo pára na berma, ligeiramente antes do fim da
-      // rota — a equipa faz o resto a pé. parkFrac é a fração útil da rota.
-      const total = cum[cum.length - 1] || 0;
-      const back = Math.min(35, total * 0.2);
-      const parkFrac = total > 0 ? Math.max(0, total - back) / total : 1;
-      let park = pointOnRoute(info.latlngs, cum, parkFrac);
-      if (!park || total <= 0) {
-        // rota degenerada — estaciona ~35m "antes" do alvo na direção da origem
-        const o = mission.origin;
-        const tg = mission.target;
-        const d = Math.max(1, Math.hypot(tg.lat - o.lat, tg.lng - o.lng));
-        park = offsetM(tg, ((o.lng - tg.lng) / d) * 0.0004, ((o.lat - tg.lat) / d) * 0.0004);
-      }
-      setRoute({ ...info, parkFrac, park });
+      // Estacionamento credível (buildParking): recuo 25–50m seeded por
+      // missão, encosto lateral à berma e rumo da via — nunca sobre o alvo.
+      const parking = buildParking(mission, info);
+      cumRef.current = parking.cum;
+      setRoute({ ...info, parking, parkFrac: parking.parkFrac, park: parking.park });
     });
     return () => { cancelled = true; };
   }, [mission.id, mission.origin.lat, mission.origin.lng, mission.target.lat, mission.target.lng]);
@@ -330,8 +335,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   // rota/janela de execução; avaliada por frame no mesmo loop rAF do veículo.
   const memberCount = Math.max(1, Math.min(6, (mission.member_ids || []).length || 2));
   const choreo = useMemo(() => {
-    if (!route?.park) return null;
-    return buildChoreography(mission, route.park, memberCount);
+    if (!route?.parking) return null;
+    return buildChoreography(mission, route.parking, memberCount);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, mission.id, mission.arrive_at, mission.finish_at, memberCount]);
   const choreoRef = useRef(null);
@@ -342,42 +347,11 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
 
   const computePos = () => {
     const now = serverNow();
-    const depart = Date.parse(mission.depart_at);
-    const arrive = Date.parse(mission.arrive_at);
-    const finish = Date.parse(mission.finish_at);
-    const ret = Date.parse(mission.return_at);
-    // If route not loaded yet, fallback to straight-line lerp.
-    if (!route || !cumRef.current) return { ...missionPosition(mission, now), progress: 0, bearing: null };
-    const latlngs = route.latlngs;
-    const cum = cumRef.current;
-    // Rumo (graus, 0 = norte, sentido horário) na fração `frac` da rota,
-    // olhando na direção do deslocamento (dirSign +1 avança, -1 recua).
-    const bearingAt = (frac, dirSign) => {
-      const eps = 0.004;
-      const a = pointOnRoute(latlngs, cum, frac);
-      const b = pointOnRoute(latlngs, cum, Math.min(1, Math.max(0, frac + dirSign * eps)));
-      if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) return null;
-      const dLng = (b.lng - a.lng) * Math.cos(((a.lat + b.lat) * Math.PI) / 360);
-      const dLat = b.lat - a.lat;
-      return (Math.atan2(dLng, dLat) * 180) / Math.PI;
-    };
-    if (now <= arrive) {
-      const t = Math.min(1, Math.max(0, (now - depart) / Math.max(1, arrive - depart)));
-      const f = t * (route.parkFrac ?? 1);
-      const p = pointOnRoute(latlngs, cum, f);
-      return { ...p, phase: "en_route", progress: t, frac: f, bearing: bearingAt(f, 1) };
-    }
-    if (now <= finish) {
-      const park = route.park || { lat: latlngs[latlngs.length - 1][0], lng: latlngs[latlngs.length - 1][1] };
-      return { lat: park.lat, lng: park.lng, phase: "operating", progress: 1, frac: route.parkFrac ?? 1, bearing: null };
-    }
-    if (now <= ret) {
-      const t = Math.min(1, Math.max(0, (now - finish) / Math.max(1, ret - finish)));
-      const f = (route.parkFrac ?? 1) * (1 - t);
-      const p = pointOnRoute(latlngs, cum, f);
-      return { ...p, phase: "returning", progress: t, frac: f, bearing: bearingAt(f, -1) };
-    }
-    return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1, frac: 0, bearing: null };
+    // Rota ainda não carregada — fallback em linha reta (sem rumo).
+    if (!route?.parking) return { ...missionPosition(mission, now), progress: 0, frac: 0, bearing: null, state: null };
+    // Pose completa do motor de estados: posição com aceleração/travagem
+    // reais, encosto à berma, rumo da via e estado nomeado.
+    return vehiclePoseAt(mission, route.parking, now);
   };
 
   // PERF: o movimento é 100% imperativo num loop requestAnimationFrame —
@@ -401,12 +375,13 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
       const mk = markerRef.current;
       if (mk && p.phase !== "done") mk.setLatLng([p.lat, p.lng]);
 
-      // 2) Rumo com lerp angular (wrap 360°) aplicado diretamente ao <svg>
-      //    (o glifo Navigation aponta para NE por defeito, daí o offset -45°).
+      // 2) Rumo com lerp angular (wrap 360°) aplicado diretamente ao corpo do
+      //    veículo (<span data-car>) — em movimento segue a estrada; quando
+      //    estaciona converge para o rumo da via e mantém a orientação.
       if (mk && p.bearing != null) {
         let el = svgRef.current;
         if (!el || !el.isConnected) {
-          el = mk.getElement?.()?.querySelector(".unit-pin svg") || null;
+          el = mk.getElement?.()?.querySelector("[data-car]") || null;
           svgRef.current = el;
         }
         if (el) {
@@ -414,7 +389,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
           const diff = ((p.bearing - cur + 540) % 360) - 180;
           const next = cur + diff * 0.18;
           bearingRef.current = next;
-          el.style.transform = `rotate(${(next - 45).toFixed(1)}deg)`;
+          el.style.transform = `rotate(${next.toFixed(1)}deg)`;
         }
       }
 
@@ -553,8 +528,38 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   const deployed = phase === "operating" && !!choreo;
   const nowSec0 = nowMs / 1000;
 
+  // Estado nomeado da máquina de estados (Deslocação, Estacionamento,
+  // Desembarque, Aproximação, Execução, Retirada, Embarque, Regresso) —
+  // atualizado a 1 Hz pelo clockTick, alimenta os tooltips do veículo e alvo.
+  const mstate = missionStateAt(mission, choreo, nowMs);
+
   return (
     <>
+      {/* Alvo físico da operação — marcador vermelho visível do despacho ao fim */}
+      <Marker
+        position={[mission.target.lat, mission.target.lng]}
+        icon={missionTargetIconCached(phase === "operating")}
+        zIndexOffset={340}
+        opacity={dim ? 0.25 : 1}
+      >
+        <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
+          <div className="min-w-[150px]">
+            <p className="text-[11px] font-bold text-red-400">{mission.opportunity?.name}</p>
+            <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+              Alvo da operação · {mission.opportunity?.district}
+            </p>
+            <div className="mt-1 space-y-0.5">
+              <TipRow label="fase" value={mstate.label} color={chased ? "#EF4444" : STATUS_COLORS[phase] || "#EF4444"} />
+              <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
+              <TipRow label="equipa" value={mission.team_name} color="#22D3EE" />
+              {phase === "operating" && (
+                <TipRow label="no terreno" value={`${memberCount} operacionais`} color="#FAFAFA" />
+              )}
+            </div>
+            {choreo && <p className="mt-1 text-[9px] text-zinc-500">{CHOREO_LABELS[choreo.kind]}</p>}
+          </div>
+        </LTooltip>
+      </Marker>
       {route?.latlngs && route.latlngs.length > 1 && (
         <>
           {/* Glow underlay */}
@@ -624,6 +629,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE" }}>
               {chased ? "PERSEGUIÇÃO POLICIAL" : STATUS_LABELS[pos.phase] || pos.phase} · {mission.opportunity?.name}
             </p>
+            <TipRow label="fase" value={mstate.label} color={chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE"} />
             <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
             {phase === "operating" && (
               <TipRow label="no terreno" value={`${memberCount} operacionais`} color="#FAFAFA" />
@@ -952,22 +958,27 @@ export const MapLegend = () => {
             <span className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-white text-[8px] text-black">⌂</span> Quartel-general</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-white/40 bg-zinc-800" /> Propriedade tua</span>
             <span className="flex items-center gap-1.5">
-              <span className="relative flex h-3 w-3 items-center justify-center rounded-full bg-cyan-400">
-                <span className="absolute -inset-1 animate-pulse rounded-full border border-white" />
+              <span className="relative flex h-3 w-3 items-center justify-center">
+                <span className="h-3 w-1.5 rounded-sm bg-cyan-400" />
+                <span className="absolute -inset-0.5 animate-pulse rounded-full border border-white" />
               </span>
-              Equipa a caminho / a regressar
+              Veículo a caminho / a regressar
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-cyan-900 text-[7px] font-extrabold text-cyan-200">P</span>
-              Veículo estacionado no local
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-extrabold text-cyan-200">
+                <span className="h-3 w-1.5 rounded-sm bg-cyan-800" />
+              </span>
+              Veículo estacionado (orientado à via)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="relative flex h-3.5 w-3.5 items-center justify-center rounded-full border border-red-500/70">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+              </span>
+              Alvo da missão (visível toda a operação)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full border border-black bg-zinc-100" />
-              Operacionais no terreno (a executar)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full border border-red-500/80 bg-red-500/20" />
-              Local da operação (halo por tipo)
+              Operacionais no terreno (papéis distintos)
             </span>
             <span className="flex items-center gap-1.5"><span className="flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[7px] font-extrabold text-white">!</span> Carro-patrulha em perseguição</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;2 min)</span>
@@ -979,10 +990,12 @@ export const MapLegend = () => {
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t border-dotted border-zinc-300" /> Trilho a pé veículo ↔ alvo</span>
           </div>
           <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
-            Passa o rato sobre qualquer marcador para veres os detalhes. Quando uma equipa chega ao
-            local, o veículo estaciona e os operacionais executam a missão a pé — cada tipo de
-            operação tem a sua própria sequência no mapa. Clica numa oportunidade para despachar,
-            ou numa unidade em movimento para a câmara a seguir.
+            Cada missão tem um alvo vermelho fixo: o veículo acelera, trava e estaciona na berma
+            (nunca sobre o alvo), os operacionais desembarcam um a um, aproximam-se em formação e
+            distribuem-se por papéis — entrada, vigilância, proteção do veículo, cobertura da
+            retirada. Passa o rato sobre o alvo ou o veículo para veres a fase exata
+            (desembarque, aproximação, execução, retirada, embarque). Clica numa unidade em
+            movimento para a câmara a seguir.
           </p>
         </Card>
       )}
