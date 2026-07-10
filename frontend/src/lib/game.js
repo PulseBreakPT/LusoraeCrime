@@ -1073,3 +1073,141 @@ export function formatApiErrorDetail(detail) {
   if (detail && typeof detail.msg === "string") return detail.msg;
   return String(detail);
 }
+
+// ============ QI da Frota (SSS v6) — espelhos EXATOS do engine.py ============
+// Réguas expostas em catalog.fleet_meta/vehicle_category_weights — a UI mostra
+// os MESMOS números que a chance de missão e a física de viagem usam.
+
+export const VEHICLE_TIERS = {
+  rua: { label: "Rua", color: "#A1A1AA" },
+  profissional: { label: "Profissional", color: "#22D3EE" },
+  executiva: { label: "Executiva", color: "#C084FC" },
+  elite: { label: "Elite", color: "#F59E0B" },
+};
+
+export function vehicleTier(vm) {
+  const lvl = vm?.min_level || 1;
+  const key = lvl >= 5 ? "elite" : lvl >= 4 ? "executiva" : lvl >= 2 ? "profissional" : "rua";
+  return { key, ...VEHICLE_TIERS[key] };
+}
+
+// Espelho de engine.vehicle_mission_score: velocidade+discrição ponderadas
+// pela categoria (VEHICLE_CATEGORY_WEIGHTS) — nenhum veículo é "sempre melhor".
+export function vehicleMissionScore(vm, category, weights) {
+  const all = weights || {};
+  const w = all[category] || all["logistica"] || {};
+  const denom = (w.speed || 0) + (w.discretion || 0);
+  if (!vm || denom <= 0) return 0;
+  const speed = Math.min(1, (vm.speed || 0) / 26);
+  const discretion = (vm.discretion ?? 50) / 100;
+  return (speed * (w.speed || 0) + discretion * (w.discretion || 0)) / denom;
+}
+
+// Adequação 0-1 por categoria de operação (score do motor × realce best_for)
+// para as 5 mini-barras dos cartões — mesma leitura visual das armas.
+export function vehicleAdequacy(vm, catalog) {
+  return TEAM_OP_CATEGORIES.map((cat) => {
+    const best = (vm?.best_for || []).includes(cat);
+    const raw = vehicleMissionScore(vm, cat, catalog?.vehicle_category_weights);
+    const score = best ? Math.min(1, raw * 1.25) : (vm?.best_for?.length ? raw * 0.85 : raw);
+    return { category: cat, label: SPEC_LABELS[cat] || cat, score: Math.max(0, Math.min(1, score)), best };
+  });
+}
+
+// Espelho de engine.effective_speed: curva contínua da condição
+// (floor + span × (condição/100)^exp) — um veículo a 65% já se ressente.
+export function vehicleSpeedFactor(condition, meta) {
+  const floor = meta?.speed_floor ?? 0.6;
+  const exp = meta?.speed_curve_exp ?? 0.9;
+  const c = Math.max(0, Math.min(100, condition ?? 100)) / 100;
+  return floor + (1 - floor) * Math.pow(c, exp);
+}
+
+// ============ QI do Património (SSS v6) — espelhos do motor passivo ============
+
+export const PROPERTY_TIERS = {
+  bairro: { label: "Bairro", color: "#A1A1AA" },
+  cidade: { label: "Cidade", color: "#22D3EE" },
+  sindicato: { label: "Sindicato", color: "#C084FC" },
+  imperial: { label: "Imperial", color: "#F59E0B" },
+};
+
+export function propertyTier(pt) {
+  const lvl = pt?.min_level || 1;
+  const key = lvl >= 4 ? "imperial" : lvl >= 3 ? "sindicato" : lvl >= 2 ? "cidade" : "bairro";
+  return { key, ...PROPERTY_TIERS[key] };
+}
+
+// Espelho de engine.property_stack_ranks/mult: a 1.ª unidade de cada tipo
+// (pela data de compra) rende o bónus cheio, as seguintes rendem menos.
+export function propertyStackRank(properties, prop) {
+  const same = (properties || [])
+    .filter((p) => p.type_key === prop.type_key)
+    .sort((a, b) => String(a.bought_at || "").localeCompare(String(b.bought_at || "")));
+  const idx = same.findIndex((p) => p.id === prop.id);
+  return idx < 0 ? 0 : idx;
+}
+
+export function propertyStackMult(rank, meta) {
+  const arr = meta?.stack_diminish || [1.0, 0.7, 0.5];
+  return arr[Math.min(rank, arr.length - 1)];
+}
+
+export function propertyUpgradeCost(pt, level, meta) {
+  return Math.round((pt?.price || 0) * (meta?.upgrade_cost_pct ?? 0.6) * (level + 1));
+}
+
+// Custo de manutenção diário do imóvel (espelho de _process_property_maintenance).
+export function propertyMaintPerDay(pt, level, meta) {
+  return (pt?.price || 0) * (level || 1) * (meta?.maintenance_pct_per_day ?? 0.0015);
+}
+
+// Payback em horas de subir 1 nível (só imóveis produtivos; lavagem devolve 90%).
+export function propertyUpgradePaybackH(pt, condition, cost) {
+  const rate = (pt?.dirty_per_h || 0) + (pt?.launder_per_h || 0) * 0.9;
+  const gain = rate * Math.max(0, Math.min(100, condition ?? 100)) / 100;
+  return gain > 0 ? cost / gain : null;
+}
+
+// ============ QI do Efetivo (SSS v6) — aptidão por categoria ============
+// Espelho da régua de team_effectiveness: atributo relevante ponderado
+// (1.º atributo 60%, 2.º 40%) × match de especialização (×1.25 no motor).
+export function employeeAdequacy(emp, catalog) {
+  const catAttrs = catalog?.team_meta?.category_attrs || {};
+  return TEAM_OP_CATEGORIES.map((cat) => {
+    const aks = catAttrs[cat] || [];
+    const attrs = emp?.attrs || {};
+    let attr;
+    if (aks.length === 2) attr = (attrs[aks[0]] ?? 2) * 0.6 + (attrs[aks[1]] ?? 2) * 0.4;
+    else if (aks.length) attr = aks.reduce((a, k) => a + (attrs[k] ?? 2), 0) / aks.length;
+    else {
+      const vs = Object.values(attrs);
+      attr = vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : 2;
+    }
+    const best = emp?.spec === cat;
+    const score = Math.max(0, Math.min(1, (attr / 10) * (best || cat === "especial" ? 1.15 : 1)));
+    return { category: cat, label: SPEC_LABELS[cat] || cat, score, best, attrs: aks };
+  });
+}
+
+// ============ QI dos Contratos (SSS v6) — decomposição do multiplicador ============
+// Espelho de quests.compute_quest_mult com as réguas de catalog.quest_meta —
+// decompõe o reward_mult que o backend envia nos seus fatores.
+export function questMultBreakdown(player, q, meta) {
+  const m = meta || {};
+  const level = Math.max(1, player?.level || 1);
+  const lvl = 1 + (m.level_money_slope ?? 0.15) * (level - 1);
+  const diff = (m.difficulty_mults || {})[q?.difficulty] ?? 1;
+  const tierN = player?.quest_perf?.tier || 0;
+  const tier = 1 + (m.tier_bonus ?? 0.08) * tierN;
+  const streakCount = player?.quest_streak?.count || 0;
+  const streakApplies = (q?.type === "diaria" || q?.type === "semanal") && streakCount > 0;
+  const streak = streakApplies
+    ? 1 + Math.min(m.streak_bonus_max ?? 0.4, (m.streak_bonus ?? 0.04) * streakCount)
+    : 1;
+  return {
+    level: lvl, difficulty: diff, tier, tierN, streak, streakCount,
+    speedBonus: m.speed_bonus ?? 0.1, cap: m.total_mult_cap ?? 4,
+  };
+}
+

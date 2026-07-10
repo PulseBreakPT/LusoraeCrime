@@ -457,6 +457,31 @@ export function GameProvider({ children }) {
     action("weapons/auto_assign", { weapon_id: weaponId }, "Arma atribuída automaticamente");
   const optimizeWeapons = () =>
     action("weapons/optimize", {}, "Arsenal redistribuído pela melhor combinação");
+  // Otimizações SSS v6 — o backend devolve a mensagem certa para cada caso
+  // (redistribuído / já ótimo / reserva salarial), por isso o toast usa-a.
+  const optimizeVehicles = useCallback(async () => {
+    const res = await action("vehicles/optimize", {});
+    if (res.ok && res.data?.message) toast.success(res.data.message);
+    return res;
+  }, [action]);
+  const optimizeEmployees = useCallback(async () => {
+    const res = await action("employees/optimize", {});
+    if (res.ok && res.data?.message) toast.success(res.data.message);
+    return res;
+  }, [action]);
+  const optimizeProperties = useCallback(async () => {
+    const res = await action("properties/optimize", {});
+    if (res.ok && res.data?.message) toast.success(res.data.message);
+    return res;
+  }, [action]);
+  const claimAllQuests = useCallback(async () => {
+    const res = await action("quests/claim_all", {});
+    if (res.ok && res.data?.rewards?.length) {
+      const shown = res.data.rewards.slice(0, 3).join(" · ");
+      toast.success(`${res.data.claimed} contrato(s) — ${shown}${res.data.rewards.length > 3 ? " …" : ""}`);
+    }
+    return res;
+  }, [action]);
   const buyProperty = (typeKey, lat, lng) =>
     action("properties/buy", { type_key: typeKey, lat, lng }, "Propriedade comprada");
   const sellProperty = (propertyId) =>
@@ -548,6 +573,10 @@ export function GameProvider({ children }) {
         unassignWeapon,
         autoAssignWeapon,
         optimizeWeapons,
+        optimizeVehicles,
+        optimizeEmployees,
+        optimizeProperties,
+        claimAllQuests,
         buyProperty,
         sellProperty,
         upgradeProperty,

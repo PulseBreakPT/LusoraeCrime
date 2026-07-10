@@ -3933,3 +3933,61 @@ html:has(.lus-page-bg) {
         animation: none;
     }
 }
+
+/* ---------------- Dossier SSS genérico (frota/imóveis/efetivo/contratos) ----
+   Mesmo tratamento dos cartões de arma/equipa, com a cor do tier do módulo a
+   entrar via --dtier — orla esquerda, brilho ambiente e placa da silhueta. */
+.lus-doss-card {
+    position: relative;
+    overflow: hidden;
+    border-left: 2px solid color-mix(in srgb, var(--dtier, #a1a1aa) 55%, transparent);
+}
+
+.lus-doss-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--dtier, #a1a1aa) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--dtier, #a1a1aa) 4%, transparent), transparent 70%);
+    pointer-events: none;
+}
+
+.lus-doss-card:hover {
+    border-left-color: color-mix(in srgb, var(--dtier, #a1a1aa) 85%, transparent);
+}
+
+.lus-doss-plate {
+    background:
+        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--dtier, #a1a1aa) 15%, transparent), transparent 76%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+}
+
+.lus-doss-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
+    background-size: 240% 100%;
+    background-position: 130% 0;
+    pointer-events: none;
+}
+
+.lus-doss-card:hover .lus-doss-plate::after {
+    background-position: -80% 0;
+    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-doss-glyph {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-doss-card:hover .lus-doss-plate::after {
+        transition: none;
+        background-position: 130% 0;
+    }
+}
