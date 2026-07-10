@@ -3,10 +3,11 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check, Plus, Minus, Crosshair, Scan } from "lucide-react";
+import { Home, Navigation, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check, Plus, Minus, Crosshair, Scan, Car, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
+import { buildChoreography, opStateAt, choreoKind, CHOREO_LABELS, offsetM } from "../../lib/choreo";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -71,6 +72,16 @@ const hqRadarIcon = () =>
   });
 
 const unitIcon = (phase, chased) => {
+  // Veículo estacionado junto ao alvo enquanto a equipa opera no terreno —
+  // a "ação" vermelha passa a viver nos operacionais e no halo do alvo.
+  if (phase === "operating" && !chased) {
+    const html = `
+    <div class="unit-pin unit-parked" style="--mk:#0E7490">
+      <span class="unit-parked-badge">P</span>
+      ${renderToStaticMarkup(<Car size={13} strokeWidth={2.5} />)}
+    </div>`;
+    return makeDivIcon(html, 26);
+  }
   const color = chased ? "#EF4444" : phase === "operating" ? "#EF4444" : "#22D3EE";
   const classes = ["unit-pin"];
   if (phase === "operating") classes.push("unit-operating");
@@ -85,6 +96,39 @@ const unitIcon = (phase, chased) => {
       ${renderToStaticMarkup(<Navigation size={13} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, chased ? 30 : 26);
+};
+
+// ---------- Execução visual das missões: operacionais + halo do alvo ----------
+// Ícones cacheados por assinatura visual (mesmo padrão do oppIconCached) e
+// marcadores NÃO interativos — puramente visuais, custo mínimo por frame.
+const opIconCache = new Map();
+const opIconCached = (kind) => {
+  let icon = opIconCache.get(kind);
+  if (!icon) {
+    const html = `
+      <div class="op-pin op-${kind}">
+        ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
+        <span class="op-carry-badge">€</span>
+      </div>`;
+    icon = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
+    opIconCache.set(kind, icon);
+  }
+  return icon;
+};
+
+const siteFxCache = new Map();
+const siteFxIconCached = (kind) => {
+  let icon = siteFxCache.get(kind);
+  if (!icon) {
+    icon = L.divIcon({
+      html: `<div class="lus-sitefx lus-sitefx-${kind}"></div>`,
+      className: "lus-marker",
+      iconSize: [56, 56],
+      iconAnchor: [28, 28],
+    });
+    siteFxCache.set(kind, icon);
+  }
+  return icon;
 };
 
 const TRANSFER_COLOR = "#A78BFA";
@@ -262,11 +306,39 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     let cancelled = false;
     fetchRoute(mission.origin, mission.target).then((info) => {
       if (cancelled) return;
-      cumRef.current = buildCumulative(info.latlngs);
-      setRoute(info);
+      const cum = buildCumulative(info.latlngs);
+      cumRef.current = cum;
+      // Estacionamento: o veículo pára na berma, ligeiramente antes do fim da
+      // rota — a equipa faz o resto a pé. parkFrac é a fração útil da rota.
+      const total = cum[cum.length - 1] || 0;
+      const back = Math.min(35, total * 0.2);
+      const parkFrac = total > 0 ? Math.max(0, total - back) / total : 1;
+      let park = pointOnRoute(info.latlngs, cum, parkFrac);
+      if (!park || total <= 0) {
+        // rota degenerada — estaciona ~35m "antes" do alvo na direção da origem
+        const o = mission.origin;
+        const tg = mission.target;
+        const d = Math.max(1, Math.hypot(tg.lat - o.lat, tg.lng - o.lng));
+        park = offsetM(tg, ((o.lng - tg.lng) / d) * 0.0004, ((o.lat - tg.lat) / d) * 0.0004);
+      }
+      setRoute({ ...info, parkFrac, park });
     });
     return () => { cancelled = true; };
   }, [mission.id, mission.origin.lat, mission.origin.lng, mission.target.lat, mission.target.lng]);
+
+  // Coreografia determinística da operação no terreno — construída uma vez por
+  // rota/janela de execução; avaliada por frame no mesmo loop rAF do veículo.
+  const memberCount = Math.max(1, Math.min(6, (mission.member_ids || []).length || 2));
+  const choreo = useMemo(() => {
+    if (!route?.park) return null;
+    return buildChoreography(mission, route.park, memberCount);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, mission.id, mission.arrive_at, mission.finish_at, memberCount]);
+  const choreoRef = useRef(null);
+  choreoRef.current = choreo;
+  const opMarkersRef = useRef([]);
+  const opElsRef = useRef([]);
+  const opFlagsRef = useRef([]);
 
   const computePos = () => {
     const now = serverNow();
@@ -291,19 +363,21 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     };
     if (now <= arrive) {
       const t = Math.min(1, Math.max(0, (now - depart) / Math.max(1, arrive - depart)));
-      const p = pointOnRoute(latlngs, cum, t);
-      return { ...p, phase: "en_route", progress: t, bearing: bearingAt(t, 1) };
+      const f = t * (route.parkFrac ?? 1);
+      const p = pointOnRoute(latlngs, cum, f);
+      return { ...p, phase: "en_route", progress: t, frac: f, bearing: bearingAt(f, 1) };
     }
     if (now <= finish) {
-      const last = latlngs[latlngs.length - 1];
-      return { lat: last[0], lng: last[1], phase: "operating", progress: 1, bearing: null };
+      const park = route.park || { lat: latlngs[latlngs.length - 1][0], lng: latlngs[latlngs.length - 1][1] };
+      return { lat: park.lat, lng: park.lng, phase: "operating", progress: 1, frac: route.parkFrac ?? 1, bearing: null };
     }
     if (now <= ret) {
       const t = Math.min(1, Math.max(0, (now - finish) / Math.max(1, ret - finish)));
-      const p = pointOnRoute(latlngs, cum, 1 - t);
-      return { ...p, phase: "returning", progress: t, bearing: bearingAt(1 - t, -1) };
+      const f = (route.parkFrac ?? 1) * (1 - t);
+      const p = pointOnRoute(latlngs, cum, f);
+      return { ...p, phase: "returning", progress: t, frac: f, bearing: bearingAt(f, -1) };
     }
-    return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1, bearing: null };
+    return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", progress: 1, frac: 0, bearing: null };
   };
 
   // PERF: o movimento é 100% imperativo num loop requestAnimationFrame —
@@ -350,9 +424,9 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         if (route?.latlngs && cumRef.current) {
           let latlngs = null;
           if (p.phase === "en_route") {
-            latlngs = sliceRoute(route.latlngs, cumRef.current, p.progress, 1);
+            latlngs = sliceRoute(route.latlngs, cumRef.current, p.frac ?? p.progress, route.parkFrac ?? 1);
           } else if (p.phase === "returning") {
-            latlngs = sliceRoute(route.latlngs, cumRef.current, 1 - p.progress, 0);
+            latlngs = sliceRoute(route.latlngs, cumRef.current, p.frac ?? (1 - p.progress), 0);
           }
           const arr = latlngs && latlngs.length > 1 ? latlngs : [];
           if (glowRef.current) glowRef.current.setLatLngs(arr);
@@ -365,8 +439,45 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         const total = cumRef.current[cumRef.current.length - 1] || 0;
         if (total > 0) {
           const lag = Math.min(0.35, 220 / Math.max(1, total));
-          const cp = pointOnRoute(route.latlngs, cumRef.current, Math.min(1, 1 - p.progress + lag));
+          const cp = pointOnRoute(route.latlngs, cumRef.current, Math.min(route.parkFrac ?? 1, (p.frac ?? 0) + lag));
           if (cp) chaseRef.current.setLatLng([cp.lat, cp.lng]);
+        }
+      }
+
+      // 4b) Operacionais no terreno — avaliados no MESMO loop (zero rAF extra).
+      //     Posição via setLatLng; fades/escala/saque aplicados diretamente ao
+      //     elemento interno (compositor), sem passar pelo React.
+      const ch = choreoRef.current;
+      if (ch && p.phase === "operating") {
+        const nowSec = serverNow() / 1000;
+        const success = mission.outcome === "success";
+        for (let i = 0; i < ch.ops.length; i++) {
+          const opMk = opMarkersRef.current[i];
+          if (!opMk) continue;
+          let el = opElsRef.current[i];
+          if (!el || !el.isConnected) {
+            el = opMk.getElement?.()?.querySelector(".op-pin") || null;
+            opElsRef.current[i] = el;
+          }
+          const st = opStateAt(ch, i, nowSec, success);
+          if (!st) {
+            if (el) el.style.opacity = "0";
+            continue;
+          }
+          opMk.setLatLng([st.lat, st.lng]);
+          if (el) {
+            el.style.opacity = ((dim ? 0.25 : 1) * st.alpha).toFixed(2);
+            el.style.transform = `scale(${st.scale.toFixed(2)})`;
+            const flags = opFlagsRef.current[i] || (opFlagsRef.current[i] = {});
+            if (flags.carry !== st.carry) {
+              flags.carry = st.carry;
+              el.classList.toggle("op-carrying", !!st.carry);
+            }
+            if (flags.walking !== st.walking) {
+              flags.walking = st.walking;
+              el.classList.toggle("op-walking", !!st.walking);
+            }
+          }
         }
       }
 
@@ -389,11 +500,21 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, mission, followed, map]);
+  }, [route, mission, followed, map, dim]);
 
   // Dash do trajeto de regresso — só quando a fase realmente muda.
   useEffect(() => {
     if (lineRef.current) lineRef.current.setStyle({ dashArray: phase === "returning" ? "6 6" : null });
+  }, [phase]);
+
+  // Saída da fase de operação → os marcadores dos operacionais desmontam;
+  // limpa as caches de elementos/flags para a próxima missão no mesmo slot.
+  useEffect(() => {
+    if (phase !== "operating") {
+      opMarkersRef.current = [];
+      opElsRef.current = [];
+      opFlagsRef.current = [];
+    }
   }, [phase]);
 
   const chased = phase === "returning" && !!mission.chase_active;
@@ -416,18 +537,21 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     : 0;
   const carryingPays = mission.pending_pays || mission.opportunity?.pays || "dirty";
 
-  // Police chase car: rendered ~120m behind on the same route so it visually "follows" the team.
+  // Police chase car: rendered ~220m behind on the same route so it visually "follows" the team.
   let chasePos = null;
   if (chased && route?.latlngs && cumRef.current) {
-    // returning: vehicle is at fraction (1 - progress); the tail is behind (closer to target)
     const total = cumRef.current[cumRef.current.length - 1] || 0;
     if (total > 0) {
       const lag = Math.min(0.35, 220 / Math.max(1, total)); // ~220m gap or 35% whichever is smaller
-      const chaseFrac = Math.min(1, (1 - pos.progress) + lag);
+      const chaseFrac = Math.min(route.parkFrac ?? 1, (pos.frac ?? (1 - pos.progress)) + lag);
       const cp = pointOnRoute(route.latlngs, cumRef.current, chaseFrac);
       if (cp) chasePos = cp;
     }
   }
+
+  // Estado inicial dos operacionais para o primeiro render (o rAF assume logo a seguir).
+  const deployed = phase === "operating" && !!choreo;
+  const nowSec0 = nowMs / 1000;
 
   return (
     <>
@@ -451,6 +575,41 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
           />
         </>
       )}
+      {deployed && (
+        <>
+          {/* Trilho a pé veículo -> alvo (subtil, não interativo) */}
+          <Polyline
+            positions={choreo.basePath.latlngs}
+            smoothFactor={1}
+            pathOptions={{ color: "#E4E4E7", weight: 1.2, opacity: dim ? 0.08 : 0.28, dashArray: "2 5", lineCap: "round" }}
+            interactive={false}
+          />
+          {/* Halo de atividade no local exato da missão — estilo por arquetipo */}
+          <Marker
+            position={[mission.target.lat, mission.target.lng]}
+            icon={siteFxIconCached(choreo.kind)}
+            interactive={false}
+            keyboard={false}
+            zIndexOffset={300}
+            opacity={dim ? 0.2 : 1}
+          />
+          {/* Operacionais — marcadores puramente visuais, movidos pelo loop rAF */}
+          {choreo.ops.map((op, i) => {
+            const st = opStateAt(choreo, i, nowSec0, mission.outcome === "success");
+            return (
+              <Marker
+                key={`${mission.id}-op-${i}`}
+                ref={(el) => { opMarkersRef.current[i] = el; }}
+                position={[st?.lat ?? choreo.park.lat, st?.lng ?? choreo.park.lng]}
+                icon={opIconCached(choreo.kind)}
+                interactive={false}
+                keyboard={false}
+                zIndexOffset={520}
+              />
+            );
+          })}
+        </>
+      )}
       <Marker
         ref={markerRef}
         position={[pos.lat, pos.lng]}
@@ -466,6 +625,12 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               {chased ? "PERSEGUIÇÃO POLICIAL" : STATUS_LABELS[pos.phase] || pos.phase} · {mission.opportunity?.name}
             </p>
             <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
+            {phase === "operating" && (
+              <TipRow label="no terreno" value={`${memberCount} operacionais`} color="#FAFAFA" />
+            )}
+            {phase === "operating" && choreo && (
+              <p className="mt-0.5 text-[9px] text-zinc-400">Veículo estacionado · {CHOREO_LABELS[choreo.kind]}</p>
+            )}
             {mission.success_chance != null && pos.phase === "en_route" && (
               <TipRow label="probabilidade" value={`${Math.round(mission.success_chance * 100)}%`} color="#34D399" />
             )}
@@ -792,7 +957,18 @@ export const MapLegend = () => {
               </span>
               Equipa a caminho / a regressar
             </span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Equipa em operação</span>
+            <span className="flex items-center gap-1.5">
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-cyan-900 text-[7px] font-extrabold text-cyan-200">P</span>
+              Veículo estacionado no local
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full border border-black bg-zinc-100" />
+              Operacionais no terreno (a executar)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full border border-red-500/80 bg-red-500/20" />
+              Local da operação (halo por tipo)
+            </span>
             <span className="flex items-center gap-1.5"><span className="flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[7px] font-extrabold text-white">!</span> Carro-patrulha em perseguição</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;2 min)</span>
           </div>
@@ -800,11 +976,13 @@ export const MapLegend = () => {
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full bg-cyan-400" /> A caminho — falta percorrer</span>
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-violet-400" /> Regresso — falta chegar</span>
+            <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t border-dotted border-zinc-300" /> Trilho a pé veículo ↔ alvo</span>
           </div>
           <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
-            Passa o rato sobre qualquer marcador para veres os detalhes. Clica numa oportunidade para
-            despachar uma equipa, ou numa equipa em movimento para a câmara a seguir. Usa os controlos
-            à direita para centrar no QG ou enquadrar toda a atividade.
+            Passa o rato sobre qualquer marcador para veres os detalhes. Quando uma equipa chega ao
+            local, o veículo estaciona e os operacionais executam a missão a pé — cada tipo de
+            operação tem a sua própria sequência no mapa. Clica numa oportunidade para despachar,
+            ou numa unidade em movimento para a câmara a seguir.
           </p>
         </Card>
       )}

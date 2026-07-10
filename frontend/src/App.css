@@ -3070,3 +3070,211 @@ html:has(.lus-page-bg) {
     }
 }
 
+
+/* ============================================================
+   Execução visual das missões — operacionais no terreno
+   ============================================================ */
+
+/* Pin de operacional — puramente visual (não interativo). A posição vem do
+   loop rAF (setLatLng); opacidade/escala são aplicadas diretamente a este
+   elemento interno para os fades de entrada/saída do veículo e o modo
+   "dentro do edifício" — tudo no compositor, sem repaints. */
+.op-pin {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: #fafafa;
+    color: #09090b;
+    border: 1.5px solid rgba(5, 5, 5, 0.9);
+    box-shadow: 0 0 8px rgba(250, 250, 250, 0.55);
+    will-change: transform, opacity;
+}
+
+.op-pin svg {
+    display: block;
+}
+
+/* Passada — bob subtil só enquanto caminha (classe gerida pelo loop rAF) */
+.op-walking svg {
+    animation: op-bob 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes op-bob {
+    from {
+        transform: translateY(-0.7px);
+    }
+    to {
+        transform: translateY(0.7px);
+    }
+}
+
+/* Saque no regresso (assaltos/cobranças com sucesso) */
+.op-carry-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #f59e0b;
+    color: #000;
+    font: 800 7px/1 ui-monospace, SFMono-Regular, monospace;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.9);
+}
+
+.op-carrying .op-carry-badge {
+    display: flex;
+}
+
+/* Tinturas ligeiras por arquetipo — leitura instantânea do tipo de operação */
+.op-heist,
+.op-spread,
+.op-combat {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.op-stealth {
+    background: #ddd6fe;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.55);
+}
+
+.op-tech {
+    background: #cffafe;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
+}
+
+.op-cargo {
+    background: #fde68a;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.op-vip {
+    background: #fef3c7;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+/* Veículo estacionado junto ao alvo (equipa no terreno) */
+.unit-parked {
+    background: #0e7490;
+    color: #cffafe;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+}
+
+.unit-parked-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: #22d3ee;
+    color: #04262e;
+    font: 800 7px/1 ui-monospace, SFMono-Regular, monospace;
+    border: 1px solid rgba(5, 5, 5, 0.8);
+}
+
+/* Halo de atividade no local exato da missão — anéis que animam apenas
+   transform/opacity (compositor). Cor e ritmo variam por arquetipo. */
+.lus-sitefx {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    pointer-events: none;
+}
+
+.lus-sitefx::before,
+.lus-sitefx::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 9999px;
+    border: 1.5px solid var(--fx, #ef4444);
+    animation: sitefx-ring 2.2s ease-out infinite;
+    will-change: transform, opacity;
+}
+
+.lus-sitefx::after {
+    animation-delay: 1.1s;
+}
+
+@keyframes sitefx-ring {
+    0% {
+        transform: scale(0.35);
+        opacity: 0.85;
+    }
+    100% {
+        transform: scale(1.15);
+        opacity: 0;
+    }
+}
+
+.lus-sitefx-heist,
+.lus-sitefx-spread {
+    --fx: #ef4444;
+}
+
+.lus-sitefx-combat {
+    --fx: #ef4444;
+}
+
+.lus-sitefx-combat::before {
+    animation-duration: 0.9s;
+}
+
+.lus-sitefx-combat::after {
+    animation-delay: 0.45s;
+    animation-duration: 0.9s;
+}
+
+.lus-sitefx-cargo {
+    --fx: #f59e0b;
+}
+
+.lus-sitefx-collect {
+    --fx: #34d399;
+}
+
+.lus-sitefx-stealth {
+    --fx: #a78bfa;
+}
+
+.lus-sitefx-stealth::before,
+.lus-sitefx-stealth::after {
+    animation-duration: 3.6s;
+    border-style: dashed;
+}
+
+.lus-sitefx-tech {
+    --fx: #22d3ee;
+}
+
+.lus-sitefx-vip {
+    --fx: #fbbf24;
+}
+
+.lus-sitefx-vip::before,
+.lus-sitefx-vip::after {
+    animation-duration: 3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-sitefx::before,
+    .lus-sitefx::after {
+        animation: none;
+        opacity: 0.35;
+        transform: scale(0.8);
+    }
+    .op-walking svg {
+        animation: none;
+    }
+}
