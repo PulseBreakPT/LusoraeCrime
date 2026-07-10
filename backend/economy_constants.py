@@ -810,6 +810,56 @@ SPAWN_ANTIFARM_PENALTY_MAX = 0.40
 STREAK_SPECIAL_THRESHOLD = 5          # vitórias seguidas para o Golpe de Oportunidade
 STREAK_SPECIAL_REWARD_MULT = 1.6
 
+# ============================================================================
+# SSS-TIER TEAM IQ (v4) — equipas que aprendem, decidem e têm papéis internos
+# ============================================================================
+
+# --- Familiaridade por categoria (a equipa aprende) ---------------------------
+# Cada operação concluída numa categoria ensina a equipa: bónus de chance com
+# curva sqrt (ganhos rápidos no início, mestria lenta), capado.
+TEAM_FAMILIARITY_BONUS_MAX = 0.05      # bónus máximo à mestria total
+TEAM_FAMILIARITY_RAMP_MISSIONS = 25    # nº de operações da categoria para mestria
+TEAM_FAMILIARITY_MIN_MISSIONS = 3      # só conta a partir da 3ª operação
+
+# --- Coordenação híbrida (tempo + missões juntos) ------------------------------
+# A coordenação deixa de ser só relógio: 50% tempo de plantel estável + 50%
+# operações reais feitas com este plantel. Mudar o plantel reinicia ambos.
+COORDINATION_RAMP_MISSIONS = 8         # missões juntos para a metade "prática"
+
+# --- Papéis internos inteligentes ----------------------------------------------
+# Condutor: o melhor atributo de condução da equipa reduz o tempo de viagem e
+# ajuda a despistar perseguições — quem conduz importa, não só o carro.
+DRIVER_ATTR_BASELINE = 5               # a partir deste valor o condutor faz diferença
+DRIVER_TRAVEL_REDUCTION_PER_POINT = 0.024
+DRIVER_TRAVEL_REDUCTION_MAX = 0.12     # condutor 10/10 ≈ -12% de viagem
+DRIVER_ESCAPE_BONUS_PER_POINT = 0.012
+DRIVER_ESCAPE_BONUS_MAX = 0.06         # condutor 10/10 ≈ +6% de fuga
+# Estratega: um operacional com inteligência alta planeia melhor — recupera
+# parte da penalização de risco da operação (fração, capada).
+STRATEGIST_MIN_INT = 7                 # inteligência mínima para contar como estratega
+STRATEGIST_RELIEF_FRAC = 0.35          # fração da penalização de risco recuperável
+STRATEGIST_RELIEF_MAX = 0.06           # tecto absoluto do alívio
+# Médico na equipa: ferimentos menos prováveis e recuperação mais rápida.
+MEDIC_INJURY_MULT = 0.5                # multiplica a prob. de ferimento em falha
+MEDIC_RECOVERY_MULT = 0.7              # multiplica a duração do ferimento
+# Advogado na equipa: prisões (interceção ou perseguição) duram menos.
+LAWYER_ARREST_MULT = 0.6               # multiplica a duração da prisão
+
+# --- Clutch save do líder --------------------------------------------------------
+# Numa falha iminente (sem interceção policial), um líder presente com
+# sangue-frio alto tem uma pequena chance de salvar a operação para parcial.
+CLUTCH_SAVE_MAX = 0.18                 # prob. máxima (líder com sangue-frio 10/10)
+
+# --- Aviso inteligente do líder ---------------------------------------------------
+# Ao chegar ao alvo, se o calor subiu muito desde a partida, o líder reporta —
+# o jogador fica a saber que as condições pioraram (a equipa nunca aborta).
+SMART_WARN_HEAT_DELTA = 12             # subida de calor (pontos) que dispara o aviso
+
+# --- Recomendações por valor esperado real ---------------------------------------
+# O ranking das recomendações passa a considerar o valor esperado completo:
+# chance*recompensa + parciais esperados − perdas esperadas em falha − combustível.
+EV_FAILURE_LOSS_FRAC = 0.15            # proxy de perdas numa falha (desgaste, calor, fadiga)
+
 # --- QI das missões (quests): recompensas dinâmicas, streaks e tiers ----------
 QUEST_LEVEL_REWARD_PCT_PER_LEVEL = 0.10  # +10%/nível de organização acima de 1
 QUEST_LEVEL_REWARD_CAP = 1.5             # bónus máximo de nível (+150%)

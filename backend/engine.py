@@ -84,6 +84,12 @@ from economy_constants import (
     RARE_PITY_PER_SPAWN, RARE_PITY_CAP, SPAWN_DEMAND_SPEC_BOOST, SPAWN_DEMAND_BOOST_MAX,
     SPAWN_ANTIFARM_PENALTY_PER, SPAWN_ANTIFARM_PENALTY_MAX,
     STREAK_SPECIAL_THRESHOLD, STREAK_SPECIAL_REWARD_MULT,
+    TEAM_FAMILIARITY_BONUS_MAX, TEAM_FAMILIARITY_RAMP_MISSIONS, TEAM_FAMILIARITY_MIN_MISSIONS,
+    COORDINATION_RAMP_MISSIONS,
+    DRIVER_ATTR_BASELINE, DRIVER_ESCAPE_BONUS_PER_POINT, DRIVER_ESCAPE_BONUS_MAX,
+    STRATEGIST_MIN_INT, STRATEGIST_RELIEF_FRAC, STRATEGIST_RELIEF_MAX,
+    MEDIC_INJURY_MULT, MEDIC_RECOVERY_MULT, LAWYER_ARREST_MULT,
+    CLUTCH_SAVE_MAX, SMART_WARN_HEAT_DELTA,
 )
 from quests import process_quests, make_instance, effective_quest_rewards
 from quests_data import QUEST_DEFS
@@ -1007,15 +1013,62 @@ def mod_team_uniform_spec(ctx):
 
 
 def mod_team_coordination(ctx):
+    """Coordenação híbrida (SSS v4): 50% tempo de plantel estável + 50%
+    operações reais feitas com este plantel — treinar no terreno constrói
+    entrosamento mais depressa do que apenas esperar. Mudar membros reinicia
+    ambos os contadores."""
     roster_stable_since = ctx.get("roster_stable_since")
-    if not roster_stable_since:
-        return None
-    stable_s = max(0.0, (ctx["now"] - parse_dt(roster_stable_since)).total_seconds())
-    pct = COORDINATION_BONUS_MAX * min(1.0, stable_s / COORDINATION_RAMP_S)
+    time_frac = 0.0
+    if roster_stable_since:
+        stable_s = max(0.0, (ctx["now"] - parse_dt(roster_stable_since)).total_seconds())
+        time_frac = min(1.0, stable_s / COORDINATION_RAMP_S)
+    mission_frac = min(1.0, ctx.get("roster_missions", 0) / COORDINATION_RAMP_MISSIONS)
+    pct = COORDINATION_BONUS_MAX * (0.5 * time_frac + 0.5 * mission_frac)
     if pct < 0.0005:
         return None
-    return {"key": "coordenacao", "category": "equipa", "label": "Equipa há muito tempo junta", "pct": pct,
-            "tip": "Tempo desde a última alteração de membros — mais tempo junto, melhor coordenação."}
+    return {"key": "coordenacao", "category": "equipa", "label": "Entrosamento do plantel", "pct": pct,
+            "tip": f"Tempo com o plantel estável ({round(time_frac * 100)}%) e operações feitas juntos ({ctx.get('roster_missions', 0)}/{COORDINATION_RAMP_MISSIONS}) — mudar membros reinicia a coordenação."}
+
+
+def mod_team_familiarity(ctx):
+    """A equipa aprende (SSS v4): operações concluídas nesta categoria criam
+    rotinas e reflexos — bónus com curva sqrt (ganhos rápidos no início,
+    mestria lenta), capado. Complementa a especialização individual: aqui é a
+    EQUIPA enquanto unidade que domina o tipo de trabalho."""
+    count = int(ctx.get("team_cat_missions", 0) or 0)
+    if count < TEAM_FAMILIARITY_MIN_MISSIONS:
+        return None
+    frac = min(1.0, count / TEAM_FAMILIARITY_RAMP_MISSIONS)
+    pct = TEAM_FAMILIARITY_BONUS_MAX * math.sqrt(frac)
+    if pct < 0.0005:
+        return None
+    mastery = count >= TEAM_FAMILIARITY_RAMP_MISSIONS
+    label = "Mestria da categoria" if mastery else "Familiaridade com a categoria"
+    return {"key": "familiaridade", "category": "equipa", "label": label, "pct": pct,
+            "tip": f"Esta equipa já concluiu {count} operações desta categoria ({min(count, TEAM_FAMILIARITY_RAMP_MISSIONS)}/{TEAM_FAMILIARITY_RAMP_MISSIONS} para a mestria) — a experiência coletiva conta."}
+
+
+def mod_team_strategist(ctx):
+    """Estratega na equipa (SSS v4): um operacional com inteligência alta
+    estuda o alvo e planeia rotas de entrada/saída — recupera uma fração da
+    penalização de risco da operação. Quanto mais arriscada a operação, mais
+    o planeamento vale (o alívio escala com a própria penalização, capado)."""
+    members = ctx["members"]
+    if not members:
+        return None
+    best_int = max(((e.get("attrs") or {}).get("inteligencia", 0) for e in members), default=0)
+    if best_int < STRATEGIST_MIN_INT:
+        return None
+    risk = ctx.get("risk", 0)
+    if risk <= 0:
+        return None
+    # Escala com a inteligência acima do limiar: 7 → 25%, 10 → 100% do alívio.
+    scale = (best_int - (STRATEGIST_MIN_INT - 1)) / (10 - (STRATEGIST_MIN_INT - 1))
+    pct = min(STRATEGIST_RELIEF_MAX, _risk_penalty(risk) * STRATEGIST_RELIEF_FRAC * scale)
+    if pct < 0.0005:
+        return None
+    return {"key": "estratega", "category": "equipa", "label": "Estratega no terreno", "pct": pct,
+            "tip": f"Um operacional com inteligência {best_int}/10 planeou a operação — parte da penalização de risco é recuperada (vale mais em operações arriscadas)."}
 
 
 def mod_team_synergy(ctx):
@@ -1277,7 +1330,7 @@ MODIFIERS = [
     mod_risk_type, mod_risk_distance, mod_heat, mod_district_attention,
     mod_team_quality, mod_team_size, mod_team_fatigue, mod_team_morale, mod_team_loyalty,
     mod_team_leader, mod_team_uniform_spec, mod_team_coordination, mod_team_synergy,
-    mod_team_momentum,
+    mod_team_momentum, mod_team_familiarity, mod_team_strategist,
     mod_vehicle_condition, mod_vehicle_fit, mod_vehicle_capacity,
     mod_weapon_score, mod_stealth_synergy, mod_environment_night, mod_hq_level, mod_talents,
 ]
@@ -1345,6 +1398,15 @@ def _roll_outcome(player, m):
     # mas salva parte do saque. O resultado deixa de ser tudo-ou-nada.
     if r <= chance + PARTIAL_SUCCESS_WINDOW:
         return "partial"
+    # Clutch save do líder (SSS v4): numa falha franca sem polícia, um líder
+    # presente com sangue-frio alto pode ainda salvar a operação para um
+    # sucesso parcial — improvisa, corta perdas e traz parte do saque.
+    if m.get("has_leader"):
+        cool = float(m.get("leader_cool", 0) or 0)
+        clutch_prob = CLUTCH_SAVE_MAX * max(0.0, min(1.0, cool / 10.0))
+        if clutch_prob > 0 and random.random() < clutch_prob:
+            m["clutch_save"] = True
+            return "partial"
     return "failure"
 
 
@@ -1469,6 +1531,12 @@ def _compute_escape_chance(player, m):
     if speed:
         base += min(ESCAPE_SPEED_BONUS_MAX,
                     max(0.0, (speed - ESCAPE_SPEED_BASELINE) * ESCAPE_SPEED_BONUS_PER_UNIT))
+    # Quem conduz também conta (SSS v4): o melhor condutor da equipa despista
+    # a polícia com manobras que o carro sozinho não faz.
+    driver = float(m.get("best_driver", 0) or 0)
+    if driver > DRIVER_ATTR_BASELINE:
+        base += min(DRIVER_ESCAPE_BONUS_MAX,
+                    (driver - DRIVER_ATTR_BASELINE) * DRIVER_ESCAPE_BONUS_PER_POINT)
     # Momentum: equipas em série de vitórias fogem com mais sangue-frio.
     streak = m.get("team_streak", 0)
     if streak > 0:
@@ -1501,7 +1569,9 @@ async def _resolve_chase(db, player, m):
     if m.get("member_ids") and random.random() < 0.4:
         victim_id = random.choice(m["member_ids"])
         bonuses = await get_org_bonuses(db, m["player_id"])
-        until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]))).isoformat()
+        # Advogado na equipa (SSS v4): trata da papelada mal chegam à esquadra.
+        lawyer_mult = LAWYER_ARREST_MULT if m.get("has_lawyer") else 1.0
+        until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]) * lawyer_mult)).isoformat()
         await db.employees.update_one(
             {"_id": ObjectId(victim_id)},
             {"$set": {"status": "arrested", "status_until": until}},
@@ -1509,8 +1579,9 @@ async def _resolve_chase(db, player, m):
         emp = await db.employees.find_one({"_id": ObjectId(victim_id)})
         if emp:
             await push_history(db, emp["_id"], "Preso na perseguição de regresso à base.")
+            suffix = " O advogado da equipa já está a tratar da libertação." if m.get("has_lawyer") else ""
             await add_event(db, m["player_id"], "police",
-                            f"{emp['name']} foi PRESO durante a perseguição policial!")
+                            f"{emp['name']} foi PRESO durante a perseguição policial!{suffix}")
     await add_event(db, m["player_id"], "police",
                     f"POLÍCIA APANHOU {m['team_name']} antes do QG — perdeu {lost:,} € do assalto.")
     return "caught"
@@ -1575,7 +1646,10 @@ def _outcome_message(m, outcome):
     if outcome == "partial":
         reward = int(m.get("pending_reward", 0) or 0)
         frac = int(m.get("partial_fraction", 0.6) * 100)
-        base = f"{m['team_name']} teve de abortar {t['name']} em {t['district']} a meio — salvou {reward:,} {symbol} ({frac}% do saque)"
+        if m.get("clutch_save"):
+            base = f"O líder de {m['team_name']} manteve o sangue-frio quando tudo parecia perdido em {t['name']} ({t['district']}) — improvisou e salvou {reward:,} {symbol} ({frac}% do saque)"
+        else:
+            base = f"{m['team_name']} teve de abortar {t['name']} em {t['district']} a meio — salvou {reward:,} {symbol} ({frac}% do saque)"
         if m.get("chase_active"):
             base += f" — POLÍCIA em perseguição (escape ≈ {int((m.get('escape_chance', 0.5)) * 100)}%)"
         base += "."
@@ -1698,17 +1772,27 @@ async def _crew_returns(db, player, m, outcome):
         if outcome == "failure":
             victim = random.choice(members)
             p = 0.35 if victim["fatigue"] > 70 else 0.2
+            # Médico na equipa (SSS v4): estabiliza no terreno — ferimentos menos
+            # prováveis e recuperação mais rápida.
+            has_medic = m.get("has_medic", False)
+            if has_medic:
+                p *= MEDIC_INJURY_MULT
             if random.random() < p:
-                until = (now_utc() + timedelta(seconds=300 * (1 - bonuses["heal"]))).isoformat()
+                duration = 300 * (1 - bonuses["heal"]) * (MEDIC_RECOVERY_MULT if has_medic else 1.0)
+                until = (now_utc() + timedelta(seconds=duration)).isoformat()
                 await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "injured", "status_until": until}})
                 await push_history(db, victim["_id"], "Ferido em operação.")
-                await add_event(db, pid, "police", f"{victim['name']} ficou ferido durante {t['name']}!")
+                suffix = " O médico da equipa estabilizou-o — recupera mais depressa." if has_medic else ""
+                await add_event(db, pid, "police", f"{victim['name']} ficou ferido durante {t['name']}!{suffix}")
         elif outcome == "police" and random.random() < 0.3:
             victim = random.choice(members)
-            until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]))).isoformat()
+            # Advogado na equipa (SSS v4): a prisão dura menos.
+            lawyer_mult = LAWYER_ARREST_MULT if m.get("has_lawyer") else 1.0
+            until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]) * lawyer_mult)).isoformat()
             await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "arrested", "status_until": until}})
             await push_history(db, victim["_id"], "Preso pela polícia.")
-            await add_event(db, pid, "police", f"{victim['name']} foi PRESO durante {t['name']}!")
+            suffix = " O advogado da equipa já está a tratar da libertação." if m.get("has_lawyer") else ""
+            await add_event(db, pid, "police", f"{victim['name']} foi PRESO durante {t['name']}!{suffix}")
 
     if m.get("vehicle_id"):
         veh = await db.vehicles.find_one({"_id": ObjectId(m["vehicle_id"])})
@@ -1745,6 +1829,15 @@ async def _progress_mission(db, player, m, now):
         phase = "operating"
         updates["phase"] = phase
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "operating"}})
+        # Aviso inteligente do líder (SSS v4): se o calor disparou desde a
+        # partida, o líder reporta do alvo — o jogador fica a saber que as
+        # condições pioraram (a equipa mantém sempre a operação).
+        heat_then = m.get("heat_at_dispatch")
+        if m.get("has_leader") and heat_then is not None:
+            heat_now = player.get("heat", 0)
+            if heat_now - heat_then >= SMART_WARN_HEAT_DELTA:
+                await add_event(db, m["player_id"], "intel",
+                                f"Líder de {m['team_name']} reporta do alvo: o calor subiu de {round(heat_then)}% para {round(heat_now)}% desde a partida — condições piores do que o planeado. A equipa mantém a operação.")
     if phase == "operating" and now >= parse_dt(m["finish_at"]):
         outcome = _roll_outcome(player, m)
         _apply_outcome(player, m, outcome)
@@ -1753,7 +1846,7 @@ async def _progress_mission(db, player, m, now):
         updates.update({"phase": phase, "outcome": outcome})
         # Persist pending reward and chase state so the front-end can display them.
         for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance",
-                  "escape_chance", "fine", "bonus_loot", "partial_fraction"):
+                  "escape_chance", "fine", "bonus_loot", "partial_fraction", "clutch_save"):
             if k in m:
                 updates[k] = m[k]
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
@@ -1790,7 +1883,13 @@ async def _progress_mission(db, player, m, now):
             new_streak = old_streak - 1 if old_streak <= 0 else -1
         else:
             new_streak = old_streak
-        await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning", "streak": new_streak}, "$inc": {"missions_done": 1}})
+        await db.teams.update_one({"_id": team_oid}, {
+            "$set": {"status": "returning", "streak": new_streak},
+            # A equipa aprende (SSS v4): qualquer operação concluída conta para a
+            # familiaridade da categoria e para o entrosamento do plantel atual.
+            "$inc": {"missions_done": 1, "roster_missions": 1,
+                     f"category_missions.{m['opportunity'].get('category', 'especial')}": 1},
+        })
         kind = "success" if outcome in ("success", "partial") else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))
     if phase == "returning" and now >= parse_dt(m["return_at"]):

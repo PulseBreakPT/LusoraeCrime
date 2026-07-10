@@ -11,7 +11,7 @@ from db import db
 from auth import get_current_user
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
-                    team_effectiveness,
+                    team_effectiveness, district_attention_of,
                     age_decay_mult, member_split_mult, property_active, property_condition_factor,
                     local_presence_reduction_s, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
@@ -43,6 +43,11 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S)
 from reward_engine import calculate_full_reward
+from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
+                               DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
+                               DRIVER_TRAVEL_REDUCTION_MAX,
+                               PARTIAL_SUCCESS_WINDOW, PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX,
+                               EV_FAILURE_LOSS_FRAC)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -371,6 +376,13 @@ async def _prepare_dispatch(player, opp, team):
     member_talents = sorted({t for e in members for t in e.get("talents", [])})
     if "motorista_fantasma" in member_talents:
         travel_s *= 0.9
+    # Condutor de topo (SSS v4): o melhor atributo de condução da equipa
+    # reduz o tempo de viagem — quem vai ao volante importa, não só o carro.
+    best_driver = max(((e.get("attrs") or {}).get("conducao", 0) for e in members), default=0)
+    if best_driver > DRIVER_ATTR_BASELINE:
+        driver_reduction = min(DRIVER_TRAVEL_REDUCTION_MAX,
+                               (best_driver - DRIVER_ATTR_BASELINE) * DRIVER_TRAVEL_REDUCTION_PER_POINT)
+        travel_s = max(20, travel_s * (1 - driver_reduction))
 
     mult = 1.0
     prop_ranks = property_stack_ranks(props)
@@ -393,14 +405,43 @@ async def _prepare_dispatch(player, opp, team):
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
+    # Inteligência da equipa (SSS v4): papéis internos e memória, lidos uma vez
+    # aqui e usados na chance, nas perseguições e nas consequências pós-missão.
+    try:
+        leader_idx = RANKS.index(TEAM_LEADER_MIN_RANK)
+    except ValueError:
+        leader_idx = len(RANKS) - 1
+    leaders = [e for e in members if e.get("rank") in RANKS and RANKS.index(e["rank"]) >= leader_idx]
+    has_leader = bool(leaders)
+    leader_cool = max(((e.get("attrs") or {}).get("sangue_frio", 0) for e in leaders), default=0)
+    member_roles = {e.get("role_key") for e in members}
+    has_medic = "medico" in member_roles
+    has_lawyer = "advogado" in member_roles
+    team_streak = int(team.get("streak", 0) or 0)
+    team_cat_missions = int((team.get("category_missions") or {}).get(opp["category"], 0) or 0)
+    roster_missions = int(team.get("roster_missions", 0) or 0)
+    vehicle_discreet = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("discretion", 50) >= STEALTH_VEHICLE_DISCRETION_MIN
     chance_ctx = {
         "heat": player["heat"], "risk": opp["risk"], "dist_km": opp.get("dist_km", 0.0),
         "category": opp["category"], "members": members, "min_members": opp.get("min_members", 1),
         "vehicle": vehicle, "weapons_by_employee_id": weapons_by_employee_id,
         "roster_stable_since": team.get("roster_stable_since"), "hq_level": player["hq"]["level"],
+        # SSS v4: memória do mundo e da equipa, finalmente ligadas à chance.
+        "district": opp.get("district"),
+        "district_attention": district_attention_of(player, opp.get("district")),
+        "team_streak": team_streak,
+        "team_cat_missions": team_cat_missions,
+        "roster_missions": roster_missions,
         "now": now,
     }
     chance, breakdown = chance_breakdown(chance_ctx)
+    # Forense pré-falha (SSS v4): os 3 fatores mais negativos do despacho, para
+    # o relatório de falha explicar PORQUÊ ("Fator crítico: ...").
+    top_negatives = [
+        {"key": i["key"], "label": i["label"], "pct": i["pct"]}
+        for i in sorted((i for i in breakdown if i["pct"] < 0 and i["key"] != "rendimentos_decrescentes"),
+                        key=lambda i: i["pct"])[:3]
+    ]
     weapon_loud = any(
         WEAPON_MODELS.get(w.get("model_key"), {}).get("loud", False)
         for w in weapons_by_employee_id.values()
@@ -444,6 +485,11 @@ async def _prepare_dispatch(player, opp, team):
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
         "talents": member_talents, "min_members": opp.get("min_members", 1),
         "weapon_loud": weapon_loud, "origin": origin,
+        # SSS v4: inteligência da equipa persistida com a missão.
+        "team_streak": team_streak, "vehicle_discreet": vehicle_discreet,
+        "has_leader": has_leader, "leader_cool": leader_cool,
+        "has_medic": has_medic, "has_lawyer": has_lawyer,
+        "best_driver": best_driver, "top_negatives": top_negatives,
     }
 
 
@@ -531,6 +577,18 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "weapon_loud": prep.get("weapon_loud", False),
         "repeat_type": repeat_type,
         "talents": prep["talents"],
+        # QI da equipa (SSS v4): campos que alimentam perseguições, clutch save,
+        # papéis internos, aviso do líder e forense de falha.
+        "team_streak": prep.get("team_streak", 0),
+        "vehicle_speed_effective": round(prep["speed"], 1),
+        "vehicle_discreet": prep.get("vehicle_discreet", False),
+        "has_leader": prep.get("has_leader", False),
+        "leader_cool": prep.get("leader_cool", 0),
+        "has_medic": prep.get("has_medic", False),
+        "has_lawyer": prep.get("has_lawyer", False),
+        "best_driver": prep.get("best_driver", 0),
+        "top_negatives": prep.get("top_negatives", []),
+        "heat_at_dispatch": player.get("heat", 0),
         "opportunity_id": str(opp["_id"]),
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
@@ -574,20 +632,39 @@ async def _try_prepare_dispatch(player, opp, team):
         return None
 
 
+def _expected_value(prep):
+    """Valor esperado real de um despacho (SSS v4): chance*recompensa + saque
+    esperado dos sucessos parciais (janela near-miss) − perdas esperadas numa
+    falha franca (desgaste, calor, fadiga — proxy) − custo real do combustível.
+    É isto que um consigliere calcularia, não apenas 'chance alta'."""
+    chance = prep["chance"]
+    reward = prep["reward"]
+    partial_ev = PARTIAL_SUCCESS_WINDOW * ((PARTIAL_REWARD_MIN + PARTIAL_REWARD_MAX) / 2) * reward
+    fail_prob = max(0.0, 1.0 - chance - PARTIAL_SUCCESS_WINDOW)
+    fuel_type = (prep.get("vehicle") or {}).get("fuel_type")
+    fuel_cost = prep.get("fuel_needed", 0.0) * FUEL_PRICES.get(fuel_type, 1.8)
+    return chance * reward + partial_ev - fail_prob * reward * EV_FAILURE_LOSS_FRAC - fuel_cost
+
+
 def _rank_key(prep, priority=HQ_DEFAULT_PRIORITY):
     # Critério principal depende da prioridade global da organização; os
-    # restantes campos servem de desempate, na mesma ordem de sempre (maior
-    # probabilidade de sucesso, depois mais perto, depois maior recompensa).
+    # restantes campos servem de desempate. SSS v4: o valor esperado real
+    # (_expected_value) substitui a recompensa bruta — uma operação de 10k a
+    # 40% de chance deixa de "ganhar" a uma de 6k a 95%.
+    ev = _expected_value(prep)
     if priority == "lucro":
-        return (-prep["reward"], -prep["chance"], prep["dist"])
+        return (-ev, -prep["chance"], prep["dist"])
     if priority == "velocidade":
-        return (prep["travel_s"], -prep["chance"], -prep["reward"])
+        return (prep["travel_s"], -prep["chance"], -ev)
     if priority == "reputacao":
-        return (-prep.get("reward_reputation", 0), -prep["chance"], -prep["reward"])
+        return (-prep.get("reward_reputation", 0), -prep["chance"], -ev)
     if priority == "complexidade":
-        return (-prep.get("reward_difficulty_score", 0), -prep["chance"], -prep["reward"])
-    # "custos" e "equilibrio" (por omissão): comportamento clássico.
-    return (-prep["chance"], prep["dist"], -prep["reward"])
+        return (-prep.get("reward_difficulty_score", 0), -prep["chance"], -ev)
+    if priority == "custos":
+        return (round(prep.get("fuel_needed", 0.0), 1), -prep["chance"], -ev)
+    # "equilibrio" (por omissão): segurança primeiro (chance em degraus de 1%),
+    # e dentro do mesmo degrau decide o valor esperado — o melhor dos dois mundos.
+    return (-round(prep["chance"], 2), -ev, prep["dist"])
 
 
 @router.post("/dispatch/recommend_opportunity")
@@ -773,6 +850,8 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         "player_id": pid, "name": name, "spec": body.spec, "status": "idle",
         "vehicle_id": None, "missions_done": 0, "created_at": created,
         "available_at": None, "roster_stable_since": created,
+        # SSS v4: memória da equipa — momentum, familiaridade e entrosamento.
+        "streak": 0, "category_missions": {}, "roster_missions": 0,
     })
     await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €.")
     await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", player["clean_money"] - TEAM_CREATE_COST, f"Nova equipa: {name}")
@@ -864,7 +943,7 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
         reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
         await db.teams.update_many(
             {"_id": {"$in": [ObjectId(tid) for tid in affected_ids]}, "player_id": pid},
-            {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until}},
+            {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until, "roster_missions": 0}},
         )
     return {"ok": True}
 

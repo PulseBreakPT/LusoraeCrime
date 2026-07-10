@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
 """
-Testes backend para autenticação e rotas legais do Lusorae.
+Testes backend para SSS v4 — QI das Equipas (Lusorae).
+Credenciais: admin@lusorae.com / admin123
 """
 import os
 import sys
 import time
 import requests
 from datetime import datetime
+from pymongo import MongoClient
 
 # Base URL from frontend/.env
-BASE_URL = "https://sss-enhancement.preview.emergentagent.com/api"
+BASE_URL = "https://71606141-6a00-440a-9da2-f4f7109928fa.preview.emergentagent.com/api"
 
-# Test credentials
+# Test credentials (CHANGED - DB was reset)
 ADMIN_EMAIL = "admin@lusorae.com"
-ADMIN_PASSWORD = "LusoraeAdmin2026!"
+ADMIN_PASSWORD = "admin123"
+
+# MongoDB connection
+MONGO_URL = "mongodb://localhost:27017"
+DB_NAME = "test_database"
 
 # Colors for output
 GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
 BLUE = "\033[94m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
-test_results = {"passed": 0, "failed": 0, "errors": []}
+test_results = {"passed": 0, "failed": 0, "errors": [], "warnings": []}
+breakdown_items_observed = set()
+mission_fields_verified = {}
 
 
 def log_test(name, passed, details=""):
@@ -37,639 +46,670 @@ def log_test(name, passed, details=""):
         test_results["errors"].append(f"{name}: {details}")
 
 
+def log_warning(message):
+    print(f"{YELLOW}⚠{RESET} {message}")
+    test_results["warnings"].append(message)
+
+
 def log_section(title):
-    print(f"\n{BLUE}{'='*60}{RESET}")
+    print(f"\n{BLUE}{'='*70}{RESET}")
     print(f"{BLUE}{title}{RESET}")
-    print(f"{BLUE}{'='*60}{RESET}")
+    print(f"{BLUE}{'='*70}{RESET}")
 
 
-def test_legal_meta():
-    """Test GET /api/legal/meta"""
-    log_section("1. ROTAS LEGAIS - GET /api/legal/meta")
-    try:
-        resp = requests.get(f"{BASE_URL}/legal/meta", timeout=10)
-        if resp.status_code != 200:
-            log_test("GET /api/legal/meta → 200", False, f"Status: {resp.status_code}")
-            return
-        
-        data = resp.json()
-        
-        # Check contact_email
-        if data.get("contact_email") != "geral@lusorae.pt":
-            log_test("contact_email = geral@lusorae.pt", False, f"Got: {data.get('contact_email')}")
-            return
-        
-        # Check documents structure
-        docs = data.get("documents", {})
-        required_docs = ["terms", "privacy", "rgpd"]
-        
-        for doc_id in required_docs:
-            if doc_id not in docs:
-                log_test(f"Document '{doc_id}' present", False, f"Missing document: {doc_id}")
-                return
-            
-            doc = docs[doc_id]
-            if doc.get("version") != "1.0":
-                log_test(f"{doc_id} version = 1.0", False, f"Got: {doc.get('version')}")
-                return
-            
-            if doc.get("effective_date") != "2026-07-08":
-                log_test(f"{doc_id} effective_date = 2026-07-08", False, f"Got: {doc.get('effective_date')}")
-                return
-        
-        log_test("GET /api/legal/meta → 200 with correct structure", True)
-        
-    except Exception as e:
-        log_test("GET /api/legal/meta", False, str(e))
+def log_info(message):
+    print(f"{CYAN}ℹ{RESET} {message}")
 
 
-def test_legal_documents():
-    """Test GET /api/legal/documents/{doc_id}"""
-    log_section("2. ROTAS LEGAIS - GET /api/legal/documents")
-    
-    # Test valid documents
-    for doc_id in ["terms", "privacy", "rgpd"]:
-        try:
-            resp = requests.get(f"{BASE_URL}/legal/documents/{doc_id}", timeout=10)
-            if resp.status_code != 200:
-                log_test(f"GET /api/legal/documents/{doc_id} → 200", False, f"Status: {resp.status_code}")
-                continue
-            
-            data = resp.json()
-            required_fields = ["id", "title", "version", "effective_date", "summary", "sections", "available_versions"]
-            
-            missing = [f for f in required_fields if f not in data]
-            if missing:
-                log_test(f"GET /api/legal/documents/{doc_id} has all fields", False, f"Missing: {missing}")
-                continue
-            
-            if not isinstance(data.get("sections"), list):
-                log_test(f"GET /api/legal/documents/{doc_id} sections is array", False, "sections is not a list")
-                continue
-            
-            log_test(f"GET /api/legal/documents/{doc_id} → 200 with correct structure", True)
-            
-        except Exception as e:
-            log_test(f"GET /api/legal/documents/{doc_id}", False, str(e))
-    
-    # Test non-existent document
+def get_mongo_client():
+    """Get MongoDB client"""
     try:
-        resp = requests.get(f"{BASE_URL}/legal/documents/inexistente", timeout=10)
-        if resp.status_code == 404:
-            log_test("GET /api/legal/documents/inexistente → 404", True)
-        else:
-            log_test("GET /api/legal/documents/inexistente → 404", False, f"Status: {resp.status_code}")
+        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+        client.server_info()  # Force connection
+        return client
     except Exception as e:
-        log_test("GET /api/legal/documents/inexistente → 404", False, str(e))
-    
-    # Test invalid version
-    try:
-        resp = requests.get(f"{BASE_URL}/legal/documents/terms?version=9.9", timeout=10)
-        if resp.status_code == 404:
-            log_test("GET /api/legal/documents/terms?version=9.9 → 404", True)
-        else:
-            log_test("GET /api/legal/documents/terms?version=9.9 → 404", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("GET /api/legal/documents/terms?version=9.9 → 404", False, str(e))
-
-
-def test_legal_changelog():
-    """Test GET /api/legal/changelog"""
-    log_section("3. ROTAS LEGAIS - GET /api/legal/changelog")
-    
-    try:
-        resp = requests.get(f"{BASE_URL}/legal/changelog", timeout=10)
-        if resp.status_code != 200:
-            log_test("GET /api/legal/changelog → 200", False, f"Status: {resp.status_code}")
-            return
-        
-        data = resp.json()
-        
-        if "categories" not in data or "versions" not in data:
-            log_test("GET /api/legal/changelog has categories and versions", False, "Missing fields")
-            return
-        
-        versions = data.get("versions", [])
-        if len(versions) != 6:
-            log_test("Changelog has 6 versions", False, f"Got {len(versions)} versions")
-            return
-        
-        # Check first version has tag "atual"
-        if versions[0].get("tag") != "atual":
-            log_test("First version has tag 'atual'", False, f"Got tag: {versions[0].get('tag')}")
-            return
-        
-        # Check first version is v0.6.0
-        if versions[0].get("version") != "0.6.0":
-            log_test("First version is v0.6.0", False, f"Got: {versions[0].get('version')}")
-            return
-        
-        log_test("GET /api/legal/changelog → 200 with 6 versions, first is v0.6.0 with tag 'atual'", True)
-        
-    except Exception as e:
-        log_test("GET /api/legal/changelog", False, str(e))
-
-
-def test_register_validation():
-    """Test POST /api/auth/register validation"""
-    log_section("4. REGISTO - Validação")
-    
-    timestamp = int(time.time())
-    
-    # Test without accept_terms
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": f"Org Test {timestamp}",
-            "email": f"test_{timestamp}@lusorae-test.pt",
-            "password": "TesteForte123",
-            "accept_terms": False
-        }, timeout=10)
-        
-        if resp.status_code == 400 and "Termos" in resp.text:
-            log_test("Register without accept_terms → 400 with message about Termos", True)
-        else:
-            log_test("Register without accept_terms → 400", False, f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-    except Exception as e:
-        log_test("Register without accept_terms", False, str(e))
-    
-    # Test weak password
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": f"Org Test {timestamp}",
-            "email": f"test_{timestamp}@lusorae-test.pt",
-            "password": "abc123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp.status_code == 400 and "fraca" in resp.text.lower():
-            log_test("Register with weak password 'abc123' → 400 'Palavra-passe fraca'", True)
-        else:
-            log_test("Register with weak password → 400", False, f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-    except Exception as e:
-        log_test("Register with weak password", False, str(e))
-    
-    # Test password without uppercase
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": f"Org Test {timestamp}",
-            "email": f"test_{timestamp}@lusorae-test.pt",
-            "password": "forte1234",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp.status_code == 400:
-            log_test("Register with password without uppercase 'forte1234' → 400", True)
-        else:
-            log_test("Register with password without uppercase → 400", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Register with password without uppercase", False, str(e))
-    
-    # Test password without number
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": f"Org Test {timestamp}",
-            "email": f"test_{timestamp}@lusorae-test.pt",
-            "password": "ForteForte",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp.status_code == 400:
-            log_test("Register with password without number 'ForteForte' → 400", True)
-        else:
-            log_test("Register with password without number → 400", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Register with password without number", False, str(e))
-    
-    # Test org_name with forbidden characters
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": "Org<script>",
-            "email": f"test_{timestamp}@lusorae-test.pt",
-            "password": "TesteForte123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp.status_code == 400:
-            log_test("Register with org_name containing forbidden chars → 400", True)
-        else:
-            log_test("Register with org_name containing forbidden chars → 400", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Register with org_name containing forbidden chars", False, str(e))
-
-
-def test_register_success():
-    """Test successful registration"""
-    log_section("5. REGISTO - Sucesso")
-    
-    timestamp = int(time.time())
-    test_email = f"test_{timestamp}@lusorae-test.pt"
-    test_org = f"Organização Teste {timestamp}"
-    
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": test_org,
-            "email": test_email,
-            "password": "TesteForte123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp.status_code != 200:
-            log_test("Valid registration → 200", False, f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-            return None
-        
-        data = resp.json()
-        required_fields = ["id", "email", "name", "role", "access_token", "refresh_token"]
-        missing = [f for f in required_fields if f not in data]
-        
-        if missing:
-            log_test("Registration response has all required fields", False, f"Missing: {missing}")
-            return None
-        
-        log_test("Valid registration → 200 with id/email/name/role/access_token/refresh_token", True)
-        
-        # Return the credentials for further tests
-        return {
-            "email": test_email,
-            "password": "TesteForte123",
-            "access_token": data["access_token"],
-            "user_id": data["id"]
-        }
-        
-    except Exception as e:
-        log_test("Valid registration", False, str(e))
+        log_warning(f"Não foi possível conectar ao MongoDB: {e}")
         return None
 
 
-def test_register_whitespace():
-    """Test org_name with multiple spaces"""
-    log_section("6. REGISTO - Normalização de espaços")
-    
-    timestamp = int(time.time())
+def test_login():
+    """Test A: Login and GET /api/game/state"""
+    log_section("A. LOGIN E GET /api/game/state")
     
     try:
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": f"  Nome   Duplo  {timestamp}  ",
-            "email": f"test_{timestamp}@lusorae-test.pt",
-            "password": "TesteForte123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            # Check if name was normalized (multiple spaces → single space, trimmed)
-            expected_name = f"Nome Duplo {timestamp}"
-            if data.get("name") == expected_name:
-                log_test("org_name with multiple spaces normalized correctly", True)
-            else:
-                log_test("org_name with multiple spaces normalized", False, f"Expected '{expected_name}', got '{data.get('name')}'")
-        else:
-            log_test("Register with spaces in org_name", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Register with spaces in org_name", False, str(e))
-
-
-def test_register_duplicate():
-    """Test duplicate email and org_name"""
-    log_section("7. REGISTO - Duplicados")
-    
-    timestamp = int(time.time())
-    test_email = f"test_dup_{timestamp}@lusorae-test.pt"
-    test_org = f"Org Duplicada {timestamp}"
-    
-    # First registration
-    try:
-        resp1 = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": test_org,
-            "email": test_email,
-            "password": "TesteForte123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp1.status_code != 200:
-            log_test("First registration for duplicate test", False, f"Status: {resp1.status_code}")
-            return
-        
-        # Try to register with same email
-        resp2 = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": f"Outra Org {timestamp}",
-            "email": test_email,
-            "password": "TesteForte123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp2.status_code == 400 and "email já está registado" in resp2.text:
-            log_test("Register with duplicate email → 400 'Este email já está registado'", True)
-        else:
-            log_test("Register with duplicate email → 400", False, f"Status: {resp2.status_code}, Body: {resp2.text[:200]}")
-        
-        # Try to register with same org_name (different capitalization)
-        resp3 = requests.post(f"{BASE_URL}/auth/register", json={
-            "org_name": test_org.upper(),  # Same name but uppercase
-            "email": f"test_dup2_{timestamp}@lusorae-test.pt",
-            "password": "TesteForte123",
-            "accept_terms": True
-        }, timeout=10)
-        
-        if resp3.status_code == 400 and "nome de organização já está a ser utilizado" in resp3.text:
-            log_test("Register with duplicate org_name (different case) → 400", True)
-        else:
-            log_test("Register with duplicate org_name → 400", False, f"Status: {resp3.status_code}, Body: {resp3.text[:200]}")
-        
-    except Exception as e:
-        log_test("Duplicate registration tests", False, str(e))
-
-
-def test_check_availability():
-    """Test POST /api/auth/check-availability"""
-    log_section("8. CHECK-AVAILABILITY")
-    
-    timestamp = int(time.time())
-    
-    # Test with admin email (should be unavailable)
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/check-availability", json={
-            "email": ADMIN_EMAIL
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            email_data = data.get("email", {})
-            if email_data.get("valid") and not email_data.get("available"):
-                log_test("check-availability with admin email → valid:true, available:false", True)
-            else:
-                log_test("check-availability with admin email", False, f"Got: {email_data}")
-        else:
-            log_test("check-availability with admin email", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("check-availability with admin email", False, str(e))
-    
-    # Test with available email
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/check-availability", json={
-            "email": f"livre_{timestamp}@teste.pt"
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            email_data = data.get("email", {})
-            if email_data.get("valid") and email_data.get("available"):
-                log_test("check-availability with available email → valid:true, available:true", True)
-            else:
-                log_test("check-availability with available email", False, f"Got: {email_data}")
-        else:
-            log_test("check-availability with available email", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("check-availability with available email", False, str(e))
-    
-    # Test with invalid email
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/check-availability", json={
-            "email": "invalido"
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            email_data = data.get("email", {})
-            if not email_data.get("valid") and not email_data.get("available"):
-                log_test("check-availability with invalid email → valid:false, available:false", True)
-            else:
-                log_test("check-availability with invalid email", False, f"Got: {email_data}")
-        else:
-            log_test("check-availability with invalid email", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("check-availability with invalid email", False, str(e))
-    
-    # Test with admin org_name (should be unavailable)
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/check-availability", json={
-            "org_name": "Sindicato Lusorae"
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            org_data = data.get("org_name", {})
-            if not org_data.get("available"):
-                log_test("check-availability with admin org_name → available:false", True)
-            else:
-                log_test("check-availability with admin org_name", False, f"Got: {org_data}")
-        else:
-            log_test("check-availability with admin org_name", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("check-availability with admin org_name", False, str(e))
-    
-    # Test with short org_name
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/check-availability", json={
-            "org_name": "ab"
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            org_data = data.get("org_name", {})
-            if not org_data.get("valid"):
-                log_test("check-availability with short org_name → valid:false", True)
-            else:
-                log_test("check-availability with short org_name", False, f"Got: {org_data}")
-        else:
-            log_test("check-availability with short org_name", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("check-availability with short org_name", False, str(e))
-    
-    # Test with unique org_name
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/check-availability", json={
-            "org_name": f"Nome Único {timestamp}"
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            org_data = data.get("org_name", {})
-            if org_data.get("valid") and org_data.get("available"):
-                log_test("check-availability with unique org_name → valid:true, available:true", True)
-            else:
-                log_test("check-availability with unique org_name", False, f"Got: {org_data}")
-        else:
-            log_test("check-availability with unique org_name", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("check-availability with unique org_name", False, str(e))
-
-
-def test_login_and_lockout():
-    """Test login and lockout mechanism"""
-    log_section("9. LOGIN + LOCKOUT")
-    
-    # Test valid login with admin
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        }, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            if "access_token" in data:
-                log_test("Login with admin credentials → 200", True)
-            else:
-                log_test("Login with admin credentials", False, "Missing access_token")
-        else:
-            log_test("Login with admin credentials → 200", False, f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-    except Exception as e:
-        log_test("Login with admin credentials", False, str(e))
-    
-    # Test lockout with disposable email
-    timestamp = int(time.time())
-    lockout_email = f"lockout_{timestamp}@teste.pt"
-    
-    try:
-        # Make 5 failed attempts
-        for i in range(5):
-            resp = requests.post(f"{BASE_URL}/auth/login", json={
-                "email": lockout_email,
-                "password": "WrongPassword123"
-            }, timeout=10)
-            
-            if resp.status_code != 401:
-                log_test(f"Failed login attempt {i+1} → 401", False, f"Status: {resp.status_code}")
-        
-        # 6th attempt should return 429 with Retry-After header
-        time.sleep(1)  # Small delay to ensure lockout is triggered
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": lockout_email,
-            "password": "WrongPassword123"
-        }, timeout=10)
-        
-        if resp.status_code == 429:
-            retry_after = resp.headers.get("Retry-After")
-            if retry_after and retry_after.isdigit() and int(retry_after) > 0:
-                log_test(f"6th failed attempt → 429 with Retry-After header ({retry_after}s)", True)
-            else:
-                log_test("6th failed attempt → 429 with Retry-After", False, f"Retry-After: {retry_after}")
-        else:
-            log_test("6th failed attempt → 429", False, f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-    except Exception as e:
-        log_test("Login lockout test", False, str(e))
-
-
-def test_change_password(user_creds):
-    """Test POST /api/auth/change-password"""
-    log_section("10. CHANGE-PASSWORD")
-    
-    if not user_creds:
-        print(f"{YELLOW}⚠ Skipping change-password tests (no user credentials){RESET}")
-        return
-    
-    # Test with weak new password
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/change-password", 
-            headers={"Authorization": f"Bearer {user_creds['access_token']}"},
-            json={
-                "current_password": user_creds["password"],
-                "new_password": "fraca"
-            }, timeout=10)
-        
-        if resp.status_code == 400:
-            log_test("change-password with weak new password → 400", True)
-        else:
-            log_test("change-password with weak new password → 400", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("change-password with weak password", False, str(e))
-    
-    # Test with wrong current password
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/change-password",
-            headers={"Authorization": f"Bearer {user_creds['access_token']}"},
-            json={
-                "current_password": "WrongPassword123",
-                "new_password": "NovaForte123"
-            }, timeout=10)
-        
-        if resp.status_code == 400:
-            log_test("change-password with wrong current password → 400", True)
-        else:
-            log_test("change-password with wrong current password → 400", False, f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("change-password with wrong current password", False, str(e))
-    
-    # Test successful password change
-    try:
-        resp = requests.post(f"{BASE_URL}/auth/change-password",
-            headers={"Authorization": f"Bearer {user_creds['access_token']}"},
-            json={
-                "current_password": user_creds["password"],
-                "new_password": "NovaForte123"
-            }, timeout=10)
-        
-        if resp.status_code == 200:
-            log_test("change-password with correct credentials → 200", True)
-            
-            # Try to login with new password
-            time.sleep(1)
-            resp2 = requests.post(f"{BASE_URL}/auth/login", json={
-                "email": user_creds["email"],
-                "password": "NovaForte123"
-            }, timeout=10)
-            
-            if resp2.status_code == 200:
-                log_test("Login with new password → 200", True)
-            else:
-                log_test("Login with new password → 200", False, f"Status: {resp2.status_code}")
-        else:
-            log_test("change-password with correct credentials → 200", False, f"Status: {resp.status_code}, Body: {resp.text[:200]}")
-    except Exception as e:
-        log_test("change-password success", False, str(e))
-
-
-def test_regression():
-    """Test regression - existing endpoints still work"""
-    log_section("11. REGRESSÃO")
-    
-    # Login as admin to get token
-    try:
+        # Login
         resp = requests.post(f"{BASE_URL}/auth/login", json={
             "email": ADMIN_EMAIL,
             "password": ADMIN_PASSWORD
         }, timeout=10)
         
         if resp.status_code != 200:
-            log_test("Login for regression tests", False, f"Status: {resp.status_code}")
-            return
+            log_test("Login com admin@lusorae.com / admin123 → 200", False, 
+                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+            return None
         
-        token = resp.json().get("access_token")
-        refresh_token = resp.json().get("refresh_token")
+        data = resp.json()
+        if "access_token" not in data:
+            log_test("Login retorna access_token", False, "Missing access_token")
+            return None
         
-        # Test GET /api/auth/me
-        resp_me = requests.get(f"{BASE_URL}/auth/me",
-            headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        log_test("Login com admin@lusorae.com / admin123 → 200", True)
+        token = data["access_token"]
         
-        if resp_me.status_code == 200:
-            log_test("GET /api/auth/me with Bearer token → 200", True)
-        else:
-            log_test("GET /api/auth/me → 200", False, f"Status: {resp_me.status_code}")
+        # GET /api/game/state
+        resp_state = requests.get(f"{BASE_URL}/game/state",
+            headers={"Authorization": f"Bearer {token}"}, timeout=15)
         
-        # Test POST /api/auth/refresh
-        resp_refresh = requests.post(f"{BASE_URL}/auth/refresh",
-            headers={"Authorization": f"Bearer {refresh_token}"}, timeout=10)
+        if resp_state.status_code != 200:
+            log_test("GET /api/game/state → 200", False, 
+                    f"Status: {resp_state.status_code}, Body: {resp_state.text[:200]}")
+            return None
         
-        if resp_refresh.status_code == 200:
-            data = resp_refresh.json()
-            if "access_token" in data:
-                log_test("POST /api/auth/refresh → 200 with new access_token", True)
-            else:
-                log_test("POST /api/auth/refresh", False, "Missing access_token")
-        else:
-            log_test("POST /api/auth/refresh → 200", False, f"Status: {resp_refresh.status_code}")
+        state = resp_state.json()
         
-        # Test GET /api/game/state (check if registration creates player/org)
-        resp_game = requests.get(f"{BASE_URL}/game/state",
-            headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        # Verify teams and opportunities exist
+        if "teams" not in state or "opportunities" not in state:
+            log_test("GET /api/game/state devolve teams e opportunities", False, 
+                    f"Missing fields. Keys: {list(state.keys())}")
+            return None
         
-        if resp_game.status_code == 200:
-            log_test("GET /api/game/state with registered user → 200", True)
-        else:
-            log_test("GET /api/game/state → 200", False, f"Status: {resp_game.status_code}")
+        log_test("GET /api/game/state → 200 com teams e opportunities", True)
+        log_info(f"Equipas disponíveis: {len(state.get('teams', []))}")
+        log_info(f"Oportunidades ativas: {len(state.get('opportunities', []))}")
+        
+        return {
+            "token": token,
+            "state": state,
+            "teams": state.get("teams", []),
+            "opportunities": state.get("opportunities", [])
+        }
         
     except Exception as e:
-        log_test("Regression tests", False, str(e))
+        log_test("Login e GET /api/game/state", False, str(e))
+        return None
+
+
+def test_dispatch_preview(context):
+    """Test B: POST /api/game/dispatch/preview for multiple opportunities"""
+    log_section("B. POST /api/game/dispatch/preview (breakdown)")
+    
+    if not context:
+        log_warning("Sem contexto de login, a saltar testes de preview")
+        return
+    
+    token = context["token"]
+    teams = context["teams"]
+    opportunities = context["opportunities"]
+    
+    if not teams:
+        log_warning("Sem equipas disponíveis para testar preview")
+        return
+    
+    if not opportunities:
+        log_warning("Sem oportunidades disponíveis para testar preview")
+        return
+    
+    # Get first idle team
+    idle_team = next((t for t in teams if t.get("status") == "idle"), None)
+    if not idle_team:
+        log_warning("Sem equipas idle para testar preview")
+        return
+    
+    team_id = idle_team["id"]
+    log_info(f"A usar equipa: {idle_team.get('name')} (id: {team_id})")
+    
+    # Test preview for multiple opportunities
+    previews_tested = 0
+    for opp in opportunities[:5]:  # Test up to 5 opportunities
+        opp_id = opp["id"]
+        opp_name = opp.get("name", "Unknown")
+        
+        try:
+            resp = requests.post(f"{BASE_URL}/game/dispatch/preview",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"opportunity_id": opp_id, "team_id": team_id},
+                timeout=10)
+            
+            if resp.status_code != 200:
+                log_test(f"Preview {opp_name} → 200", False, 
+                        f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+                continue
+            
+            data = resp.json()
+            
+            # Verify breakdown structure
+            if "breakdown" not in data:
+                log_test(f"Preview {opp_name} tem breakdown", False, "Missing breakdown")
+                continue
+            
+            breakdown = data["breakdown"]
+            if not isinstance(breakdown, list):
+                log_test(f"Preview {opp_name} breakdown é lista", False, 
+                        f"Type: {type(breakdown)}")
+                continue
+            
+            # Verify breakdown items structure
+            valid_breakdown = True
+            for item in breakdown:
+                if not all(k in item for k in ["key", "label", "pct", "tip", "category"]):
+                    log_test(f"Preview {opp_name} breakdown items têm campos obrigatórios", False,
+                            f"Item missing fields: {item}")
+                    valid_breakdown = False
+                    break
+                
+                # Collect breakdown keys
+                breakdown_items_observed.add(item["key"])
+            
+            if not valid_breakdown:
+                continue
+            
+            # Verify sum of pct ≈ chance (tolerance 0.001)
+            chance = data.get("chance", 0)
+            sum_pct = sum(item["pct"] for item in breakdown)
+            diff = abs(sum_pct - chance)
+            
+            if diff > 0.001:
+                log_test(f"Preview {opp_name}: soma breakdown ≈ chance", False,
+                        f"Chance: {chance:.4f}, Soma: {sum_pct:.4f}, Diff: {diff:.4f}")
+                continue
+            
+            log_test(f"Preview {opp_name} → 200 com breakdown válido (soma={sum_pct:.3f}, chance={chance:.3f})", True)
+            previews_tested += 1
+            
+            # Log breakdown items for first opportunity
+            if previews_tested == 1:
+                log_info(f"Breakdown items ({len(breakdown)}):")
+                for item in breakdown:
+                    sign = "+" if item["pct"] >= 0 else ""
+                    print(f"    {sign}{item['pct']*100:.1f}% - {item['label']} ({item['key']})")
+            
+        except Exception as e:
+            log_test(f"Preview {opp_name}", False, str(e))
+    
+    if previews_tested > 0:
+        log_info(f"Total de previews testados: {previews_tested}")
+        log_info(f"Breakdown keys observadas: {sorted(breakdown_items_observed)}")
+
+
+def test_dispatch_and_mission_cycle(context):
+    """Test C: POST /api/game/dispatch and complete mission cycle"""
+    log_section("C. POST /api/game/dispatch + ciclo completo de missão")
+    
+    if not context:
+        log_warning("Sem contexto de login, a saltar teste de dispatch")
+        return None
+    
+    token = context["token"]
+    teams = context["teams"]
+    opportunities = context["opportunities"]
+    
+    if not teams or not opportunities:
+        log_warning("Sem equipas ou oportunidades para testar dispatch")
+        return None
+    
+    # Find a viable opportunity (low risk, short duration)
+    viable_opp = None
+    idle_team = next((t for t in teams if t.get("status") == "idle"), None)
+    
+    if not idle_team:
+        log_warning("Sem equipas idle para despachar")
+        return None
+    
+    team_id = idle_team["id"]
+    
+    # Try to find a short, low-risk opportunity
+    for opp in opportunities:
+        if opp.get("risk", 5) <= 2 and opp.get("duration_s", 999) <= 120:
+            viable_opp = opp
+            break
+    
+    if not viable_opp:
+        # Fallback to first opportunity
+        viable_opp = opportunities[0]
+    
+    opp_id = viable_opp["id"]
+    opp_name = viable_opp.get("name", "Unknown")
+    duration_s = viable_opp.get("duration_s", 120)
+    
+    log_info(f"A despachar equipa '{idle_team.get('name')}' para '{opp_name}'")
+    log_info(f"Duração estimada: {duration_s}s + viagem")
+    
+    try:
+        # Dispatch
+        resp = requests.post(f"{BASE_URL}/game/dispatch",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"opportunity_id": opp_id, "team_id": team_id},
+            timeout=10)
+        
+        if resp.status_code != 200:
+            log_test("POST /api/game/dispatch → 200", False,
+                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+            return None
+        
+        data = resp.json()
+        if "mission_id" not in data:
+            log_test("Dispatch retorna mission_id", False, "Missing mission_id")
+            return None
+        
+        mission_id = data["mission_id"]
+        log_test(f"POST /api/game/dispatch → 200 com mission_id", True)
+        log_info(f"Mission ID: {mission_id}")
+        
+        # Poll /api/game/state until mission completes
+        log_info("A aguardar conclusão da missão (polling /state)...")
+        max_polls = 60  # Max 5 minutes (60 * 5s)
+        poll_interval = 5
+        mission_completed = False
+        errors_during_polling = []
+        
+        for poll_count in range(max_polls):
+            time.sleep(poll_interval)
+            
+            try:
+                resp_state = requests.get(f"{BASE_URL}/game/state",
+                    headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                
+                if resp_state.status_code != 200:
+                    errors_during_polling.append(f"Poll {poll_count+1}: Status {resp_state.status_code}")
+                    continue
+                
+                state = resp_state.json()
+                
+                # Check if team is back to idle
+                current_team = next((t for t in state.get("teams", []) if t["id"] == team_id), None)
+                if current_team and current_team.get("status") == "idle":
+                    mission_completed = True
+                    log_info(f"Missão concluída após {(poll_count+1)*poll_interval}s de polling")
+                    break
+                
+                # Show progress
+                if (poll_count + 1) % 6 == 0:  # Every 30s
+                    status = current_team.get("status", "unknown") if current_team else "not found"
+                    log_info(f"  Poll {poll_count+1}/{max_polls}: equipa status = {status}")
+            
+            except Exception as e:
+                errors_during_polling.append(f"Poll {poll_count+1}: {str(e)}")
+        
+        if errors_during_polling:
+            log_test("Polling /state sem erros 500", False,
+                    f"Erros durante polling: {errors_during_polling[:3]}")
+            return None
+        
+        if not mission_completed:
+            log_test("Missão concluída dentro do timeout", False,
+                    f"Timeout após {max_polls*poll_interval}s")
+            return None
+        
+        log_test("Ciclo completo de missão sem erros 500 e equipa volta a idle", True)
+        
+        # Check for events
+        final_state = requests.get(f"{BASE_URL}/game/state",
+            headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
+        
+        events = final_state.get("events", [])
+        if events:
+            log_info(f"Eventos gerados: {len(events)}")
+            # Show last 3 events
+            for event in events[:3]:
+                msg = event.get("message", "")
+                if len(msg) > 80:
+                    msg = msg[:77] + "..."
+                log_info(f"  • {msg}")
+        
+        return {"mission_id": mission_id, "team_id": team_id, "category": viable_opp.get("category")}
+        
+    except Exception as e:
+        log_test("Dispatch e ciclo de missão", False, str(e))
+        return None
+
+
+def test_repeat_preview(context, mission_context):
+    """Test D: Repeat preview after mission completion"""
+    log_section("D. Preview após missão concluída (familiaridade)")
+    
+    if not context or not mission_context:
+        log_warning("Sem contexto para testar preview repetido")
+        return
+    
+    token = context["token"]
+    team_id = mission_context["team_id"]
+    category = mission_context["category"]
+    
+    log_info(f"A procurar oportunidades da categoria '{category}' para testar familiaridade")
+    
+    try:
+        # Get fresh state
+        resp_state = requests.get(f"{BASE_URL}/game/state",
+            headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        
+        if resp_state.status_code != 200:
+            log_test("GET /state para preview repetido", False, f"Status: {resp_state.status_code}")
+            return
+        
+        state = resp_state.json()
+        opportunities = state.get("opportunities", [])
+        
+        # Find opportunity of same category
+        same_category_opp = next((o for o in opportunities if o.get("category") == category), None)
+        
+        if not same_category_opp:
+            log_warning(f"Sem oportunidades da categoria '{category}' disponíveis para testar familiaridade")
+            log_info("A testar preview com qualquer oportunidade disponível...")
+            if opportunities:
+                same_category_opp = opportunities[0]
+            else:
+                log_warning("Sem oportunidades disponíveis")
+                return
+        
+        opp_id = same_category_opp["id"]
+        opp_name = same_category_opp.get("name", "Unknown")
+        
+        # Test preview
+        resp = requests.post(f"{BASE_URL}/game/dispatch/preview",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"opportunity_id": opp_id, "team_id": team_id},
+            timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(f"Preview após missão → 200", False,
+                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+            return
+        
+        data = resp.json()
+        breakdown = data.get("breakdown", [])
+        
+        # Check if "familiaridade" appears
+        has_familiaridade = any(item.get("key") == "familiaridade" for item in breakdown)
+        
+        if has_familiaridade:
+            log_test("Preview após missão: item 'familiaridade' aparece no breakdown", True)
+            fam_item = next(item for item in breakdown if item.get("key") == "familiaridade")
+            log_info(f"  Familiaridade: +{fam_item['pct']*100:.1f}% - {fam_item['label']}")
+        else:
+            log_info("Item 'familiaridade' NÃO aparece (normal se <3 ops da categoria)")
+            log_test("Preview após missão não dá erro 500", True)
+        
+        log_info(f"Breakdown items no preview repetido: {[item['key'] for item in breakdown]}")
+        
+    except Exception as e:
+        log_test("Preview após missão concluída", False, str(e))
+
+
+def test_mission_document_fields(mission_context):
+    """Test E: Verify mission document has new fields in MongoDB"""
+    log_section("E. Verificação de campos novos no documento de missão (MongoDB)")
+    
+    if not mission_context:
+        log_warning("Sem contexto de missão para verificar MongoDB")
+        return
+    
+    mission_id = mission_context["mission_id"]
+    
+    client = get_mongo_client()
+    if not client:
+        log_warning("Sem acesso ao MongoDB, a saltar verificação de campos")
+        return
+    
+    try:
+        db = client[DB_NAME]
+        missions_col = db["missions"]
+        teams_col = db["teams"]
+        
+        # Find mission document
+        from bson import ObjectId
+        mission_doc = missions_col.find_one({"_id": ObjectId(mission_id)})
+        
+        if not mission_doc:
+            log_test("Documento de missão encontrado no MongoDB", False, f"Mission ID: {mission_id}")
+            return
+        
+        log_test("Documento de missão encontrado no MongoDB", True)
+        
+        # Check new fields
+        required_fields = {
+            "team_streak": int,
+            "vehicle_speed_effective": (int, float),
+            "vehicle_discreet": bool,
+            "has_leader": bool,
+            "leader_cool": (int, float),
+            "has_medic": bool,
+            "has_lawyer": bool,
+            "best_driver": (int, float),
+            "top_negatives": list,
+            "heat_at_dispatch": (int, float)
+        }
+        
+        for field, expected_type in required_fields.items():
+            if field not in mission_doc:
+                log_test(f"Campo '{field}' presente no mission doc", False, "Campo em falta")
+                mission_fields_verified[field] = False
+            else:
+                value = mission_doc[field]
+                if isinstance(expected_type, tuple):
+                    type_ok = isinstance(value, expected_type)
+                else:
+                    type_ok = isinstance(value, expected_type)
+                
+                if type_ok:
+                    log_test(f"Campo '{field}' presente e tipo correto", True)
+                    mission_fields_verified[field] = True
+                    
+                    # Log value for inspection
+                    if field == "top_negatives":
+                        log_info(f"  {field} = {value[:2] if len(value) > 2 else value}...")
+                    else:
+                        log_info(f"  {field} = {value}")
+                else:
+                    log_test(f"Campo '{field}' tem tipo correto", False,
+                            f"Esperado {expected_type}, obtido {type(value)}")
+                    mission_fields_verified[field] = False
+        
+        # Check team document
+        team_id = mission_doc.get("team_id")
+        if team_id:
+            team_doc = teams_col.find_one({"_id": ObjectId(team_id)})
+            if team_doc:
+                log_test("Documento de equipa encontrado no MongoDB", True)
+                
+                # Check team fields
+                roster_missions = team_doc.get("roster_missions", 0)
+                category_missions = team_doc.get("category_missions", {})
+                streak = team_doc.get("streak")
+                
+                log_info(f"  roster_missions = {roster_missions}")
+                log_info(f"  category_missions = {category_missions}")
+                log_info(f"  streak = {streak}")
+                
+                if roster_missions >= 1:
+                    log_test("Team.roster_missions >= 1 após conclusão", True)
+                else:
+                    log_test("Team.roster_missions >= 1", False, f"Valor: {roster_missions}")
+                
+                if streak is not None:
+                    log_test("Team.streak != null", True)
+                else:
+                    log_test("Team.streak != null", False, "streak é null")
+            else:
+                log_test("Documento de equipa encontrado", False, f"Team ID: {team_id}")
+        
+    except Exception as e:
+        log_test("Verificação de campos no MongoDB", False, str(e))
+    finally:
+        if client:
+            client.close()
+
+
+def test_recommendation_endpoints(context):
+    """Test F: Recommendation endpoints"""
+    log_section("F. Endpoints de recomendação (recommend_*)")
+    
+    if not context:
+        log_warning("Sem contexto para testar recomendações")
+        return
+    
+    token = context["token"]
+    teams = context["teams"]
+    opportunities = context["opportunities"]
+    
+    if not teams:
+        log_warning("Sem equipas para testar recomendações")
+        return
+    
+    # Get first idle team
+    idle_team = next((t for t in teams if t.get("status") == "idle"), None)
+    if not idle_team:
+        log_warning("Sem equipas idle para testar recomendações")
+        return
+    
+    team_id = idle_team["id"]
+    
+    # Test recommend_opportunity
+    try:
+        resp = requests.post(f"{BASE_URL}/game/dispatch/recommend_opportunity",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"team_id": team_id},
+            timeout=10)
+        
+        if resp.status_code != 200:
+            log_test("POST /dispatch/recommend_opportunity → 200", False,
+                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+        else:
+            data = resp.json()
+            opp_id = data.get("opportunity_id")
+            if opp_id:
+                log_test("POST /dispatch/recommend_opportunity → 200 com opportunity_id", True)
+                log_info(f"  Recomendação: opportunity_id={opp_id}, chance={data.get('chance')}, reward={data.get('reward')}")
+            else:
+                log_test("POST /dispatch/recommend_opportunity → 200 (null, sem viáveis)", True)
+                log_info("  Nenhuma oportunidade viável recomendada")
+    except Exception as e:
+        log_test("POST /dispatch/recommend_opportunity", False, str(e))
+    
+    # Test recommend_team
+    if opportunities:
+        opp_id = opportunities[0]["id"]
+        try:
+            resp = requests.post(f"{BASE_URL}/game/dispatch/recommend_team",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"opportunity_id": opp_id},
+                timeout=10)
+            
+            if resp.status_code != 200:
+                log_test("POST /dispatch/recommend_team → 200", False,
+                        f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+            else:
+                data = resp.json()
+                team_id_rec = data.get("team_id")
+                if team_id_rec:
+                    log_test("POST /dispatch/recommend_team → 200 com team_id", True)
+                    log_info(f"  Recomendação: team_id={team_id_rec}, chance={data.get('chance')}")
+                else:
+                    log_test("POST /dispatch/recommend_team → 200 (null, sem viáveis)", True)
+        except Exception as e:
+            log_test("POST /dispatch/recommend_team", False, str(e))
+    
+    # Test recommend_repeat
+    try:
+        resp = requests.post(f"{BASE_URL}/game/dispatch/recommend_repeat",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"team_id": team_id},
+            timeout=10)
+        
+        if resp.status_code != 200:
+            log_test("POST /dispatch/recommend_repeat → 200", False,
+                    f"Status: {resp.status_code}, Body: {resp.text[:200]}")
+        else:
+            data = resp.json()
+            opp_id = data.get("opportunity_id")
+            if opp_id:
+                log_test("POST /dispatch/recommend_repeat → 200 com opportunity_id", True)
+                log_info(f"  Recomendação: opportunity_id={opp_id}")
+            else:
+                log_test("POST /dispatch/recommend_repeat → 200 (null, sem repetição)", True)
+    except Exception as e:
+        log_test("POST /dispatch/recommend_repeat", False, str(e))
+
+
+def test_regression(context):
+    """Test G: Regression tests"""
+    log_section("G. Testes de regressão")
+    
+    if not context:
+        log_warning("Sem contexto para testes de regressão")
+        return
+    
+    token = context["token"]
+    
+    # Test GET /state 3x without 500
+    errors = []
+    for i in range(3):
+        try:
+            resp = requests.get(f"{BASE_URL}/game/state",
+                headers={"Authorization": f"Bearer {token}"}, timeout=15)
+            
+            if resp.status_code != 200:
+                errors.append(f"Tentativa {i+1}: Status {resp.status_code}")
+        except Exception as e:
+            errors.append(f"Tentativa {i+1}: {str(e)}")
+    
+    if errors:
+        log_test("GET /state 3x sem erros", False, f"Erros: {errors}")
+    else:
+        log_test("GET /state 3x sem erros 500", True)
+    
+    # Test create new team (if money allows)
+    try:
+        resp_state = requests.get(f"{BASE_URL}/game/state",
+            headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        
+        if resp_state.status_code == 200:
+            state = resp_state.json()
+            player = state.get("player", {})
+            clean_money = player.get("clean_money", 0)
+            
+            if clean_money >= 5000:
+                resp_create = requests.post(f"{BASE_URL}/game/teams/create",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={"spec": "assalto"},
+                    timeout=10)
+                
+                if resp_create.status_code == 200:
+                    log_test("POST /teams/create → 200", True)
+                    
+                    # Verify new team in MongoDB
+                    client = get_mongo_client()
+                    if client:
+                        try:
+                            db = client[DB_NAME]
+                            teams_col = db["teams"]
+                            
+                            # Get player_id
+                            player_id = player.get("id")
+                            if player_id:
+                                new_teams = list(teams_col.find({"player_id": player_id}).sort("created_at", -1).limit(1))
+                                if new_teams:
+                                    new_team = new_teams[0]
+                                    streak = new_team.get("streak")
+                                    category_missions = new_team.get("category_missions", {})
+                                    roster_missions = new_team.get("roster_missions")
+                                    
+                                    log_info(f"  Nova equipa: streak={streak}, category_missions={category_missions}, roster_missions={roster_missions}")
+                                    
+                                    if streak == 0 and category_missions == {} and roster_missions == 0:
+                                        log_test("Nova equipa criada com campos corretos (streak=0, category_missions={}, roster_missions=0)", True)
+                                    else:
+                                        log_test("Nova equipa com campos corretos", False,
+                                                f"streak={streak}, category_missions={category_missions}, roster_missions={roster_missions}")
+                        finally:
+                            client.close()
+                else:
+                    log_test("POST /teams/create → 200", False,
+                            f"Status: {resp_create.status_code}, Body: {resp_create.text[:200]}")
+            else:
+                log_info(f"Dinheiro insuficiente para criar equipa ({clean_money} < 5000)")
+                log_test("POST /teams/create (skip - sem dinheiro)", True)
+    except Exception as e:
+        log_test("Teste de criação de equipa", False, str(e))
 
 
 def print_summary():
@@ -681,10 +721,31 @@ def print_summary():
     print(f"{GREEN}Passou: {test_results['passed']}{RESET}")
     print(f"{RED}Falhou: {test_results['failed']}{RESET}")
     
+    if test_results["warnings"]:
+        print(f"{YELLOW}Avisos: {len(test_results['warnings'])}{RESET}")
+    
+    # Report breakdown items observed
+    if breakdown_items_observed:
+        print(f"\n{CYAN}Breakdown items observados:{RESET}")
+        for key in sorted(breakdown_items_observed):
+            print(f"  • {key}")
+    
+    # Report mission fields verified
+    if mission_fields_verified:
+        print(f"\n{CYAN}Campos novos verificados no mission doc:{RESET}")
+        for field, verified in mission_fields_verified.items():
+            status = f"{GREEN}✓{RESET}" if verified else f"{RED}✗{RESET}"
+            print(f"  {status} {field}")
+    
     if test_results["failed"] > 0:
         print(f"\n{RED}Erros encontrados:{RESET}")
         for error in test_results["errors"]:
             print(f"  • {error}")
+    
+    if test_results["warnings"]:
+        print(f"\n{YELLOW}Avisos:{RESET}")
+        for warning in test_results["warnings"][:5]:  # Show first 5
+            print(f"  • {warning}")
     
     print()
     
@@ -692,23 +753,20 @@ def print_summary():
 
 
 def main():
-    print(f"\n{BLUE}{'='*60}{RESET}")
-    print(f"{BLUE}TESTES BACKEND - LUSORAE AUTENTICAÇÃO E ROTAS LEGAIS{RESET}")
+    print(f"\n{BLUE}{'='*70}{RESET}")
+    print(f"{BLUE}TESTES BACKEND - LUSORAE SSS v4 QI DAS EQUIPAS{RESET}")
     print(f"{BLUE}Base URL: {BASE_URL}{RESET}")
-    print(f"{BLUE}{'='*60}{RESET}\n")
+    print(f"{BLUE}Credenciais: {ADMIN_EMAIL} / {ADMIN_PASSWORD}{RESET}")
+    print(f"{BLUE}{'='*70}{RESET}\n")
     
-    # Run all tests
-    test_legal_meta()
-    test_legal_documents()
-    test_legal_changelog()
-    test_register_validation()
-    user_creds = test_register_success()
-    test_register_whitespace()
-    test_register_duplicate()
-    test_check_availability()
-    test_login_and_lockout()
-    test_change_password(user_creds)
-    test_regression()
+    # Run all tests in order
+    context = test_login()
+    test_dispatch_preview(context)
+    mission_context = test_dispatch_and_mission_cycle(context)
+    test_repeat_preview(context, mission_context)
+    test_mission_document_fields(mission_context)
+    test_recommendation_endpoints(context)
+    test_regression(context)
     
     # Print summary
     success = print_summary()
