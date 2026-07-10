@@ -1510,3 +1510,18 @@ export function opStateAt(choreo, i, nowSec, success) {
     heading: heading == null ? null : ((heading % 360) + 360) % 360,
   };
 }
+
+
+// ============================================================================
+// Primitivos genéricos partilhados — expostos para a camada de simulação de
+// entidades (simCore.js). NÃO são específicos de missões: geometria local,
+// caminhos a pé, easings de veículo e micro-comportamentos de personagens.
+// A polícia (police.js) e futuras entidades especializam estes primitivos em
+// vez de duplicar código.
+// ============================================================================
+export {
+  clamp, smooth, lerpPt, bearingRad, toDeg, distMeters, ringPoint,
+  walkPath, polyPath, pathAt, pathHeading,
+  trapezoidEase, steppedEase, hesitantEase,
+  idleDrift, lookHeading, spreadAngles, normAng,
+};

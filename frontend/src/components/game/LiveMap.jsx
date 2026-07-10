@@ -3,11 +3,12 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap,
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, Siren, X, Star, Check, Plus, Minus, Crosshair, Scan, UserRound } from "lucide-react";
+import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X, Star, Check, Plus, Minus, Crosshair, Scan, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
+import PoliceLayer from "./PoliceLayer";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -162,14 +163,8 @@ const transferIcon = () => {
   return makeDivIcon(html, 24);
 };
 
-const policeChaseIcon = () => {
-  const html = `
-    <div class="chase-pin" style="--mk:#EF4444">
-      <span class="chase-flash"></span>
-      ${renderToStaticMarkup(<Siren size={12} strokeWidth={3} />)}
-    </div>`;
-  return makeDivIcon(html, 24);
-};
+// Perseguição policial: agora simulada pela força policial viva (PoliceLayer /
+// lib/police.js) — uma patrulha real intercepta e cola-se à rota da equipa.
 
 const propIcon = (typeKey) => {
   const Icon = PROP_ICONS[typeKey] || Warehouse;
@@ -317,7 +312,6 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   const glowRef = useRef(null);
   const lineRef = useRef(null);
   const markerRef = useRef(null);
-  const chaseRef = useRef(null);
   const svgRef = useRef(null);
   const carRootRef = useRef(null);
   const bearingRef = useRef(null);
@@ -420,15 +414,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         }
       }
 
-      // 4) Carro-patrulha ~220m atrás na mesma rota.
-      if (chaseRef.current && route?.latlngs && cumRef.current && p.phase === "returning") {
-        const total = cumRef.current[cumRef.current.length - 1] || 0;
-        if (total > 0) {
-          const lag = Math.min(0.35, 220 / Math.max(1, total));
-          const cp = pointOnRoute(route.latlngs, cumRef.current, Math.min(route.parkFrac ?? 1, (p.frac ?? 0) + lag));
-          if (cp) chaseRef.current.setLatLng([cp.lat, cp.lng]);
-        }
-      }
+      // 4) (o carro-patrulha da perseguição vive agora na PoliceLayer)
 
       // 4b) Operacionais no terreno — avaliados no MESMO loop (zero rAF extra).
       //     Posição via setLatLng; fades/escala/orientação do olhar/objetos/
@@ -589,17 +575,9 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     : 0;
   const carryingPays = mission.pending_pays || mission.opportunity?.pays || "dirty";
 
-  // Police chase car: rendered ~220m behind on the same route so it visually "follows" the team.
-  let chasePos = null;
-  if (chased && route?.latlngs && cumRef.current) {
-    const total = cumRef.current[cumRef.current.length - 1] || 0;
-    if (total > 0) {
-      const lag = Math.min(0.35, 220 / Math.max(1, total)); // ~220m gap or 35% whichever is smaller
-      const chaseFrac = Math.min(route.parkFrac ?? 1, (pos.frac ?? (1 - pos.progress)) + lag);
-      const cp = pointOnRoute(route.latlngs, cumRef.current, chaseFrac);
-      if (cp) chasePos = cp;
-    }
-  }
+  // Perseguição: visual do carro-patrulha entregue à PoliceLayer (patrulha
+  // real intercepta e segue a equipa na mesma rota). Aqui fica só o estado
+  // "chased" para o estilo/sirene do veículo da equipa.
 
   // Estado inicial dos operacionais para o primeiro render (o rAF assume logo a seguir).
   const deployed = phase === "operating" && !!choreo;
@@ -760,20 +738,6 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
           </div>
         </LTooltip>
       </Marker>
-      {chased && chasePos && (
-        <Marker position={[chasePos.lat, chasePos.lng]} icon={policeChaseIcon()} zIndexOffset={490}>
-          <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
-            <div className="min-w-[130px]">
-              <p className="text-[11px] font-bold text-red-400">Carro-patrulha</p>
-              <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">A perseguir {mission.team_name}</p>
-              <TipRow label="chance de escape" value={`${Math.round((mission.escape_chance || 0.5) * 100)}%`} color="#EF4444" />
-              <p className="mt-1 text-[9px] text-zinc-500">
-                Se apanhados antes do QG, perdem toda a carga.
-              </p>
-            </div>
-          </LTooltip>
-        </Marker>
-      )}
     </>
   );
 };
@@ -1019,6 +983,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             }
           />
         ))}
+      <PoliceLayer state={state} serverNow={serverNow} />
       <PanTo target={state.opportunities.find((o) => o.id === selectedOppId)} />
     </MapContainer>
   );
@@ -1093,7 +1058,19 @@ export const MapLegend = () => {
               <span className="h-2.5 w-2.5 rounded-full border border-black bg-zinc-100" />
               Operacionais no terreno (papéis distintos)
             </span>
-            <span className="flex items-center gap-1.5"><span className="flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[7px] font-extrabold text-white">!</span> Carro-patrulha em perseguição</span>
+            <span className="flex items-center gap-1.5">
+              <span className="flex h-3.5 w-3.5 items-center justify-center">
+                <span className="h-3 w-1.5 rounded-sm bg-blue-500" />
+              </span>
+              Patrulha policial (azul fixo = a patrulhar)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="flex h-3.5 w-3.5 items-center justify-center">
+                <span className="h-3 w-1.5 animate-pulse rounded-sm bg-blue-400 shadow-[0_0_6px_#3b82f6]" />
+              </span>
+              Patrulha com luzes — a responder / em perseguição
+            </span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-blue-900 bg-blue-200" /> Agentes no terreno (perímetro)</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;2 min)</span>
           </div>
           <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
@@ -1111,7 +1088,12 @@ export const MapLegend = () => {
             apenas na retirada, reagrupam junto ao veículo e o último confirma o perímetro antes
             de as portas fecharem. Passa o rato sobre o alvo ou o veículo para veres a fase exata
             (reconhecimento, aproximação, execução, retirada, reagrupamento, embarque,
-            confirmação). Clica numa unidade em movimento para a câmara a seguir.
+            confirmação). Clica numa unidade em movimento para a câmara a seguir. A polícia
+            patrulha a cidade em permanência: viaturas azuis percorrem os bairros por ruas
+            reais e, quando uma operação levanta suspeitas, a patrulha mais próxima acorre
+            com as luzes ligadas, estaciona nas proximidades, desembarca os agentes e monta
+            um perímetro — podendo pedir reforços. Nas fugas, é uma patrulha real que
+            persegue a tua equipa.
           </p>
         </Card>
       )}
