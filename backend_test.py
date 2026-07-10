@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://dynamic-tactical-map.preview.emergentagent.com"
+BASE_URL = "https://tactical-squad-ops-10.preview.emergentagent.com"
 API_URL = f"{BASE_URL}/api"
 
 # Test credentials
