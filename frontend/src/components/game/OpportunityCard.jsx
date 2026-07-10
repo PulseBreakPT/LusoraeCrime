@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import {
@@ -9,7 +9,6 @@ import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { ScrollArea } from "../ui/scroll-area";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
@@ -29,6 +28,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [confirmLowChance, setConfirmLowChance] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const previewRef = useRef(null);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
   // Nunca devolve vazio — QG é sempre o fallback quando a missão não tem propriedade de origem.
@@ -72,6 +72,15 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     const id = setTimeout(() => setConfirmLowChance(false), 4000);
     return () => clearTimeout(id);
   }, [confirmLowChance]);
+
+  // O corpo do cartão é rolável em ecrãs baixos — quando o preview de
+  // probabilidade chega (ou os detalhes expandem), garante que fica visível
+  // sem o jogador ter de perceber que há scroll.
+  useEffect(() => {
+    if ((preview || showDetails) && previewRef.current) {
+      previewRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [preview, showDetails]);
 
   // Ao abrir uma oportunidade, pré-seleciona automaticamente a equipa com maior
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
@@ -199,10 +208,14 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   return (
     <Card
       data-testid="opportunity-card"
-      style={{ "--mk": color }}
-      className="lus-opp-card pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up lus-panel p-4 shadow-2xl"
+      style={{
+        "--mk": color,
+        bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
+        maxHeight: "min(calc(100dvh - 10rem), 40rem)",
+      }}
+      className="lus-opp-card pointer-events-auto absolute left-2 right-2 z-30 mx-auto flex max-w-sm animate-slide-up flex-col lus-panel p-4 shadow-2xl"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex shrink-0 items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span
             className="flex h-9 w-9 items-center justify-center rounded-md border"
@@ -234,6 +247,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         </div>
       </div>
 
+      {/* Corpo rolável único — em ecrãs baixos (preview + detalhes expandidos)
+          tudo continua acessível; o cabeçalho e o botão de despacho ficam
+          sempre fixos e visíveis. */}
+      <div className="-mr-2 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
       <div className="mt-2 flex flex-wrap gap-1">
         <Chip icon={MapPin} value={`${(distM / 1000).toFixed(1)} km`} color="#22D3EE"
           tip="Distância do QG ao alvo — determina o tempo de viagem e o combustível gasto (ida e volta)." />
@@ -348,8 +365,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         <p className="mt-3 text-center font-mono text-xs text-red-500">Requer nível {opp.min_level}</p>
       ) : (
         <>
-          <ScrollArea className="mt-3 h-36">
-            <div className="space-y-1 pr-3">
+          <div className="mt-3 max-h-36 overflow-y-auto overscroll-contain">
+            <div className="space-y-1 pr-1.5">
               {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
                   jogador não precisa de percorrer bloqueadas para achar a boa. */}
               {[...state.teams]
@@ -440,7 +457,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
           {!anyReady && (
             <p className="mt-2 text-center font-mono text-[10px] text-zinc-500">
               Nenhuma equipa operacional — verifica membros, combustível e condição
@@ -456,7 +473,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             }
             const categoryOrder = Object.keys(MODIFIER_CATEGORY_LABELS).filter((cat) => byCategory[cat]?.length);
             return (
-              <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up lus-card p-2.5 shadow-none">
+              <Card ref={previewRef} data-testid="dispatch-preview" className="mt-2 animate-slide-up lus-card p-2.5 shadow-none">
                 <div className="flex items-baseline justify-between">
                   <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
                   <div className="flex items-center gap-1.5">
@@ -561,13 +578,19 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               </Card>
             );
           })()}
+        </>
+      )}
+      </div>
+      {/* Botão de despacho ancorado fora do corpo rolável — a ação principal
+          nunca sai do ecrã, independentemente do tamanho do conteúdo. */}
+      {!(inProgress && activeMission) && !policeAlert && !lockedByLevel && (
           <Tip tip={confirmLowChance ? "Probabilidade muito baixa — clica outra vez para confirmar mesmo assim." : null} block>
             <Button
               data-testid="dispatch-team-button"
               onClick={handleDispatch}
               disabled={!selectedTeamId || busy}
               variant={!selectedTeamId || busy || confirmLowChance ? "outline" : "success"}
-              className={`mt-3 w-full font-bold uppercase tracking-wider ${
+              className={`mt-3 w-full shrink-0 font-bold uppercase tracking-wider ${
                 !selectedTeamId || busy
                   ? "border-red-500/30 bg-red-500/10 from-transparent to-transparent text-red-400 shadow-none hover:bg-red-500/20"
                   : confirmLowChance
@@ -578,7 +601,6 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               {busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}
             </Button>
           </Tip>
-        </>
       )}
     </Card>
   );
