@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 
 # Configuration
-BASE_URL = "https://737970f5-e984-42c5-af9e-8508f17ae284.preview.emergentagent.com/api"
+BASE_URL = "https://missao-qr.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@lusorae.com"
 ADMIN_PASSWORD = "LusoraeAdmin2026!"
 
