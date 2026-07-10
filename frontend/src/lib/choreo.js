@@ -1,24 +1,45 @@
 // ============================================================================
-// choreo.js v2 — Motor de estados da simulação visual de missões
+// choreo.js v3 — Motor de estados da simulação visual de missões
 // ============================================================================
 //
 // Simulação determinística 100% no cliente: tudo é derivado dos timestamps do
 // motor (depart_at/arrive_at/finish_at/return_at) + seed do id da missão. A
-// cena é reproduzível após refresh, mantém-se sincronizada com o ETA real e
-// não precisa de qualquer estado adicional no servidor.
+// cena é reproduzível após refresh/mudança de página, mantém-se sincronizada
+// com o ETA real e não precisa de qualquer estado adicional no servidor.
 //
-// Máquina de estados por missão:
-//   travel → arrival → parking → disembark → approach → execute → withdraw
-//   → board → return → done
+// Máquina de estados por missão (v3):
+//   travel → arrival → parking → (repark) → disembark → recon → approach
+//   → execute → withdraw → regroup → board → confirm → return → done
 //
-// Arquitetura modular: cada arquetipo de missão é uma entrada no registo
-// ARCHETYPES (papéis, estações, programas de execução, rótulo). Os programas
-// são compostos a partir de uma biblioteca partilhada (pace/stand/inside/
-// shuttle/cover/creep/orbit) — adicionar um tipo novo = adicionar uma entrada.
+// Novidades v3 (QI de coreografia):
+//   • Papéis por especialização real dos operacionais (hacker→acessos
+//     técnicos, negociador→alvo, logística→carga/veículo, motorista pode
+//     ficar ao volante) e líder de facto (patente mais alta).
+//   • Sequenciamento tático: batedor verifica o perímetro primeiro; o líder
+//     dá a ordem de avanço; os apoios avançam antes dos primários (os
+//     primários aguardam que o primeiro apoio chegue à posição).
+//   • Comunicações rádio (relatório do batedor, ordem de avanço, check-ins
+//     periódicos, sinal de retirada, confirmação final) — commAt().
+//   • Velocidades por fase: caminham na aproximação (abrandam junto ao alvo,
+//     com micro-hesitações), correm apenas na retirada; urgência da missão
+//     (janela curta) acelera tudo; missões longas → retirada apressada,
+//     curtas → retirada organizada.
+//   • Retirada em pipeline: percurso diferente da chegada → reagrupamento
+//     junto ao veículo → espera → embarque escalonado; a retaguarda cobre a
+//     retirada, corre em último e faz a confirmação visual à porta antes de
+//     o veículo poder arrancar. O veículo aguarda ainda uns segundos.
+//   • Veículo: micro-reposicionamento se ficou mal estacionado (repark) e
+//     janelas de portas abertas (desembarque/embarque, fecham antes de partir).
+//   • Naturalidade: orientação do olhar por papel + varrimento em direções
+//     diferentes, hesitações nos trajetos, líder circula entre membros em
+//     operações longas, rotação de posições (3 estações) em janelas grandes,
+//     estações ordenadas por ângulo (trajetos que não se cruzam), leque e
+//     raios adaptados ao espaço disponível (distância carro↔alvo).
+//   • Objetos: caixas (carregadores), documentos/dispositivo (negociador,
+//     hacker) e saque (€) no regresso com sucesso.
 //
-// Performance: a avaliação por frame (opStateAt / vehiclePoseAt) é matemática
-// pura O(1) por entidade — escala para dezenas de missões e centenas de
-// operacionais sem custo relevante.
+// Performance: a avaliação por frame (opStateAt / vehiclePoseAt / commAt) é
+// matemática pura O(1) por entidade — escala para dezenas de missões.
 
 import { buildCumulative, pointOnRoute } from "./routing";
 
@@ -62,6 +83,8 @@ function bearingRad(a, b) {
   return Math.atan2(east, north);
 }
 
+const toDeg = (rad) => (rad * 180) / Math.PI;
+
 function distMeters(a, b) {
   const east = (b.lng - a.lng) * M_LAT * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180);
   const north = (b.lat - a.lat) * M_LAT;
@@ -90,9 +113,34 @@ function walkPath(from, to, bulgeM, samples = 12) {
   return { latlngs, cum, length: cum[cum.length - 1] || 0 };
 }
 
+// Caminho por pontos arbitrários (perímetro do batedor).
+function polyPath(points, samplesPerLeg = 5) {
+  const latlngs = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    for (let k = 0; k < samplesPerLeg; k++) {
+      const t = k / samplesPerLeg;
+      latlngs.push([a.lat + (b.lat - a.lat) * t, a.lng + (b.lng - a.lng) * t]);
+    }
+  }
+  const last = points[points.length - 1];
+  latlngs.push([last.lat, last.lng]);
+  const cum = buildCumulative(latlngs);
+  return { latlngs, cum, length: cum[cum.length - 1] || 0 };
+}
+
 const pathAt = (path, f) => pointOnRoute(path.latlngs, path.cum, clamp(f, 0, 1));
 
-// Avanço em passos (infiltração): mover ~62% de cada troço, pausar o resto.
+// Rumo (graus) do deslocamento ao longo de um caminho a pé.
+function pathHeading(path, f) {
+  const a = pathAt(path, f);
+  const b = pathAt(path, clamp(f + 0.03, 0, 1));
+  if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) return null;
+  return toDeg(bearingRad(a, b));
+}
+
+// Avanço em passos (infiltração/batedor): mover ~62% de cada troço, pausar o resto.
 function steppedEase(t) {
   const steps = 4;
   const seg = 1 / steps;
@@ -103,9 +151,32 @@ function steppedEase(t) {
   return clamp((k + p) * seg, 0, 1);
 }
 
+// Hesitações: remove a janela [p, p+w] do tempo de progresso (congela aí).
+function pauseWarp(t, p, w) {
+  if (t <= p) return t;
+  if (t >= p + w) return t - w;
+  return p;
+}
+
+// Aproximação natural: arranque decidido + abrandamento junto ao alvo, com
+// até duas micro-pausas seeded (só quando a missão não é urgente).
+function hesitantEase(t, r1, r3, pauses) {
+  t = clamp(t, 0, 1);
+  let tau = t;
+  let span = 1;
+  if (pauses) {
+    const p1 = 0.26 + r1 * 0.16;
+    const w1 = 0.05 + r3 * 0.04;
+    const p2 = 0.62 + r3 * 0.14;
+    const w2 = 0.04 + r1 * 0.04;
+    tau = pauseWarp(pauseWarp(t, p2, w2), p1, w1);
+    span = 1 - w1 - w2;
+  }
+  const x = clamp(tau / span, 0, 1);
+  return 1 - Math.pow(1 - x, 1.62);
+}
+
 // Perfil de velocidade trapezoidal — aceleração suave, cruzeiro, travagem.
-// t∈[0,1] tempo normalizado; a = fração de arranque; b = fração de travagem.
-// Devolve a fração de DISTÂNCIA percorrida (integral do perfil, normalizado).
 function trapezoidEase(t, a, b) {
   t = clamp(t, 0, 1);
   a = clamp(a, 0.001, 0.49);
@@ -136,14 +207,6 @@ export function routeBearingDeg(latlngs, cum, frac, dirSign) {
 // ============================================================================
 // Mapeamento tipo de oportunidade → arquetipo
 // ============================================================================
-// heist   — entram no edifício (vigia à porta), saem com o saque (joalharia…)
-// spread  — dispersam pelas entradas, convergem e invadem (banco…)
-// cargo   — vaivém contínuo veículo<->alvo a carregar/descarregar
-// collect — semicírculo a "negociar" frente ao alvo (cobrança)
-// stealth — avanço em passos, semi-transparentes, pelas traseiras (infiltração)
-// tech    — 1 operacional planta o dispositivo, os restantes vigiam
-// combat  — arco tático com corridas curtas entre coberturas
-// vip     — escolta em diamante à volta do ponto
 const TYPE_CHOREO = {
   assalto: "heist",
   roubo: "heist",
@@ -202,8 +265,7 @@ const CATEGORY_CHOREO = {
   especial: "vip",
 };
 
-// Tipos de carga em que o sentido "carregado" é veículo → alvo (descarga /
-// entrega); nos restantes é alvo → veículo (recolha / contrabando).
+// Tipos de carga em que o sentido "carregado" é veículo → alvo (entrega).
 const CARGO_OUTBOUND = new Set([
   "transporte", "entrega_expressa", "entrega_local", "transporte_armas",
   "carga_diplomatica", "rede_distribuicao",
@@ -229,11 +291,15 @@ export const MISSION_STATE_LABELS = {
   travel: "Deslocação",
   arrival: "Chegada",
   parking: "Estacionamento",
+  repark: "Reposicionamento",
   disembark: "Desembarque",
+  recon: "Reconhecimento",
   approach: "Aproximação",
   execute: "Execução",
   withdraw: "Retirada",
+  regroup: "Reagrupamento",
   board: "Embarque",
+  confirm: "Confirmação final",
   return: "Regresso",
   done: "Concluída",
 };
@@ -241,8 +307,23 @@ export const MISSION_STATE_LABELS = {
 // Sacos de dinheiro no regresso a pé (se a missão teve sucesso).
 const LOOT_ON_EXIT = { heist: true, spread: true, collect: true };
 
+// Papéis de apoio (nunca "entram" no objetivo).
+const SUPPORT_ROLES = new Set(["vehicle", "retreat", "overwatch", "door", "techaccess"]);
+const PRIMARY_ROLES = new Set(["entry", "carrier", "assault", "ghostop", "escort", "negotiator", "hacker"]);
+
+// Especialização real → papel desejado na coreografia.
+const DRIVER_KEYS = new Set(["motorista", "piloto"]);
+const RANK_ORDER = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"];
+
+function specDesire(spec, kind) {
+  if (spec === "tecnica") return kind === "tech" ? "hacker" : "techaccess";
+  if (spec === "influencia") return "negotiator";
+  if (spec === "logistica") return kind === "cargo" ? "carrier" : "vehicle";
+  return null;
+}
+
 // ============================================================================
-// Veículo — timings, estacionamento e pose por frame
+// Veículo — timings, estacionamento (com repark) e pose por frame
 // ============================================================================
 
 export function vehicleTimings(mission) {
@@ -261,10 +342,9 @@ export function vehicleTimings(mission) {
   };
 }
 
-// Escolhe o local de estacionamento: recuado 25–50m do fim da rota (variação
-// por missão), encostado à berma (offset perpendicular à via) e NUNCA sobre o
-// alvo. Devolve também o rumo da via nesse ponto (o carro fica orientado no
-// sentido em que chegou).
+// Escolhe o local de estacionamento: recuado 25–50m do fim da rota, encostado
+// à berma e NUNCA sobre o alvo. v3: com probabilidade seeded o carro fica
+// "mal estacionado" e faz um micro-reposicionamento (repark) já no local.
 export function buildParking(mission, routeInfo) {
   const rng = mulberry32(hashStr(String(mission.id || "m") + ":prk"));
   const latlngs = routeInfo.latlngs;
@@ -283,7 +363,6 @@ export function buildParking(mission, routeInfo) {
     }
   }
   if (!anchor) {
-    // Rota degenerada: ancora ~30m antes do alvo na direção da origem.
     const o = { lat: mission.origin.lat, lng: mission.origin.lng };
     const d = Math.max(1e-6, distMeters(o, target));
     anchor = lerpPt(target, o, Math.min(30, d * 0.5) / d);
@@ -298,22 +377,33 @@ export function buildParking(mission, routeInfo) {
   const curbDist = 2.6 + rng() * 1.2;
   let park = ringPoint(anchor, streetBearingRad + (curbSide * Math.PI) / 2, curbDist);
   if (distMeters(park, target) < 14) {
-    // Garantia dura: nunca estacionar em cima do alvo.
     const away = bearingRad(target, anchor);
     park = ringPoint(target, isFinite(away) ? away : rng() * 2 * Math.PI, 16);
   }
 
-  return { latlngs, cum, total, parkFrac, anchor, park, streetBearingRad, curbSide, fallback: !!routeInfo.fallback };
+  // Repark: ~38% das missões o carro encosta mal e ajusta 4.5–8m ao longo da
+  // via, ainda antes de as portas abrirem.
+  const repark = rng() < 0.38 && total > 40;
+  let park2 = park;
+  if (repark) {
+    park2 = ringPoint(park, streetBearingRad, 4.5 + rng() * 3.5);
+    if (distMeters(park2, target) < 14) park2 = ringPoint(park, streetBearingRad + Math.PI, 5 + rng() * 2);
+  }
+
+  return {
+    latlngs, cum, total, parkFrac, anchor, park, streetBearingRad, curbSide,
+    repark, park2, reparkStartOff: 0.9, reparkDur: 2.4,
+    fallback: !!routeInfo.fallback,
+  };
 }
 
 // Pose do veículo num instante — posição, rumo (graus) e estado.
-// Aceleração/desaceleração via perfil trapezoidal; manobra de encosto à berma
-// nos últimos segundos da viagem; arranque da berma no início do regresso.
 export function vehiclePoseAt(mission, parking, nowMs) {
   const vt = vehicleTimings(mission);
   const s = nowMs / 1000;
   const { latlngs, cum, parkFrac, anchor, park, streetBearingRad } = parking;
-  const streetDeg = (streetBearingRad * 180) / Math.PI;
+  const streetDeg = toDeg(streetBearingRad);
+  const parkEff = parking.repark ? parking.park2 : park;
 
   if (s >= vt.ret) {
     return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", state: "done", frac: 0, progress: 1, bearing: null, moving: false };
@@ -326,7 +416,6 @@ export function vehiclePoseAt(mission, parking, nowMs) {
     const b = vt.parkDur / T;
     const f = trapezoidEase(t, a, b) * parkFrac;
     const base = pointOnRoute(latlngs, cum, f) || anchor;
-    // Encosto: desliza lateralmente para a berma durante a travagem final.
     const lateralT = clamp((s - (vt.arrive - vt.parkDur)) / vt.parkDur, 0, 1);
     const lf = smooth(lateralT);
     const pos = {
@@ -339,10 +428,23 @@ export function vehiclePoseAt(mission, parking, nowMs) {
   }
 
   if (s < vt.finish) {
-    return { lat: park.lat, lng: park.lng, phase: "operating", state: "execute", frac: parkFrac, progress: 1, bearing: streetDeg, moving: false };
+    // v3: micro-reposicionamento se ficou mal estacionado.
+    if (parking.repark) {
+      const rs = vt.arrive + parking.reparkStartOff;
+      const reEnd = rs + parking.reparkDur;
+      if (s < rs) {
+        return { lat: park.lat, lng: park.lng, phase: "operating", state: "parking", frac: parkFrac, progress: 1, bearing: streetDeg, moving: false };
+      }
+      if (s < reEnd) {
+        const f = smooth((s - rs) / parking.reparkDur);
+        const pos = lerpPt(park, parking.park2, f);
+        return { ...pos, phase: "operating", state: "repark", frac: parkFrac, progress: 1, bearing: streetDeg, moving: true };
+      }
+    }
+    return { lat: parkEff.lat, lng: parkEff.lng, phase: "operating", state: "execute", frac: parkFrac, progress: 1, bearing: streetDeg, moving: false };
   }
 
-  // Regresso — sai da berma, acelera, trava na base.
+  // Regresso — sai da berma, acelera lentamente, trava na base.
   const T = vt.Tr;
   const t = clamp((s - vt.finish) / T, 0, 1);
   const a = vt.departDur / T;
@@ -351,8 +453,8 @@ export function vehiclePoseAt(mission, parking, nowMs) {
   const base = pointOnRoute(latlngs, cum, f) || anchor;
   const lf = 1 - smooth(clamp((s - vt.finish) / vt.departDur, 0, 1));
   const pos = {
-    lat: base.lat + (park.lat - anchor.lat) * lf,
-    lng: base.lng + (park.lng - anchor.lng) * lf,
+    lat: base.lat + (parkEff.lat - anchor.lat) * lf,
+    lng: base.lng + (parkEff.lng - anchor.lng) * lf,
   };
   const bearing = routeBearingDeg(latlngs, cum, f, -1) ?? (streetDeg + 180) % 360;
   return { ...pos, phase: "returning", state: "return", frac: f, progress: t, bearing, moving: true };
@@ -361,18 +463,6 @@ export function vehiclePoseAt(mission, parking, nowMs) {
 // ============================================================================
 // Registo de arquetipos — papéis, estações e parâmetros por tipo de missão
 // ============================================================================
-// Papéis:
-//   entry      — aproxima-se / entra no objetivo
-//   door       — cobertura da entrada (patrulha a fachada)
-//   overwatch  — vigilância (parado, varre a zona, reposiciona-se)
-//   vehicle    — proteção do veículo (patrulha junto ao carro)
-//   retreat    — cobertura da retirada (a meio caminho carro↔alvo)
-//   carrier    — vaivém de carga veículo↔alvo
-//   hacker     — no dispositivo, junto ao alvo
-//   negotiator — semicírculo frente ao alvo
-//   ghostop    — infiltração (semi-transparente, avanços curtos)
-//   assault    — corridas entre coberturas
-//   escort     — escolta em anel com deriva lenta
 
 const spreadAngles = (base, totalDeg, count) => {
   const out = [];
@@ -383,8 +473,6 @@ const spreadAngles = (base, totalDeg, count) => {
   return out;
 };
 
-// Substitui papéis "primários" por papéis de apoio conforme o tamanho da
-// equipa — as posições variam por missão via jitter seeded nas estações.
 function withSupportRoles(primary, n, extras) {
   const roles = new Array(n).fill(primary);
   for (const { min, at, role } of extras) {
@@ -403,6 +491,7 @@ const ARCHETYPES = {
       { min: 6, at: 5, role: "overwatch" },
     ]),
     primaryFan: { spreadDeg: 46, radius: 4 },
+    entrances: true, // distribuem-se pelas entradas do edifício
   },
   spread: {
     speed: 1.6,
@@ -411,7 +500,7 @@ const ARCHETYPES = {
       { min: 5, at: 4, role: "vehicle" },
     ]),
     primaryFan: { spreadDeg: 360, radius: 12, fullCircle: true },
-    invade: true, // entram todos pela porta após o cerco
+    invade: true,
   },
   cargo: {
     speed: 1.5,
@@ -462,9 +551,10 @@ const ARCHETYPES = {
   },
 };
 
-// Estação de um papel de apoio (partilhada entre arquetipos).
+// Estação de um papel de apoio (partilhada entre arquetipos). radScale adapta
+// as distâncias ao espaço disponível em redor do alvo.
 function supportStation(role, ctx, rng) {
-  const { target, park, approach, street } = ctx;
+  const { target, park, approach, street, radScale } = ctx;
   if (role === "vehicle") {
     return ringPoint(park, approach + (rng() - 0.5) * 2.0, 2.6 + rng() * 1.4);
   }
@@ -475,70 +565,187 @@ function supportStation(role, ctx, rng) {
   }
   if (role === "overwatch") {
     const side = rng() < 0.5 ? 1 : -1;
-    return ringPoint(target, street + side * (1.0 + rng() * 0.8), 9 + rng() * 4);
+    return ringPoint(target, street + side * (1.0 + rng() * 0.8), (9 + rng() * 4) * radScale);
   }
   if (role === "door") {
-    return ringPoint(target, street + (rng() - 0.5) * 0.4, 6.5 + rng() * 2);
+    return ringPoint(target, street + (rng() - 0.5) * 0.4, (6.5 + rng() * 2) * radScale);
   }
-  return ringPoint(target, street, 5);
+  if (role === "techaccess") {
+    // acessos técnicos — traseiras/lateral do edifício
+    const side = rng() < 0.5 ? 1 : -1;
+    return ringPoint(target, street + Math.PI + side * (0.5 + rng() * 0.5), (4.5 + rng() * 2.5) * radScale);
+  }
+  return ringPoint(target, street, 5 * radScale);
 }
+
+// Normaliza um ângulo para (-π, π].
+const normAng = (a) => {
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a <= -Math.PI) a += 2 * Math.PI;
+  return a;
+};
 
 // ============================================================================
 // Construção da coreografia (uma vez por missão)
 // ============================================================================
-// parking: resultado de buildParking; opsCount: nº de operacionais (máx. 6)
-export function buildChoreography(mission, parking, opsCount) {
+// parking: resultado de buildParking; opsCount: nº de operacionais (máx. 6);
+// roster: [{ role_key, spec, rank }] alinhado com mission.member_ids (opcional).
+export function buildChoreography(mission, parking, opsCount, roster) {
   const arrive = Date.parse(mission.arrive_at) / 1000;
   const finish = Date.parse(mission.finish_at) / 1000;
   const W = Math.max(4, finish - arrive);
   const target = { lat: mission.target.lat, lng: mission.target.lng };
-  const park = parking.park || parking;
+  const park = parking.repark ? parking.park2 : (parking.park || parking);
   const kind = choreoKind(mission.opportunity);
   const arch = ARCHETYPES[kind] || ARCHETYPES.collect;
   const rng = mulberry32(hashStr(String(mission.id || "m")));
-  const n = clamp(opsCount || 1, 1, 6);
+  const nTotal = clamp(opsCount || 1, 1, 6);
+  const members = Array.isArray(roster) ? roster.slice(0, nTotal) : [];
+
+  // ----- Urgência e estilo de retirada -----
+  // Janela curta → todos se mexem mais depressa; missões longas terminam com
+  // uma retirada apressada, curtas com uma retirada organizada.
+  const urgency = clamp(1.26 - W / 300, 0.92, 1.26);
+  const hurried = W > 110;
+  const calm = urgency < 1.12; // permite micro-hesitações na aproximação
+
+  // ----- Motorista pode ficar ao volante -----
+  let driverInside = false;
+  let driverMemberIdx = -1;
+  if (nTotal >= 3) {
+    for (let i = 0; i < members.length; i++) {
+      if (members[i] && DRIVER_KEYS.has(members[i].role_key)) { driverMemberIdx = i; break; }
+    }
+    if (driverMemberIdx >= 0 && rng() < 0.75) driverInside = true;
+  }
+  const groundMembers = [];
+  for (let i = 0; i < nTotal; i++) {
+    if (driverInside && i === driverMemberIdx) continue;
+    groundMembers.push(members[i] || null);
+  }
+  const n = driverInside ? nTotal - 1 : nTotal;
+  const cinematic = W >= 26 && n >= 2;
 
   const approach = bearingRad(park, target); // rumo carro -> alvo
   const street = approach + Math.PI;         // lado da rua (de onde chegam)
   const dPT = Math.max(6, distMeters(park, target));
+  const radScale = clamp(dPT / 26, 0.72, 1.5); // adapta a ocupação ao espaço
 
-  // ----- Papéis e estações (leque rodado + jitter por missão) -----
+  // ----- Papéis: arquetipo + especializações reais -----
   const roles = arch.roles(n);
-  const fan = arch.primaryFan;
-  const fanRot = (rng() - 0.5) * (fan.fullCircle ? 0.9 : 0.6); // rotação global do leque
-  const primaryIdx = [];
-  for (let i = 0; i < n; i++) if (roles[i] !== "vehicle" && roles[i] !== "retreat" && roles[i] !== "overwatch" && roles[i] !== "door") primaryIdx.push(i);
-
-  const baseBearing = fan.rear ? approach : street;
-  const angles = fan.fullCircle
-    ? primaryIdx.map((_, k) => baseBearing + fanRot + (k * 2 * Math.PI) / Math.max(1, primaryIdx.length))
-    : spreadAngles(baseBearing + fanRot, fan.spreadDeg, primaryIdx.length);
-
-  const stations = new Array(n);
-  let pk = 0;
+  let primaryCount = roles.filter((r) => PRIMARY_ROLES.has(r)).length;
+  const minPrimary = Math.max(1, Math.ceil(n * 0.4));
   for (let i = 0; i < n; i++) {
-    const role = roles[i];
-    if (role === "vehicle" || role === "retreat" || role === "overwatch" || role === "door") {
-      stations[i] = supportStation(role, { target, park, approach, street }, rng);
-    } else {
-      const ang = angles[pk] + (rng() - 0.5) * 0.14; // jitter por estação
-      const rad = fan.radius * (0.85 + rng() * 0.3);
-      stations[i] = ringPoint(target, ang, rad);
-      pk++;
+    const spec = groundMembers[i]?.spec || null;
+    const desire = spec ? specDesire(spec, kind) : null;
+    if (!desire || roles[i] === desire) continue;
+    const j = roles.indexOf(desire);
+    if (j >= 0) {
+      const tmp = roles[i];
+      roles[i] = roles[j];
+      roles[j] = tmp;
+      continue;
+    }
+    const iPrim = PRIMARY_ROLES.has(roles[i]);
+    const dPrim = PRIMARY_ROLES.has(desire);
+    if (!iPrim || dPrim || primaryCount > minPrimary) {
+      if (iPrim && !dPrim) primaryCount--;
+      if (!iPrim && dPrim) primaryCount++;
+      roles[i] = desire;
     }
   }
 
-  // ----- Timings partilhados (variação seeded por missão) -----
-  const exitStagger = 0.45 + rng() * 0.4;   // intervalo entre saídas do carro
-  const boardStagger = 0.4 + rng() * 0.5;   // intervalo entre embarques
-  const bulgeBase = (rng() - 0.5) * 2 * clamp(dPT * 0.18, 3, 14); // curva partilhada da formação
-  const boardOrder = [...Array(n).keys()];
-  for (let i = n - 1; i > 0; i--) {         // shuffle seeded — regressam por ordem diferente
-    const j = Math.floor(rng() * (i + 1));
-    [boardOrder[i], boardOrder[j]] = [boardOrder[j], boardOrder[i]];
+  // ----- Líder de facto (patente mais alta em terra) -----
+  let leaderIdx = 0;
+  let bestRank = -1;
+  for (let i = 0; i < n; i++) {
+    const rk = RANK_ORDER.indexOf(groundMembers[i]?.rank);
+    if (rk > bestRank) { bestRank = rk; leaderIdx = i; }
   }
+
+  // ----- Batedor (verifica o perímetro antes de todos) -----
+  let scoutIdx = -1;
+  if (cinematic) {
+    const prefs = ["overwatch", "door", "retreat", "vehicle", "techaccess"];
+    for (const pr of prefs) {
+      const j = roles.findIndex((r, k) => r === pr && k !== leaderIdx);
+      if (j >= 0) { scoutIdx = j; break; }
+    }
+    if (scoutIdx < 0) {
+      for (let i = 0; i < n; i++) if (i !== leaderIdx) { scoutIdx = i; break; }
+    }
+  }
+
+  // ----- Estações (leque/entradas + jitter), ordenadas para não se cruzarem -----
+  const fan = arch.primaryFan;
+  const fanRot = (rng() - 0.5) * (fan.fullCircle ? 0.9 : 0.6);
+  const primaryIdx = [];
+  for (let i = 0; i < n; i++) if (!SUPPORT_ROLES.has(roles[i])) primaryIdx.push(i);
+
+  const baseBearing = fan.rear ? approach : street;
+  // Entradas do edifício (heist): 2–3 pontos de acesso; spread mantém o cerco
+  // completo mas cada op invade pela entrada mais próxima.
+  const entrances = [street + (rng() - 0.5) * 0.3];
+  if (n >= 2) entrances.push(street + 1.7 + (rng() - 0.5) * 0.3);
+  if (n >= 5) entrances.push(street - 1.7 + (rng() - 0.5) * 0.3);
+
+  let angles;
+  if (arch.entrances && primaryIdx.length >= 2) {
+    angles = primaryIdx.map((_, k) => entrances[k % entrances.length] + (rng() - 0.5) * 0.24);
+  } else if (fan.fullCircle) {
+    angles = primaryIdx.map((_, k) => baseBearing + fanRot + (k * 2 * Math.PI) / Math.max(1, primaryIdx.length));
+  } else {
+    angles = spreadAngles(baseBearing + fanRot, fan.spreadDeg, primaryIdx.length);
+  }
+  // Trajetos que não se cruzam: estações ordenadas por ângulo relativo e
+  // atribuídas por ordem — o op mais "à esquerda" sai pela porta esquerda.
+  const sortedAngles = angles
+    .map((a) => ({ a, rel: normAng(a - approach) }))
+    .sort((x, y) => x.rel - y.rel);
+
+  const stations = new Array(n);
+  const doorSides = new Array(n);
+  const opAngle = new Array(n).fill(null);
+  for (let k = 0; k < primaryIdx.length; k++) {
+    const i = primaryIdx[k];
+    const ent = sortedAngles[k];
+    const ang = ent.a + (rng() - 0.5) * 0.14;
+    const rad = fan.radius * radScale * (0.85 + rng() * 0.3);
+    stations[i] = ringPoint(target, ang, rad);
+    doorSides[i] = ent.rel > 0 ? 1 : -1;
+    opAngle[i] = ang;
+  }
+  for (let i = 0; i < n; i++) {
+    if (stations[i]) continue;
+    stations[i] = supportStation(roles[i], { target, park, approach, street, radScale }, rng);
+    doorSides[i] = normAng(bearingRad(park, stations[i]) - approach) > 0 ? 1 : -1;
+  }
+
+  // ----- Timeline global (v3) -----
+  const settleEnd = arrive + (parking.repark ? parking.reparkStartOff + parking.reparkDur + 0.3 : 0.7);
+  const doorsOpenAt = settleEnd + 0.25;
+
+  // Ordem de saída: batedor → líder → apoios → primários.
+  const exitOrder = [];
+  if (scoutIdx >= 0) exitOrder.push(scoutIdx);
+  if (leaderIdx !== scoutIdx) exitOrder.push(leaderIdx);
+  for (let i = 0; i < n; i++) if (!exitOrder.includes(i) && SUPPORT_ROLES.has(roles[i])) exitOrder.push(i);
+  for (let i = 0; i < n; i++) if (!exitOrder.includes(i)) exitOrder.push(i);
+
+  const exitStagger = (0.5 + rng() * 0.35) / urgency;
+  const spawnAts = new Array(n);
+  for (let k = 0; k < exitOrder.length; k++) {
+    spawnAts[exitOrder[k]] = doorsOpenAt + 0.3 + k * exitStagger * (0.85 + rng() * 0.3);
+  }
+  let tDisembarkEnd = arrive;
+  for (let i = 0; i < n; i++) tDisembarkEnd = Math.max(tDisembarkEnd, spawnAts[i] + 0.6);
+  const doorsCloseExitAt = tDisembarkEnd + 1.4 + rng() * 1.8; // ficam abertas uns segundos
+
+  const bulgeBase = (rng() - 0.5) * 2 * clamp(dPT * 0.18, 3, 14);
   const cargoOutbound = CARGO_OUTBOUND.has(mission.opportunity?.type_key);
 
+  // ----- Ops: pontos, caminhos e velocidades -----
+  const rallyBase = ringPoint(park, approach, clamp(3.2 * radScale, 2.4, 4.5));
   const ops = [];
   for (let i = 0; i < n; i++) {
     const r1 = rng();
@@ -546,51 +753,60 @@ export function buildChoreography(mission, parking, opsCount) {
     const r3 = rng();
     const role = roles[i];
     const station = stations[i];
-
-    // Sai por uma das portas (lados alternados) e contorna para o passeio.
-    const doorSide = i % 2 === 0 ? 1 : -1;
+    const doorSide = doorSides[i] ?? (i % 2 === 0 ? 1 : -1);
     const spawnPt = ringPoint(park, approach + (doorSide * Math.PI) / 2, 1.8);
+    const holdPt = ringPoint(spawnPt, rng() * 2 * Math.PI, 0.5 + rng() * 0.8);
+    const rallyPt = ringPoint(rallyBase, rng() * 2 * Math.PI, 0.6 + rng() * 1.0);
 
-    // Formação: curva coerente (mesma barriga base) + variação individual +
-    // afastamento lateral em leque — nunca caminham em linha única.
     const bulge = bulgeBase * (0.75 + 0.5 * r1) + (r1 - 0.5) * 2.5;
     const pIn = walkPath(spawnPt, station, bulge);
-    const pOut = walkPath(station, spawnPt, -bulge * 0.7);
+    // Retirada por percurso diferente: barriga invertida, via ponto de reunião.
+    const pOut = walkPath(station, rallyPt, -bulge * 0.9);
+    const pBoard = walkPath(rallyPt, spawnPt, (rng() - 0.5) * 1.2, 6);
     const latAmp = clamp((i - (n - 1) / 2) * (1.0 + 0.8 * r2), -3.5, 3.5);
     const latPerp = bearingRad(spawnPt, station) + Math.PI / 2;
 
-    const speed = arch.speed * (0.88 + 0.3 * r2);
-    const walkInDur = clamp(pIn.length / speed, 1.2, W * 0.26) + (kind === "stealth" ? i * 1.0 : 0);
-    const walkOutDur = clamp(pOut.length / speed, 1.2, W * 0.24);
-
-    const spawnAt = arrive + 0.5 + i * exitStagger + (r3 - 0.5) * 0.2;
-    const boardEnd = finish - 0.4 - boardOrder[i] * boardStagger;
-    const actionStart = spawnAt + 0.6 + walkInDur;
-    let walkBackAt = boardEnd - 0.5 - walkOutDur - r1 * 1.2;
-    if (walkBackAt < actionStart) {
-      // janela apertada: vão ao ponto e voltam logo
-      walkBackAt = Math.max(spawnAt + 0.8, (spawnAt + boardEnd) / 2);
-    }
-    const action = Math.max(0, walkBackAt - actionStart);
+    const speed = arch.speed * (0.88 + 0.3 * r2) * urgency;         // caminhar
+    const runSpeed = speed * (1.9 + 0.3 * r3) * (hurried ? 1.12 : 1); // correr (só retirada)
+    const walkInDur = clamp(pIn.length / speed, 1.0, W * 0.26);
+    const runOutDur = clamp(pOut.length / runSpeed, 0.8, W * 0.22);
 
     const op = {
-      role, station, spawnPt, pIn, pOut, speed,
-      spawnAt, walkInDur, actionStart, walkBackAt, walkOutDur, boardEnd,
-      latAmp, latPerp, r1, r2, r3, action,
-      // deriva idle universal (duas frequências — parece respiração/passos curtos)
+      role, station, spawnPt, holdPt, rallyPt, pIn, pOut, pBoard,
+      speed, runSpeed, walkInDur, runOutDur,
+      spawnAt: spawnAts[i],
+      isLeader: i === leaderIdx,
+      isScout: i === scoutIdx,
+      latAmp, latPerp, r1, r2, r3,
+      // deriva idle universal (duas frequências)
       dw1: (2 * Math.PI) / (4.2 + r2 * 3.2), dp1: r1 * 6.28,
       dw2: (2 * Math.PI) / (6.5 + r3 * 3.5), dp2: r2 * 6.28,
+      // varrimento do olhar — período/fase próprios por operacional
+      lookP: 2.8 + r1 * 2.8, lookPhase: r2 * 20, lookSeed: r3 * 97.3,
+      faceBase: null, // preenchido abaixo
     };
+
+    // Orientação base do olhar por papel (parado).
+    if (role === "overwatch" || role === "retreat" || role === "door" || role === "techaccess") {
+      op.faceBase = toDeg(bearingRad(target, station)); // vigiam para fora
+    } else if (role === "vehicle") {
+      op.faceBase = toDeg(parking.streetBearingRad ?? approach);
+    } else {
+      op.faceBase = toDeg(bearingRad(station, target)); // virados ao alvo
+    }
 
     // ----- Parâmetros de programa por papel/arquetipo -----
     if (role === "entry") {
-      op.enterDelay = clamp(action * 0.15, 0.6, 2.5);
-      op.exitLead = clamp(action * 0.1, 0.5, 1.5);
-      op.holdDur = clamp(action * 0.3, 0.8, 4);      // usado no spread (cerco)
-      op.convergeDur = clamp(action * 0.15, 0.8, 1.8);
-      op.door = ringPoint(target, street, 2);
       op.invade = !!arch.invade;
       op.target = target;
+      // porta de entrada: a mais próxima da estação (entradas do edifício)
+      let bestEnt = entrances[0];
+      let bestD = Infinity;
+      for (const ea of entrances) {
+        const d = Math.abs(normAng((opAngle[i] ?? bearingRad(target, station)) - ea));
+        if (d < bestD) { bestD = d; bestEnt = ea; }
+      }
+      op.door = ringPoint(target, bestEnt, 1.9);
     }
     if (role === "carrier") {
       op.period = clamp(2 * (pIn.length / speed) * 0.8 + 5, 8, 26) * (0.9 + 0.2 * r3);
@@ -599,8 +815,8 @@ export function buildChoreography(mission, parking, opsCount) {
     }
     if (role === "assault") {
       const perp = bearingRad(station, target) + Math.PI / 2;
-      op.coverA = ringPoint(station, perp, 4);
-      op.coverB = ringPoint(station, perp + Math.PI, 4);
+      op.coverA = ringPoint(station, perp, 4 * radScale);
+      op.coverB = ringPoint(station, perp + Math.PI, 4 * radScale);
       op.cycleHold = 2.4 + r3 * 2.2;
       op.dashDur = 0.7;
     }
@@ -612,56 +828,318 @@ export function buildChoreography(mission, parking, opsCount) {
         op.orbitCenter = target;
         op.orbitBearing = bearingRad(target, station);
         op.orbitRadius = Math.max(2, distMeters(target, station));
-        op.orbitDrift = (2 * Math.PI) / (26 + r3 * 18); // deriva lenta do anel
+        op.orbitDrift = (2 * Math.PI) / (26 + r3 * 18);
         op.orbitDir = r1 < 0.5 ? 1 : -1;
       }
     }
     if (role === "door" || role === "vehicle") {
-      // patrulha pendular — fachada (door) ou a flanquear o carro (vehicle)
       const axis = role === "door" ? street + Math.PI / 2 : (parking.streetBearingRad ?? approach);
-      const span = role === "door" ? 3.5 : 2.8;
+      const span = (role === "door" ? 3.5 : 2.8) * radScale;
       op.paceA = ringPoint(station, axis, span);
       op.paceB = ringPoint(station, axis + Math.PI, span);
       op.pacePeriod = 5.5 + r3 * 3;
     }
-    if (role === "overwatch" || role === "retreat" || role === "ghostop") {
-      // reposicionamento discreto entre dois pontos próximos
-      const shiftDir = role === "ghostop"
-        ? bearingRad(station, target)                 // infiltração: aproxima-se
-        : r2 * 2 * Math.PI;
+    if (role === "overwatch" || role === "retreat" || role === "ghostop" || role === "techaccess") {
+      const shiftDir = role === "ghostop" ? bearingRad(station, target) : r2 * 2 * Math.PI;
       op.stationB = ringPoint(station, shiftDir, role === "ghostop" ? 1.6 + r3 * 1.2 : 1.5 + r3 * 1.8);
       op.msPeriod = 8 + r3 * 7;
+      // Operações longas: terceira estação → rotação periódica de posições.
+      if (W > 75) op.stationC = ringPoint(station, r1 * 2 * Math.PI, 2.0 + r2 * 2.2);
     }
 
     ops.push(op);
   }
 
-  // Continuidade do vaivém de carga: fração do trajeto no instante em que o
-  // regresso começa — o operacional caminha daí para o veículo sem teleporte.
+  // ----- Reconhecimento do batedor + ordem do líder -----
+  let reconEnd = null;
+  if (scoutIdx >= 0) {
+    const sc = ops[scoutIdx];
+    const reconR = fan.radius * radScale + 4.5;
+    const side = rng() < 0.5 ? 1 : -1;
+    const b0 = street + side * (0.7 + rng() * 0.4);
+    const sweep = side * -(1.2 + rng() * 0.8);
+    const pts = [sc.spawnPt, ringPoint(target, b0, reconR)];
+    pts.push(ringPoint(target, b0 + sweep * 0.5, reconR * (0.92 + rng() * 0.16)));
+    pts.push(ringPoint(target, b0 + sweep, reconR * (0.9 + rng() * 0.2)));
+    pts.push(sc.station);
+    sc.pRecon = polyPath(pts);
+    sc.walkStart = sc.spawnAt + 0.5;
+    sc.reconDur = clamp(sc.pRecon.length / sc.speed, 3, W * 0.2);
+    reconEnd = sc.walkStart + sc.reconDur;
+  }
+  const orderAt = (reconEnd != null ? reconEnd : tDisembarkEnd) + 0.4 + rng() * 0.6;
+
+  // ----- Avanço: apoios primeiro, primários aguardam a primeira cobertura -----
+  const supIdx = [];
+  const priIdx = [];
+  for (let i = 0; i < n; i++) {
+    if (i === scoutIdx) continue;
+    (SUPPORT_ROLES.has(ops[i].role) ? supIdx : priIdx).push(i);
+  }
+  let firstSupportArrive = orderAt + 0.6;
+  supIdx.forEach((i, k) => {
+    const op = ops[i];
+    op.advanceAt = Math.max(orderAt + 0.25 + k * (0.4 + op.r3 * 0.25), op.spawnAt + 0.6);
+    op.actionStart = op.advanceAt + op.walkInDur;
+    if (k === 0) firstSupportArrive = op.actionStart;
+    else firstSupportArrive = Math.min(firstSupportArrive, op.actionStart);
+  });
+  const actionCap = arrive + W * 0.55;
+  priIdx.forEach((i, k) => {
+    const op = ops[i];
+    const waitFor = cinematic && supIdx.length > 0 ? firstSupportArrive + 0.3 : orderAt + 0.6;
+    op.advanceAt = Math.max(op.spawnAt + 0.6, Math.max(orderAt + 0.6, waitFor) + k * (0.45 + op.r3 * 0.3));
+    if (op.advanceAt + op.walkInDur > actionCap) {
+      op.advanceAt = Math.max(orderAt + 0.2 + k * 0.3, actionCap - op.walkInDur);
+    }
+    op.actionStart = op.advanceAt + op.walkInDur;
+  });
+  if (scoutIdx >= 0) {
+    const sc = ops[scoutIdx];
+    sc.advanceAt = sc.walkStart;
+    sc.actionStart = reconEnd;
+  }
+  let tApproachEnd = arrive;
+  for (const op of ops) tApproachEnd = Math.max(tApproachEnd, op.actionStart);
+
+  // ----- Retaguarda (protege a retirada, embarca em último, confirma) -----
+  let rearIdx = -1;
+  if (cinematic && n >= 2) {
+    rearIdx = ops.findIndex((o, k) => o.role === "retreat" && k !== leaderIdx);
+    if (rearIdx < 0 && scoutIdx >= 0) rearIdx = scoutIdx;
+    if (rearIdx < 0) rearIdx = n - 1 === leaderIdx ? n - 2 : n - 1;
+    if (rearIdx < 0) rearIdx = -1;
+  }
+
+  // ----- Retirada resolvida de trás para a frente a partir do finish -----
+  const solveRetreat = (tight) => {
+    const departHold = tight ? 0.8 : 1.2 + rng() * 1.4;
+    const confDur = rearIdx >= 0 ? (tight ? 0.6 : 0.9 + rng() * 0.8) : 0;
+    const boardWalk = 1.0 + rng() * 0.4;
+    const boardStagger = tight ? 0.35 : hurried ? 0.45 + rng() * 0.25 : 0.8 + rng() * 0.45;
+    const regHold = tight ? 0.2 : hurried ? 0.25 + rng() * 0.4 : 0.9 + rng() * 1.1;
+    const jitScale = tight ? 0.4 : hurried ? 0.6 : 1;
+    return { departHold, confDur, boardWalk, boardStagger, regHold, jitScale };
+  };
+
+  const applyRetreat = (P) => {
+    const departReadyAt = finish - P.departHold;
+    const others = [];
+    for (let i = 0; i < n; i++) if (i !== rearIdx) others.push(i);
+
+    // jitters e caudas
+    let maxTail = 0;
+    for (const i of others) {
+      const op = ops[i];
+      op.retJit = (0.2 + op.r1 * 0.8) * P.jitScale;
+      maxTail = Math.max(maxTail, op.retJit + op.runOutDur);
+    }
+
+    // ordem de embarque: organizada → primários (com saque) primeiro;
+    // apressada → ordem baralhada seeded.
+    const order = [...others];
+    if (hurried) {
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+    } else {
+      order.sort((a, b) => (SUPPORT_ROLES.has(ops[a].role) ? 1 : 0) - (SUPPORT_ROLES.has(ops[b].role) ? 1 : 0));
+    }
+
+    const nB = others.length;
+    const boardSpan = nB > 0 ? (nB - 1) * P.boardStagger + P.boardWalk + 0.45 : 0;
+
+    // retaguarda: tempos próprios
+    let rear = null;
+    if (rearIdx >= 0) {
+      const op = ops[rearIdx];
+      const coverPt = ringPoint(lerpPt(park, target, 0.42 + op.r2 * 0.16), approach + Math.PI / 2, (op.r1 - 0.5) * 6);
+      const pCoverIn = walkPath(op.station, coverPt, (op.r3 - 0.5) * 2, 6);
+      const pCoverOut = walkPath(coverPt, op.spawnPt, (op.r1 - 0.5) * 2, 6);
+      rear = {
+        coverPt, pCoverIn, pCoverOut,
+        dashDur: clamp(pCoverIn.length / op.runSpeed, 0.5, 3),
+        runDur: clamp(pCoverOut.length / op.runSpeed, 0.6, 4),
+      };
+    }
+
+    // estimativa inicial do sinal de retirada
+    let signal = departReadyAt - (maxTail + P.regHold + boardSpan + (rear ? rear.runDur + P.confDur + 0.5 : 0.4));
+
+    const computeForward = () => {
+      let lastRally = signal;
+      for (const i of others) {
+        const op = ops[i];
+        op.walkBackAt = signal + op.retJit;
+        op.rallyArrive = op.walkBackAt + op.runOutDur;
+        lastRally = Math.max(lastRally, op.rallyArrive);
+      }
+      const firstBoardAt = lastRally + P.regHold;
+      let lastOthersEnd = firstBoardAt;
+      order.forEach((i, k) => {
+        const op = ops[i];
+        op.boardStart = Math.max(firstBoardAt + k * P.boardStagger, op.rallyArrive);
+        op.boardWalk = P.boardWalk;
+        op.boardEnd = op.boardStart + P.boardWalk + 0.45;
+        lastOthersEnd = Math.max(lastOthersEnd, op.boardEnd);
+      });
+      let rearEnd = lastOthersEnd;
+      if (rear && rearIdx >= 0) {
+        const op = ops[rearIdx];
+        op.coverAt = signal + 0.15;
+        op.coverArrive = op.coverAt + rear.dashDur;
+        op.coverUntil = Math.max(firstBoardAt, op.coverArrive + 0.5);
+        op.doorAt = Math.max(op.coverUntil + rear.runDur, lastOthersEnd - 0.25);
+        op.confDur = P.confDur;
+        op.boardEnd = op.doorAt + P.confDur + 0.5;
+        op.walkBackAt = op.coverAt;
+        op.rallyArrive = op.doorAt;
+        op.boardStart = op.doorAt;
+        op.boardWalk = 0;
+        op.coverPt = rear.coverPt;
+        op.pCoverIn = rear.pCoverIn;
+        op.pCoverOut = rear.pCoverOut;
+        op.coverDashDur = rear.dashDur;
+        op.coverRunDur = rear.runDur;
+        rearEnd = op.boardEnd;
+      }
+      return { lastRally, firstBoardAt, end: Math.max(lastOthersEnd, rearEnd) };
+    };
+
+    let fw = computeForward();
+    const overshoot = fw.end - departReadyAt;
+    if (overshoot > 0) {
+      signal -= overshoot;
+      fw = computeForward();
+    }
+    return { signal, fw, P };
+  };
+
+  const minSignal = tApproachEnd + clamp(W * 0.12, 0.8, 6);
+  let R = applyRetreat(solveRetreat(false));
+  if (R.signal < minSignal) R = applyRetreat(solveRetreat(true));
+  if (R.signal < minSignal) {
+    // janela apertadíssima — aceita a compressão mas garante monotonicidade
+    R.signal = minSignal;
+    for (const op of ops) {
+      op.walkBackAt = Math.max(op.walkBackAt ?? R.signal, Math.min(op.actionStart + 0.4, finish - 2));
+      op.rallyArrive = Math.min(op.rallyArrive ?? (op.walkBackAt + op.runOutDur), finish - 1.2);
+      op.boardStart = Math.min(op.boardStart ?? op.rallyArrive, finish - 1.0);
+      op.boardEnd = Math.min(op.boardEnd ?? (op.boardStart + 1.2), finish - 0.4);
+    }
+  }
+  const retreatSignalAt = R.signal;
+  let tRegroupStart = finish;
+  let tBoardStart = finish;
+  for (let i = 0; i < n; i++) {
+    if (i === rearIdx) continue;
+    tRegroupStart = Math.min(tRegroupStart, ops[i].rallyArrive ?? finish);
+    tBoardStart = Math.min(tBoardStart, ops[i].boardStart ?? finish);
+  }
+  const tConfirmStart = rearIdx >= 0 ? ops[rearIdx].doorAt ?? null : null;
+  if (rearIdx >= 0) ops[rearIdx].isRear = true;
+
+  // Continuidade do vaivém de carga na retirada (sem teleporte).
   for (const op of ops) {
     if (op.role === "carrier") op.cargoF0 = shuttleFrac(op, op.walkBackAt);
   }
 
-  // ----- Agregados para a máquina de estados (etiquetas de fase) -----
-  let tDisembarkEnd = arrive, tApproachEnd = arrive, tWithdrawStart = finish, tBoardStart = finish;
-  for (const op of ops) {
-    tDisembarkEnd = Math.max(tDisembarkEnd, op.spawnAt + 0.6);
-    tApproachEnd = Math.max(tApproachEnd, op.actionStart);
-    tWithdrawStart = Math.min(tWithdrawStart, op.walkBackAt);
-    tBoardStart = Math.min(tBoardStart, op.walkBackAt + op.walkOutDur);
+  // ----- Líder circula entre membros (operações longas) -----
+  const ROAMABLE = new Set(["negotiator", "door", "vehicle", "overwatch", "techaccess", "retreat"]);
+  const leaderOp = ops[leaderIdx];
+  if (leaderOp && W > 45 && ROAMABLE.has(leaderOp.role) && n >= 3 && !leaderOp.isRear) {
+    const visits = [];
+    for (let i = 0; i < n; i++) {
+      if (i === leaderIdx) continue;
+      const st = ops[i].station;
+      visits.push({ pt: ringPoint(st, bearingRad(st, leaderOp.station), 1.4), d: distMeters(leaderOp.station, st) });
+    }
+    visits.sort((a, b) => a.d - b.d);
+    leaderOp.roam = {
+      visits: visits.slice(0, 3).map((v) => v.pt),
+      period: 13 + rng() * 8,
+      start: tApproachEnd + 4,
+      walkDur: 2.2,
+      until: retreatSignalAt - 3,
+    };
   }
+
+  // ----- Comunicações rádio (linhas/pings entre operacionais) -----
+  const comms = [];
+  if (cinematic) {
+    if (scoutIdx >= 0 && scoutIdx !== leaderIdx && reconEnd != null) {
+      comms.push({ at: reconEnd - 0.3, dur: 1.5, from: scoutIdx, to: leaderIdx, kind: "report" });
+    }
+    let nearest = -1;
+    let nd = Infinity;
+    for (let i = 0; i < n; i++) {
+      if (i === leaderIdx) continue;
+      const d = distMeters(ops[leaderIdx].station, ops[i].station);
+      if (d < nd) { nd = d; nearest = i; }
+    }
+    if (nearest >= 0) comms.push({ at: orderAt, dur: 1.7, from: leaderIdx, to: nearest, kind: "order" });
+    // check-ins periódicos durante a execução
+    const checkers = [...supIdx, ...priIdx].filter((i) => i !== leaderIdx);
+    if (checkers.length) {
+      let t = tApproachEnd + 5 + rng() * 3;
+      let k = 0;
+      while (t < retreatSignalAt - 7 && k < 6) {
+        comms.push({ at: t, dur: 1.3, from: checkers[k % checkers.length], to: leaderIdx, kind: "check" });
+        t += 8 + rng() * 8;
+        k++;
+      }
+    }
+    let farthest = nearest;
+    let fd = -1;
+    for (let i = 0; i < n; i++) {
+      if (i === leaderIdx) continue;
+      const d = distMeters(ops[leaderIdx].station, ops[i].station);
+      if (d > fd) { fd = d; farthest = i; }
+    }
+    if (farthest >= 0) comms.push({ at: retreatSignalAt + 0.05, dur: 1.7, from: leaderIdx, to: farthest, kind: "retreat" });
+    if (rearIdx >= 0 && tConfirmStart != null && rearIdx !== leaderIdx) {
+      comms.push({ at: tConfirmStart + 0.25, dur: 1.2, from: rearIdx, to: leaderIdx, kind: "clear" });
+    }
+    comms.sort((a, b) => a.at - b.at);
+  }
+
+  // ----- Janelas das portas do veículo -----
+  const boardDoorsOpenAt = tBoardStart - 0.6;
+  const doorsFinalCloseAt = Math.min(finish - 0.7, (rearIdx >= 0 ? ops[rearIdx].boardEnd : tBoardStart + 2) + 0.4);
 
   return {
     kind,
     park,
     target,
     ops,
+    n,
+    groundCount: n,
+    driverInside,
+    leaderIdx,
+    scoutIdx,
+    rearIdx,
+    calm,
+    hurried,
+    urgency,
+    comms,
     ghost: arch.ghost || 0,
     lootOnExit: !!LOOT_ON_EXIT[kind],
     basePath: walkPath(park, target, clamp(dPT * 0.1, 2, 8)),
     deployStart: arrive,
     deployEnd: finish,
-    tDisembarkEnd, tApproachEnd, tWithdrawStart, tBoardStart,
+    orderAt,
+    tDisembarkEnd,
+    tReconEnd: reconEnd != null ? orderAt : null,
+    tApproachEnd,
+    tWithdrawStart: retreatSignalAt,
+    tRegroupStart,
+    tBoardStart,
+    tConfirmStart,
+    doorsOpenAt,
+    doorsCloseExitAt,
+    boardDoorsOpenAt,
+    doorsFinalCloseAt,
   };
 }
 
@@ -677,8 +1155,11 @@ export function missionStateAt(mission, choreo, nowMs) {
   else if (s >= vt.arrive) {
     if (!choreo) state = "execute";
     else if (s < choreo.tDisembarkEnd) state = "disembark";
+    else if (choreo.tReconEnd != null && s < choreo.tReconEnd) state = "recon";
     else if (s < choreo.tApproachEnd) state = "approach";
+    else if (choreo.tConfirmStart != null && s >= choreo.tConfirmStart) state = "confirm";
     else if (s >= choreo.tBoardStart) state = "board";
+    else if (s >= choreo.tRegroupStart) state = "regroup";
     else if (s >= choreo.tWithdrawStart) state = "withdraw";
     else state = "execute";
   } else if (s >= vt.arrive - vt.parkDur * 0.45) state = "parking";
@@ -688,11 +1169,23 @@ export function missionStateAt(mission, choreo, nowMs) {
 }
 
 // ============================================================================
+// Comunicações rádio — evento ativo num instante (ou null)
+// ============================================================================
+export function commAt(choreo, nowSec) {
+  const cs = choreo?.comms;
+  if (!cs || !cs.length) return null;
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i];
+    if (nowSec >= c.at && nowSec < c.at + c.dur) return { ...c, f: (nowSec - c.at) / c.dur };
+    if (c.at > nowSec) break;
+  }
+  return null;
+}
+
+// ============================================================================
 // Biblioteca de programas de execução (avaliados por frame, O(1))
 // ============================================================================
 
-// Fração [0..1] do trajeto pIn no vaivém de carga no instante nowSec.
-// Ciclo: pausa no alvo -> leg para o veículo -> pausa -> leg de volta.
 function shuttleFrac(op, nowSec) {
   const tt = ((nowSec - op.actionStart) % op.period + op.period) % op.period;
   const legDur = (op.period - 2 * op.dwell) / 2;
@@ -707,28 +1200,37 @@ function shuttleCarrying(op, nowSec) {
   const legDur = (op.period - 2 * op.dwell) / 2;
   const towardVehicle = tt >= op.dwell && tt < op.dwell + legDur;
   const towardTarget = tt >= 2 * op.dwell + legDur;
-  // sentido "carregado" depende do tipo (entrega vs recolha)
   return op.cargoOutbound ? towardTarget : towardVehicle;
 }
 
-// Movimento pendular entre A e B (triângulo suavizado).
+function shuttleDir(op, nowSec) {
+  const tt = ((nowSec - op.actionStart) % op.period + op.period) % op.period;
+  const legDur = (op.period - 2 * op.dwell) / 2;
+  if (tt >= op.dwell && tt < op.dwell + legDur) return -1; // alvo → veículo
+  if (tt >= 2 * op.dwell + legDur) return 1;               // veículo → alvo
+  return 0;
+}
+
 function paceBetween(a, b, period, nowSec) {
   const t = ((nowSec % period) + period) % period / period;
   const f = t < 0.5 ? smooth(t * 2) : smooth(2 - t * 2);
   return { lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f };
 }
 
-// Reposicionamento discreto: alterna entre station e stationB a cada período,
-// com uma transição curta a caminhar.
+// Reposicionamento discreto: alterna entre 2 (ou 3 em operações longas)
+// estações, com uma transição curta a caminhar.
 function microShift(op, nowSec) {
   const t = Math.max(0, nowSec - op.actionStart);
+  const pts = op.stationC ? [op.station, op.stationB, op.stationC] : [op.station, op.stationB];
   const k = Math.floor(t / op.msPeriod);
   const within = t - k * op.msPeriod;
-  const from = k % 2 === 0 ? op.station : op.stationB;
-  const to = k % 2 === 0 ? op.stationB : op.station;
+  const from = pts[k % pts.length];
+  const to = pts[(k + 1) % pts.length];
   const mv = 1.4;
-  if (within < mv) return { pos: lerpPt(from, to, smooth(within / mv)), walking: true };
-  return { pos: to, walking: false };
+  if (within < mv) {
+    return { pos: lerpPt(from, to, smooth(within / mv)), walking: true, heading: toDeg(bearingRad(from, to)) };
+  }
+  return { pos: to, walking: false, heading: null };
 }
 
 // Programa de ação por papel (durante [actionStart, walkBackAt]).
@@ -737,33 +1239,44 @@ function programEval(choreo, op, nowSec) {
   const role = op.role;
 
   if (role === "entry") {
-    let enterAt = op.actionStart + op.enterDelay;
+    let enterAt = op.actionStart + clamp((op.walkBackAt - op.actionStart) * 0.15, 0.6, 2.5);
     let from = op.station;
     if (op.invade) {
-      // cerco nas entradas, depois convergem para a porta e invadem
-      const holdEnd = op.actionStart + op.holdDur;
-      enterAt = holdEnd + op.convergeDur;
+      const action = Math.max(0, op.walkBackAt - op.actionStart);
+      const holdEnd = op.actionStart + clamp(action * 0.3, 0.8, 4);
+      const convergeDur = clamp(action * 0.15, 0.8, 1.8);
+      enterAt = holdEnd + convergeDur;
       if (nowSec < holdEnd) return { pos: op.station, ghost: 0, walking: false };
       if (nowSec < enterAt) {
-        return { pos: lerpPt(op.station, op.door, smooth((nowSec - holdEnd) / op.convergeDur)), ghost: 0, walking: true };
+        return {
+          pos: lerpPt(op.station, op.door, smooth((nowSec - holdEnd) / convergeDur)),
+          ghost: 0, walking: true, heading: toDeg(bearingRad(op.station, op.door)),
+        };
       }
       from = op.door;
     }
-    const exitAt = op.walkBackAt - op.exitLead;
+    const exitAt = op.walkBackAt - clamp((op.walkBackAt - op.actionStart) * 0.1, 0.5, 1.5);
     const fadeT = 0.5;
     if (nowSec < enterAt) return { pos: from, ghost: 0, walking: false };
     if (nowSec < enterAt + fadeT) {
       const f = (nowSec - enterAt) / fadeT;
       return { pos: lerpPt(from, target, f), ghost: f, walking: true };
     }
-    if (nowSec < exitAt) return { pos: target, ghost: 1, walking: false }; // dentro do edifício
+    if (nowSec < exitAt) return { pos: target, ghost: 1, walking: false };
     const f = clamp((nowSec - exitAt) / fadeT, 0, 1);
     return { pos: lerpPt(target, op.station, f), ghost: 1 - f, walking: true };
   }
 
   if (role === "carrier") {
     const f = shuttleFrac(op, nowSec);
-    return { pos: pathAt(op.pIn, f), ghost: 0, walking: f > 0.02 && f < 0.98, carry: shuttleCarrying(op, nowSec) };
+    const dir = shuttleDir(op, nowSec);
+    const heading = dir === 0 ? null : (pathHeading(op.pIn, f) != null ? (dir > 0 ? pathHeading(op.pIn, f) : (pathHeading(op.pIn, f) + 180) % 360) : null);
+    return {
+      pos: pathAt(op.pIn, f), ghost: 0,
+      walking: f > 0.02 && f < 0.98,
+      carry: shuttleCarrying(op, nowSec) ? "box" : null,
+      heading,
+    };
   }
 
   if (role === "assault") {
@@ -773,26 +1286,31 @@ function programEval(choreo, op, nowSec) {
     const from = k % 2 === 0 ? op.coverA : op.coverB;
     const to = k % 2 === 0 ? op.coverB : op.coverA;
     if (within < op.cycleHold) return { pos: from, ghost: 0, walking: false };
-    return { pos: lerpPt(from, to, smooth((within - op.cycleHold) / op.dashDur)), ghost: 0, walking: true };
+    return {
+      pos: lerpPt(from, to, smooth((within - op.cycleHold) / op.dashDur)),
+      ghost: 0, walking: true, running: true, heading: toDeg(bearingRad(from, to)),
+    };
   }
 
   if (role === "door" || role === "vehicle") {
-    return { pos: paceBetween(op.paceA, op.paceB, op.pacePeriod, nowSec), ghost: 0, walking: true };
+    const pos = paceBetween(op.paceA, op.paceB, op.pacePeriod, nowSec);
+    const pos2 = paceBetween(op.paceA, op.paceB, op.pacePeriod, nowSec + 0.15);
+    const heading = pos.lat === pos2.lat && pos.lng === pos2.lng ? null : toDeg(bearingRad(pos, pos2));
+    return { pos, ghost: 0, walking: true, heading };
   }
 
-  if (role === "overwatch" || role === "retreat" || role === "ghostop") {
+  if (role === "overwatch" || role === "retreat" || role === "ghostop" || role === "techaccess") {
     const ms = microShift(op, nowSec);
-    return { pos: ms.pos, ghost: 0, walking: ms.walking };
+    return { pos: ms.pos, ghost: 0, walking: ms.walking, heading: ms.heading };
   }
 
   if (role === "escort") {
-    // anel com deriva angular lenta à volta do alvo
     const ang = op.orbitBearing + op.orbitDir * Math.sin(nowSec * op.orbitDrift) * 0.35;
     const pos = ringPoint(op.orbitCenter, ang, op.orbitRadius);
-    return { pos, ghost: 0, walking: false };
+    return { pos, ghost: 0, walking: false, faceOut: true };
   }
 
-  // negotiator / hacker — permanecem com um balanço subtil virado ao alvo
+  // negotiator / hacker — balanço subtil virado ao alvo
   const sway = Math.sin((nowSec * 2 * Math.PI) / (op.swayPeriod || 4)) * (op.swayAmp || 0.6);
   return {
     pos: offsetM(op.station, Math.sin(op.swayBearing || 0) * sway, Math.cos(op.swayBearing || 0) * sway),
@@ -809,8 +1327,18 @@ function idleDrift(op, nowSec, amp = 0.55) {
   };
 }
 
-// Offset de formação — afastamento lateral em leque durante as caminhadas,
-// desvanece nas pontas (saem do carro juntos, chegam à estação exata).
+// Olhar: base por papel + varrimento por passos (cada operacional olha para
+// um lado diferente e muda de direção no seu próprio ritmo).
+function lookHeading(op, base, nowSec, amp = 55) {
+  const t = (nowSec + op.lookPhase) / op.lookP;
+  const k = Math.floor(t);
+  const offK = Math.sin(k * 127.1 + op.lookSeed) * amp;
+  const offPrev = Math.sin((k - 1) * 127.1 + op.lookSeed) * amp;
+  const w = clamp((t - k) / 0.25, 0, 1);
+  return base + offPrev + (offK - offPrev) * smooth(w);
+}
+
+// Offset de formação — afastamento lateral em leque durante as caminhadas.
 function formationOffset(op, pos, f, ampMult = 1) {
   const off = op.latAmp * ampMult * Math.sin(Math.PI * clamp(f, 0, 1));
   if (off === 0) return pos;
@@ -820,59 +1348,165 @@ function formationOffset(op, pos, f, ampMult = 1) {
 // ============================================================================
 // Estado por frame de um operacional
 // ============================================================================
-// Devolve null quando está dentro do veículo; caso contrário
-// { lat, lng, alpha, scale, carry, walking }.
+// Devolve null quando está dentro do veículo/edifício; caso contrário
+// { lat, lng, alpha, scale, carryKind, walking, running, heading }.
 export function opStateAt(choreo, i, nowSec, success) {
   const op = choreo.ops[i];
-  if (!op || nowSec < op.spawnAt || nowSec > op.boardEnd) return null;
+  if (!op || nowSec < op.spawnAt || nowSec >= (op.boardEnd ?? choreo.deployEnd)) return null;
 
-  // fades de entrada/saída do veículo
+  const boardEnd = op.boardEnd ?? choreo.deployEnd;
   const inRamp = clamp((nowSec - op.spawnAt) / 0.6, 0, 1);
-  const outRamp = clamp((op.boardEnd - nowSec) / 0.5, 0, 1);
+  const outRamp = clamp((boardEnd - nowSec) / 0.45, 0, 1);
   let alpha = Math.min(inRamp, outRamp);
   let scale = 0.45 + 0.55 * Math.min(inRamp, outRamp);
   if (alpha <= 0.01) return null;
 
   const stealthGhost = choreo.ghost ? 1 - choreo.ghost * (op.role === "ghostop" ? 0.82 : 0.5) : 1;
-  let pos;
-  let carry = false;
+  let pos = null;
+  let carryKind = null;
   let walking = false;
+  let running = false;
+  let heading = null;
 
-  const walkStart = op.spawnAt + 0.6;
-  const walkInEnd = walkStart + op.walkInDur;
+  const faceTarget = toDeg(bearingRad(op.station, choreo.target));
+  const withdrawStart = op.isRear ? (op.coverAt ?? op.walkBackAt) : op.walkBackAt;
 
-  if (nowSec < walkInEnd) {
-    // ----- Aproximação em formação -----
-    const t = clamp((nowSec - walkStart) / op.walkInDur, 0, 1);
-    const f = op.role === "ghostop" ? steppedEase(t) : smooth(t);
+  if (op.isScout && op.pRecon && nowSec < op.actionStart) {
+    // ----- Reconhecimento do perímetro (batedor) -----
+    if (nowSec < op.walkStart) {
+      const d = idleDrift(op, nowSec, 0.4);
+      pos = offsetM(op.holdPt, d.e, d.n);
+      heading = lookHeading(op, faceTarget, nowSec, 70);
+    } else {
+      const t = clamp((nowSec - op.walkStart) / op.reconDur, 0, 1);
+      const f = steppedEase(t);
+      pos = pathAt(op.pRecon, f);
+      walking = t > 0 && t < 1;
+      heading = pathHeading(op.pRecon, f) ?? faceTarget;
+    }
+    alpha *= stealthGhost;
+  } else if (nowSec < op.advanceAt) {
+    // ----- À espera da ordem do líder, junto ao veículo -----
+    const d = idleDrift(op, nowSec, 0.4);
+    pos = offsetM(op.holdPt, d.e, d.n);
+    heading = lookHeading(op, faceTarget, nowSec, 75);
+    alpha *= stealthGhost;
+  } else if (nowSec < op.actionStart) {
+    // ----- Aproximação em formação (caminham; abrandam junto ao alvo) -----
+    const t = clamp((nowSec - op.advanceAt) / op.walkInDur, 0, 1);
+    const f = op.role === "ghostop" ? steppedEase(t) : hesitantEase(t, op.r1, op.r3, choreo.calm);
     pos = formationOffset(op, pathAt(op.pIn, f), f);
     walking = t > 0 && t < 1;
+    heading = pathHeading(op.pIn, f) ?? faceTarget;
     alpha *= stealthGhost;
-  } else if (nowSec < op.walkBackAt) {
-    // ----- Execução (programa por papel) -----
-    const ev = programEval(choreo, op, nowSec);
+    if (op.role === "hacker" || op.role === "techaccess" || op.role === "negotiator") carryKind = "doc";
+  } else if (nowSec < withdrawStart) {
+    // ----- Execução (programa por papel; líder pode circular entre membros) -----
+    let ev = null;
+    if (op.roam && nowSec >= op.roam.start && nowSec < op.roam.until && op.roam.visits.length) {
+      const cyc = op.roam.period;
+      const el = nowSec - op.roam.start;
+      const k = Math.floor(el / cyc) % op.roam.visits.length;
+      const within = el % cyc;
+      const v = op.roam.visits[k];
+      const wd = op.roam.walkDur;
+      const dwell = cyc * 0.32;
+      if (within < wd) {
+        ev = { pos: lerpPt(op.station, v, smooth(within / wd)), walking: true, heading: toDeg(bearingRad(op.station, v)) };
+      } else if (within < wd + dwell) {
+        ev = { pos: v, walking: false };
+      } else if (within < 2 * wd + dwell) {
+        ev = { pos: lerpPt(v, op.station, smooth((within - wd - dwell) / wd)), walking: true, heading: toDeg(bearingRad(v, op.station)) };
+      } else {
+        ev = { pos: op.station, walking: false };
+      }
+    } else {
+      ev = programEval(choreo, op, nowSec);
+    }
     pos = ev.pos;
     walking = !!ev.walking;
-    carry = !!ev.carry;
+    running = !!ev.running;
+    carryKind = typeof ev.carry === "string" ? ev.carry : null;
     alpha *= (1 - (ev.ghost || 0)) * stealthGhost;
     if (ev.ghost >= 1) return null; // dentro do edifício — invisível
+    if (ev.heading != null) heading = ev.heading;
+    else {
+      const base = ev.faceOut
+        ? toDeg(bearingRad(choreo.target, pos))
+        : op.role === "negotiator" || op.role === "hacker" || op.role === "entry"
+        ? faceTarget
+        : op.faceBase ?? faceTarget;
+      heading = lookHeading(op, base, nowSec, walking ? 20 : 55);
+    }
     if (!walking && pos) {
       const d = idleDrift(op, nowSec);
       pos = offsetM(pos, d.e, d.n);
     }
-  } else {
-    // ----- Retirada para o veículo -----
-    const t = clamp((nowSec - op.walkBackAt) / op.walkOutDur, 0, 1);
-    if (op.role === "carrier") {
-      pos = pathAt(op.pIn, (op.cargoF0 ?? 1) * (1 - smooth(t)));
+  } else if (op.isRear) {
+    // ----- Retaguarda: cobre a retirada, corre em último, confirma à porta -----
+    const loot = success && choreo.lootOnExit ? "money" : null;
+    if (nowSec < op.coverArrive) {
+      const t = clamp((nowSec - op.coverAt) / op.coverDashDur, 0, 1);
+      pos = pathAt(op.pCoverIn, smooth(t));
+      running = true;
+      walking = true;
+      heading = pathHeading(op.pCoverIn, smooth(t)) ?? faceTarget;
+    } else if (nowSec < op.coverUntil) {
+      const d = idleDrift(op, nowSec, 0.35);
+      pos = offsetM(op.coverPt, d.e, d.n);
+      heading = lookHeading(op, toDeg(bearingRad(op.coverPt, choreo.target)), nowSec, 40);
+      scale *= 0.94; // ligeiramente agachado, em cobertura
+    } else if (nowSec < op.doorAt) {
+      const t = clamp((nowSec - op.coverUntil) / Math.max(0.4, op.doorAt - op.coverUntil), 0, 1);
+      pos = pathAt(op.pCoverOut, smooth(t));
+      running = true;
+      walking = true;
+      heading = pathHeading(op.pCoverOut, smooth(t)) ?? (faceTarget + 180) % 360;
+      carryKind = loot;
     } else {
-      pos = formationOffset(op, pathAt(op.pOut, smooth(t)), t, 0.5);
+      // confirmação visual: parado à porta, a varrer o perímetro
+      const d = idleDrift(op, nowSec, 0.3);
+      pos = offsetM(op.spawnPt, d.e, d.n);
+      heading = toDeg(bearingRad(op.spawnPt, choreo.target)) + Math.sin(nowSec * 2.1) * 70;
+      carryKind = loot;
     }
-    walking = t < 1;
-    carry = !!success && choreo.lootOnExit;
+    alpha *= stealthGhost;
+  } else {
+    // ----- Retirada: corre para o ponto de reunião → espera → embarca -----
+    const loot = success && choreo.lootOnExit ? "money" : op.role === "carrier" && success ? "box" : null;
+    if (nowSec < op.rallyArrive) {
+      const t = clamp((nowSec - op.walkBackAt) / op.runOutDur, 0, 1);
+      if (op.role === "carrier") {
+        pos = pathAt(op.pIn, (op.cargoF0 ?? 1) * (1 - smooth(t)));
+        heading = pathHeading(op.pIn, (op.cargoF0 ?? 1) * (1 - smooth(t)));
+        if (heading != null) heading = (heading + 180) % 360;
+      } else {
+        pos = formationOffset(op, pathAt(op.pOut, smooth(t)), t, 0.5);
+        heading = pathHeading(op.pOut, smooth(t));
+      }
+      running = true;
+      walking = true;
+      carryKind = loot;
+    } else if (nowSec < op.boardStart) {
+      // reagrupamento junto ao veículo antes da fuga
+      const d = idleDrift(op, nowSec, 0.4);
+      pos = offsetM(op.rallyPt, d.e, d.n);
+      heading = lookHeading(op, faceTarget, nowSec, 65);
+      carryKind = loot;
+    } else {
+      const t = clamp((nowSec - op.boardStart) / Math.max(0.4, op.boardWalk || 1), 0, 1);
+      pos = pathAt(op.pBoard, smooth(t));
+      walking = t < 1;
+      heading = pathHeading(op.pBoard, smooth(t));
+      carryKind = loot;
+    }
     alpha *= stealthGhost;
   }
 
   if (!pos) return null;
-  return { lat: pos.lat, lng: pos.lng, alpha, scale, carry, walking };
+  return {
+    lat: pos.lat, lng: pos.lng, alpha, scale,
+    carry: !!carryKind, carryKind, walking, running,
+    heading: heading == null ? null : ((heading % 360) + 360) % 360,
+  };
 }

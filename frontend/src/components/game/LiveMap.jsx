@@ -7,7 +7,7 @@ import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes,
 import { useGame } from "../../context/GameContextV2";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
-import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, CHOREO_LABELS } from "../../lib/choreo";
+import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -89,6 +89,8 @@ const unitIcon = (phase, chased) => {
       ${traveling ? '<span class="unit-pulse"></span>' : ''}
       <span class="unit-car-body" data-car>
         <span class="unit-car-glass"></span>
+        <span class="unit-car-door unit-car-door-l"></span>
+        <span class="unit-car-door unit-car-door-r"></span>
       </span>
       ${parked ? '<span class="unit-parked-badge">P</span>' : ""}
     </div>`;
@@ -104,8 +106,9 @@ const opIconCached = (kind) => {
   if (!icon) {
     const html = `
       <div class="op-pin op-${kind}">
+        <span class="op-face-wrap" data-face><span class="op-face"></span></span>
         ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
-        <span class="op-carry-badge">€</span>
+        <span class="op-carry-badge"></span>
       </div>`;
     icon = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
     opIconCache.set(kind, icon);
@@ -114,16 +117,17 @@ const opIconCached = (kind) => {
 };
 
 const siteFxCache = new Map();
-const siteFxIconCached = (kind) => {
-  let icon = siteFxCache.get(kind);
+const siteFxIconCached = (kind, stage = "execute") => {
+  const key = `${kind}|${stage}`;
+  let icon = siteFxCache.get(key);
   if (!icon) {
     icon = L.divIcon({
-      html: `<div class="lus-sitefx lus-sitefx-${kind}"></div>`,
+      html: `<div class="lus-sitefx lus-sitefx-${kind} lus-sitefx-stage-${stage}"></div>`,
       className: "lus-marker",
       iconSize: [56, 56],
       iconAnchor: [28, 28],
     });
-    siteFxCache.set(kind, icon);
+    siteFxCache.set(key, icon);
   }
   return icon;
 };
@@ -306,7 +310,7 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   </div>
 );
 
-const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow }) => {
+const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, roster }) => {
   const map = useMap();
   const [route, setRoute] = useState(null);
   const cumRef = useRef(null);
@@ -315,8 +319,10 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   const markerRef = useRef(null);
   const chaseRef = useRef(null);
   const svgRef = useRef(null);
+  const carRootRef = useRef(null);
   const bearingRef = useRef(null);
   const posRef = useRef(null);
+  const commLineRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -333,16 +339,21 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
 
   // Coreografia determinística da operação no terreno — construída uma vez por
   // rota/janela de execução; avaliada por frame no mesmo loop rAF do veículo.
+  // v3: usa o roster real (especializações/patentes) para papéis, líder,
+  // batedor, retaguarda e motorista ao volante.
   const memberCount = Math.max(1, Math.min(6, (mission.member_ids || []).length || 2));
+  const rosterKey = (roster || []).map((r) => `${r.role_key}:${r.spec}:${r.rank}`).join(",");
   const choreo = useMemo(() => {
     if (!route?.parking) return null;
-    return buildChoreography(mission, route.parking, memberCount);
+    return buildChoreography(mission, route.parking, memberCount, roster);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, mission.id, mission.arrive_at, mission.finish_at, memberCount]);
+  }, [route, mission.id, mission.arrive_at, mission.finish_at, memberCount, rosterKey]);
   const choreoRef = useRef(null);
   choreoRef.current = choreo;
   const opMarkersRef = useRef([]);
   const opElsRef = useRef([]);
+  const opFaceElsRef = useRef([]);
+  const opHeadingRef = useRef([]);
   const opFlagsRef = useRef([]);
 
   const computePos = () => {
@@ -420,12 +431,13 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
       }
 
       // 4b) Operacionais no terreno — avaliados no MESMO loop (zero rAF extra).
-      //     Posição via setLatLng; fades/escala/saque aplicados diretamente ao
-      //     elemento interno (compositor), sem passar pelo React.
+      //     Posição via setLatLng; fades/escala/orientação do olhar/objetos/
+      //     rádio aplicados diretamente aos elementos (compositor), sem React.
       const ch = choreoRef.current;
       if (ch && p.phase === "operating") {
         const nowSec = serverNow() / 1000;
         const success = mission.outcome === "success";
+        const states = new Array(ch.ops.length).fill(null);
         for (let i = 0; i < ch.ops.length; i++) {
           const opMk = opMarkersRef.current[i];
           if (!opMk) continue;
@@ -433,8 +445,10 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
           if (!el || !el.isConnected) {
             el = opMk.getElement?.()?.querySelector(".op-pin") || null;
             opElsRef.current[i] = el;
+            opFaceElsRef.current[i] = el ? el.querySelector("[data-face]") : null;
           }
           const st = opStateAt(ch, i, nowSec, success);
+          states[i] = st;
           if (!st) {
             if (el) el.style.opacity = "0";
             continue;
@@ -443,17 +457,77 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
           if (el) {
             el.style.opacity = ((dim ? 0.25 : 1) * st.alpha).toFixed(2);
             el.style.transform = `scale(${st.scale.toFixed(2)})`;
+            // Orientação do olhar — lerp angular no wedge (compositor).
+            const face = opFaceElsRef.current[i];
+            if (face && st.heading != null) {
+              const cur = opHeadingRef.current[i] == null ? st.heading : opHeadingRef.current[i];
+              const diff = ((st.heading - cur + 540) % 360) - 180;
+              const next = cur + diff * 0.22;
+              opHeadingRef.current[i] = next;
+              face.style.transform = `rotate(${next.toFixed(1)}deg)`;
+            }
             const flags = opFlagsRef.current[i] || (opFlagsRef.current[i] = {});
-            if (flags.carry !== st.carry) {
-              flags.carry = st.carry;
-              el.classList.toggle("op-carrying", !!st.carry);
+            if (flags.carryKind !== st.carryKind) {
+              flags.carryKind = st.carryKind;
+              el.classList.toggle("op-carrying", !!st.carryKind);
+              el.classList.toggle("op-carry-money", st.carryKind === "money");
+              el.classList.toggle("op-carry-box", st.carryKind === "box");
+              el.classList.toggle("op-carry-doc", st.carryKind === "doc");
             }
             if (flags.walking !== st.walking) {
               flags.walking = st.walking;
               el.classList.toggle("op-walking", !!st.walking);
             }
+            if (flags.running !== st.running) {
+              flags.running = st.running;
+              el.classList.toggle("op-running", !!st.running);
+            }
+            if (!flags.tagged) {
+              flags.tagged = true;
+              if (ch.ops[i].isLeader) el.classList.add("op-leader");
+              if (ch.ops[i].isRear) el.classList.add("op-rear");
+            }
           }
         }
+
+        // Comunicações rádio: ping em quem emite + linha tracejada até quem recebe.
+        const comm = commAt(ch, nowSec);
+        const fromEl = comm ? opElsRef.current[comm.from] : null;
+        for (let i = 0; i < ch.ops.length; i++) {
+          const el = opElsRef.current[i];
+          if (!el) continue;
+          const flags = opFlagsRef.current[i] || (opFlagsRef.current[i] = {});
+          const active = !!comm && comm.from === i && !!states[i];
+          if (flags.radio !== active) {
+            flags.radio = active;
+            el.classList.toggle("op-radio", active);
+          }
+        }
+        if (commLineRef.current) {
+          if (comm && states[comm.from] && states[comm.to] && fromEl) {
+            commLineRef.current.setLatLngs([
+              [states[comm.from].lat, states[comm.from].lng],
+              [states[comm.to].lat, states[comm.to].lng],
+            ]);
+          } else {
+            commLineRef.current.setLatLngs([]);
+          }
+        }
+
+        // Portas do veículo: abertas no desembarque/embarque, fecham antes de partir.
+        let car = carRootRef.current;
+        if (!car || !car.isConnected) {
+          car = mk?.getElement?.()?.querySelector(".unit-car") || null;
+          carRootRef.current = car;
+        }
+        if (car) {
+          const doorsOpen =
+            (nowSec >= ch.doorsOpenAt && nowSec < ch.doorsCloseExitAt) ||
+            (nowSec >= ch.boardDoorsOpenAt && nowSec < ch.doorsFinalCloseAt);
+          car.classList.toggle("unit-doors-open", doorsOpen);
+        }
+      } else if (commLineRef.current) {
+        commLineRef.current.setLatLngs([]);
       }
 
       // 5) Follow cam — sem animação: o próprio rAF é a animação.
@@ -488,6 +562,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     if (phase !== "operating") {
       opMarkersRef.current = [];
       opElsRef.current = [];
+      opFaceElsRef.current = [];
+      opHeadingRef.current = [];
       opFlagsRef.current = [];
     }
   }, [phase]);
@@ -497,6 +573,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   // Ícone novo = elemento DOM novo — invalida a cache do <svg> rodado.
   useEffect(() => {
     svgRef.current = null;
+    carRootRef.current = null;
   }, [icon]);
   if (phase === "done") return null;
 
@@ -528,10 +605,20 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   const deployed = phase === "operating" && !!choreo;
   const nowSec0 = nowMs / 1000;
 
-  // Estado nomeado da máquina de estados (Deslocação, Estacionamento,
-  // Desembarque, Aproximação, Execução, Retirada, Embarque, Regresso) —
-  // atualizado a 1 Hz pelo clockTick, alimenta os tooltips do veículo e alvo.
+  // Estado nomeado da máquina de estados (Deslocação, Reposicionamento,
+  // Desembarque, Reconhecimento, Aproximação, Execução, Retirada,
+  // Reagrupamento, Embarque, Confirmação, Regresso) — atualizado a 1 Hz pelo
+  // clockTick, alimenta os tooltips do veículo e alvo.
   const mstate = missionStateAt(mission, choreo, nowMs);
+
+  // Grupo de fase para o halo do local — cada transição remonta o divIcon e
+  // dispara a animação de entrada própria dessa fase.
+  const fxStage = ["disembark", "recon", "approach"].includes(mstate.state)
+    ? "deploy"
+    : ["withdraw", "regroup", "board", "confirm"].includes(mstate.state)
+    ? "withdraw"
+    : "execute";
+  const groundCount = choreo?.groundCount ?? memberCount;
 
   return (
     <>
@@ -553,9 +640,12 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
               <TipRow label="equipa" value={mission.team_name} color="#22D3EE" />
               {phase === "operating" && (
-                <TipRow label="no terreno" value={`${memberCount} operacionais`} color="#FAFAFA" />
+                <TipRow label="no terreno" value={`${groundCount} operacionais`} color="#FAFAFA" />
               )}
             </div>
+            {phase === "operating" && choreo?.driverInside && (
+              <p className="mt-0.5 text-[9px] text-cyan-500/80">Motorista ao volante — pronto para a fuga</p>
+            )}
             {choreo && <p className="mt-1 text-[9px] text-zinc-500">{CHOREO_LABELS[choreo.kind]}</p>}
           </div>
         </LTooltip>
@@ -589,14 +679,23 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             pathOptions={{ color: "#E4E4E7", weight: 1.2, opacity: dim ? 0.08 : 0.28, dashArray: "2 5", lineCap: "round" }}
             interactive={false}
           />
-          {/* Halo de atividade no local exato da missão — estilo por arquetipo */}
+          {/* Halo de atividade no local exato da missão — estilo por arquetipo,
+              com animação de transição própria por grupo de fase */}
           <Marker
             position={[mission.target.lat, mission.target.lng]}
-            icon={siteFxIconCached(choreo.kind)}
+            icon={siteFxIconCached(choreo.kind, fxStage)}
             interactive={false}
             keyboard={false}
             zIndexOffset={300}
             opacity={dim ? 0.2 : 1}
+          />
+          {/* Linha de comunicações rádio entre operacionais (gerida no rAF) */}
+          <Polyline
+            ref={commLineRef}
+            positions={[]}
+            smoothFactor={1}
+            pathOptions={{ color: "#22D3EE", weight: 1.1, opacity: dim ? 0.15 : 0.65, dashArray: "3 4", lineCap: "round" }}
+            interactive={false}
           />
           {/* Operacionais — marcadores puramente visuais, movidos pelo loop rAF */}
           {choreo.ops.map((op, i) => {
@@ -632,10 +731,12 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             <TipRow label="fase" value={mstate.label} color={chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE"} />
             <TipRow label={nextLabel} value={fmtDuration(remaining)} color="#F59E0B" />
             {phase === "operating" && (
-              <TipRow label="no terreno" value={`${memberCount} operacionais`} color="#FAFAFA" />
+              <TipRow label="no terreno" value={`${groundCount} operacionais`} color="#FAFAFA" />
             )}
             {phase === "operating" && choreo && (
-              <p className="mt-0.5 text-[9px] text-zinc-400">Veículo estacionado · {CHOREO_LABELS[choreo.kind]}</p>
+              <p className="mt-0.5 text-[9px] text-zinc-400">
+                {choreo.driverInside ? "Motorista ao volante" : "Veículo estacionado"} · {CHOREO_LABELS[choreo.kind]}
+              </p>
             )}
             {mission.success_chance != null && pos.phase === "en_route" && (
               <TipRow label="probabilidade" value={`${Math.round(mission.success_chance * 100)}%`} color="#34D399" />
@@ -746,6 +847,14 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
   const hqMarkerIcon = useMemo(() => hqIcon(), []);
   const hqRadarMarkerIcon = useMemo(() => hqRadarIcon(), []);
   const level = state.player.level;
+
+  // Roster real por operacional (especialização/patente) — alimenta a
+  // coreografia v3 (papéis por especialização, líder, motorista ao volante).
+  const empById = useMemo(() => {
+    const m = {};
+    for (const e of state.employees || []) m[e.id] = e;
+    return m;
+  }, [state.employees]);
 
   // Modo seguir: id da missão cuja unidade a câmara acompanha.
   const [followId, setFollowId] = useState(null);
@@ -890,6 +999,10 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           dim={baseFilter !== "all" && (m.origin_property_id || "hq") !== baseFilter}
           followed={m.id === followId}
           onToggleFollow={() => setFollowId((cur) => (cur === m.id ? null : m.id))}
+          roster={(m.member_ids || [])
+            .map((id) => empById[id])
+            .filter(Boolean)
+            .map((e) => ({ role_key: e.role_key, spec: e.spec, rank: e.rank }))}
         />
       ))}
       {state.vehicles
@@ -991,11 +1104,14 @@ export const MapLegend = () => {
           </div>
           <p className="mt-2 border-t border-white/10 pt-1.5 text-[9px] leading-snug text-zinc-500">
             Cada missão tem um alvo vermelho fixo: o veículo acelera, trava e estaciona na berma
-            (nunca sobre o alvo), os operacionais desembarcam um a um, aproximam-se em formação e
-            distribuem-se por papéis — entrada, vigilância, proteção do veículo, cobertura da
-            retirada. Passa o rato sobre o alvo ou o veículo para veres a fase exata
-            (desembarque, aproximação, execução, retirada, embarque). Clica numa unidade em
-            movimento para a câmara a seguir.
+            (nunca sobre o alvo — e reajusta a posição se encostou mal), as portas abrem, um
+            batedor verifica o perímetro e o líder dá a ordem de avanço por rádio. Os operacionais
+            distribuem-se por papéis conforme a especialização — hacker nos acessos técnicos,
+            negociador junto ao alvo, motorista ao volante — caminham na aproximação e correm
+            apenas na retirada, reagrupam junto ao veículo e o último confirma o perímetro antes
+            de as portas fecharem. Passa o rato sobre o alvo ou o veículo para veres a fase exata
+            (reconhecimento, aproximação, execução, retirada, reagrupamento, embarque,
+            confirmação). Clica numa unidade em movimento para a câmara a seguir.
           </p>
         </Card>
       )}

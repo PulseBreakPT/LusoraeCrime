@@ -3440,3 +3440,221 @@ html:has(.lus-page-bg) {
         animation: none;
     }
 }
+
+/* ============================================================
+   Coreografia v3 — orientação do olhar, rádio, corrida, líder,
+   objetos transportados, portas do veículo, transições de fase
+   ============================================================ */
+
+/* Orientação do olhar — wedge rodado pelo loop rAF (compositor). */
+.op-face-wrap {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.op-face {
+    position: absolute;
+    top: -4.5px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    margin-left: -2.5px;
+    border-left: 2.5px solid transparent;
+    border-right: 2.5px solid transparent;
+    border-bottom: 4px solid rgba(250, 250, 250, 0.95);
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+}
+
+.op-stealth .op-face {
+    border-bottom-color: rgba(221, 214, 254, 0.95);
+}
+
+.op-tech .op-face {
+    border-bottom-color: rgba(207, 250, 254, 0.95);
+}
+
+.op-cargo .op-face {
+    border-bottom-color: rgba(253, 230, 138, 0.95);
+}
+
+/* Corrida (apenas na retirada) — passada mais rápida e enérgica. */
+.op-running svg {
+    animation: op-bob 0.3s ease-in-out infinite alternate;
+}
+
+/* Líder de facto — anel dourado subtil + ponto de comando. */
+.op-leader {
+    border-color: rgba(251, 191, 36, 0.95);
+    box-shadow: 0 0 9px rgba(251, 191, 36, 0.65);
+}
+
+.op-leader::before {
+    content: "";
+    position: absolute;
+    bottom: -4.5px;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 9999px;
+    background: #fbbf24;
+    box-shadow: 0 0 4px rgba(251, 191, 36, 0.9);
+}
+
+/* Retaguarda — orla avermelhada discreta (protege a retirada). */
+.op-rear {
+    border-color: rgba(239, 68, 68, 0.75);
+}
+
+/* Ping de rádio — anel a expandir sobre quem está a transmitir. */
+.op-radio::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(34, 211, 238, 0.9);
+    animation: op-radio-ping 0.9s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes op-radio-ping {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.95;
+    }
+    100% {
+        transform: scale(2.1);
+        opacity: 0;
+    }
+}
+
+/* Objetos transportados — saque (€), caixa (carga), documentos/dispositivo. */
+.op-carry-money .op-carry-badge::after {
+    content: "€";
+}
+
+.op-carry-box .op-carry-badge {
+    border-radius: 2px;
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.9);
+}
+
+.op-carry-doc .op-carry-badge {
+    width: 7px;
+    height: 9px;
+    border-radius: 1.5px;
+    background: #fafafa;
+    box-shadow: 0 0 6px rgba(250, 250, 250, 0.8);
+}
+
+/* Portas do veículo — flaps que abrem no desembarque/embarque e fecham
+   antes da partida (classe unit-doors-open gerida pelo loop rAF). */
+.unit-car-door {
+    position: absolute;
+    top: 6px;
+    width: 3px;
+    height: 6px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--mk, #22d3ee) 75%, #fff);
+    border: 0.5px solid rgba(5, 5, 5, 0.9);
+    opacity: 0;
+    transition: transform 0.35s ease, opacity 0.35s ease;
+    pointer-events: none;
+}
+
+.unit-car-door-l {
+    left: -3px;
+    transform-origin: right top;
+    transform: rotate(0deg);
+}
+
+.unit-car-door-r {
+    right: -3px;
+    transform-origin: left top;
+    transform: rotate(0deg);
+}
+
+.unit-doors-open .unit-car-door {
+    opacity: 1;
+}
+
+.unit-doors-open .unit-car-door-l {
+    transform: rotate(-42deg);
+}
+
+.unit-doors-open .unit-car-door-r {
+    transform: rotate(42deg);
+}
+
+/* Transições de fase no halo do local — cada grupo de fase remonta o ícone
+   e dispara uma animação de entrada própria. */
+.lus-sitefx-stage-deploy {
+    animation: sitefx-in-deploy 0.9s ease-out;
+}
+
+.lus-sitefx-stage-execute {
+    animation: sitefx-in-execute 0.7s ease-out;
+}
+
+.lus-sitefx-stage-withdraw {
+    animation: sitefx-in-withdraw 0.9s ease-out;
+}
+
+@keyframes sitefx-in-deploy {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes sitefx-in-execute {
+    0% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes sitefx-in-withdraw {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    35% {
+        transform: scale(0.85);
+        opacity: 0.55;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .op-running svg,
+    .op-radio::after,
+    .lus-sitefx-stage-deploy,
+    .lus-sitefx-stage-execute,
+    .lus-sitefx-stage-withdraw {
+        animation: none;
+    }
+    .op-radio::after {
+        opacity: 0.6;
+        transform: scale(1.2);
+    }
+    .unit-car-door {
+        transition: none;
+    }
+}
