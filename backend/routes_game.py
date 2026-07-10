@@ -17,7 +17,8 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
                     record_tx, property_stack_ranks, property_stack_mult,
                     dirty_money_cap, grant_quest_rewards,
-                    weapon_combat_score,
+                    weapon_combat_score, weapon_effective_score, weapon_jam_risk,
+                    weapon_condition_factor,
                     _unlink_employee_weapon,
                     is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage)
 from quests import make_instance, enrich_quest, locked_principals, effective_quest_rewards
@@ -39,6 +40,12 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
                        HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER,
+                       WEAPON_CATEGORY_WEIGHTS, WEAPON_SKILL_FLOOR, WEAPON_SKILL_ATTR_CAP,
+                       WEAPON_PROFICIENCY_MAX, WEAPON_PROFICIENCY_BONUS_MAX_PCT,
+                       WEAPON_COMPATIBILITY_MIN_FACTOR, WEAPON_CONDITION_SOFT_KNEE,
+                       WEAPON_JAM_RELIABILITY_WEIGHT, WEAPON_JAM_CONDITION_THRESHOLD,
+                       WEAPON_JAM_CONDITION_WEIGHT, WEAPON_JAM_MAX, WEAPON_JAM_WARN_RISK,
+                       WEAPON_DURABILITY_WEAR_REF,
                        LOW_CHANCE_CONFIRM_THRESHOLD,
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S)
@@ -233,6 +240,25 @@ async def catalog():
         "hq_departments": HQ_DEPARTMENTS,
         "weapon_models": WEAPON_MODELS,
         "weapon_categories": WEAPON_CATEGORIES,
+        # QI das armas (SSS v5): pesos e fórmulas expostos para o frontend
+        # calcular match %, risco de encravamento e adequação — a MESMA régua
+        # que o motor usa na chance de missão.
+        "weapon_category_weights": WEAPON_CATEGORY_WEIGHTS,
+        "weapon_meta": {
+            "skill_floor": WEAPON_SKILL_FLOOR,
+            "skill_attr_cap": WEAPON_SKILL_ATTR_CAP,
+            "proficiency_max": WEAPON_PROFICIENCY_MAX,
+            "proficiency_bonus_max_pct": WEAPON_PROFICIENCY_BONUS_MAX_PCT,
+            "compatibility_min_factor": WEAPON_COMPATIBILITY_MIN_FACTOR,
+            "condition_soft_knee": WEAPON_CONDITION_SOFT_KNEE,
+            "jam_reliability_weight": WEAPON_JAM_RELIABILITY_WEIGHT,
+            "jam_condition_threshold": WEAPON_JAM_CONDITION_THRESHOLD,
+            "jam_condition_weight": WEAPON_JAM_CONDITION_WEIGHT,
+            "jam_max": WEAPON_JAM_MAX,
+            "jam_warn_risk": WEAPON_JAM_WARN_RISK,
+            "durability_wear_ref": WEAPON_DURABILITY_WEAR_REF,
+            "repair_cost_multiplier": WEAPON_REPAIR_COST_MULTIPLIER,
+        },
         "low_chance_confirm_threshold": LOW_CHANCE_CONFIRM_THRESHOLD,
     }
 
@@ -446,6 +472,29 @@ async def _prepare_dispatch(player, opp, team):
         WEAPON_MODELS.get(w.get("model_key"), {}).get("loud", False)
         for w in weapons_by_employee_id.values()
     )
+    # QI das armas (SSS v5): perfil de encravamento e poder de fogo médio,
+    # persistidos com a missão — alimentam o roll de encravamento na ação,
+    # a intimidação na fuga e os avisos do preview.
+    weapon_jam_profile = []
+    weapon_powers = []
+    emp_by_id = {str(e["_id"]): e for e in members}
+    for eid, w in weapons_by_employee_id.items():
+        wm = WEAPON_MODELS.get(w.get("model_key"))
+        if not wm:
+            continue
+        weapon_powers.append(wm.get("power", 0))
+        jr = weapon_jam_risk(wm, w.get("condition", 100))
+        if jr > 0:
+            emp = emp_by_id.get(eid)
+            weapon_jam_profile.append({
+                "weapon_id": str(w["_id"]), "weapon_name": w.get("name", wm["name"]),
+                "emp_name": (emp or {}).get("name", "?"), "jam_risk": round(jr, 3),
+            })
+    weapon_power_avg = round(sum(weapon_powers) / len(members), 1) if weapon_powers else 0.0
+    weapon_alerts = [
+        f"{wj['weapon_name']} de {wj['emp_name']}: risco de encravar ≈ {round(wj['jam_risk'] * 100)}%"
+        for wj in weapon_jam_profile if wj["jam_risk"] >= WEAPON_JAM_WARN_RISK
+    ]
 
     # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
     # opp["duration_s"] é sempre um único int (gerado em spawn_opportunities), não um intervalo.
@@ -490,6 +539,10 @@ async def _prepare_dispatch(player, opp, team):
         "has_leader": has_leader, "leader_cool": leader_cool,
         "has_medic": has_medic, "has_lawyer": has_lawyer,
         "best_driver": best_driver, "top_negatives": top_negatives,
+        # QI das armas (SSS v5): encravamento, intimidação e avisos.
+        "weapon_jam_profile": weapon_jam_profile,
+        "weapon_power_avg": weapon_power_avg,
+        "weapon_alerts": weapon_alerts,
     }
 
 
@@ -530,6 +583,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "talents": prep["talents"],
         "min_members": prep["min_members"],
         "min_members_met": len(prep["members"]) >= prep["min_members"],
+        "weapon_alerts": prep.get("weapon_alerts", []),
     }
 
 
@@ -589,6 +643,10 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "best_driver": prep.get("best_driver", 0),
         "top_negatives": prep.get("top_negatives", []),
         "heat_at_dispatch": player.get("heat", 0),
+        # QI das armas (SSS v5): perfil de encravamento (roll na ação) e
+        # poder de fogo médio (intimidação na fuga).
+        "weapon_jam_profile": prep.get("weapon_jam_profile", []),
+        "weapon_power_avg": prep.get("weapon_power_avg", 0.0),
         "opportunity_id": str(opp["_id"]),
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
@@ -1432,10 +1490,11 @@ async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_cu
 
 @router.post("/weapons/auto_assign")
 async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
-    """Sugere e atribui automaticamente a arma ao funcionário mais adequado:
-    idle, compatível (especialização própria ou da equipa actual corresponde
-    à categoria da arma), mais experiente, e com pior equipamento actual —
-    mirror do padrão de ordenação por tuplo já usado em recommend_team."""
+    """Atribui automaticamente a arma ao operacional disponível com o maior
+    GANHO MARGINAL de score efetivo (SSS v5) — a mesma régua da chance de
+    missão: adequação à especialização, compatibilidade de requisitos,
+    habilidade, proficiência e condição da arma, descontando o que o
+    operacional já rende com a arma atual."""
     player = await get_player(user)
     pid = str(player["_id"])
     weapon = await db.weapons.find_one({"_id": _oid(body.weapon_id, "Arma inválida"), "player_id": pid})
@@ -1447,19 +1506,23 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
     candidates = await db.employees.find({"player_id": pid, "status": "idle"}).to_list(300)
     if not candidates:
         raise HTTPException(status_code=400, detail="Não há operacionais disponíveis para equipar")
-    teams_by_id = {str(t["_id"]): t for t in await db.teams.find({"player_id": pid}).to_list(100)}
     current_weapons = {w["employee_id"]: w for w in await db.weapons.find({"player_id": pid, "employee_id": {"$ne": None}}).to_list(300)}
 
     def rank_key(emp):
-        team = teams_by_id.get(emp.get("team_id"))
-        spec_match = emp.get("spec") in model.get("best_for", [])
-        team_match = bool(team) and team.get("spec") in model.get("best_for", [])
+        # QI das armas (SSS v5): ganho marginal REAL — score efetivo desta arma
+        # nas mãos deste operacional (compatibilidade, habilidade, proficiência
+        # e condição incluídas) menos o que ele já rende com a arma atual.
+        # É a mesma régua que a chance de missão usa (weapon_effective_score).
+        spec = emp.get("spec") or "especial"
+        new_score = weapon_effective_score(emp, weapon, model, spec)
         current = current_weapons.get(str(emp["_id"]))
         current_score = 0.0
         if current:
-            current_model = WEAPON_MODELS.get(current["model_key"], {})
-            current_score = weapon_combat_score(current_model, emp.get("spec", "")) if current_model else 0.0
-        return (-int(spec_match), -int(team_match), -emp.get("level", 1), current_score)
+            current_model = WEAPON_MODELS.get(current["model_key"])
+            if current_model:
+                current_score = weapon_effective_score(emp, current, current_model, spec)
+        gain = new_score - current_score
+        return (-round(gain, 6), -new_score, -emp.get("level", 1))
 
     best = min(candidates, key=rank_key)
     if best.get("weapon_id"):
@@ -1469,6 +1532,93 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
     await db.employees.update_one({"_id": best["_id"]}, {"$set": {"weapon_id": str(weapon["_id"])}})
     await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"employee_id": str(best["_id"])}})
     return {"ok": True, "employee_id": str(best["_id"]), "employee_name": best["name"]}
+
+
+@router.post("/weapons/optimize")
+async def optimize_weapons(user: dict = Depends(get_current_user)):
+    """QI das armas (SSS v5): redistribui TODO o arsenal disponível pelos
+    operacionais disponíveis maximizando o score efetivo global — atribuição
+    gulosa por score (a mesma régua da chance de missão). Só mexe em armas
+    cujo portador atual está disponível; quem está em serviço não larga a
+    arma. Armas a mais ficam no inventário, sempre as piores combinações."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    weapons = await db.weapons.find({"player_id": pid}).to_list(300)
+    if not weapons:
+        raise HTTPException(status_code=400, detail="Não tens armas no arsenal")
+    employees = await db.employees.find({"player_id": pid}).to_list(300)
+    emp_by_id = {str(e["_id"]): e for e in employees}
+    idle = [e for e in employees if e.get("status") == "idle"]
+    if not idle:
+        raise HTTPException(status_code=400, detail="Nenhum operacional disponível para equipar")
+    movable = []
+    for w in weapons:
+        holder = emp_by_id.get(w.get("employee_id") or "")
+        if holder is None or holder.get("status") == "idle":
+            movable.append(w)
+    if not movable:
+        raise HTTPException(status_code=400, detail="Nenhuma arma disponível para redistribuir (portadores em serviço)")
+
+    # Todas as combinações (arma, operacional) avaliadas pela régua única e
+    # atribuídas gulosamente por ordem decrescente de score efetivo.
+    pairs = []
+    weapons_by_id = {}
+    for w in movable:
+        wm = WEAPON_MODELS.get(w.get("model_key"))
+        if not wm:
+            continue
+        wid = str(w["_id"])
+        weapons_by_id[wid] = w
+        for e in idle:
+            spec = e.get("spec") or "especial"
+            pairs.append((weapon_effective_score(e, w, wm, spec), wid, str(e["_id"])))
+    if not pairs:
+        raise HTTPException(status_code=400, detail="Nenhuma combinação válida para otimizar")
+    pairs.sort(key=lambda p: p[0], reverse=True)
+    plan, used_w, used_e = {}, set(), set()
+    for score, wid, eid in pairs:
+        if wid in used_w or eid in used_e:
+            continue
+        plan[wid] = eid
+        used_w.add(wid)
+        used_e.add(eid)
+
+    changes = []
+    for wid, eid in plan.items():
+        w = weapons_by_id[wid]
+        old_eid = w.get("employee_id")
+        if old_eid == eid:
+            continue
+        changes.append({
+            "weapon": w.get("name", "?"),
+            "from": emp_by_id.get(old_eid, {}).get("name") if old_eid else None,
+            "to": emp_by_id.get(eid, {}).get("name", "?"),
+        })
+    # Armas móveis que ficam sem portador (mais armas do que operacionais).
+    benched = [weapons_by_id[wid].get("name", "?") for wid in weapons_by_id
+               if wid not in plan and weapons_by_id[wid].get("employee_id")]
+    if not changes and not benched:
+        return {"ok": True, "changes": [], "message": "O arsenal já está na distribuição ótima."}
+
+    # Aplicar: limpar vínculos das armas móveis e dos operacionais disponíveis,
+    # depois ligar o plano — evita estados intermédios inconsistentes.
+    await db.weapons.update_many(
+        {"_id": {"$in": [ObjectId(wid) for wid in weapons_by_id]}},
+        {"$set": {"employee_id": None}},
+    )
+    await db.employees.update_many(
+        {"_id": {"$in": [e["_id"] for e in idle]}},
+        {"$set": {"weapon_id": None}},
+    )
+    for wid, eid in plan.items():
+        await db.weapons.update_one({"_id": ObjectId(wid)}, {"$set": {"employee_id": eid}})
+        await db.employees.update_one({"_id": ObjectId(eid)}, {"$set": {"weapon_id": wid}})
+    moved = len(changes)
+    await add_event(db, pid, "weapon",
+                    f"Arsenal otimizado — {moved} arma(s) redistribuída(s) pelos operacionais mais aptos."
+                    + (f" {len(benched)} arma(s) voltaram ao inventário." if benched else ""))
+    return {"ok": True, "changes": changes, "benched": benched,
+            "message": f"{moved} arma(s) redistribuída(s)." if moved else "Arsenal arrumado — sem trocas necessárias."}
 
 
 # ---------------- Propriedades ----------------

@@ -64,6 +64,12 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        STEALTH_SYNERGY_BONUS, STEALTH_SYNERGY_PENALTY,
                        STEALTH_VEHICLE_DISCRETION_MIN, NOISY_VEHICLE_DISCRETION_MAX,
                        WEAPON_SKILL_FLOOR, WEAPON_SKILL_ATTR_CAP,
+                       WEAPON_DURABILITY_WEAR_REF, WEAPON_CONDITION_SOFT_KNEE,
+                       WEAPON_JAM_RELIABILITY_WEIGHT, WEAPON_JAM_CONDITION_THRESHOLD,
+                       WEAPON_JAM_CONDITION_WEIGHT, WEAPON_JAM_MAX,
+                       WEAPON_JAM_CHANCE_PENALTY, WEAPON_JAM_CHANCE_PENALTY_CAP,
+                       WEAPON_JAM_EXTRA_WEAR,
+                       WEAPON_INTIMIDATION_ESCAPE_MAX, WEAPON_STEALTH_DISCRETION_REF,
                        VEHICLE_SPEED_FLOOR, VEHICLE_SPEED_CURVE_EXP,
                        VEHICLE_WEAR_BASE, VEHICLE_WEAR_PER_RISK, VEHICLE_WEAR_PER_KM,
                        ESCAPE_SPEED_BASELINE, ESCAPE_SPEED_BONUS_PER_UNIT, ESCAPE_SPEED_BONUS_MAX,
@@ -824,6 +830,54 @@ def weapon_compatibility_factor(emp, model):
     return max(WEAPON_COMPATIBILITY_MIN_FACTOR, 1.0 - shortfall * 0.3)
 
 
+def weapon_condition_factor(condition):
+    """Curva de condição das armas (SSS v5): linear até ao joelho
+    (WEAPON_CONDITION_SOFT_KNEE), quadrática abaixo dele — uma arma a 20% não
+    é 'meio útil', é quase sucata (e candidata a encravar)."""
+    c = max(0.0, min(100.0, float(condition if condition is not None else 100))) / 100.0
+    knee = WEAPON_CONDITION_SOFT_KNEE / 100.0
+    if c >= knee or knee <= 0:
+        return c
+    return c * (c / knee)
+
+
+def weapon_jam_risk(model, condition):
+    """Risco de encravamento por missão (SSS v5): fiabilidade do modelo +
+    défice de condição abaixo do limiar de manutenção. Armas sem mecanismo
+    (carregador < 2 e silenciosas, ex.: faca/taser) nunca encravam; uma
+    caçadeira serrada aos 30% é uma roleta-russa."""
+    if model.get("magazine_capacity", 0) < 2 and not model.get("loud"):
+        return 0.0
+    rel = max(0.0, min(100.0, float(model.get("reliability", 100)))) / 100.0
+    risk = (1.0 - rel) * WEAPON_JAM_RELIABILITY_WEIGHT
+    cond = max(0.0, min(100.0, float(condition if condition is not None else 100)))
+    if cond < WEAPON_JAM_CONDITION_THRESHOLD:
+        risk += (WEAPON_JAM_CONDITION_THRESHOLD - cond) / WEAPON_JAM_CONDITION_THRESHOLD * WEAPON_JAM_CONDITION_WEIGHT
+    return max(0.0, min(WEAPON_JAM_MAX, risk))
+
+
+def weapon_effective_score(emp, weapon_doc, model, category):
+    """Score efetivo de uma arma NAS MÃOS de um operacional concreto para uma
+    categoria de operação (SSS v5): qualidade do modelo ponderada pela
+    categoria × adequação best_for × condição (curva não-linear) × fiabilidade
+    × compatibilidade de requisitos × habilidade do portador + proficiência.
+    É a MESMA régua em todo o lado: mod_weapon_score (chance de missão),
+    /weapons/auto_assign e /weapons/optimize — o que o jogador vê no painel é
+    o que a missão usa."""
+    score = weapon_combat_score(model, category)
+    best_for = model.get("best_for", [])
+    best_for_mult = 1.3 if category in best_for else 0.7
+    condition = weapon_condition_factor((weapon_doc or {}).get("condition", 100))
+    reliability = model.get("reliability", 100) / 100
+    compat = weapon_compatibility_factor(emp, model)
+    skill = _weapon_skill_factor(emp, model)
+    proficiency = (emp.get("weapon_proficiency") or {}).get(model.get("category"), 0)
+    # Curva de proficiência com raiz quadrada (SSS v2): ganhos rápidos no
+    # início, rendimentos decrescentes perto da mestria.
+    proficiency_bonus = math.sqrt(max(0.0, proficiency) / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
+    return score * best_for_mult * condition * reliability * compat * skill * WEAPON_COMBAT_SCORE_SCALE + proficiency_bonus
+
+
 # ---------------- Modificadores de chance (sistema modular) ----------------
 # Cada modificador lê o mesmo `ctx` (montado em _prepare_dispatch) e devolve
 # None (não aplicável) ou {"key","label","pct","tip"}. Acrescentar um
@@ -1114,9 +1168,16 @@ def mod_stealth_synergy(ctx):
     any_loud = any(w.get("loud") for w in weapons)
     disc = model.get("discretion", 50)
     if disc >= STEALTH_VEHICLE_DISCRETION_MIN and not any_loud:
+        # SSS v5: o bónus deixa de ser binário — escala com a discrição média
+        # das armas transportadas (mãos vazias contam como discrição total).
+        w_disc = [w.get("discretion", 50) for w in weapons]
+        stealth_frac = 1.0 if not w_disc else min(1.0, (sum(w_disc) / len(w_disc)) / WEAPON_STEALTH_DISCRETION_REF)
+        pct = STEALTH_SYNERGY_BONUS * max(0.35, stealth_frac)
+        tip = "Veículo discreto e nenhuma arma ruidosa — o conjunto passa despercebido nesta operação."
+        if w_disc and stealth_frac < 1.0:
+            tip += " Armas mais discretas (ex.: silenciadas) aumentariam ainda mais este bónus."
         return {"key": "furtividade", "category": "especializacoes", "label": "Perfil totalmente furtivo",
-                "pct": STEALTH_SYNERGY_BONUS,
-                "tip": "Veículo discreto e nenhuma arma ruidosa — o conjunto passa despercebido nesta operação."}
+                "pct": pct, "tip": tip}
     if any_loud or disc <= NOISY_VEHICLE_DISCRETION_MAX:
         reasons = []
         if any_loud:
@@ -1223,21 +1284,12 @@ def mod_weapon_score(ctx):
         if not model:
             continue
         equipped += 1
-        score = weapon_combat_score(model, category)
         best_for = model.get("best_for", [])
-        best_for_mult = 1.3 if category in best_for else 0.7
         if best_for and category not in best_for:
             mismatch = True
-        condition_factor = weapon.get("condition", 100) / 100
-        reliability_factor = model.get("reliability", 100) / 100
-        compat = weapon_compatibility_factor(e, model)
-        skill = _weapon_skill_factor(e, model)
-        proficiency = e.get("weapon_proficiency", {}).get(model["category"], 0)
-        # Curva de proficiência com raiz quadrada (SSS v2): ganhos rápidos no
-        # início, rendimentos decrescentes perto da mestria — mais realista.
-        proficiency_bonus = math.sqrt(max(0.0, proficiency) / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
-        total += score * best_for_mult * condition_factor * reliability_factor * compat * skill * WEAPON_COMBAT_SCORE_SCALE
-        total += proficiency_bonus
+        # Régua única (SSS v5): o mesmo score efetivo usado pelo auto-assign e
+        # pelo otimizador de arsenal — inclui a curva de condição não-linear.
+        total += weapon_effective_score(e, weapon, model, category)
     if equipped == 0:
         return None
     avg = total / len(members)
@@ -1383,6 +1435,20 @@ def _roll_outcome(player, m):
         # uma recomputação parcial e inconsistente.
         logger.warning("Mission %s sem success_chance persistida — a usar valor neutro (0.5).", m.get("id") or m.get("_id"))
         chance = 0.5
+    # Encravamento (SSS v5): cada arma leva um risco por missão (fiabilidade ×
+    # condição, persistido no despacho em weapon_jam_profile). Uma arma que
+    # encrava a meio da ação custa pontos de chance — e o relatório final diz
+    # de quem era e qual foi.
+    jams = [wj for wj in (m.get("weapon_jam_profile") or [])
+            if random.random() < float(wj.get("jam_risk", 0) or 0)]
+    if jams:
+        m["weapon_jams"] = [
+            {"weapon_id": wj.get("weapon_id"), "weapon_name": wj.get("weapon_name"),
+             "emp_name": wj.get("emp_name")}
+            for wj in jams
+        ]
+        penalty = min(WEAPON_JAM_CHANCE_PENALTY_CAP, WEAPON_JAM_CHANCE_PENALTY * len(jams))
+        chance = max(0.02, chance - penalty)
     r = random.random()
     if r <= chance:
         return "success"
@@ -1541,6 +1607,13 @@ def _compute_escape_chance(player, m):
     streak = m.get("team_streak", 0)
     if streak > 0:
         base += min(TEAM_MOMENTUM_ESCAPE_BONUS_MAX, streak * 0.01)
+    # Intimidação (SSS v5): em assaltos, poder de fogo visível dissuade
+    # testemunhas e patrulhas — ganha segundos preciosos na fuga. É a
+    # contrapartida real do calor extra que as armas ruidosas custam.
+    if t.get("category") == "assalto":
+        power_avg = float(m.get("weapon_power_avg", 0) or 0)
+        if power_avg > 0:
+            base += WEAPON_INTIMIDATION_ESCAPE_MAX * min(1.0, power_avg / 100.0)
     heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
     base -= ESCAPE_HEAT_SPAN * heat_frac ** ESCAPE_HEAT_EXP
     return max(0.10, min(0.95, base))
@@ -1630,6 +1703,18 @@ def _failure_cause_suffix(m):
     return f" Fator crítico: {cause['label']} ({round(cause['pct'] * 100)}%)."
 
 
+def _jam_suffix(m):
+    """Relatório de encravamento (SSS v5): o jogador fica a saber QUAL arma
+    encravou e DE QUEM era — para reparar, substituir ou vender."""
+    jams = m.get("weapon_jams") or []
+    if not jams:
+        return ""
+    if len(jams) == 1:
+        j = jams[0]
+        return f" A {j.get('weapon_name', 'arma')} de {j.get('emp_name', '?')} ENCRAVOU no pior momento."
+    return f" {len(jams)} armas ENCRAVARAM durante a ação — o arsenal precisa de manutenção."
+
+
 def _outcome_message(m, outcome):
     t = m["opportunity"]
     symbol = "€ limpos" if t["pays"] == "clean" else "€ sujos"
@@ -1642,7 +1727,7 @@ def _outcome_message(m, outcome):
         else:
             base += ", regressa em segurança"
         base += f", +{t['respect']} respeito."
-        return base
+        return base + _jam_suffix(m)
     if outcome == "partial":
         reward = int(m.get("pending_reward", 0) or 0)
         frac = int(m.get("partial_fraction", 0.6) * 100)
@@ -1653,11 +1738,11 @@ def _outcome_message(m, outcome):
         if m.get("chase_active"):
             base += f" — POLÍCIA em perseguição (escape ≈ {int((m.get('escape_chance', 0.5)) * 100)}%)"
         base += "."
-        return base
+        return base + _jam_suffix(m)
     if outcome == "failure":
-        return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada.{_failure_cause_suffix(m)}"
+        return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada.{_failure_cause_suffix(m)}{_jam_suffix(m)}"
     fine = m.get("fine", 0)
-    return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €.{_failure_cause_suffix(m)}"
+    return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €.{_failure_cause_suffix(m)}{_jam_suffix(m)}"
 
 
 async def _crew_returns(db, player, m, outcome):
@@ -1761,7 +1846,15 @@ async def _crew_returns(db, player, m, outcome):
         await db.employees.update_one({"_id": emp["_id"]}, {"$set": sets})
         await push_history(db, emp["_id"], f"{t['name']} em {t['district']}: {OUTCOME_PT[outcome]}.")
         if weapon:
-            wear = WEAPON_WEAR_PER_MISSION + t["risk"] * WEAPON_WEAR_RISK_MULT
+            w_model = WEAPON_MODELS.get(weapon["model_key"], {})
+            # Durabilidade finalmente ligada (SSS v5): modelos robustos desgastam
+            # devagar, modelos frágeis desfazem-se depressa — e uma arma que
+            # encravou durante a ação perde condição extra.
+            durability = max(30.0, float(w_model.get("durability", WEAPON_DURABILITY_WEAR_REF)))
+            wear = (WEAPON_WEAR_PER_MISSION + t["risk"] * WEAPON_WEAR_RISK_MULT) * (WEAPON_DURABILITY_WEAR_REF / durability)
+            jammed_ids = {j.get("weapon_id") for j in (m.get("weapon_jams") or [])}
+            if str(weapon["_id"]) in jammed_ids:
+                wear += WEAPON_JAM_EXTRA_WEAR
             new_w_condition = max(0.0, weapon.get("condition", 100.0) - wear)
             await db.weapons.update_one({"_id": weapon["_id"]}, {
                 "$set": {"condition": new_w_condition},
@@ -1846,7 +1939,8 @@ async def _progress_mission(db, player, m, now):
         updates.update({"phase": phase, "outcome": outcome})
         # Persist pending reward and chase state so the front-end can display them.
         for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance",
-                  "escape_chance", "fine", "bonus_loot", "partial_fraction", "clutch_save"):
+                  "escape_chance", "fine", "bonus_loot", "partial_fraction", "clutch_save",
+                  "weapon_jams"):
             if k in m:
                 updates[k] = m[k]
         # Track success now (before pay-out): the operation succeeded, delivery is separate.

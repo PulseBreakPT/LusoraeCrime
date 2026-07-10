@@ -559,10 +559,10 @@ backend:
 
 test_plan:
   current_focus:
-    - "SSS v4 QI das Equipas — religação de mecânicas desligadas (atenção de distrito, momentum, fuga consciente do veículo, forense de falha)"
-    - "SSS v4 QI das Equipas — novos modificadores (familiaridade, estratega, coordenação híbrida)"
-    - "SSS v4 QI das Equipas — papéis internos (condutor, médico, advogado), clutch save do líder, aviso do líder"
-    - "SSS v4 QI das Equipas — recomendações por valor esperado real"
+    - "SSS v5 QI das Armas — catálogo expandido (9 modelos, 3 novos) + weapon_meta/weights no /catalog"
+    - "SSS v5 QI das Armas — encravamento (jam profile no dispatch, roll no outcome, weapon_jams persistido, mensagem, desgaste extra)"
+    - "SSS v5 QI das Armas — durabilidade no desgaste, curva de condição não-linear, intimidação na fuga, furtividade gradual"
+    - "SSS v5 QI das Armas — auto_assign por ganho marginal + POST /weapons/optimize"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -601,3 +601,65 @@ agent_communication:
       BREAKDOWN items observados em missão ativa: distancia, risco_base (top_negatives).
       CONCLUSÃO: Implementação SSS v4 está funcional — campos persistidos corretamente, endpoints de
       recomendação operacionais, sem crashes no /state. Recomendo ao main agent sumarizar e concluir.
+
+backend:
+  - task: "SSS v5 QI das Armas — catálogo expandido: 3 modelos novos (pistola_silenciada N3 silenciosa, cacadeira_serrada N3 assalto frágil/potente, metralhadora_ligeira N6 assalto_pesado) + categoria assalto_pesado; /catalog expõe weapon_category_weights e weapon_meta (fórmulas para o frontend calcular match %/jam risk com a mesma régua do motor)"
+    implemented: true
+    working: NA
+    file: "backend/game_data.py, backend/economy_constants.py, backend/routes_game.py (catalog)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Verificado por curl: catálogo devolve 9 modelos, 6 categorias, weights e meta com 13 chaves."
+  - task: "SSS v5 QI das Armas — encravamento: weapon_jam_risk (fiabilidade+condição, armas sem mecanismo nunca encravam), weapon_jam_profile/weapon_power_avg persistidos no mission doc no dispatch, roll em _roll_outcome (perda de chance 4%/arma cap 10%, weapon_jams persistido), sufixo 'ENCRAVOU' nas mensagens de outcome, desgaste extra +6 na arma encravada, weapon_alerts no preview (risco >= 15%)"
+    implemented: true
+    working: NA
+    file: "backend/engine.py, backend/routes_game.py (_prepare_dispatch, dispatch, preview)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Verificado ponta-a-ponta por curl+mongo: pistola a 25% → alerta 21% no preview; jam forçado (risk 1.0) → weapon_jams persistido, outcome partial, evento com 'ENCRAVOU no pior momento', condição 25→14.5 (4.5 base + 6.0 jam)."
+  - task: "SSS v5 QI das Armas — lógica profunda: durabilidade liga ao desgaste (wear × 70/durability), curva de condição não-linear (quadrática abaixo de 40%), intimidação na fuga (assalto: +até 6% escape por poder de fogo médio), sinergia furtiva gradual (bónus escala com discrição média das armas)"
+    implemented: true
+    working: NA
+    file: "backend/engine.py (weapon_condition_factor, _crew_returns, _compute_escape_chance, mod_stealth_synergy)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — mod_weapon_score refatorado para régua única weapon_effective_score (mesma função usada por auto_assign/optimize)."
+  - task: "SSS v5 QI das Armas — QI de atribuição: /weapons/auto_assign reescrito por ganho marginal real (weapon_effective_score novo − atual); novo POST /api/game/weapons/optimize redistribui todo o arsenal disponível (guloso por score efetivo, só mexe em portadores idle, devolve changes/benched/message, idempotente)"
+    implemented: true
+    working: NA
+    file: "backend/routes_game.py (auto_assign_weapon, optimize_weapons), backend/engine.py (weapon_effective_score)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "10/07/2026 — Verificado por curl: optimize atribuiu Pistola→spec assalto e Faca→logistica; 2.ª chamada devolve 'já está na distribuição ótima' (idempotente)."
+
+agent_communication:
+  - agent: "main"
+    message: >
+      10/07/2026 — SSS v5 QI das Armas (backend only, frontend na fase seguinte). NOTA fork: ambiente
+      RESET — .env recriados, DB nova, credenciais admin@lusorae.com / admin123
+      (/app/memory/test_credentials.md). Conta admin é nível 1 com 2 operacionais/1 equipa (DB fresca).
+      4 blocos: (1) CATÁLOGO: 9 modelos (3 novos), categoria assalto_pesado, /catalog com
+      weapon_category_weights + weapon_meta. (2) ENCRAVAMENTO: perfil no dispatch → roll no outcome →
+      weapon_jams + mensagem + desgaste extra; preview devolve weapon_alerts. (3) LÓGICA: durabilidade
+      no desgaste, condição não-linear, intimidação na fuga (assalto), furtividade gradual.
+      (4) QI: weapon_effective_score como régua única; auto_assign por ganho marginal; POST
+      /weapons/optimize (testids frontend ainda não existem — NÃO testar UI). Testar: catálogo (9 modelos,
+      meta), buy/sell/repair/assign/unassign/auto_assign/optimize sem 500, optimize idempotente,
+      preview com weapon_alerts (arma degradada), dispatch persiste weapon_jam_profile/weapon_power_avg,
+      ciclo de missão sem crash. CUIDADO: lockout de login é por ip:email — usar emails descartáveis.

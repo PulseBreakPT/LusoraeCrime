@@ -34,6 +34,13 @@ from economy_constants import (
     STEALTH_SYNERGY_BONUS, STEALTH_SYNERGY_PENALTY,
     STEALTH_VEHICLE_DISCRETION_MIN, NOISY_VEHICLE_DISCRETION_MAX,
     WEAPON_SKILL_FLOOR, WEAPON_SKILL_ATTR_CAP,
+    # ---- SSS v5 — QI das Armas ----
+    WEAPON_DURABILITY_WEAR_REF, WEAPON_CONDITION_SOFT_KNEE,
+    WEAPON_JAM_RELIABILITY_WEIGHT, WEAPON_JAM_CONDITION_THRESHOLD,
+    WEAPON_JAM_CONDITION_WEIGHT, WEAPON_JAM_MAX,
+    WEAPON_JAM_CHANCE_PENALTY, WEAPON_JAM_CHANCE_PENALTY_CAP,
+    WEAPON_JAM_EXTRA_WEAR, WEAPON_JAM_WARN_RISK,
+    WEAPON_INTIMIDATION_ESCAPE_MAX, WEAPON_STEALTH_DISCRETION_REF,
     VEHICLE_SPEED_FLOOR, VEHICLE_SPEED_CURVE_EXP,
     VEHICLE_WEAR_BASE, VEHICLE_WEAR_PER_RISK, VEHICLE_WEAR_PER_KM,
     ESCAPE_SPEED_BASELINE, ESCAPE_SPEED_BONUS_PER_UNIT, ESCAPE_SPEED_BONUS_MAX,
@@ -287,6 +294,20 @@ WEAPON_MODELS = {
         "discretion": 25, "best_for": ["assalto", "especial"], "requires_attr": {"forca": 3, "tiro": 4}, "loud": True,
         "desc": "Cadência e carregador elevados — precisão baixa, exige manutenção frequente.",
     },
+    "pistola_silenciada": {
+        "name": "Pistola Silenciada", "category": "silenciosa", "min_level": 3, "price": 8000,
+        "power": 35, "accuracy": 75, "range": 20, "weight": 15, "use_speed": 85,
+        "durability": 80, "reliability": 90, "magazine_capacity": 12, "maintenance_cost": 240,
+        "discretion": 85, "best_for": ["tecnica", "especial"], "requires_attr": {"discricao": 4}, "loud": False,
+        "desc": "Discreta com poder de fogo real — o upgrade natural da faca para operações silenciosas de alto risco.",
+    },
+    "cacadeira_serrada": {
+        "name": "Caçadeira de Canos Serrados", "category": "assalto", "min_level": 3, "price": 6500,
+        "power": 95, "accuracy": 35, "range": 8, "weight": 40, "use_speed": 65,
+        "durability": 45, "reliability": 60, "magazine_capacity": 2, "maintenance_cost": 320,
+        "discretion": 15, "best_for": ["assalto"], "requires_attr": {"forca": 5}, "loud": True,
+        "desc": "Devastadora à queima-roupa e barata — mas encrava com frequência e desfaz-se depressa. Alto risco, alto impacto.",
+    },
     "rifle_assalto": {
         "name": "Rifle de Assalto", "category": "assalto_especial", "min_level": 4, "price": 18000,
         "power": 75, "accuracy": 70, "range": 55, "weight": 60, "use_speed": 70,
@@ -301,13 +322,21 @@ WEAPON_MODELS = {
         "discretion": 65, "best_for": ["tecnica", "especial"], "requires_attr": {"tiro": 7, "inteligencia": 4}, "loud": False,
         "desc": "Precisão e alcance máximos, carregador e velocidade mínimos — investimento para 1-2 especialistas, não para toda a equipa.",
     },
+    "metralhadora_ligeira": {
+        "name": "Metralhadora Ligeira", "category": "assalto_pesado", "min_level": 6, "price": 45000,
+        "power": 88, "accuracy": 55, "range": 60, "weight": 90, "use_speed": 60,
+        "durability": 85, "reliability": 82, "magazine_capacity": 100, "maintenance_cost": 1200,
+        "discretion": 5, "best_for": ["assalto", "especial"], "requires_attr": {"forca": 7, "tiro": 6}, "loud": True,
+        "desc": "Supressão total — poder e carregador esmagadores, mas pesadíssima, caríssima de manter e impossível de esconder.",
+    },
 }
 
 WEAPON_CATEGORIES = {
-    "silenciosa": {"name": "Silenciosa", "desc": "Sem munições, ideal para discrição."},
+    "silenciosa": {"name": "Silenciosa", "desc": "Sem barulho, ideal para discrição."},
     "equilibrada": {"name": "Equilibrada", "desc": "Sem requisitos, funciona em qualquer lado."},
     "assalto": {"name": "Assalto", "desc": "Potência e cadência para operações de força."},
     "assalto_especial": {"name": "Assalto/Especial", "desc": "Alta gama equilibrada."},
+    "assalto_pesado": {"name": "Assalto Pesado", "desc": "Supressão máxima para quem aguenta o peso."},
     "tecnica_especial": {"name": "Técnica/Especial", "desc": "Precisão e alcance para operações de alto risco."},
 }
 

@@ -621,6 +621,33 @@ WEAPON_BONUS_MIN = -0.05                  # limite inferior do bónus total de a
 WEAPON_BONUS_MAX = 0.12                   # limite superior do bónus total de armamento
 WEAPON_COMPATIBILITY_MIN_FACTOR = 0.4     # factor mínimo quando os requisitos de atributo não são cumpridos
 
+# ---------------- SSS v5 — QI das Armas ----------------
+# Durabilidade finalmente ligada ao desgaste: modelos robustos (durability
+# alta) desgastam-se devagar, modelos frágeis desfazem-se depressa.
+# wear_mult = WEAPON_DURABILITY_WEAR_REF / durability (durability 90 ⇒ 0.78x,
+# durability 45 ⇒ 1.56x).
+WEAPON_DURABILITY_WEAR_REF = 70.0
+# Curva de condição não-linear: acima do joelho a eficácia é linear; abaixo
+# degrada quadraticamente — uma arma a 20% não é "meio útil", é quase sucata.
+WEAPON_CONDITION_SOFT_KNEE = 40.0
+# Encravamento: risco por missão = (1 - fiabilidade) * peso + défice de
+# condição abaixo do limiar * peso. Armas sem munições (carregador < 2 e não
+# ruidosas) nunca encravam. Cada encravamento corta chance e desgasta extra.
+WEAPON_JAM_RELIABILITY_WEIGHT = 0.40
+WEAPON_JAM_CONDITION_THRESHOLD = 60.0
+WEAPON_JAM_CONDITION_WEIGHT = 0.25
+WEAPON_JAM_MAX = 0.35                     # risco máximo de encravar por missão
+WEAPON_JAM_CHANCE_PENALTY = 0.04          # perda de chance por arma encravada
+WEAPON_JAM_CHANCE_PENALTY_CAP = 0.10      # perda de chance máxima por missão
+WEAPON_JAM_EXTRA_WEAR = 6.0               # condição extra perdida pela arma que encravou
+WEAPON_JAM_WARN_RISK = 0.15               # a partir deste risco, o preview avisa o jogador
+# Intimidação: em assaltos, o poder de fogo médio da equipa dissuade
+# perseguições na fuga — contrapartida real do calor extra das armas ruidosas.
+WEAPON_INTIMIDATION_ESCAPE_MAX = 0.06
+# Sinergia furtiva gradual: o bónus de perfil furtivo escala com a discrição
+# média das armas transportadas (referência = discrição 80).
+WEAPON_STEALTH_DISCRETION_REF = 80.0
+
 # ---------------- Reformulação do cálculo de chance (sistema modular) ----------------
 LOYALTY_BONUS_MAX = 0.04                  # bónus máx. quando a lealdade média está bem acima do padrão (70)
 LOYALTY_PENALTY_MAX = 0.06                # penalização máx. quando a lealdade média está muito abaixo do padrão
