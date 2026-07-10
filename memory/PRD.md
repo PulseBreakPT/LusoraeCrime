@@ -91,6 +91,11 @@ Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
 - hud.jsx: Kpi (lus-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
 - ResourceBar: lus-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)
 
+### Central da rede + fix de sobreposições (10/07/2026)
+- Fusão "Em direto" + "Últimos registos" num só painel: ActivityFeed é agora a "Central da rede" com separadores EM DIRETO (transmissão: fases, chance ao vivo, rádio — LiveOpsPanel embutível, ex-LiveOpsDock) e REGISTOS (filtros/não lidos); auto-switch para EM DIRETO ao despachar; mobile: barra única com estado ao vivo + popover com as mesmas tabs
+- Fix crítico: botão Confirmar da colocação de imóveis era tapado pelo dock (mesma âncora centro-fundo z-30) — modo de colocação agora é focado (GamePage esconde dock/consola/legenda/filtro/OpportunityCard), PlacementControls redesenhado (z-40, cartão com tipo+estado+botões grandes)
+- MapBaseFilter movido para topo-esquerdo sob a ResourceBar (colidia com o dock no mobile); consola suprimida (<xl) quando OpportunityCard aberto — regra: nenhuma UI sobreposta/inclicável
+
 ### Botão Otimizar no painel Equipas (10/07/2026)
 - TeamsPanel: botão "Otimizar equipas" (teams-optimize) entre o SummaryStrip e a lista — a lógica optimizeTeams/canOptimize já existia mas nunca era renderizada; um clique compõe /employees/optimize (preenche vagas por aptidão) + /vehicles/optimize (redistribui frota), tooltip dinâmico com contagens, desativado com razão quando nada há para otimizar
 - NOTA infra: fork 10/07 — .env recriados (preview 3aa9b74b-e9aa-4239-b583-92d6420afc1b), credenciais em /app/memory/test_credentials.md

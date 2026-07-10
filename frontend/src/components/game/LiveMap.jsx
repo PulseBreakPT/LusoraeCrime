@@ -1117,39 +1117,57 @@ export const MapLegend = () => {
   );
 };
 
-// Par de botões flutuante para o modo de colocação de propriedades — mesmo
-// visual de MapLegend. Mostra uma dica antes de haver ponto escolhido e
-// desativa Confirmar até o ponto estar num local válido.
+// Painel flutuante do modo de colocação de propriedades — quando ativo, a
+// GamePage esconde o dock e restantes widgets do fundo, por isso este painel
+// tem sempre o centro-fundo livre (z-40 garante topo da pilha). Mostra o tipo
+// de propriedade, o estado do ponto escolhido e botões grandes e clicáveis.
 export const PlacementControls = () => {
-  const { placement, confirmPlacement, cancelPlacement } = useGame();
+  const { placement, confirmPlacement, cancelPlacement, catalog } = useGame();
   if (!placement) return null;
+  const typeName = catalog?.property_types?.[placement.typeKey]?.name || "Propriedade";
+  const invalid = placement.point && !placement.valid;
   return (
     <div
-      className="pointer-events-auto absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-2"
+      data-testid="placement-controls"
+      className="pointer-events-auto absolute left-1/2 z-40 w-[calc(100vw-1rem)] max-w-md -translate-x-1/2"
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
-      {!placement.point && (
-        <span className="rounded-full border border-white/10 bg-[#0a0a0c]/95 px-3 py-1.5 font-mono text-[10px] text-zinc-300 shadow-2xl">
-          Toca no mapa para escolher a localização
-        </span>
-      )}
-      <Button
-        data-testid="placement-confirm"
-        onClick={confirmPlacement}
-        disabled={!placement.point || !placement.valid}
-        variant="success"
-        className="gap-1.5 rounded-full shadow-2xl disabled:opacity-40"
-      >
-        <Check size={15} /> Confirmar
-      </Button>
-      <Button
-        data-testid="placement-cancel"
-        variant="outline"
-        onClick={cancelPlacement}
-        className="gap-1.5 rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-300 shadow-2xl hover:bg-black hover:text-white"
-      >
-        <X size={15} /> Cancelar
-      </Button>
+      <div className="lus-panel animate-slide-up rounded-xl border p-3 shadow-2xl">
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-block h-1.5 w-1.5 animate-pulse rounded-full ${invalid ? "bg-red-500" : "bg-emerald-400"}`} />
+          <p className={`font-mono text-[9px] font-bold uppercase tracking-[0.24em] ${invalid ? "text-red-400" : "text-emerald-300"}`}>
+            Modo de colocação
+          </p>
+        </div>
+        <p className="mt-1 font-mono text-[11px] leading-snug text-zinc-300" data-testid="placement-hint">
+          <span className="font-bold text-white">{typeName}</span>
+          {" — "}
+          {!placement.point
+            ? "toca no mapa para escolheres a localização."
+            : invalid
+            ? "local inválido: escolhe um ponto em terra firme."
+            : "localização válida. Confirma para comprares."}
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <Button
+            data-testid="placement-confirm"
+            onClick={confirmPlacement}
+            disabled={!placement.point || !placement.valid}
+            variant="success"
+            className="flex-1 gap-1.5 rounded-full disabled:opacity-40"
+          >
+            <Check size={15} /> Confirmar
+          </Button>
+          <Button
+            data-testid="placement-cancel"
+            variant="outline"
+            onClick={cancelPlacement}
+            className="flex-1 gap-1.5 rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-300 hover:bg-black hover:text-white"
+          >
+            <X size={15} /> Cancelar
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1157,15 +1175,14 @@ export const PlacementControls = () => {
 // Filtro do mapa por base — segmentado (Tabs), idioma já usado em
 // QuestsPanel.jsx para filtros (por oposição a <Select>, que neste código é
 // o idioma de atribuição). Esbate (não esconde) propriedades e missões que
-// não pertencem à base selecionada.
+// não pertencem à base selecionada. Vive no topo-esquerdo, sob a ResourceBar,
+// para não colidir com o dock (que no mobile está encostado à esquerda) nem
+// com a central da rede.
 export const MapBaseFilter = ({ value, onChange }) => {
   const { state } = useGame();
   if (!state?.properties?.length) return null;
   return (
-    <div
-      className="pointer-events-auto absolute left-2 z-30 max-w-[calc(100vw-1rem)] overflow-x-auto"
-      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
-    >
+    <div className="pointer-events-auto absolute left-2 top-16 z-20 max-w-[calc(100vw-6rem)] overflow-x-auto md:max-w-[45vw]">
       <Tabs value={value} onValueChange={onChange}>
         <TabsList className="bg-[#0a0a0c]/95">
           <TabsTrigger value="all">Todos</TabsTrigger>

@@ -8,6 +8,14 @@ import {
 } from "lucide-react";
 import { parseActivityMessage, classifyEvent } from "../../lib/game";
 import { useFlash } from "./hud";
+import { LiveOpsPanel, phaseInfo } from "./LiveOpsDock";
+
+/*
+ * Central da rede — uma só superfície de UI que junta a transmissão EM DIRETO
+ * das operações (antigo dock central) e os REGISTOS de atividade num painel
+ * com separadores. Quando uma equipa é despachada, a central muda sozinha
+ * para EM DIRETO; sem operações, o separador mostra o estado vazio tático.
+ */
 
 const KIND_LABELS = {
   success: "Sucesso",
@@ -145,6 +153,65 @@ function useUnread(events, playerId) {
   return { unread, markSeen };
 }
 
+// ---------- Operações ativas + mudança automática para EM DIRETO ----------
+function useLiveOps(state, onFresh) {
+  const liveMissions = useMemo(
+    () => (state?.missions || []).filter((m) => m.phase !== "done"),
+    [state?.missions]
+  );
+  const liveIdsKey = liveMissions.map((m) => m.id).join(",");
+  const prevRef = useRef("");
+  const onFreshRef = useRef(onFresh);
+  onFreshRef.current = onFresh;
+  useEffect(() => {
+    const prev = new Set(prevRef.current.split(",").filter(Boolean));
+    const fresh = liveIdsKey.split(",").filter(Boolean).some((id) => !prev.has(id));
+    prevRef.current = liveIdsKey;
+    if (fresh && onFreshRef.current) onFreshRef.current();
+  }, [liveIdsKey]);
+  return liveMissions;
+}
+
+// ---------- Separadores da central (partilhados desktop/mobile) ----------
+const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) => (
+  <div className="flex border-b border-white/[0.06]" role="tablist" aria-label="Central da rede">
+    <button
+      type="button"
+      role="tab"
+      aria-selected={tab === "live"}
+      data-testid={`${idPrefix}-tab-live`}
+      onClick={() => onTab("live")}
+      className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] transition-colors ${
+        tab === "live" ? "bg-red-500/10 text-red-300" : "text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      <span className="lus-lo-rec" style={liveCount === 0 ? { animation: "none", opacity: 0.25, boxShadow: "none" } : undefined} />
+      Em direto
+      {liveCount > 0 && (
+        <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold text-red-300">
+          {liveCount}
+        </span>
+      )}
+    </button>
+    <span className="w-px shrink-0 bg-white/[0.06]" />
+    <button
+      type="button"
+      role="tab"
+      aria-selected={tab === "log"}
+      data-testid={`${idPrefix}-tab-log`}
+      onClick={() => onTab("log")}
+      className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] transition-colors ${
+        tab === "log" ? "bg-white/[0.05] text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      Registos
+      {unread > 0 && (
+        <span className="lus-feed-unread font-mono">{unread > 9 ? "9+" : unread}</span>
+      )}
+    </button>
+  </div>
+);
+
 // ---------- Chips de filtro (partilhados desktop/mobile) ----------
 const FilterChips = ({ counts, filter, onFilter }) => (
   <div className="lus-feed-chiprow px-2 pt-1.5" role="tablist" aria-label="Filtrar registos">
@@ -222,7 +289,7 @@ const FeedList = ({ rows, nowMs, onNavigate, firstId, newFlash }) => {
   );
 };
 
-export const ActivityFeed = ({ onNavigate }) => {
+export const ActivityFeed = ({ onNavigate, suppressed }) => {
   const { state, serverNow } = useGame();
   const events = state?.events || [];
   const firstId = events[0]?.id;
@@ -230,6 +297,7 @@ export const ActivityFeed = ({ onNavigate }) => {
   // "voz" da rede; a entrada tem de se sentir. (Hooks antes do early-return.)
   const newFlash = useFlash(firstId);
   const [filter, setFilter] = useState("all");
+  const [tab, setTab] = useState("log");
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("lus-feed-collapsed") === "1"; } catch { return false; }
   });
@@ -237,14 +305,17 @@ export const ActivityFeed = ({ onNavigate }) => {
   const nowMs = serverNow();
   const { rows, counts } = useFeedData(events, filter, nowMs);
   const { unread, markSeen } = useUnread(events, state?.player?.id);
+  // Nova operação no terreno → a central muda sozinha para EM DIRETO e abre-se.
+  const liveMissions = useLiveOps(state, () => { setTab("live"); setCollapsed(false); });
+  const liveCount = liveMissions.length;
 
-  // Painel aberto = registos "vistos" (com um pequeno atraso, para o badge
-  // "novos" ainda se sentir quando chega qualquer coisa). Colapsado acumula.
+  // Separador Registos à vista = registos "vistos" (com um pequeno atraso, para
+  // o badge "novos" ainda se sentir quando chega qualquer coisa).
   useEffect(() => {
-    if (collapsed || !firstId) return;
+    if (collapsed || tab !== "log" || !firstId) return;
     const id = setTimeout(markSeen, 1800);
     return () => clearTimeout(id);
-  }, [collapsed, firstId, markSeen]);
+  }, [collapsed, tab, firstId, markSeen]);
 
   // Se o filtro ativo ficou sem registos (rotação dos 30 do estado), volta a Tudo.
   useEffect(() => {
@@ -264,20 +335,27 @@ export const ActivityFeed = ({ onNavigate }) => {
   return (
     <div
       data-testid="activity-feed"
-      className="lus-panel lus-hud-solid pointer-events-auto absolute bottom-20 left-2 z-20 hidden w-[21.5rem] animate-slide-up overflow-hidden rounded-xl border shadow-2xl md:block"
+      className={`lus-panel lus-hud-solid pointer-events-auto absolute bottom-20 left-2 z-20 w-[24rem] animate-slide-up overflow-hidden rounded-xl border shadow-2xl ${
+        suppressed ? "hidden xl:block" : "hidden md:block"
+      }`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
         <button
           type="button"
           data-testid="feed-collapse-toggle"
           onClick={toggleCollapsed}
-          title={collapsed ? "Abrir o registo da rede" : "Encolher o registo da rede"}
+          title={collapsed ? "Abrir a central da rede" : "Encolher a central da rede"}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
         >
           <span className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-destructive" />
           <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-            Atividade da rede
+            Central da rede
           </span>
+          {collapsed && liveCount > 0 && (
+            <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold uppercase text-red-300">
+              Em direto · {liveCount}
+            </span>
+          )}
           {unread > 0 && (
             <span data-testid="feed-unread-badge" className="lus-feed-unread font-mono">
               {unread > 9 ? "9+" : unread} {unread === 1 ? "novo" : "novos"}
@@ -295,7 +373,7 @@ export const ActivityFeed = ({ onNavigate }) => {
               type="button"
               data-testid="feed-expand-toggle"
               onClick={() => setExpanded((x) => !x)}
-              title={expanded ? "Reduzir a altura do registo" : "Aumentar a altura do registo"}
+              title={expanded ? "Reduzir a altura da central" : "Aumentar a altura da central"}
               className="lus-feed-iconbtn"
             >
               {expanded ? <Minimize2 size={10} /> : <Maximize2 size={10} />}
@@ -305,25 +383,35 @@ export const ActivityFeed = ({ onNavigate }) => {
       </div>
       {!collapsed && (
         <>
-          <FilterChips counts={counts} filter={filter} onFilter={setFilter} />
-          <ScrollArea className={`${expanded ? "h-80" : "h-44"} p-2`}>
-            {rows.length === 0 ? (
-              <p className="px-1 font-mono text-[11px] text-zinc-600">
-                {filter === "all" ? "Silêncio na rede. Por agora." : "Sem registos nesta categoria."}
-              </p>
-            ) : (
-              <FeedList rows={rows} nowMs={nowMs} onNavigate={onNavigate} firstId={firstId} newFlash={newFlash} />
-            )}
-          </ScrollArea>
+          <ConsoleTabs tab={tab} onTab={setTab} liveCount={liveCount} unread={unread} />
+          {tab === "live" ? (
+            <div className="overflow-y-auto" style={{ maxHeight: expanded ? "26rem" : "19rem" }}>
+              <LiveOpsPanel state={state} serverNow={serverNow} />
+            </div>
+          ) : (
+            <>
+              <FilterChips counts={counts} filter={filter} onFilter={setFilter} />
+              <ScrollArea className={`${expanded ? "h-80" : "h-44"} p-2`}>
+                {rows.length === 0 ? (
+                  <p className="px-1 font-mono text-[11px] text-zinc-600">
+                    {filter === "all" ? "Silêncio na rede. Por agora." : "Sem registos nesta categoria."}
+                  </p>
+                ) : (
+                  <FeedList rows={rows} nowMs={nowMs} onNavigate={onNavigate} firstId={firstId} newFlash={newFlash} />
+                )}
+              </ScrollArea>
+            </>
+          )}
         </>
       )}
     </div>
   );
 };
 
-export const ActivityFeedMobile = ({ onNavigate }) => {
+export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
   const { state, serverNow } = useGame();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState("log");
   const [filter, setFilter] = useState("all");
   const containerRef = useRef(null);
   const events = state?.events || [];
@@ -332,6 +420,9 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
   const nowMs = serverNow();
   const { rows, counts } = useFeedData(events, filter, nowMs);
   const { unread, markSeen } = useUnread(events, state?.player?.id);
+  // Nova operação → a barra passa a mostrar o EM DIRETO (sem abrir sozinha).
+  const liveMissions = useLiveOps(state, () => setTab("live"));
+  const liveCount = liveMissions.length;
 
   // Clicar fora fecha a lista, tal como um popover/dropdown normal — e Escape
   // também, para consistência com o resto da interface (desktop).
@@ -349,18 +440,20 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
     };
   }, [open]);
 
-  // Abrir a lista marca tudo como visto (e mantém-se visto enquanto aberta).
-  useEffect(() => { if (open) markSeen(); }, [open, markSeen]);
+  // Abrir a lista no separador Registos marca tudo como visto.
+  useEffect(() => { if (open && tab === "log") markSeen(); }, [open, tab, markSeen]);
 
   useEffect(() => {
     if (filter !== "all" && !counts[filter]) setFilter("all");
   }, [filter, counts]);
 
-  if (!state || events.length === 0) return null;
+  if (!state || suppressed || (events.length === 0 && liveCount === 0)) return null;
   const latest = events[0];
-  const latestDest = classifyEvent(latest.kind, latest.message);
-  const LatestIcon = iconFor(latest, latestDest);
+  const latestDest = latest ? classifyEvent(latest.kind, latest.message) : null;
+  const LatestIcon = latest ? iconFor(latest, latestDest) : Radar;
   const visible = rows.slice(0, 14);
+  const liveFirst = liveCount > 0 ? liveMissions[liveMissions.length - 1] : null;
+  const livePhase = liveFirst ? phaseInfo(liveFirst, nowMs) : null;
 
   return (
     <div ref={containerRef} data-testid="activity-feed-mobile" className="pointer-events-none absolute bottom-[4.2rem] left-2 right-2 z-20 md:hidden">
@@ -372,45 +465,68 @@ export const ActivityFeedMobile = ({ onNavigate }) => {
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
-              Últimos registos
+              Central da rede
             </p>
             <span className="font-mono text-[9px] text-zinc-600">{events.length} registos</span>
           </div>
-          <FilterChips counts={counts} filter={filter} onFilter={setFilter} />
-          <div className="max-h-60 overflow-y-auto p-2">
-            {visible.length === 0 ? (
-              <p className="px-1 font-mono text-[10px] text-zinc-600">Sem registos nesta categoria.</p>
-            ) : (
-              <FeedList
-                rows={visible}
-                nowMs={nowMs}
-                onNavigate={(panel, dest) => { setOpen(false); onNavigate && onNavigate(panel, dest); }}
-                firstId={firstId}
-                newFlash={false}
-              />
-            )}
-          </div>
+          <ConsoleTabs tab={tab} onTab={setTab} liveCount={liveCount} unread={unread} idPrefix="console-m" />
+          {tab === "live" ? (
+            <div className="max-h-72 overflow-y-auto">
+              <LiveOpsPanel state={state} serverNow={serverNow} />
+            </div>
+          ) : (
+            <>
+              <FilterChips counts={counts} filter={filter} onFilter={setFilter} />
+              <div className="max-h-60 overflow-y-auto p-2">
+                {visible.length === 0 ? (
+                  <p className="px-1 font-mono text-[10px] text-zinc-600">Sem registos nesta categoria.</p>
+                ) : (
+                  <FeedList
+                    rows={visible}
+                    nowMs={nowMs}
+                    onNavigate={(panel, dest) => { setOpen(false); onNavigate && onNavigate(panel, dest); }}
+                    firstId={firstId}
+                    newFlash={false}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </Card>
       )}
       <button
         data-testid="activity-feed-mobile-toggle"
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`pointer-events-auto flex w-full items-center gap-2 rounded-md border border-white/10 bg-[#0a0a0c]/95 px-2.5 py-1.5 text-left shadow-2xl ${newFlash && !open ? "lus-feed-new" : ""}`}
+        className={`pointer-events-auto flex w-full items-center gap-2 rounded-md border border-white/10 bg-[#0a0a0c]/95 px-2.5 py-1.5 text-left shadow-2xl ${newFlash && !open && liveCount === 0 ? "lus-feed-new" : ""}`}
       >
-        <span
-          className="lus-feed-ico"
-          style={{ color: latestDest.color, background: `${latestDest.color}14`, borderColor: `${latestDest.color}33` }}
-        >
-          <LatestIcon size={11} strokeWidth={2.2} />
-        </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">
-          {parseActivityMessage(latest.message)}
-        </span>
+        {liveFirst ? (
+          <>
+            <span className="lus-lo-rec shrink-0" />
+            <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-300">
+              <span className="font-bold uppercase text-white">{liveFirst.team_name}</span>
+              <span className="mx-1 text-zinc-600">·</span>
+              <span style={{ color: livePhase?.color }}>{livePhase?.label}</span>
+              {liveCount > 1 && <span className="ml-1 text-zinc-500">+{liveCount - 1}</span>}
+            </span>
+          </>
+        ) : (
+          <>
+            <span
+              className="lus-feed-ico"
+              style={{ color: latestDest.color, background: `${latestDest.color}14`, borderColor: `${latestDest.color}33` }}
+            >
+              <LatestIcon size={11} strokeWidth={2.2} />
+            </span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">
+              {parseActivityMessage(latest.message)}
+            </span>
+          </>
+        )}
         {unread > 0 && !open && (
           <span className="lus-feed-unread font-mono">{unread > 9 ? "9+" : unread}</span>
         )}
-        <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>
+        {latest && <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>}
         <ChevronUp size={11} className={`shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
     </div>

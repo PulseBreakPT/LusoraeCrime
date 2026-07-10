@@ -157,6 +157,28 @@ backend:
         comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
+  - task: "Central da rede — fusão do 'Em direto' (LiveOpsDock) e 'Últimos registos' (ActivityFeed) num só painel com separadores EM DIRETO/REGISTOS (desktop canto inferior esquerdo, mobile barra única); auto-switch para EM DIRETO ao despachar equipa; LiveOpsDock.jsx refeito como LiveOpsPanel embutível (sem Shell/posicionamento próprio) com estado vazio tático"
+    implemented: true
+    working: true
+    file: "frontend/src/components/game/ActivityFeed.jsx, frontend/src/components/game/LiveOpsDock.jsx, frontend/src/pages/GamePage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Verificado por screenshots desktop+mobile: consola com tabs, badge nº operações, estado vazio, transmissão ao vivo (fases/chance/rádio) após despacho com auto-switch, barra mobile mostra 'CREW ALFA · Em rota para o alvo' e popover com as mesmas tabs. Testids antigos liveops-* preservados (liveops-panel, liveops-feed, liveops-chance...); console-tab-live/console-tab-log novos; liveops-dock/liveops-expand/liveops-collapse removidos (colapso agora é da consola)."
+  - task: "Fix crítico de sobreposição de UI: modo de colocação de imóveis focado — GamePage esconde dock/consola/legenda/filtro/OpportunityCard durante placement (o dock tapava o botão Confirmar: ambos centro-fundo z-30); PlacementControls redesenhado (z-40, cartão com tipo de propriedade + estado do ponto + botões grandes); MapBaseFilter movido do fundo-esquerdo (colidia com o dock no mobile) para topo-esquerdo sob a ResourceBar; consola/barra suprimidas quando OpportunityCard aberto em ecrãs < xl"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/GamePage.jsx, frontend/src/components/game/LiveMap.jsx, frontend/src/components/game/ActivityFeed.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "10/07/2026 — Bug reportado pelo utilizador: 'quando tento colocar um imóvel não consigo carregar no botão de confirmar'. Causa raiz: PlacementControls e dock partilhavam âncora centro-fundo com z-30, dock renderizado depois no DOM intercetava cliques. Verificado por E2E screenshots: comprar Esconderijo → modo focado limpo (dock/consola/legenda escondidos) → clique no mapa → 'localização válida' → Confirmar clicável → 'Propriedade comprada', tudo restaurado depois. Filtro de bases visível no topo ('Todos | QG | Esconderijo — Areeiro')."
   - task: "Botão 'Otimizar equipas' no painel Equipas (data-testid teams-optimize) — usa optimizeTeams já existente (compõe /api/employees/optimize + /api/vehicles/optimize), tooltip dinâmico com contagens, estilo cyan Sparkles igual aos outros painéis, desativado quando nada há para otimizar"
     implemented: true
     working: true

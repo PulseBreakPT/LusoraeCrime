@@ -15,7 +15,6 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
-import { LiveOpsDock } from "../components/game/LiveOpsDock";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
@@ -24,7 +23,7 @@ import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords } from "lucide-react";
 
 export default function GamePage() {
-  const { state, stateError, refresh, serverNow, autoOpenReportSignal } = useGame();
+  const { state, stateError, refresh, serverNow, autoOpenReportSignal, placement } = useGame();
   const { hideImpossibleMissions, showFps } = useSettings();
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
@@ -184,15 +183,18 @@ export default function GamePage() {
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
         </Button>
       </Tip>
-      <ActivityFeed onNavigate={navigateTo} />
-      <ActivityFeedMobile onNavigate={navigateTo} />
-      {selectedOpp && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
+      {/* Modo de colocação = modo focado: só o mapa e os controlos de colocação
+          ficam visíveis; central, cartões, legenda, filtro e dock saem do
+          caminho para nada tapar o Confirmar/Cancelar. */}
+      {!placement && <ActivityFeed onNavigate={navigateTo} suppressed={!!selectedOpp} />}
+      {!placement && <ActivityFeedMobile onNavigate={navigateTo} suppressed={!!selectedOpp} />}
+      {selectedOpp && !placement && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
 
-      <MapLegend />
-      <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />
+      {!placement && <MapLegend />}
+      {!placement && <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />}
       <PlacementControls />
-      <LiveOpsDock state={state} serverNow={serverNow} />
 
+      {!placement && (
       <div
         className="pointer-events-auto absolute left-2 z-30 md:left-1/2 md:-translate-x-1/2"
         style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
@@ -246,6 +248,7 @@ export default function GamePage() {
         />
       </div>
       </div>
+      )}
 
       <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} />
       <QuestsPanel

@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtMoney, chanceColor, CATEGORY_COLORS } from "../../lib/game";
-import { Radio, ChevronDown, ChevronUp, Crosshair, Siren, X } from "lucide-react";
+import { Radio, Crosshair, Siren, X } from "lucide-react";
 
 /*
- * Operação em Direto — dock inferior estilo "transmissão em direto" sobre o mapa.
+ * Operação em Direto — painel embutível com a "transmissão" das operações.
  * Revela o guião da missão (live_log do backend) linha a linha, seguindo o
  * relógio do servidor: rádio da equipa, marcos da operação e COMPLICAÇÕES com
  * efeito real na chance (o pct de cada complicação soma à "chance ao vivo",
  * que é exatamente o valor usado pelo servidor no desfecho).
+ *
+ * Este painel já não se posiciona sozinho sobre o mapa: vive dentro da
+ * "Central da rede" (ActivityFeed), no separador EM DIRETO — uma só superfície
+ * de UI em vez de dois widgets sobrepostos.
  */
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -31,7 +35,7 @@ const OUTCOME_META = {
   recalled: { label: "REGRESSO ANTECIPADO", color: "#A1A1AA" },
 };
 
-function phaseInfo(m, now) {
+export function phaseInfo(m, now) {
   const arr = Date.parse(m.arrive_at);
   const fin = Date.parse(m.finish_at);
   const ret = Date.parse(m.return_at);
@@ -45,7 +49,7 @@ function phaseInfo(m, now) {
   };
 }
 
-const fmtMMSS = (ms) => {
+export const fmtMMSS = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
@@ -53,13 +57,12 @@ const fmtMMSS = (ms) => {
 const fmtHMS = (iso) =>
   new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-export function LiveOpsDock({ state, serverNow }) {
+export function LiveOpsPanel({ state, serverNow }) {
   const missions = useMemo(
     () => (state.missions || []).filter((m) => m.phase !== "done"),
     [state.missions]
   );
   const [selectedId, setSelectedId] = useState(null);
-  const [collapsed, setCollapsed] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 768 : false));
   const [now, setNow] = useState(() => serverNow());
   const [finished, setFinished] = useState(null); // snapshot da última operação concluída
   const prevIdsRef = useRef(new Set());
@@ -82,7 +85,6 @@ export function LiveOpsDock({ state, serverNow }) {
     if (fresh && prevIdsRef.current.size >= 0) {
       setSelectedId(fresh.id);
       setFinished(null);
-      setCollapsed(false);
     }
     // Operação selecionada desapareceu da lista → concluída (chegou à base).
     if (selectedId && !ids.has(selectedId)) {
@@ -110,39 +112,50 @@ export function LiveOpsDock({ state, serverNow }) {
   useEffect(() => {
     const el = feedRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [revealed.length, collapsed, selectedId]);
+  }, [revealed.length, selectedId]);
 
-  if (!sel && !finished) return null;
+  // ---- Sem transmissão: estado vazio tático ----
+  if (!sel && !finished) {
+    return (
+      <div className="px-3 py-6 text-center" data-testid="liveops-empty">
+        <Radio size={15} className="mx-auto mb-2 text-zinc-600" />
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
+          Sem operações no terreno
+        </p>
+        <p className="mt-1 font-mono text-[10px] leading-relaxed text-zinc-600">
+          Despacha uma equipa para veres a transmissão em direto — rádio, fases e chance ao vivo.
+        </p>
+      </div>
+    );
+  }
 
   // ---- Cartão de conclusão (a equipa chegou à base) ----
   if (!sel && finished) {
     const fm = finished.mission;
     const om = OUTCOME_META[fm.outcome] || OUTCOME_META.recalled;
     return (
-      <Shell collapsed={false}>
-        <div className="flex items-center justify-between gap-2 px-3 py-2" data-testid="liveops-finished">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="lus-lo-rec" style={{ background: om.color, boxShadow: `0 0 8px ${om.color}` }} />
-            <div className="min-w-0">
-              <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: om.color }}>
-                Operação concluída — {om.label}
-              </p>
-              <p className="truncate font-mono text-[10px] text-zinc-500">
-                {fm.team_name} · {fm.opportunity?.name} · relatório no registo de atividade
-              </p>
-            </div>
+      <div className="flex items-center justify-between gap-2 px-3 py-3" data-testid="liveops-finished">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="lus-lo-rec" style={{ background: om.color, boxShadow: `0 0 8px ${om.color}` }} />
+          <div className="min-w-0">
+            <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: om.color }}>
+              Operação concluída — {om.label}
+            </p>
+            <p className="truncate font-mono text-[10px] text-zinc-500">
+              {fm.team_name} · {fm.opportunity?.name} · relatório nos registos
+            </p>
           </div>
-          <button
-            type="button"
-            data-testid="liveops-finished-close"
-            onClick={() => setFinished(null)}
-            className="rounded-full border border-white/10 p-1 text-zinc-500 transition-colors hover:text-white"
-            aria-label="Fechar"
-          >
-            <X size={12} />
-          </button>
         </div>
-      </Shell>
+        <button
+          type="button"
+          data-testid="liveops-finished-close"
+          onClick={() => setFinished(null)}
+          className="rounded-full border border-white/10 p-1 text-zinc-500 transition-colors hover:text-white"
+          aria-label="Fechar"
+        >
+          <X size={12} />
+        </button>
+      </div>
     );
   }
 
@@ -164,82 +177,26 @@ export function LiveOpsDock({ state, serverNow }) {
     { label: "Volta", f: clamp((now - fin) / Math.max(1, ret - fin), 0, 1), col: sel.chase_active ? "#F59E0B" : "#34D399" },
   ];
 
-  // ---- Barra colapsada ----
-  if (collapsed) {
-    return (
-      <Shell collapsed>
-        <button
-          type="button"
-          data-testid="liveops-expand"
-          onClick={() => setCollapsed(false)}
-          className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left"
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="lus-lo-rec" />
-            <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white">
-              {sel.team_name}
-            </span>
-            <span className="hidden truncate font-mono text-[10px] uppercase tracking-wider sm:inline" style={{ color: ph.color }}>
-              {ph.label}
-            </span>
-            {missions.length > 1 && (
-              <span className="rounded-full border border-white/10 px-1.5 font-mono text-[9px] text-zinc-400">
-                +{missions.length - 1}
-              </span>
-            )}
-          </span>
-          <span className="flex items-center gap-2">
-            {!om && (
-              <span className="font-mono text-[11px] font-bold" style={{ color: chanceCol }} data-testid="liveops-chance-mini">
-                {Math.round(liveChance * 100)}%
-              </span>
-            )}
-            {om && (
-              <span className="font-mono text-[10px] font-bold uppercase" style={{ color: om.color }}>
-                {om.label}
-              </span>
-            )}
-            <span className="font-mono text-[10px] tabular-nums text-zinc-400">{fmtMMSS(ph.until - now)}</span>
-            <ChevronUp size={12} className="text-zinc-500" />
-          </span>
-        </button>
-      </Shell>
-    );
-  }
-
   return (
-    <Shell collapsed={false}>
-      {/* Cabeçalho — REC, alvo, seguir câmara, colapsar */}
+    <div data-testid="liveops-panel">
+      {/* Cabeçalho — alvo + seguir câmara */}
       <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-1.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="lus-lo-rec" />
-          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.28em] text-red-400">Em direto</p>
-          <span className="h-3 w-px bg-white/10" />
           <p className="truncate font-mono text-[10px] font-bold uppercase tracking-wider text-white">
             {sel.opportunity?.name}
             <span className="ml-1.5 font-normal text-zinc-500">· {sel.opportunity?.district}</span>
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            data-testid="liveops-follow"
-            title="Seguir esta unidade no mapa"
-            onClick={() => window.dispatchEvent(new CustomEvent("lus:follow-mission", { detail: { id: sel.id } }))}
-            className="rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
-          >
-            <Crosshair size={11} />
-          </button>
-          <button
-            type="button"
-            data-testid="liveops-collapse"
-            onClick={() => setCollapsed(true)}
-            className="rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:text-white"
-            aria-label="Minimizar"
-          >
-            <ChevronDown size={11} />
-          </button>
-        </div>
+        <button
+          type="button"
+          data-testid="liveops-follow"
+          title="Seguir esta unidade no mapa"
+          onClick={() => window.dispatchEvent(new CustomEvent("lus:follow-mission", { detail: { id: sel.id } }))}
+          className="shrink-0 rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
+        >
+          <Crosshair size={11} />
+        </button>
       </div>
 
       {/* Tabs quando há várias operações em simultâneo */}
@@ -366,22 +323,8 @@ export function LiveOpsDock({ state, serverNow }) {
           );
         })}
       </div>
-    </Shell>
+    </div>
   );
 }
 
-// Concha exterior — posicionamento sobre o mapa + vidro escuro + scanline.
-const Shell = ({ collapsed, children }) => (
-  <div
-    className={`lus-lo-wrap pointer-events-none absolute inset-x-2 z-20 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 ${
-      collapsed ? "md:w-[380px]" : "md:w-[560px]"
-    }`}
-  >
-    <div className="lus-lo pointer-events-auto animate-slide-up rounded-xl" data-testid="liveops-dock">
-      <span className="lus-lo-scan" aria-hidden="true" />
-      {children}
-    </div>
-  </div>
-);
-
-export default LiveOpsDock;
+export default LiveOpsPanel;
