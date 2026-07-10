@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, QUEST_STATUS_LABELS, QUEST_STATUS_COLORS,
   DIFFICULTY_LABELS, DIFFICULTY_COLORS, CHAPTER_LABELS, QUEST_TYPE_LABELS,
-  QUEST_TIER_LABELS, QUEST_TIER_COLORS,
+  QUEST_TIER_LABELS, QUEST_TIER_COLORS, questMultBreakdown,
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
@@ -115,17 +115,26 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
 
       {chips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {q.reward_mult > 1.01 && (
-            <Tip tip={`Recompensa dinâmica ×${q.reward_mult.toFixed(2)} — ${q.mult_note || "escala com nível, dificuldade, tier e série"}. Concluir na 1.ª metade do prazo dá +10%.`}>
-              <Badge
-                variant="outline"
-                data-testid={`quest-mult-${q.id || q.quest_key}`}
-                className="gap-0.5 border-transparent bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300"
-              >
-                <Zap size={9} /> ×{q.reward_mult.toFixed(2)}
-              </Badge>
-            </Tip>
-          )}
+          {q.reward_mult > 1.01 && (() => {
+            const bd = questMultBreakdown(state?.player, q, catalog?.quest_meta);
+            const parts = [
+              `nível ×${bd.level.toFixed(2)}`,
+              `dificuldade ×${bd.difficulty.toFixed(2)}`,
+              bd.tierN > 0 ? `tier ${QUEST_TIER_LABELS[bd.tierN]} ×${bd.tier.toFixed(2)}` : null,
+              bd.streak > 1 ? `série ${bd.streakCount}d ×${bd.streak.toFixed(2)}` : null,
+            ].filter(Boolean).join(" · ");
+            return (
+              <Tip tip={`Recompensa dinâmica ×${q.reward_mult.toFixed(2)} — decomposição do motor: ${parts}. Concluir na 1.ª metade do prazo dá +${Math.round(bd.speedBonus * 100)}% extra (teto global ×${bd.cap}).`}>
+                <Badge
+                  variant="outline"
+                  data-testid={`quest-mult-${q.id || q.quest_key}`}
+                  className="gap-0.5 border-transparent bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300"
+                >
+                  <Zap size={9} /> ×{q.reward_mult.toFixed(2)}
+                </Badge>
+              </Tip>
+            );
+          })()}
           {chips.map((c, i) => (
             <Badge key={i} variant="outline" className="gap-0.5 border-transparent bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-normal text-emerald-300">
               <Gift size={9} /> {c}
@@ -203,7 +212,7 @@ const TABS = [
 ];
 
 export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusTabConsumed }) => {
-  const { state, serverNow, claimQuest } = useGame();
+  const { state, serverNow, claimAllQuests } = useGame();
   const { rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("questsTab", "historia", rememberSort);
   useTick(open);
@@ -220,7 +229,9 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   const quests = state.quests || [];
   const close = () => onOpenChange(false);
-  const claimAll = () => quests.filter((q) => q.status === "completed").forEach((q) => claimQuest(q.id));
+  // Uma única chamada ao motor (/quests/claim_all) — aplica multiplicadores,
+  // série e momentum de uma vez, em vez de reclamar contrato a contrato.
+  const claimAll = () => claimAllQuests();
 
   const principals = quests.filter((q) => q.type === "principal").sort((a, b) => a.order - b.order);
   const featured = principals.find((q) => q.status === "completed") || principals.find((q) => q.status === "active");

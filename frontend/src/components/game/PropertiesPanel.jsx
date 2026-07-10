@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD } from "../../lib/game";
+import {
+  fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD, matchesSearch,
+  propertyTier, propertyStackRank, propertyStackMult, propertyUpgradeCost, propertyMaintPerDay,
+  propertyUpgradePaybackH,
+} from "../../lib/game";
+import { cn } from "../../lib/utils";
 import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { PropertyGlyph } from "./PropertyGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
+import { Input } from "../ui/input";
 import { Alert, AlertDescription } from "../ui/alert";
-import { Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote, Wrench, Clock } from "lucide-react";
+import {
+  Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote,
+  Wrench, Clock, Search, Sparkles, MapPin, Layers, Timer, Landmark,
+} from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -16,10 +26,59 @@ const useTick = (active) => {
   }, [active]);
 };
 
+// Chip do tier (Bairro/Cidade/Sindicato/Imperial) — derivado do nível de
+// desbloqueio do tipo, com a cor a alimentar toda a moldura do cartão.
+const TierChip = ({ tier }) => (
+  <Tip tip={`Tier ${tier.label} — classe do imóvel pelo nível de desbloqueio no mercado.`}>
+    <span
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
+      style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
+    >
+      {tier.label}
+    </span>
+  </Tip>
+);
+
+// Pontos de nível (●●○) com o mesmo tom do tier.
+const LevelDots = ({ level, max, color }) => (
+  <Tip tip={`Nível ${level} de ${max} — cada nível multiplica o benefício do imóvel.`}>
+    <span className="font-mono text-[10px] tracking-wider" style={{ color }}>
+      {"●".repeat(level)}
+      <span className="text-zinc-700">{"○".repeat(Math.max(0, max - level))}</span>
+    </span>
+  </Tip>
+);
+
 export const PropertiesPanel = ({ open, onOpenChange }) => {
-  const { state, catalog, serverNow, sellProperty, upgradeProperty, renameProperty, startPlacement } = useGame();
+  const { state, catalog, serverNow, sellProperty, upgradeProperty, renameProperty, startPlacement, optimizeProperties } = useGame();
+  const [query, setQuery] = useState("");
   useTick(open);
   if (!state) return null;
+
+  const meta = catalog?.property_meta || {};
+  const maxLevel = catalog?.property_max_level || 3;
+  const sellFrac = meta.sell_fraction ?? 0.7;
+  const props = state.properties || [];
+
+  const isUpgrading = (p) => p.upgrading_until && Date.parse(p.upgrading_until) > serverNow();
+  const upgradableCount = props.filter((p) => p.level < maxLevel && !isUpgrading(p)).length;
+  const canOptimize = props.length > 0 && upgradableCount > 0;
+  const reserve = state.salary_total || 0;
+
+  const maintDayTotal = props.reduce((a, p) => {
+    const pt = catalog?.property_types?.[p.type_key];
+    return a + (pt ? propertyMaintPerDay(pt, p.level, meta) : 0);
+  }, 0);
+  const avgCondition = props.length ? Math.round(props.reduce((a, p) => a + (p.condition ?? 100), 0) / props.length) : 100;
+
+  const filtered = props.filter((p) =>
+    matchesSearch(query, p.name, catalog?.property_types?.[p.type_key]?.name || p.type_key, p.district)
+  );
+  // Em obras para o fim — o jogador quer ver primeiro o que pode gerir já.
+  const sorted = [...filtered].sort((a, b) => {
+    const rank = (p) => (isUpgrading(p) ? 1 : 0);
+    return rank(a) - rank(b);
+  });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -29,106 +88,182 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           <PanelKicker>Património · Território</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Warehouse size={18} className="text-primary" /> Imóveis
-            <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="properties-count">{state.properties.length}</span>
+            <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="properties-count">{props.length}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">Cada esquina comprada é uma esquina controlada — expande o território.</SheetDescription>
         </SheetHeader>
 
         {(() => {
           const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
-          const sellTotal = state.properties.reduce((a, p) => {
+          const sellTotal = props.reduce((a, p) => {
             const pt = catalog?.property_types?.[p.type_key];
-            return a + (pt ? Math.round(pt.price * 0.7 * p.level) : 0);
+            return a + (pt ? Math.round(pt.price * sellFrac * p.level) : 0);
           }, 0);
           return (
             <SummaryStrip cols={4} className="mt-3" testId="properties-summary">
               <Kpi icon={TrendingUp} label="Produção" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B"
-                tip="Dinheiro sujo gerado por hora pelos laboratórios — acumula automaticamente, mas gera calor." />
+                tip="Dinheiro sujo gerado por hora pelos laboratórios — acumula automaticamente à condição atual (rendimentos decrescentes por unidade repetida), mas gera calor." />
               <Kpi icon={Droplets} label="Lavagem" value={`${fmtMoney(launderPerH)}/h`} color="#34D399"
-                tip="Lavagem passiva por hora das empresas de fachada — converte sujo em limpo sem taxa." />
+                tip="Lavagem passiva por hora das empresas de fachada — converte sujo em limpo sem taxa, à condição atual de cada imóvel." />
               <Kpi icon={Flame} label="Calor" value={`+${heatPerH.toFixed(1)}/h`} color={heatPerH > 0 ? "#EF4444" : "#71717A"}
-                tip="Calor policial gerado por hora pelas propriedades ilegais (laboratórios)." />
-              <Kpi icon={Banknote} label="Valor" value={fmtMoney(sellTotal)}
-                tip="Valor de revenda total do património (70% do preço × nível de cada propriedade)." />
+                tip="Calor policial gerado por hora pelas propriedades ilegais (laboratórios). Acima de 70 de calor há risco de rusga." />
+              <Kpi icon={Banknote} label="Valor" value={fmtMoney(sellTotal)} sub={`manut. ${fmtMoney(maintDayTotal)}/dia`} subColor="#F59E0B"
+                tip={`Valor de revenda total do património (${Math.round(sellFrac * 100)}% do preço × nível). A manutenção diária (${fmtMoney(maintDayTotal)}) é debitada automaticamente — sem fundos, a condição degrada-se ${meta.condition_decay_per_hour ?? 2}%/h e os benefícios rendem menos.`} />
             </SummaryStrip>
           );
         })()}
 
-        <div className="mt-4 space-y-2" data-testid="properties-list">
-          {state.player.heat >= 70 && state.properties.some((p) => p.type_key === "laboratorio") && (
+        <div className="mt-3 flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
+            <Input
+              data-testid="properties-search"
+              value={query}
+              onChange={(ev) => setQuery(ev.target.value)}
+              placeholder="Pesquisar imóvel..."
+              className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+            />
+          </div>
+          <Tip tip={canOptimize
+            ? `Lança as melhorias com melhor retorno real: imóveis produtivos ordenados por payback (custo ÷ ganho/h à condição atual), depois capacidade/bónus do mais barato ao mais caro — preservando sempre uma reserva de ${fmtMoney(reserve)} para o próximo ciclo salarial.`
+            : props.length === 0 ? "Sem imóveis no património." : "Nenhum imóvel elegível — tudo no nível máximo ou já em obras."}>
+            <button
+              data-testid="properties-optimize"
+              onClick={() => canOptimize && optimizeProperties()}
+              disabled={!canOptimize}
+              className={cn(
+                "flex shrink-0 items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                canOptimize
+                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
+                  : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+              )}
+            >
+              <Sparkles size={11} /> Otimizar
+            </button>
+          </Tip>
+        </div>
+
+        <div className="mt-3 space-y-2" data-testid="properties-list">
+          {state.player.heat >= 70 && props.some((p) => p.type_key === "laboratorio") && (
             <Alert variant="destructive" data-testid="raid-warning" className="border-red-600/40 bg-red-600/10 py-2">
               <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
                 <Siren size={12} /> Calor alto: risco de rusga policial aos laboratórios!
               </AlertDescription>
             </Alert>
           )}
-          {state.properties.length === 0 && (
-            <p className="rounded-lg border border-dashed border-white/10 p-4 text-center font-mono text-[11px] text-zinc-600">
-              Ainda não tens propriedades. Expande o teu império abaixo.
+          {props.length === 0 && (
+            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+              Ainda não tens propriedades — expande o teu império no mercado abaixo.
             </p>
           )}
-          {state.properties.map((p) => {
+          {props.length > 0 && sorted.length === 0 && (
+            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+              Nenhum imóvel com esse nome no património.
+            </p>
+          )}
+          {sorted.map((p) => {
             const pt = catalog?.property_types?.[p.type_key];
             if (!pt) return null;
-            const maxed = p.level >= (catalog?.property_max_level || 3);
-            const upgradeCost = Math.round(pt.price * 0.6 * (p.level + 1));
-            const sellValue = Math.round(pt.price * 0.7 * p.level);
+            const tier = propertyTier(pt);
+            const maxed = p.level >= maxLevel;
+            const upgradeCost = propertyUpgradeCost(pt, p.level, meta);
+            const sellValue = Math.round(pt.price * sellFrac * p.level);
             const originalName = `${pt.name} — ${p.district}`;
             const renamed = p.name !== originalName;
             const condition = p.condition ?? 100;
-            const upgrading = p.upgrading_until && Date.parse(p.upgrading_until) > serverNow();
+            const upgrading = isUpgrading(p);
             const upgradeRemaining = upgrading ? Math.max(0, (Date.parse(p.upgrading_until) - serverNow()) / 1000) : 0;
+            const upgradeDuration = (meta.upgrade_base_s ?? 0) + (meta.upgrade_per_level_s ?? 0) * (p.level + 1);
+            const maintDay = propertyMaintPerDay(pt, p.level, meta);
+            const stackRank = propertyStackRank(props, p);
+            const stackMult = propertyStackMult(stackRank, meta);
+            const stacks = stackRank > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
+            const paybackH = !maxed ? propertyUpgradePaybackH(pt, condition, upgradeCost) : null;
             return (
-              <Card key={p.id} data-testid={`property-card-${p.id}`} className="lus-card p-3 shadow-none">
-                <div className="flex items-center justify-between">
+              <Card key={p.id} data-testid={`property-card-${p.id}`} className="lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
+                {/* Cabeçalho: placa com emblema + identidade */}
+                <div className="relative z-[1] flex items-stretch gap-2.5">
+                  <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                    <PropertyGlyph typeKey={p.type_key} accent={tier.color} className="h-[44px] w-[96px]" />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-start justify-between gap-1.5">
                       <InlineRename
                         testId={`property-rename-${p.id}`} value={p.name} onSave={(name) => renameProperty(p.id, name)}
                         textClassName="text-sm font-bold text-white"
                       />
+                      <TierChip tier={tier} />
+                    </div>
+                    <p className="flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                      <MapPin size={9} className="shrink-0" /> {p.district}
                       {renamed && (
-                        <Tip tip="Nome original desta propriedade, antes de a renomeares.">
-                          <span data-testid={`property-original-tag-${p.id}`} className="shrink-0 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-zinc-500">
-                            {pt.name} · {p.district}
+                        <Tip tip="Tipo original desta propriedade, antes de a renomeares.">
+                          <span data-testid={`property-original-tag-${p.id}`} className="rounded bg-black/40 px-1 py-px text-zinc-400">{pt.name}</span>
+                        </Tip>
+                      )}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <LevelDots level={p.level} max={maxLevel} color={tier.color} />
+                      <Tip tip={`Manutenção diária deste imóvel: ${fmtMoney(maintDay)} (${((meta.maintenance_pct_per_day ?? 0.0015) * 100).toFixed(2)}% do preço × nível). Sem fundos, a condição cai ${meta.condition_decay_per_hour ?? 2}%/h; paga e recupera ${meta.condition_recovery_per_hour ?? 4}%/h.`}>
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                          <Wrench size={9} /> {fmtMoney(maintDay)}/dia
+                        </span>
+                      </Tip>
+                      {stacks && (
+                        <Tip tip={`${stackRank + 1}.ª unidade deste tipo (por ordem de compra) — rendimentos decrescentes do motor: esta unidade rende ${Math.round(stackMult * 100)}% do benefício.`}>
+                          <span data-testid={`property-stack-${p.id}`} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                            <Layers size={9} /> {stackRank + 1}.ª · {Math.round(stackMult * 100)}%
+                          </span>
+                        </Tip>
+                      )}
+                      {paybackH != null && !upgrading && (
+                        <Tip tip={`Payback da melhoria para N${p.level + 1}: ~${paybackH >= 48 ? `${Math.round(paybackH / 24)} dias` : `${Math.round(paybackH)}h`} de produção à condição atual — a mesma régua que o botão Otimizar usa para ordenar melhorias.`}>
+                          <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-cyan-400">
+                            <Timer size={9} /> payback {paybackH >= 48 ? `${Math.round(paybackH / 24)}d` : `${Math.round(paybackH)}h`}
                           </span>
                         </Tip>
                       )}
                     </div>
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                      Nível {"●".repeat(p.level)}{"○".repeat((catalog?.property_max_level || 3) - p.level)}
-                    </p>
                   </div>
                 </div>
-                <div className="mt-1.5">
-                  <Tip tip={`Condição: ${Math.round(condition)}% — degrada-se se não conseguires pagar a manutenção diária, e recupera enquanto a pagares. Abaixo de 100% os benefícios passivos rendem proporcionalmente menos.`} block>
-                    <div className="flex items-center gap-1.5">
-                      <Wrench size={9} className="shrink-0" style={{ color: condition < 50 ? "#EF4444" : "#34D399" }} />
-                      <MiniBar value={condition} color={condition < 50 ? "#EF4444" : "#34D399"} height="h-1" />
-                      <span className="shrink-0 font-mono text-[9px]" style={{ color: condition < 50 ? "#EF4444" : "#34D399" }}>{Math.round(condition)}%</span>
-                    </div>
-                  </Tip>
+
+                {/* Condição — alimenta diretamente o rendimento passivo */}
+                <div className="relative z-[1] mt-2">
+                  <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+                    <span>Condição</span>
+                    <Tip tip={`Condição ${Math.round(condition)}% — os benefícios passivos rendem proporcionalmente. Degrada-se ${meta.condition_decay_per_hour ?? 2}%/h sem manutenção paga e recupera ${meta.condition_recovery_per_hour ?? 4}%/h com ela em dia.`}>
+                      <span style={{ color: condition < 50 ? "#EF4444" : condition < 90 ? "#F59E0B" : "#34D399" }}>
+                        {Math.round(condition)}%{condition < 100 && ` · rende ${Math.round(condition)}%`}
+                      </span>
+                    </Tip>
+                  </div>
+                  <MiniBar value={condition} color={condition < 50 ? "#EF4444" : condition < 90 ? "#F59E0B" : "#34D399"} className="mt-0.5" />
                 </div>
+
+                {/* Benefício atual / em obras / próximo nível */}
                 {upgrading ? (
-                  <p data-testid={`property-upgrading-${p.id}`} className="mt-1.5 flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-cyan-400">
+                  <p data-testid={`property-upgrading-${p.id}`} className="relative z-[1] mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-cyan-400">
                     <Clock size={11} /> A melhorar para nível {p.level + 1} — pronto em {fmtDuration(upgradeRemaining)}
                   </p>
                 ) : (
-                  <p className="mt-1.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>
+                  <Tip tip="Benefício passivo atual deste imóvel ao nível e condição atuais." block>
+                    <p className="relative z-[1] mt-2 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>
+                  </Tip>
+                )}
+                {!maxed && !upgrading && (
+                  <p className="relative z-[1] mt-0.5 font-mono text-[10px] text-cyan-400/80">
+                    N{p.level + 1}: {propertyBenefit(pt, p.level + 1)}
+                  </p>
                 )}
                 {(p.total_dirty_generated > 0 || p.total_laundered > 0) && (
-                  <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
+                  <p className="relative z-[1] mt-1 font-mono text-[10px] text-zinc-500">
                     {p.total_dirty_generated > 0 && <>Gerado: <span className="text-amber-400">{fmtMoney(p.total_dirty_generated)}</span></>}
                     {p.total_dirty_generated > 0 && p.total_laundered > 0 && " · "}
                     {p.total_laundered > 0 && <>Lavado: <span className="text-emerald-400">{fmtMoney(p.total_laundered)}</span></>}
                   </p>
                 )}
-                {!maxed && !upgrading && (
-                  <p className="mt-1 font-mono text-[10px] text-cyan-400/80">
-                    Nível {p.level + 1}: {propertyBenefit(pt, p.level + 1)}
-                  </p>
-                )}
-                <div className="mt-2 flex gap-1.5">
+
+                <div className="relative z-[1] mt-2 flex gap-1.5">
                   <PurchaseButton
                     testId={`upgrade-property-${p.id}`}
                     icon={ArrowUpCircle}
@@ -139,7 +274,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       !upgrading && maxed ? "Nível máximo atingido." : null,
                       !upgrading && !maxed && state.player.clean_money < upgradeCost ? "Dinheiro insuficiente." : null,
                     ].filter(Boolean)}
-                    availableTip={`Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} (demora um tempo a ficar concluído) — benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`}
+                    availableTip={`Melhorar para o nível ${p.level + 1} por ${fmtMoney(upgradeCost)} — obras durante ${fmtDuration(upgradeDuration)}, benefício passa a: ${propertyBenefit(pt, p.level + 1)}.`}
                     onConfirm={() => upgradeProperty(p.id)}
                     className="flex-1"
                   />
@@ -155,7 +290,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     tip={
                       upgrading
                         ? "Não podes vender uma propriedade a meio de uma melhoria."
-                        : `Vender por ${fmtMoney(sellValue)} (70% do investido). Perdes o benefício imediatamente — cuidado com as capacidades. Ação irreversível.`
+                        : `Vender por ${fmtMoney(sellValue)} (${Math.round(sellFrac * 100)}% do investido). Perdes o benefício imediatamente — cuidado com as capacidades. Ação irreversível.`
                     }
                   />
                 </div>
@@ -165,31 +300,82 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
         </div>
 
         <div className="mt-6">
-          <SectionHeader icon={TrendingUp} title="Mercado imobiliário" />
+          <SectionHeader icon={Landmark} title="Mercado imobiliário" meta={catalog ? `${Object.keys(catalog.property_types || {}).length} tipos` : undefined} />
           <div className="space-y-2">
             {catalog &&
               Object.entries(catalog.property_types).map(([key, pt]) => {
+                const tier = propertyTier(pt);
                 const locked = state.player.level < pt.min_level;
-                const ownedOfType = state.properties.filter((pr) => pr.type_key === key).length;
+                const ownedOfType = props.filter((pr) => pr.type_key === key).length;
                 const roiDays = pt.dirty_per_h ? Math.ceil(pt.price / (pt.dirty_per_h * 24)) : null;
-                const diminished = ownedOfType > 0 && (pt.bonus_pct || pt.repair_discount_pct);
-                const nextStackPct = ownedOfType >= 2 ? 50 : 70;
+                const diminished = ownedOfType > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
+                const nextStackPct = Math.round(propertyStackMult(ownedOfType, meta) * 100);
+                const maintDay = propertyMaintPerDay(pt, 1, meta);
                 const buyTip = locked
                   ? `Desbloqueia ao nível ${pt.min_level} da organização.`
                   : `${fmtMoney(pt.price)} limpos — escolhes a localização exacta no mapa antes de pagar. Benefício imediato: ${propertyBenefit(pt, 1)}.${
-                      diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do bónus (rendimentos decrescentes).` : ""
+                      diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do benefício (rendimentos decrescentes).` : ""
                     }`;
                 return (
-                  <Card key={key} className="lus-card p-3 shadow-none">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-white">
-                        {pt.name}
-                        {locked && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 font-mono text-[9px] uppercase text-amber-400">
-                            <Lock size={9} /> Nível {pt.min_level}
+                  <Card key={key} data-testid={`market-card-${key}`} className={cn("lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
+                    <div className="relative z-[1] flex items-stretch gap-2.5">
+                      <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                        <PropertyGlyph typeKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
+                        {locked && <Lock size={13} className="absolute text-zinc-400" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <p className="truncate text-sm font-semibold text-white">{pt.name}</p>
+                          <TierChip tier={tier} />
+                        </div>
+                        <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                          {locked && (
+                            <span className="mr-1.5 inline-flex items-center gap-0.5 text-amber-400">
+                              <Lock size={9} /> nível {pt.min_level}
+                            </span>
+                          )}
+                          {pt.heat_per_h ? (
+                            <Tip tip={`Propriedade ilegal — gera +${pt.heat_per_h} de calor por hora por nível e pode ser alvo de rusgas acima de 70 de calor.`}>
+                              <span className="mr-1.5 inline-flex items-center gap-0.5 text-red-400">
+                                <Flame size={9} /> ilegal
+                              </span>
+                            </Tip>
+                          ) : null}
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-zinc-500">{pt.desc}</p>
+                      </div>
+                    </div>
+
+                    <Tip tip="Benefício passivo ao nível 1 — cada nível seguinte multiplica estes valores." block>
+                      <p className="relative z-[1] mt-2 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, 1)}</p>
+                    </Tip>
+
+                    <div className="relative z-[1] mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                      <Tip tip={`Manutenção diária ao nível 1: ${fmtMoney(maintDay)} — debitada automaticamente; sem fundos, a condição degrada-se e o imóvel rende menos.`}>
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
+                          <Wrench size={9} /> {fmtMoney(maintDay)}/dia
+                        </span>
+                      </Tip>
+                      {roiDays != null && (
+                        <Tip tip={`Retorno do investimento em ~${roiDays} dias de produção contínua a 100% de condição.`}>
+                          <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-cyan-400">
+                            <Timer size={9} /> ROI ~{roiDays}d
                           </span>
-                        )}
-                      </p>
+                        </Tip>
+                      )}
+                      {diminished && (
+                        <Tip tip={`Rendimentos decrescentes: já tens ${ownedOfType} unidade(s) deste tipo — a próxima rende ${nextStackPct}% do benefício.`}>
+                          <span data-testid={`market-stack-${key}`} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                            <Layers size={9} /> próxima {nextStackPct}%
+                          </span>
+                        </Tip>
+                      )}
+                    </div>
+
+                    <div className="relative z-[1] mt-2 flex items-center justify-between gap-2">
+                      {ownedOfType > 0 ? (
+                        <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">no património: <span className="text-zinc-300">{ownedOfType}</span></span>
+                      ) : <span />}
                       <PurchaseButton
                         testId={`buy-property-${key}`}
                         label={fmtMoney(pt.price)}
@@ -204,16 +390,6 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                         className="w-auto shrink-0"
                       />
                     </div>
-                    <p className="mt-1 text-[10px] text-zinc-500">{pt.desc}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, 1)}</p>
-                    {roiDays != null && (
-                      <p className="mt-0.5 font-mono text-[10px] text-cyan-400">Retorno estimado: ~{roiDays} dias de produção</p>
-                    )}
-                    {diminished && (
-                      <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-amber-400">
-                        Já tens {ownedOfType} — próxima unidade rende {nextStackPct}% do bónus
-                      </p>
-                    )}
                   </Card>
                 );
               })}

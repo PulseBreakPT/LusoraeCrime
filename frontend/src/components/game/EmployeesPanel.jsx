@@ -3,8 +3,9 @@ import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, STATUS_LABELS,
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
-  matchesSearch, conditionBand, weaponCompatibility,
+  matchesSearch, conditionBand, weaponCompatibility, employeeAdequacy,
 } from "../../lib/game";
+import { cn } from "../../lib/utils";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, EmptyState, SectionHeader } from "./hud";
@@ -133,8 +134,8 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const idle = e.status === "idle";
 
   return (
-    <Card data-testid={`employee-card-${e.id}`} className="lus-card p-3 shadow-none">
-      <div className="flex items-start justify-between gap-2">
+    <Card data-testid={`employee-card-${e.id}`} className="lus-card lus-doss-card p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
+      <div className="relative z-[1] flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
@@ -211,7 +212,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
         </p>
       )}
 
-      <div className="mt-2 grid grid-cols-5 gap-1">
+      <div className="relative z-[1] mt-2 grid grid-cols-5 gap-1">
         {Object.entries(e.attrs || {}).map(([k, v]) => {
           const key = (sp.attrs || []).includes(k);
           return (
@@ -228,8 +229,27 @@ const EmployeeCard = ({ e, onNavigate }) => {
         })}
       </div>
 
+      {/* Aptidão por categoria de operação — a MESMA régua de team_effectiveness
+          (atributo relevante ponderado 60/40 × match de especialização). */}
+      <div data-testid={`emp-adequacy-${e.id}`} className="relative z-[1] mt-1.5 grid grid-cols-5 gap-1">
+        {employeeAdequacy(e, catalog).map((c) => (
+          <Tip
+            key={c.category}
+            tip={`${c.label}: aptidão ${Math.round(c.score * 100)}%${c.best ? " — especialização deste operacional (match ×1.25 no motor)" : ""}. ${c.attrs.length ? `Pondera ${c.attrs.map((a) => ATTR_FULL[a] || a).join(" + ")} — ` : ""}a mesma régua da eficácia de missão e do botão Otimizar.`}
+            block
+          >
+            <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
+              <p className={cn("truncate text-center font-mono text-[8px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+                {c.label.slice(0, 3)}
+              </p>
+              <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
+            </div>
+          </Tip>
+        ))}
+      </div>
+
       {(e.talents || []).length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
+        <div className="relative z-[1] mt-1.5 flex flex-wrap gap-1">
           {e.talents.map((t) => (
             <Tip key={t} tip={catalog.talents[t]?.desc}>
               <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300">
@@ -501,7 +521,7 @@ const CandidateCard = ({ c }) => {
 };
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, refreshPool, startPlacement, restEmployee, favoriteEmployeeIds } = useGame();
+  const { state, catalog, serverNow, refreshPool, startPlacement, restEmployee, favoriteEmployeeIds, optimizeEmployees } = useGame();
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
@@ -523,6 +543,15 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
   const restAllIds = state.employees.filter((e) => e.status === "idle" && e.fatigue >= 15).map((e) => e.id);
   const restAll = () => restAllIds.forEach((id) => restEmployee(id));
+
+  // QI do efetivo — o Otimizar preenche vagas de equipas disponíveis com quem
+  // está de fora, por aptidão à especialização (nunca move membros entre equipas).
+  const teamMax = catalog.team_max_members || 4;
+  const freeIdleCount = state.employees.filter((e) => e.status === "idle" && !e.team_id).length;
+  const openTeamsCount = state.teams.filter(
+    (t) => t.status === "idle" && state.employees.filter((e) => e.team_id === t.id).length < teamMax
+  ).length;
+  const canOptimize = freeIdleCount > 0 && openTeamsCount > 0;
 
   const searched = state.employees.filter((e) =>
     matchesSearch(query, e.name, catalog.specializations[e.role_key]?.name || e.role_key)
@@ -674,6 +703,23 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                       className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
                     />
                   </div>
+                  <Tip tip={canOptimize
+                    ? `Coloca os ${freeIdleCount} operacional(is) sem equipa nas ${openTeamsCount} equipa(s) com vagas, maximizando a aptidão à especialização — a mesma régua da eficácia de missão (atributo ponderado 60/40 × match ×1.25 × nível). Nunca move membros entre equipas (protege o entrosamento); colocar novos membros reinicia a coordenação da equipa.`
+                    : freeIdleCount === 0 ? "Nenhum operacional disponível sem equipa para colocar." : "Nenhuma equipa disponível com vagas."}>
+                    <button
+                      data-testid="employees-optimize"
+                      onClick={() => canOptimize && optimizeEmployees()}
+                      disabled={!canOptimize}
+                      className={cn(
+                        "flex shrink-0 items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                        canOptimize
+                          ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
+                          : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+                      )}
+                    >
+                      <Sparkles size={11} /> Otimizar
+                    </button>
+                  </Tip>
                   <Tip tip={hideUnavailable ? "A mostrar só disponíveis (e favoritos) — clica para ver todos." : "A mostrar todos — clica para esconder indisponíveis."}>
                     <Button
                       data-testid="employees-toggle-unavailable"
@@ -686,14 +732,14 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     </Button>
                   </Tip>
                   {restAllIds.length > 0 && (
-                    <Tip tip={`Manda descansar todos os operacionais disponíveis com fadiga (${restAllIds.length}).`}>
+                    <Tip tip={`Manda descansar todos os operacionais disponíveis com fadiga (${restAllIds.length}) — cada um recupera 50 de fadiga e +5 de moral.`}>
                       <Button
                         data-testid="employees-rest-all"
                         variant="outline"
                         onClick={restAll}
                         className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 hover:bg-white/5"
                       >
-                        <BedDouble size={11} /> Descansar todos
+                        <BedDouble size={11} /> {restAllIds.length}
                       </Button>
                     </Tip>
                   )}

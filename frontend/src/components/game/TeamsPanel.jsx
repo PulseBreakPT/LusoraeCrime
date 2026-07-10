@@ -17,7 +17,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from ".
 import {
   Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2,
   AlertTriangle, Activity, Target, Clock, PartyPopper, Crown, Gauge, Stethoscope, Scale,
-  Brain, Flame, TrendingDown, Link2, FlaskConical,
+  Brain, Flame, TrendingDown, Link2, FlaskConical, Sparkles,
 } from "lucide-react";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
@@ -181,6 +181,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     state, catalog, serverNow, createTeam, recallTeam, assignEmployee, assignVehicle,
     refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
     recommendRepeatForTeam, favoriteTeamIds, toggleFavoriteTeam, justReturnedTeamIds,
+    optimizeEmployees, optimizeVehicles,
   } = useGame();
   const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
@@ -261,6 +262,19 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const freeEmployees = state.employees.filter((e) => !e.team_id && e.status === "idle");
   const freeVehicles = state.vehicles.filter((v) => !v.team_id && !v.transfer);
   const nav = (p) => onNavigate && onNavigate(p);
+
+  // QI das equipas — o Otimizar compõe as duas réguas do backend num comando:
+  // preenche as vagas com os operacionais mais aptos (/employees/optimize) e
+  // redistribui os veículos pela melhor adequação (/vehicles/optimize).
+  const idleTeamsList = state.teams.filter((t) => t.status === "idle");
+  const openSlotTeams = idleTeamsList.filter((t) => membersOf(t.id).length < teamMaxMembers).length;
+  const canOptEmployees = freeEmployees.length > 0 && openSlotTeams > 0;
+  const canOptVehicles = state.vehicles.length > 0 && idleTeamsList.length > 0;
+  const canOptimize = canOptEmployees || canOptVehicles;
+  const optimizeTeams = async () => {
+    if (canOptEmployees) await optimizeEmployees();
+    if (canOptVehicles) await optimizeVehicles();
+  };
 
   const readiness = (t, members, vehicle) => {
     if (t.status !== "idle") return { ok: false, reason: STATUS_LABELS[t.status] || "Ocupada" };
