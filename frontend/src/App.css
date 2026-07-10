@@ -2766,3 +2766,185 @@ html:has(.lus-page-bg) {
     .lus-auth-feature { transition: none; }
 }
 
+/* ==================== SSS — Últimos registos (ActivityFeed) ==================== */
+
+/* Fila de chips de filtro — scroll horizontal sem scrollbar visível. */
+.lus-feed-chiprow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lus-feed-chiprow::-webkit-scrollbar {
+    display: none;
+}
+
+.lus-feed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #a1a1aa;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lus-feed-chip:hover {
+    color: #e4e4e7;
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.lus-feed-chip.is-active {
+    border-color: rgba(239, 68, 68, 0.55);
+    background: linear-gradient(180deg, rgba(220, 38, 38, 0.28), rgba(127, 29, 29, 0.18));
+    color: #fecaca;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lus-feed-chip-n {
+    color: #71717a;
+    font-weight: 700;
+}
+
+.lus-feed-chip.is-active .lus-feed-chip-n {
+    color: #fca5a5;
+}
+
+/* Quadrado tingido do ícone de cada registo (cor inline vinda do classifyEvent). */
+.lus-feed-ico {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Linha de registo — acento lateral por severidade via ::before. */
+.lus-feed-row {
+    position: relative;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+}
+
+.lus-feed-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: transparent;
+}
+
+.lus-feed-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.lus-feed-row[data-sev="crit"]::before { background: rgba(239, 68, 68, 0.75); }
+.lus-feed-row[data-sev="warn"]::before { background: rgba(245, 158, 11, 0.6); }
+.lus-feed-row[data-sev="pos"]::before { background: rgba(52, 211, 153, 0.55); }
+.lus-feed-row[data-sev="gold"]::before { background: rgba(251, 191, 36, 0.55); }
+
+.lus-feed-row[data-sev="crit"] {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+.lus-feed-row[data-sev="crit"]:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Separador temporal (Agora / Últimos 10 min / Última hora / ...). */
+.lus-feed-sep {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 2px 2px;
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #52525b;
+}
+
+.lus-feed-sep::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent);
+}
+
+/* Badge de registos não lidos — pulso vermelho tático. */
+.lus-feed-unread {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    background: linear-gradient(180deg, rgba(220, 38, 38, 0.85), rgba(153, 27, 27, 0.85));
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.35);
+    animation: lus-feed-unread-pulse 2s ease-in-out infinite;
+}
+
+@keyframes lus-feed-unread-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(220, 38, 38, 0.25); }
+    50% { box-shadow: 0 0 14px rgba(220, 38, 38, 0.5); }
+}
+
+/* Contador ×N de eventos repetidos colapsados. */
+.lus-feed-xn {
+    padding: 0 4px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.07);
+    color: #d4d4d8;
+    font-weight: 700;
+}
+
+/* Botão de ícone pequeno (expandir/reduzir altura). */
+.lus-feed-iconbtn {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #a1a1aa;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.lus-feed-iconbtn:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-feed-unread {
+        animation: none;
+    }
+
+    .lus-feed-chip,
+    .lus-feed-row,
+    .lus-feed-iconbtn {
+        transition: none;
+    }
+}
+
