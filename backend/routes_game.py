@@ -9,7 +9,8 @@ from datetime import timedelta
 
 from db import db
 from auth import get_current_user
-from geo import is_valid_hq_location
+from geo import (is_valid_hq_location, is_in_portugal, in_water_body,
+                 distance_to_boundary_m)
 from geocode import reverse_geocode, street_label, locality_label
 from world_gen import generate_district_points, name_districts_task, ensure_naming_scheduled
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
@@ -2186,6 +2187,95 @@ async def optimize_properties(user: dict = Depends(get_current_user)):
 
 
 # ---------------- Quartel-General ----------------
+
+# Margem mínima de terra firme entre o QG e a costa/fronteira — protege
+# contra a margem de erro do polígono simplificado junto ao mar (mesma
+# régua do geo.is_valid_hq_location).
+HQ_MIN_INLAND_M = 120.0
+
+
+class HqPlaceInput(BaseModel):
+    lat: float
+    lng: float
+
+
+def _hq_location_verdict(lat: float, lng: float):
+    """Razão exata pela qual um ponto (não) serve para o QG — alimenta o
+    feedback específico do ecrã de escolha. Regra do jogo: em Portugal
+    (continente, Madeira ou Açores), NUNCA no mar/estuários/albufeiras e
+    afastado da linha de costa pelo menos ~120 m."""
+    if not (math.isfinite(lat) and math.isfinite(lng)
+            and -90.0 <= lat <= 90.0 and -180.0 <= lng <= 180.0):
+        return False, "Coordenadas inválidas."
+    if not is_in_portugal(lat, lng):
+        return False, ("Este ponto está fora de território português — mar ou estrangeiro. "
+                       "O Quartel-General tem de ficar em terra firme de Portugal "
+                       "(continente, Madeira ou Açores).")
+    if in_water_body(lat, lng):
+        return False, ("Este ponto está na água — estuário, ria ou albufeira. "
+                       "O Quartel-General precisa de terra firme.")
+    if distance_to_boundary_m(lat, lng) < HQ_MIN_INLAND_M:
+        return False, ("Demasiado colado à linha de costa ou fronteira — recua um pouco "
+                       "para o interior (mínimo ~120 m de terra firme).")
+    return True, ""
+
+
+@router.post("/hq/validate")
+async def validate_hq_spot(body: HqPlaceInput, user: dict = Depends(get_current_user)):
+    """Validação em direto de um ponto candidato a QG (onboarding). Devolve a
+    razão exata quando inválido; quando válido, devolve o nome REAL do local
+    (Nominatim com cache Mongo — nunca inventa nomes)."""
+    valid, reason = _hq_location_verdict(body.lat, body.lng)
+    label, locality = None, None
+    if valid:
+        g = await reverse_geocode(db, body.lat, body.lng, zoom=16)
+        label = street_label(g)
+        locality = locality_label(g)
+    return {"valid": valid, "reason": reason or None, "label": label, "locality": locality}
+
+
+@router.post("/hq/place")
+async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
+    """Coloca o PRIMEIRO Quartel-General (onboarding de conta nova). Regras
+    estritas: só uma vez; só em terra firme portuguesa — o mar é estritamente
+    proibido. Gera as zonas de operação em anéis à volta do QG e agenda o
+    batismo com moradas reais em background; as missões começam a aparecer
+    assim que a primeira zona tem nome."""
+    player = await get_player(user, allow_pending=True)
+    if player.get("hq"):
+        raise HTTPException(status_code=409, detail="O Quartel-General já está estabelecido — não pode ser mudado.")
+    valid, reason = _hq_location_verdict(body.lat, body.lng)
+    if not valid or not is_valid_hq_location(body.lat, body.lng, min_inland_m=HQ_MIN_INLAND_M):
+        raise HTTPException(status_code=422, detail=reason or "Localização inválida para o Quartel-General.")
+    lat, lng = round(float(body.lat), 6), round(float(body.lng), 6)
+
+    # Nome real do local (melhor esforço — sem rede fica o rótulo genérico;
+    # nunca inventamos moradas).
+    g = await reverse_geocode(db, lat, lng, zoom=16)
+    label = street_label(g)
+    region = locality_label(g) or ""
+    hq_name = f"QG · {label}" if label else "Quartel-General"
+
+    districts = generate_district_points(lat, lng)
+    now_iso = now_utc().isoformat()
+    hq = {"name": hq_name, "lat": lat, "lng": lng, "level": 1,
+          "upgrading_until": None, "upgrade_history": []}
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "hq": hq, "districts": districts, "region": region,
+        "hq_placed_at": now_iso,
+        # Reset do relógio do motor: o tempo parado no onboarding não conta
+        # como tempo de jogo (salários, decaimentos, spawns).
+        "last_tick": now_iso,
+    }})
+    pid = str(player["_id"])
+    where = label or f"{lat:.4f}, {lng:.4f}"
+    suffix = f" ({region})" if region and region not in where else ""
+    await add_event(db, pid, "system",
+                    f"Quartel-General estabelecido em {where}{suffix}. A rede está a mapear as zonas de operação em redor.")
+    # Batismo das zonas com moradas reais em background (Nominatim ~1 req/s).
+    asyncio.create_task(name_districts_task(db, player["_id"]))
+    return {"ok": True, "hq": hq, "region": region, "districts": len(districts)}
+
 
 @router.post("/hq/upgrade")
 async def upgrade_hq(user: dict = Depends(get_current_user)):

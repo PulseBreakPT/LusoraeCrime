@@ -67,9 +67,12 @@ async def migrate_v2():
             "v2": True, "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0,
         }})
     await db.players.update_many({"stats": {"$exists": False}}, {"$set": {"stats": default_stats()}})
-    await db.players.update_many({"hq.level": {"$exists": False}}, {"$set": {
-        "hq.level": 1, "hq.upgrading_until": None, "hq.upgrade_history": [],
-    }})
+    # Nota: contas em onboarding têm hq=null (ainda sem QG escolhido) — o
+    # filtro exige um hq objeto para não tentar criar campos dentro de null.
+    await db.players.update_many(
+        {"hq": {"$type": "object"}, "hq.level": {"$exists": False}},
+        {"$set": {"hq.level": 1, "hq.upgrading_until": None, "hq.upgrade_history": []}},
+    )
     await db.players.update_many({"priorities": {"$exists": False}}, {"$set": {
         "priorities": {"active": HQ_DEFAULT_PRIORITY},
     }})

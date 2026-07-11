@@ -15,7 +15,7 @@ import string
 from datetime import datetime, timezone
 
 # Configuration - UPDATED URL
-BASE_URL = "https://quartel-quest.preview.emergentagent.com/api"
+BASE_URL = "https://mission-hub-159.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@lusorae.com"
 ADMIN_PASSWORD = "LusoraeAdmin2026!"
 
