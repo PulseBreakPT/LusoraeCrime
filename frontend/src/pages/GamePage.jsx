@@ -17,6 +17,7 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
+import { DisclaimerModal } from "../components/game/DisclaimerModal";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
@@ -332,6 +333,11 @@ export default function GamePage() {
           onClose={() => setOperationId(null)}
         />
       )}
+
+      {/* Disclaimer de ficção — mostrado uma vez por sessão de login, por cima
+          de toda a UI (z-[130]); "Sim" regista o compromisso e liberta o jogo,
+          "Não" leva a um ecrã de recusa com logout seguro. */}
+      <DisclaimerModal />
     </div>
   );
 }

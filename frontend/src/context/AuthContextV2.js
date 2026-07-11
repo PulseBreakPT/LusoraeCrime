@@ -5,6 +5,18 @@ import { useBoot } from "./BootContext";
 
 const AuthContext = createContext(null);
 
+// Disclaimer de ficção ("é apenas um jogo") — a flag vive em sessionStorage e
+// é limpa em cada login/registo/logout/expiração de sessão, para que o aviso
+// reapareça a CADA login (mas não em cada refresh a meio da mesma sessão).
+export const DISCLAIMER_SESSION_KEY = "lusorae_disclaimer_ack";
+const clearDisclaimerFlag = () => {
+  try {
+    sessionStorage.removeItem(DISCLAIMER_SESSION_KEY);
+  } catch (_err) {
+    // sessionStorage indisponível — sem consequências, o modal mostra-se sempre
+  }
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [gameState, setGameState] = useState(null);
@@ -148,6 +160,8 @@ export function AuthProvider({ children }) {
           localStorage.setItem("lusorae_access_token", res.data.access_token);
           localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
         }
+        // Novo login → o disclaimer de ficção volta a ser mostrado no mapa.
+        clearDisclaimerFlag();
 
         // Start boot sequence
         await startBoot(performBoot);
@@ -172,6 +186,8 @@ export function AuthProvider({ children }) {
           localStorage.setItem("lusorae_access_token", res.data.access_token);
           localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
         }
+        // Conta nova → primeira entrada no mapa também mostra o disclaimer.
+        clearDisclaimerFlag();
 
         // Start boot sequence
         await startBoot(performBoot);
@@ -203,6 +219,7 @@ export function AuthProvider({ children }) {
     }
     localStorage.removeItem("lusorae_access_token");
     localStorage.removeItem("lusorae_refresh_token");
+    clearDisclaimerFlag();
     setUser(null);
     setGameState(null);
     setCatalog(null);
@@ -242,6 +259,7 @@ export function AuthProvider({ children }) {
   // limpa o estado e devolve o utilizador ao ecrã de login com aviso.
   useEffect(() => {
     const onExpired = () => {
+      clearDisclaimerFlag();
       setUser(false);
       setGameState(null);
       setCatalog(null);

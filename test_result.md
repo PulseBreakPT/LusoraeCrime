@@ -111,6 +111,17 @@ user_problem_statement: >
   Retry-After, refresh automático de sessão expirada).
 
 backend:
+  - task: "POST /api/legal/disclaimer-ack (autenticado) — regista resposta ao disclaimer de ficção {accepted, at, version 1.0, ip} em last_disclaimer + histórico disclaimer_log ($slice -20) no doc do utilizador; 401 sem auth. Infra: backend/.env e frontend/.env recriados 11/07 (reset de ambiente pós-fork) — MONGO_URL, DB_NAME=test_database, CORS_ORIGINS explícito com preview URL, JWT_SECRET novo"
+    implemented: true
+    working: NA
+    file: "backend/routes_legal.py, backend/.env, frontend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "11/07/2026 — Smoke test por curl OK: login admin, disclaimer-ack devolve {ok:true, version:1.0, accepted:true}, registo cria conta nova (teste.env@lusorae.com / TesteEnv123). Falta teste formal: accepted:false, 401 sem token, persistência last_disclaimer/disclaimer_log no MongoDB."
   - task: "Documentos legais versionados + changelog data-driven (legal_data.py) e rotas públicas GET /api/legal/meta, /api/legal/documents/{terms|privacy|rgpd}, /api/legal/changelog (routes_legal.py)"
     implemented: true
     working: NA
@@ -157,6 +168,17 @@ backend:
         comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
+  - task: "DisclaimerModal ('é só um jogo') mostrado a cada login quando o mapa aparece — alertdialog z-[130] com compromisso explícito; 'Sim, compreendo — é só um jogo' → regista ack no backend + sessionStorage e liberta o jogo; 'Não concordo' → ecrã 'Compromisso necessário' com 'Reler o aviso' ou 'Terminar sessão' (logout + recusa registada); flag limpa em login/register/logout/expiração no AuthContextV2 (reaparece a cada login, não em refresh); testids: disclaimer-overlay, disclaimer-accept, disclaimer-decline, disclaimer-declined-view, disclaimer-reconsider, disclaimer-exit"
+    implemented: true
+    working: NA
+    file: "frontend/src/components/game/DisclaimerModal.jsx, frontend/src/context/AuthContextV2.js, frontend/src/pages/GamePage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "11/07/2026 — Implementado; ainda sem verificação visual. NOTA para testes E2E: o modal bloqueia toda a UI do jogo após login — clicar disclaimer-accept antes de interagir com o mapa/painéis."
   - task: "Central da rede — fusão do 'Em direto' (LiveOpsDock) e 'Últimos registos' (ActivityFeed) num só painel com separadores EM DIRETO/REGISTOS (desktop canto inferior esquerdo, mobile barra única); auto-switch para EM DIRETO ao despachar equipa; LiveOpsDock.jsx refeito como LiveOpsPanel embutível (sem Shell/posicionamento próprio) com estado vazio tático"
     implemented: true
     working: true
@@ -342,15 +364,25 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Documentos legais versionados + changelog data-driven (legal_data.py) e rotas públicas GET /api/legal/meta, /api/legal/documents/{terms|privacy|rgpd}, /api/legal/changelog (routes_legal.py)"
-    - "Registo com aceitação obrigatória de termos (accept_terms) + registo de aceitação {accepted_at, terms_version, privacy_version, ip} no doc do utilizador; política de password forte no servidor (8+ chars, minúscula, maiúscula, número); sanitização org_name (whitespace, chars proibidos <>{}[]\\/;`); unicidade case-insensitive do nome da organização; DuplicateKeyError tratado (índice único email)"
-    - "POST /api/auth/check-availability {email?, org_name?} → {valid, available} para validação em tempo real no registo"
-    - "Login lockout 429 com header Retry-After (segundos restantes) para countdown no frontend; change-password com nova política de password"
+    - "POST /api/legal/disclaimer-ack (autenticado) — regista resposta ao disclaimer de ficção {accepted, at, version 1.0, ip} em last_disclaimer + histórico disclaimer_log ($slice -20) no doc do utilizador; 401 sem auth. Infra: backend/.env e frontend/.env recriados 11/07 (reset de ambiente pós-fork) — MONGO_URL, DB_NAME=test_database, CORS_ORIGINS explícito com preview URL, JWT_SECRET novo"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: >
+      11/07/2026 — (1) INFRA: .env de backend+frontend recriados após reset de ambiente
+      (preview d659bcdf-9bf2-4790-8c09-7b3c263608fc); JWT_SECRET novo → sessões antigas
+      invalidadas; admin seed OK (admin@lusorae.com / admin123 — ver /app/memory/test_credentials.md).
+      (2) NOVO: disclaimer de ficção a cada login. Backend: POST /api/legal/disclaimer-ack
+      (Bearer/cookie) body {accepted: bool} → guarda {accepted, at ISO, version "1.0", ip} em
+      users.last_disclaimer + push em users.disclaimer_log (cap 20) e devolve
+      {ok, version, accepted}. Testar: accepted true/false, 401 sem token, persistência no Mongo.
+      Frontend: modal DisclaimerModal em GamePage — NOS TESTES E2E é preciso clicar
+      data-testid="disclaimer-accept" logo após o login para desbloquear a UI do jogo.
+      Endpoints legais GET existentes não mudaram de comportamento. Testar backend primeiro;
+      frontend só com autorização do utilizador.
   - agent: "main"
     message: >
       08/07/2026 — Redesenho AAA da autenticação. BACKEND NOVO: legal_data.py (termos/privacidade/rgpd
