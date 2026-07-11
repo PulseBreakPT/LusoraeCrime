@@ -204,6 +204,10 @@ export const QUEST_STATUS_COLORS = {
 
 export const DIFFICULTY_LABELS = { facil: "Fácil", normal: "Normal", dificil: "Difícil", elite: "Elite", lendaria: "Lendária" };
 
+// SSS v3 — tiers adaptativos do sistema de missões (quest_perf.tier)
+export const QUEST_TIER_LABELS = { 0: "Iniciado", 1: "Profissional", 2: "Veterano", 3: "Lenda" };
+export const QUEST_TIER_COLORS = { 0: "#A1A1AA", 1: "#22D3EE", 2: "#C084FC", 3: "#F59E0B" };
+
 export const DIFFICULTY_COLORS = { facil: "#34D399", normal: "#22D3EE", dificil: "#F59E0B", elite: "#C084FC", lendaria: "#F43F5E" };
 
 export const CHAPTER_LABELS = {
@@ -327,6 +331,273 @@ export function weaponCompatibility(emp, wm) {
   return { compatible: missing.length === 0, missing };
 }
 
+// ---------------- QI das Armas (SSS v5) — espelho EXATO do motor ----------------
+// Todas as fórmulas abaixo replicam engine.py (weapon_combat_score,
+// weapon_condition_factor, weapon_jam_risk, _weapon_skill_factor,
+// weapon_compatibility_factor, weapon_effective_score) usando as constantes
+// expostas em /catalog (weapon_meta + weapon_category_weights) — o que o
+// jogador vê no arsenal é a MESMA régua que a chance de missão usa.
+
+export const WEAPON_TIERS = {
+  rua: { label: "Rua", color: "#A1A1AA" },
+  profissional: { label: "Profissional", color: "#22D3EE" },
+  militar: { label: "Militar", color: "#C084FC" },
+  pesado: { label: "Pesado", color: "#F59E0B" },
+};
+
+export function weaponTier(wm) {
+  const lvl = wm?.min_level || 1;
+  const key = lvl >= 6 ? "pesado" : lvl >= 4 ? "militar" : lvl >= 2 ? "profissional" : "rua";
+  return { key, ...WEAPON_TIERS[key] };
+}
+
+// As 6 dimensões do score de combate — a mesma decomposição que
+// WEAPON_CATEGORY_WEIGHTS pondera por categoria de operação.
+export const WEAPON_STATS = [
+  { key: "power", label: "Potência", tip: "Poder de fogo bruto — decisivo em assaltos e operações especiais." },
+  { key: "accuracy", label: "Precisão", tip: "Probabilidade de acertar à primeira — vale ouro em operações técnicas e de influência." },
+  { key: "range", label: "Alcance", tip: "Distância útil — operações técnicas e especiais valorizam ataque à distância." },
+  { key: "lightness", label: "Leveza", tip: "Inverso do peso — armas leves movem-se depressa e escondem-se melhor." },
+  { key: "use_speed", label: "Velocidade", tip: "Rapidez de uso/cadência — crítica quando a operação corre mal." },
+  { key: "magazine", label: "Carregador", tip: "Capacidade de munições (escala até 30) — sustenta operações longas." },
+];
+
+export function weaponStatValue(wm, key) {
+  if (!wm) return 0;
+  if (key === "lightness") return Math.max(0, 100 - (wm.weight || 0));
+  if (key === "magazine") return Math.min(100, Math.round(((wm.magazine_capacity || 0) / 30) * 100));
+  return Math.min(100, wm[key] || 0);
+}
+
+// Espelho de engine.weapon_combat_score: score 0-1 ponderado pela categoria.
+export function weaponCombatScore(wm, category, categoryWeights) {
+  const all = categoryWeights || {};
+  const weights = all[category] || all["logistica"] || {};
+  if (!wm || !Object.keys(weights).length) return 0;
+  const power = (wm.power || 0) / 100;
+  const accuracy = (wm.accuracy || 0) / 100;
+  const rng = (wm.range || 0) / 100;
+  const lightness = 1 - Math.min(1, (wm.weight || 0) / 100);
+  const speed = (wm.use_speed || 0) / 100;
+  const magazine = Math.min(1, (wm.magazine_capacity || 0) / 30);
+  return (
+    power * (weights.power || 0) + accuracy * (weights.accuracy || 0)
+    + rng * (weights.range || 0) + lightness * (weights.lightness || 0)
+    + speed * (weights.speed || 0) + magazine * (weights.magazine || 0)
+  );
+}
+
+// Espelho de engine.weapon_condition_factor: linear até ao joelho
+// (condition_soft_knee), quadrática abaixo — a 20% a arma é quase sucata.
+export function weaponConditionFactor(condition, meta) {
+  const knee = ((meta && meta.condition_soft_knee) ?? 40) / 100;
+  const c = Math.max(0, Math.min(100, condition ?? 100)) / 100;
+  if (c >= knee || knee <= 0) return c;
+  return c * (c / knee);
+}
+
+// Espelho de engine.weapon_jam_risk: fiabilidade do modelo + défice de
+// condição abaixo do limiar. Armas sem mecanismo (faca/taser) nunca encravam.
+export function weaponJamRisk(wm, condition, meta) {
+  if (!wm) return 0;
+  if ((wm.magazine_capacity || 0) < 2 && !wm.loud) return 0;
+  const m = meta || {};
+  const rel = Math.max(0, Math.min(100, wm.reliability ?? 100)) / 100;
+  let risk = (1 - rel) * (m.jam_reliability_weight ?? 0.4);
+  const cond = Math.max(0, Math.min(100, condition ?? 100));
+  const thr = m.jam_condition_threshold ?? 60;
+  if (cond < thr) risk += ((thr - cond) / thr) * (m.jam_condition_weight ?? 0.25);
+  return Math.max(0, Math.min(m.jam_max ?? 0.35, risk));
+}
+
+// Espelho de engine._weapon_skill_factor: a arma certa na mão errada rende
+// pouco — eficácia escala com o atributo relevante do portador.
+export function weaponSkillInfo(emp, wm, meta) {
+  const m = meta || {};
+  const floor = m.skill_floor ?? 0.55;
+  const cap = m.skill_attr_cap ?? 8;
+  const reqs = wm?.requires_attr || {};
+  const attr = Object.keys(reqs)[0] || (wm?.loud ? "tiro" : "discricao");
+  const value = (emp?.attrs || {})[attr] ?? 2;
+  const factor = floor + (1 - floor) * Math.min(1, value / cap);
+  return { attr, value, factor };
+}
+
+// Espelho de engine.weapon_compatibility_factor: sinal suave, nunca bloqueio.
+export function weaponCompatFactor(emp, wm, meta) {
+  const reqs = wm?.requires_attr || {};
+  const keys = Object.keys(reqs);
+  if (!keys.length) return 1;
+  const attrs = emp?.attrs || {};
+  let shortfall = 0;
+  keys.forEach((k) => {
+    const v = attrs[k] || 0;
+    if (v < reqs[k]) shortfall += (reqs[k] - v) / Math.max(1, reqs[k]);
+  });
+  if (shortfall <= 0) return 1;
+  return Math.max((meta && meta.compatibility_min_factor) ?? 0.4, 1 - shortfall * 0.3);
+}
+
+// Espelho de engine.weapon_effective_score: qualidade do modelo × adequação
+// best_for × condição × fiabilidade × compatibilidade × habilidade + proficiência.
+export function weaponEffectiveScore(emp, weaponDoc, wm, category, catalog) {
+  if (!wm) return 0;
+  const meta = catalog?.weapon_meta || {};
+  const score = weaponCombatScore(wm, category, catalog?.weapon_category_weights);
+  const bestForMult = (wm.best_for || []).includes(category) ? 1.3 : 0.7;
+  const condition = weaponConditionFactor(weaponDoc?.condition ?? 100, meta);
+  const reliability = (wm.reliability ?? 100) / 100;
+  const compat = weaponCompatFactor(emp, wm, meta);
+  const skill = weaponSkillInfo(emp, wm, meta).factor;
+  const profMax = meta.proficiency_max ?? 100;
+  const prof = (emp?.weapon_proficiency || {})[wm.category] || 0;
+  const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
+  return score * bestForMult * condition * reliability * compat * skill * (meta.combat_score_scale ?? 0.15) + profBonus;
+}
+
+// Desgaste base de condição por missão deste modelo (antes do risco da
+// operação): wear_per_mission × durability_wear_ref / durability.
+export function weaponWearPerMission(wm, meta) {
+  const m = meta || {};
+  const base = m.wear_per_mission ?? 3;
+  const ref = m.durability_wear_ref ?? 70;
+  return base * (ref / Math.max(1, wm?.durability || ref));
+}
+
+// Adequação 0-1 por categoria de operação (score de combate × multiplicador
+// best_for) — para as 5 mini-barras "adequação por operação" dos cartões.
+export const WEAPON_OP_CATEGORIES = ["assalto", "tecnica", "especial", "influencia", "logistica"];
+
+export function weaponAdequacy(wm, catalog) {
+  return WEAPON_OP_CATEGORIES.map((cat) => {
+    const best = (wm?.best_for || []).includes(cat);
+    const score = weaponCombatScore(wm, cat, catalog?.weapon_category_weights) * (best ? 1.3 : 0.7);
+    return { category: cat, label: SPEC_LABELS[cat] || cat, score: Math.max(0, Math.min(1, score)), best };
+  });
+}
+
+// ============ QI das Equipas (SSS v4) — espelhos EXATOS do engine.py ============
+// Todas as fórmulas replicam os modificadores do motor com as réguas expostas
+// em catalog.team_meta — a UI mostra os MESMOS números que a chance de missão usa.
+
+export const TEAM_TIERS = {
+  recruta: { label: "Recruta", color: "#A1A1AA" },
+  operacional: { label: "Operacional", color: "#22D3EE" },
+  veterana: { label: "Veterana", color: "#C084FC" },
+  lendaria: { label: "Lendária", color: "#F59E0B" },
+};
+
+// Tier da unidade pela experiência real: os degraus alinham com as rampas do
+// motor (8 ops = entrosamento máximo em prática, 25 = mestria de categoria).
+export function teamTier(missionsDone) {
+  const n = missionsDone || 0;
+  const key = n >= 60 ? "lendaria" : n >= 25 ? "veterana" : n >= 8 ? "operacional" : "recruta";
+  return { key, ...TEAM_TIERS[key] };
+}
+
+// Espelho de engine.mod_team_momentum: série de vitórias dá bónus capado,
+// série de falhas penaliza; só conta a partir de |streak| >= 2.
+export function teamMomentum(streak, meta) {
+  const m = meta || {};
+  const s = streak || 0;
+  if (s >= 2) {
+    return { state: "hot", streak: s, pct: Math.min(m.momentum_bonus_max ?? 0.06, (m.momentum_bonus_per_win ?? 0.012) * s) };
+  }
+  if (s <= -2) {
+    return { state: "cold", streak: s, pct: -Math.min(m.momentum_penalty_max ?? 0.06, (m.momentum_penalty_per_loss ?? 0.02) * -s) };
+  }
+  return { state: "neutral", streak: s, pct: 0 };
+}
+
+// Espelho de engine.mod_team_coordination: 50% tempo de plantel estável +
+// 50% operações feitas com este plantel; mudar membros reinicia ambos.
+export function teamCoordination(team, meta, nowMs) {
+  const m = meta || {};
+  const rampS = m.coordination_ramp_s ?? 21600;
+  const rampMissions = m.coordination_ramp_missions ?? 8;
+  let timeFrac = 0;
+  if (team?.roster_stable_since) {
+    const stableS = Math.max(0, (nowMs - Date.parse(team.roster_stable_since)) / 1000);
+    timeFrac = Math.min(1, stableS / rampS);
+  }
+  const missions = team?.roster_missions || 0;
+  const missionFrac = Math.min(1, missions / rampMissions);
+  const max = m.coordination_bonus_max ?? 0.05;
+  const pct = max * (0.5 * timeFrac + 0.5 * missionFrac);
+  return { timeFrac, missionFrac, missions, rampMissions, pct, max };
+}
+
+// Espelho de engine.mod_team_familiarity: a equipa aprende por categoria —
+// curva sqrt (ganhos rápidos no início, mestria lenta), só conta a partir
+// da 3.ª operação, capada na mestria.
+export function teamFamiliarity(count, meta) {
+  const m = meta || {};
+  const min = m.familiarity_min_missions ?? 3;
+  const ramp = m.familiarity_ramp_missions ?? 25;
+  const max = m.familiarity_bonus_max ?? 0.05;
+  const c = count || 0;
+  const frac = Math.min(1, c / ramp);
+  const active = c >= min;
+  return { count: c, frac, pct: active ? max * Math.sqrt(frac) : 0, mastery: c >= ramp, active, min, ramp, max };
+}
+
+// Ordem fixa das 5 categorias de operação para a fila de familiaridade.
+export const TEAM_OP_CATEGORIES = ["assalto", "logistica", "tecnica", "influencia", "especial"];
+
+// Papéis a bordo (SSS v4) — espelho da deteção do dispatch (_prepare_dispatch):
+// líder por patente (clutch save = clutch_max × sangue-frio/10), médico e
+// advogado por role_key, condutor pelo melhor atributo de condução (reduz
+// viagem e melhora a fuga), estratega por inteligência >= limiar.
+export function teamRoles(members, meta, ranks) {
+  const m = meta || {};
+  const list = members || [];
+  const rankList = ranks && ranks.length ? ranks : ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"];
+  const leaderIdx = rankList.indexOf(m.leader_min_rank || "chefe_equipa");
+  const leaders = leaderIdx >= 0 ? list.filter((e) => rankList.indexOf(e.rank) >= leaderIdx) : [];
+  const leaderCool = leaders.reduce((a, e) => Math.max(a, (e.attrs || {}).sangue_frio || 0), 0);
+  const clutchPct = (m.clutch_save_max ?? 0.18) * Math.max(0, Math.min(1, leaderCool / 10));
+  const bestDriver = list.reduce((a, e) => Math.max(a, (e.attrs || {}).conducao || 0), 0);
+  const dBase = m.driver_attr_baseline ?? 5;
+  const driverActive = bestDriver > dBase;
+  const travelPct = driverActive
+    ? Math.min(m.driver_travel_reduction_max ?? 0.12, (bestDriver - dBase) * (m.driver_travel_reduction_per_point ?? 0.024))
+    : 0;
+  const escapePct = driverActive
+    ? Math.min(m.driver_escape_bonus_max ?? 0.06, (bestDriver - dBase) * (m.driver_escape_bonus_per_point ?? 0.012))
+    : 0;
+  const bestInt = list.reduce((a, e) => Math.max(a, (e.attrs || {}).inteligencia || 0), 0);
+  return {
+    leader: { present: leaders.length > 0, cool: leaderCool, clutchPct },
+    medic: { present: list.some((e) => e.role_key === "medico") },
+    lawyer: { present: list.some((e) => e.role_key === "advogado") },
+    driver: { value: bestDriver, active: driverActive, travelPct, escapePct },
+    strategist: { present: bestInt >= (m.strategist_min_int ?? 7), intel: bestInt },
+  };
+}
+
+// Espelho de engine.mod_team_synergy: cobertura dos atributos-chave da
+// categoria pelos melhores membros (60%) + diversidade de papéis (40%),
+// centrada num baseline — só composições complementares ganham.
+export function teamSynergy(members, category, meta) {
+  const list = members || [];
+  if (list.length < 2) return null;
+  const m = meta || {};
+  const catAttrs = (m.category_attrs || {})[category];
+  const bestOf = (k) => list.reduce((mx, e) => Math.max(mx, (e.attrs || {})[k] ?? 2), 0);
+  let coverage;
+  if (catAttrs && catAttrs.length) {
+    coverage = catAttrs.reduce((a, k) => a + bestOf(k), 0) / (catAttrs.length * 10);
+  } else {
+    const best = ["forca", "inteligencia", "discricao", "conducao", "tiro", "hack", "negociacao", "sangue_frio", "resistencia"]
+      .map(bestOf).sort((a, b) => b - a);
+    coverage = (best[0] + best[1] + best[2]) / 30;
+  }
+  const diversity = new Set(list.map((e) => e.role_key)).size / list.length;
+  const raw = 0.6 * coverage + 0.4 * diversity - (m.synergy_baseline ?? 0.62);
+  const pct = Math.max(-1, Math.min(1, raw / (m.synergy_spread ?? 0.38))) * (m.synergy_max ?? 0.03);
+  return { coverage, diversity, pct };
+}
+
 export function parseActivityMessage(message) {
   const React = require('react');
   const parts = [];
@@ -427,6 +698,18 @@ export function fmtMoney(n) {
     return new Intl.NumberFormat("pt-PT", { notation: "compact", maximumFractionDigits: 1 }).format(val) + " €";
   }
   return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 0 }).format(val) + " €";
+}
+
+// Formato ultra-curto para HUDs estreitos (mobile): 75 000 → "75k €",
+// 5 400 → "5,4k €", 1 250 000 → "1,25M €". Nunca trunca com reticências.
+export function fmtMoneyShort(n) {
+  const val = Math.round(n || 0);
+  const sign = val < 0 ? "-" : "";
+  const abs = Math.abs(val);
+  const trim = (x, d) => x.toFixed(d).replace(".", ",").replace(/,?0+$/, "");
+  if (abs >= 1_000_000) return `${sign}${trim(abs / 1_000_000, 2)}M €`;
+  if (abs >= 1_000) return `${sign}${trim(abs / 1_000, 1)}k €`;
+  return `${sign}${abs} €`;
 }
 
 export function haversineM(lat1, lng1, lat2, lng2) {
@@ -802,3 +1085,141 @@ export function formatApiErrorDetail(detail) {
   if (detail && typeof detail.msg === "string") return detail.msg;
   return String(detail);
 }
+
+// ============ QI da Frota (SSS v6) — espelhos EXATOS do engine.py ============
+// Réguas expostas em catalog.fleet_meta/vehicle_category_weights — a UI mostra
+// os MESMOS números que a chance de missão e a física de viagem usam.
+
+export const VEHICLE_TIERS = {
+  rua: { label: "Rua", color: "#A1A1AA" },
+  profissional: { label: "Profissional", color: "#22D3EE" },
+  executiva: { label: "Executiva", color: "#C084FC" },
+  elite: { label: "Elite", color: "#F59E0B" },
+};
+
+export function vehicleTier(vm) {
+  const lvl = vm?.min_level || 1;
+  const key = lvl >= 5 ? "elite" : lvl >= 4 ? "executiva" : lvl >= 2 ? "profissional" : "rua";
+  return { key, ...VEHICLE_TIERS[key] };
+}
+
+// Espelho de engine.vehicle_mission_score: velocidade+discrição ponderadas
+// pela categoria (VEHICLE_CATEGORY_WEIGHTS) — nenhum veículo é "sempre melhor".
+export function vehicleMissionScore(vm, category, weights) {
+  const all = weights || {};
+  const w = all[category] || all["logistica"] || {};
+  const denom = (w.speed || 0) + (w.discretion || 0);
+  if (!vm || denom <= 0) return 0;
+  const speed = Math.min(1, (vm.speed || 0) / 26);
+  const discretion = (vm.discretion ?? 50) / 100;
+  return (speed * (w.speed || 0) + discretion * (w.discretion || 0)) / denom;
+}
+
+// Adequação 0-1 por categoria de operação (score do motor × realce best_for)
+// para as 5 mini-barras dos cartões — mesma leitura visual das armas.
+export function vehicleAdequacy(vm, catalog) {
+  return TEAM_OP_CATEGORIES.map((cat) => {
+    const best = (vm?.best_for || []).includes(cat);
+    const raw = vehicleMissionScore(vm, cat, catalog?.vehicle_category_weights);
+    const score = best ? Math.min(1, raw * 1.25) : (vm?.best_for?.length ? raw * 0.85 : raw);
+    return { category: cat, label: SPEC_LABELS[cat] || cat, score: Math.max(0, Math.min(1, score)), best };
+  });
+}
+
+// Espelho de engine.effective_speed: curva contínua da condição
+// (floor + span × (condição/100)^exp) — um veículo a 65% já se ressente.
+export function vehicleSpeedFactor(condition, meta) {
+  const floor = meta?.speed_floor ?? 0.6;
+  const exp = meta?.speed_curve_exp ?? 0.9;
+  const c = Math.max(0, Math.min(100, condition ?? 100)) / 100;
+  return floor + (1 - floor) * Math.pow(c, exp);
+}
+
+// ============ QI do Património (SSS v6) — espelhos do motor passivo ============
+
+export const PROPERTY_TIERS = {
+  bairro: { label: "Bairro", color: "#A1A1AA" },
+  cidade: { label: "Cidade", color: "#22D3EE" },
+  sindicato: { label: "Sindicato", color: "#C084FC" },
+  imperial: { label: "Imperial", color: "#F59E0B" },
+};
+
+export function propertyTier(pt) {
+  const lvl = pt?.min_level || 1;
+  const key = lvl >= 4 ? "imperial" : lvl >= 3 ? "sindicato" : lvl >= 2 ? "cidade" : "bairro";
+  return { key, ...PROPERTY_TIERS[key] };
+}
+
+// Espelho de engine.property_stack_ranks/mult: a 1.ª unidade de cada tipo
+// (pela data de compra) rende o bónus cheio, as seguintes rendem menos.
+export function propertyStackRank(properties, prop) {
+  const same = (properties || [])
+    .filter((p) => p.type_key === prop.type_key)
+    .sort((a, b) => String(a.bought_at || "").localeCompare(String(b.bought_at || "")));
+  const idx = same.findIndex((p) => p.id === prop.id);
+  return idx < 0 ? 0 : idx;
+}
+
+export function propertyStackMult(rank, meta) {
+  const arr = meta?.stack_diminish || [1.0, 0.7, 0.5];
+  return arr[Math.min(rank, arr.length - 1)];
+}
+
+export function propertyUpgradeCost(pt, level, meta) {
+  return Math.round((pt?.price || 0) * (meta?.upgrade_cost_pct ?? 0.6) * (level + 1));
+}
+
+// Custo de manutenção diário do imóvel (espelho de _process_property_maintenance).
+export function propertyMaintPerDay(pt, level, meta) {
+  return (pt?.price || 0) * (level || 1) * (meta?.maintenance_pct_per_day ?? 0.0015);
+}
+
+// Payback em horas de subir 1 nível (só imóveis produtivos; lavagem devolve 90%).
+export function propertyUpgradePaybackH(pt, condition, cost) {
+  const rate = (pt?.dirty_per_h || 0) + (pt?.launder_per_h || 0) * 0.9;
+  const gain = rate * Math.max(0, Math.min(100, condition ?? 100)) / 100;
+  return gain > 0 ? cost / gain : null;
+}
+
+// ============ QI do Efetivo (SSS v6) — aptidão por categoria ============
+// Espelho da régua de team_effectiveness: atributo relevante ponderado
+// (1.º atributo 60%, 2.º 40%) × match de especialização (×1.25 no motor).
+export function employeeAdequacy(emp, catalog) {
+  const catAttrs = catalog?.team_meta?.category_attrs || {};
+  return TEAM_OP_CATEGORIES.map((cat) => {
+    const aks = catAttrs[cat] || [];
+    const attrs = emp?.attrs || {};
+    let attr;
+    if (aks.length === 2) attr = (attrs[aks[0]] ?? 2) * 0.6 + (attrs[aks[1]] ?? 2) * 0.4;
+    else if (aks.length) attr = aks.reduce((a, k) => a + (attrs[k] ?? 2), 0) / aks.length;
+    else {
+      const vs = Object.values(attrs);
+      attr = vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : 2;
+    }
+    const best = emp?.spec === cat;
+    const score = Math.max(0, Math.min(1, (attr / 10) * (best || cat === "especial" ? 1.15 : 1)));
+    return { category: cat, label: SPEC_LABELS[cat] || cat, score, best, attrs: aks };
+  });
+}
+
+// ============ QI dos Contratos (SSS v6) — decomposição do multiplicador ============
+// Espelho de quests.compute_quest_mult com as réguas de catalog.quest_meta —
+// decompõe o reward_mult que o backend envia nos seus fatores.
+export function questMultBreakdown(player, q, meta) {
+  const m = meta || {};
+  const level = Math.max(1, player?.level || 1);
+  const lvl = 1 + (m.level_money_slope ?? 0.15) * (level - 1);
+  const diff = (m.difficulty_mults || {})[q?.difficulty] ?? 1;
+  const tierN = player?.quest_perf?.tier || 0;
+  const tier = 1 + (m.tier_bonus ?? 0.08) * tierN;
+  const streakCount = player?.quest_streak?.count || 0;
+  const streakApplies = (q?.type === "diaria" || q?.type === "semanal") && streakCount > 0;
+  const streak = streakApplies
+    ? 1 + Math.min(m.streak_bonus_max ?? 0.4, (m.streak_bonus ?? 0.04) * streakCount)
+    : 1;
+  return {
+    level: lvl, difficulty: diff, tier, tierN, streak, streakCount,
+    speedBonus: m.speed_bonus ?? 0.1, cap: m.total_mult_cap ?? 4,
+  };
+}
+

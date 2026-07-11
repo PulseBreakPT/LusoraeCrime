@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import {
@@ -9,11 +9,10 @@ import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { ScrollArea } from "../ui/scroll-area";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown, Video } from "lucide-react";
 import { audio } from "../../lib/audio";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
@@ -29,6 +28,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [confirmLowChance, setConfirmLowChance] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const previewRef = useRef(null);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
   // Nunca devolve vazio — QG é sempre o fallback quando a missão não tem propriedade de origem.
@@ -72,6 +72,15 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     const id = setTimeout(() => setConfirmLowChance(false), 4000);
     return () => clearTimeout(id);
   }, [confirmLowChance]);
+
+  // O corpo do cartão é rolável em ecrãs baixos — quando o preview de
+  // probabilidade chega (ou os detalhes expandem), garante que fica visível
+  // sem o jogador ter de perceber que há scroll.
+  useEffect(() => {
+    if ((preview || showDetails) && previewRef.current) {
+      previewRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [preview, showDetails]);
 
   // Ao abrir uma oportunidade, pré-seleciona automaticamente a equipa com maior
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
@@ -146,7 +155,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     setBusy(true);
     const res = await dispatchTeam(opp.id, selectedTeamId);
     setBusy(false);
-    if (res.ok) onClose();
+    if (res.ok) {
+      const teamName = state.teams.find((t) => t.id === selectedTeamId)?.name;
+      window.dispatchEvent(new CustomEvent("lus:dispatch-stamp", { detail: { team: teamName } }));
+      onClose();
+    }
   };
 
   const anyReady = state.teams.some((t) => readiness(t).ok);
@@ -195,15 +208,23 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   return (
     <Card
       data-testid="opportunity-card"
-      className="pointer-events-auto absolute bottom-20 left-2 right-2 z-30 mx-auto max-w-sm animate-slide-up border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl"
+      style={{
+        "--mk": color,
+        bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
+        maxHeight: "min(calc(100dvh - 10rem), 40rem)",
+      }}
+      className="lus-opp-card pointer-events-auto absolute left-2 right-2 z-30 mx-auto flex max-w-sm animate-slide-up flex-col lus-panel p-4 shadow-2xl"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex shrink-0 items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md" style={{ background: `${color}22`, color }}>
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-md border"
+            style={{ background: `${color}1e`, color, borderColor: `${color}44`, boxShadow: `0 0 16px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.08)` }}
+          >
             <Icon size={18} />
           </span>
           <div>
-            <h3 className="text-sm font-bold text-white">{opp.name}</h3>
+            <h3 className="font-display text-base font-bold uppercase leading-tight tracking-wide text-white">{opp.name}</h3>
             <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               {opp.district} · {SPEC_LABELS[opp.category]}
             </p>
@@ -226,6 +247,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         </div>
       </div>
 
+      {/* Corpo rolável único — em ecrãs baixos (preview + detalhes expandidos)
+          tudo continua acessível; o cabeçalho e o botão de despacho ficam
+          sempre fixos e visíveis. */}
+      <div className="-mr-2 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
       <div className="mt-2 flex flex-wrap gap-1">
         <Chip icon={MapPin} value={`${(distM / 1000).toFixed(1)} km`} color="#22D3EE"
           tip="Distância do QG ao alvo — determina o tempo de viagem e o combustível gasto (ida e volta)." />
@@ -318,6 +343,17 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               ? "Um carro-patrulha segue a equipa. Se apanhados antes do QG, perdem toda a carga."
               : "A operação está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
           </p>
+          <Button
+            data-testid="opportunity-camera-button"
+            variant="outline"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: activeMission.id } }));
+              onClose();
+            }}
+            className="mt-2 w-full gap-1.5 border-red-500/30 font-bold uppercase tracking-wider text-red-300 hover:border-red-400/60 hover:text-red-200"
+          >
+            <Video size={13} /> Câmara da operação
+          </Button>
           {activeMission.phase === "en_route" && (
             <Button
               data-testid="recall-team-button"
@@ -340,8 +376,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         <p className="mt-3 text-center font-mono text-xs text-red-500">Requer nível {opp.min_level}</p>
       ) : (
         <>
-          <ScrollArea className="mt-3 h-36">
-            <div className="space-y-1 pr-3">
+          <div className="mt-3 max-h-36 overflow-y-auto overscroll-contain">
+            <div className="space-y-1 pr-1.5">
               {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
                   jogador não precisa de percorrer bloqueadas para achar a boa. */}
               {[...state.teams]
@@ -363,7 +399,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                     className={`flex w-full flex-col gap-1 rounded-md border px-2.5 py-1.5 text-left shadow-none transition-colors ${
                       selectedTeamId === t.id
                         ? "border-primary/50 bg-primary/10"
-                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+                        : "lus-card hover:bg-white/[0.07]"
                     } ${r.ok ? "cursor-pointer" : ""}`}
                   >
                     <div className="flex w-full items-center justify-between gap-2">
@@ -432,7 +468,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
           {!anyReady && (
             <p className="mt-2 text-center font-mono text-[10px] text-zinc-500">
               Nenhuma equipa operacional — verifica membros, combustível e condição
@@ -448,7 +484,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             }
             const categoryOrder = Object.keys(MODIFIER_CATEGORY_LABELS).filter((cat) => byCategory[cat]?.length);
             return (
-              <Card data-testid="dispatch-preview" className="mt-2 animate-slide-up border-white/10 bg-white/[0.03] p-2.5 shadow-none">
+              <Card ref={previewRef} data-testid="dispatch-preview" className="mt-2 animate-slide-up lus-card p-2.5 shadow-none">
                 <div className="flex items-baseline justify-between">
                   <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
                   <div className="flex items-center gap-1.5">
@@ -553,23 +589,29 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               </Card>
             );
           })()}
+        </>
+      )}
+      </div>
+      {/* Botão de despacho ancorado fora do corpo rolável — a ação principal
+          nunca sai do ecrã, independentemente do tamanho do conteúdo. */}
+      {!(inProgress && activeMission) && !policeAlert && !lockedByLevel && (
           <Tip tip={confirmLowChance ? "Probabilidade muito baixa — clica outra vez para confirmar mesmo assim." : null} block>
             <Button
               data-testid="dispatch-team-button"
               onClick={handleDispatch}
               disabled={!selectedTeamId || busy}
-              className={`mt-3 w-full font-bold uppercase tracking-wider ${
+              variant={!selectedTeamId || busy || confirmLowChance ? "outline" : "success"}
+              className={`mt-3 w-full shrink-0 font-bold uppercase tracking-wider ${
                 !selectedTeamId || busy
-                  ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  ? "border-red-500/30 bg-red-500/10 from-transparent to-transparent text-red-400 shadow-none hover:bg-red-500/20"
                   : confirmLowChance
-                  ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
-                  : "bg-success text-success-foreground shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-success/90"
+                  ? "border-amber-500/50 bg-gradient-to-b from-amber-500/30 to-amber-600/20 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.25)] hover:border-amber-400/70 hover:from-amber-500/40 hover:to-amber-600/30 hover:text-amber-200"
+                  : ""
               }`}
             >
               {busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}
             </Button>
           </Tip>
-        </>
       )}
     </Card>
   );
@@ -577,7 +619,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
 const Metric = ({ icon: Icon, label, value, color, tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full border-white/10 bg-white/[0.03] p-2 shadow-none">
+    <Card className="h-full lus-card p-2 shadow-none">
       <div className="flex items-center gap-1">
         <Icon size={10} style={{ color }} />
         <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>

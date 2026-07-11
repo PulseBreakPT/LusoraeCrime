@@ -1,6 +1,6 @@
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
-import { Tip } from "./hud";
+import { Tip, PanelKicker, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -64,9 +64,7 @@ const RecommendedActions = ({ onNavigate }) => {
 
   return (
     <div className="mt-4" data-testid="intel-recommendations">
-      <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-        <Lightbulb size={12} className="text-amber-400" /> Ações recomendadas
-      </h3>
+      <SectionHeader icon={Lightbulb} title="Ações recomendadas" meta={recs.length > 0 ? `${recs.length}` : null} />
       {recs.length === 0 ? (
         <Alert className="border-emerald-500/20 bg-emerald-500/5 py-2">
           <AlertDescription className="font-mono text-[11px] text-emerald-400">
@@ -76,7 +74,7 @@ const RecommendedActions = ({ onNavigate }) => {
       ) : (
         <div className="space-y-1.5">
           {recs.map((r) => (
-            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 border-white/10 bg-white/[0.03] px-3 py-2 shadow-none">
+            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 lus-card px-3 py-2 shadow-none">
               <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
               <Button
                 data-testid={`intel-rec-action-${r.id}`}
@@ -120,12 +118,14 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
+          <PanelWatermark icon={BrainCircuit} />
+          <PanelKicker>Informação · Análise</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <BrainCircuit size={18} className="text-primary" /> Central de Inteligência
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Toda a informação da organização, num só lugar.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Quem sabe primeiro, age primeiro — números, alertas e histórico da rede.</SheetDescription>
         </SheetHeader>
 
         <RecommendedActions onNavigate={onNavigate} />
@@ -217,11 +217,15 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Section title="Registo de operações" testId="intel-history">
           {state.history.length === 0 && (
-            <p className="font-mono text-[11px] text-zinc-600">Nenhuma operação concluída ainda.</p>
+            <EmptyState
+              title="Historial em branco"
+              sub="As primeiras operações concluídas escrevem-se aqui — seleciona um alvo no mapa e despacha uma equipa."
+              testId="intel-history-empty"
+            />
           )}
           <div className="space-y-1">
             {state.history.map((m) => (
-              <Card key={m.id} className="flex items-center justify-between border-white/10 bg-white/[0.03] px-2.5 py-1.5 shadow-none">
+              <Card key={m.id} className="flex items-center justify-between lus-card px-2.5 py-1.5 shadow-none">
                 <div>
                   <p className="text-xs font-semibold text-white">
                     {m.opportunity.name} <span className="font-mono text-[9px] text-zinc-500">{m.opportunity.district}</span>
@@ -249,8 +253,8 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 };
 
 const Section = ({ title, testId, children }) => (
-  <div className="mt-5" data-testid={testId}>
-    <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">{title}</h3>
+  <div className="mt-6" data-testid={testId}>
+    <SectionHeader title={title} />
     {children}
   </div>
 );
@@ -259,7 +263,7 @@ const Grid = ({ children }) => <div className="grid grid-cols-2 gap-2">{children
 
 const Cell = ({ label, value, color = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full border-white/10 bg-white/[0.03] p-2.5 shadow-none">
+    <Card className="h-full lus-card p-2.5 shadow-none">
       <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
     </Card>

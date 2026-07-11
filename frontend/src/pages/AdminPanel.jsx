@@ -8,11 +8,29 @@ import { Input } from "../components/ui/input";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, Unlock, RotateCcw, Zap } from "lucide-react";
+import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, RotateCcw, Zap, ArrowLeft, Eye, Shield, Crown, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
+
+const ROLE_META = {
+  player: { label: "Jogador", icon: UserIcon, badge: "border-zinc-500/40 bg-zinc-500/10 text-zinc-300" },
+  moderator: { label: "Moderador", icon: Shield, badge: "border-blue-500/40 bg-blue-500/10 text-blue-300" },
+  admin: { label: "Admin", icon: Crown, badge: "border-amber-500/40 bg-amber-500/10 text-amber-300" },
+};
+
+const RoleBadge = ({ role }) => {
+  const meta = ROLE_META[role] || ROLE_META.player;
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline" className={`gap-1 font-mono text-[10px] uppercase ${meta.badge}`}>
+      <Icon size={11} /> {meta.label}
+    </Badge>
+  );
+};
 
 export default function AdminPanel() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const isStaff = user?.role === "admin" || user?.role === "moderator";
   const [dashboard, setDashboard] = useState(null);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -26,9 +44,9 @@ export default function AdminPanel() {
   const [resetForm, setResetForm] = useState({ keep_level: false });
   const [banForm, setBanForm] = useState({ reason: "" });
 
-  // Verificar se é admin
+  // Só a equipa de gestão (admin/moderador) pode estar aqui
   useEffect(() => {
-    if (user && user.role !== "admin") {
+    if (user && user.role !== "admin" && user.role !== "moderator") {
       window.location.href = "/";
     }
   }, [user]);
@@ -142,28 +160,19 @@ export default function AdminPanel() {
     }
   };
 
-  const handleGrantAdmin = async () => {
+  const handleSetRole = async (role) => {
+    const label = ROLE_META[role]?.label || role;
+    if (!window.confirm(`Definir a função deste utilizador como "${label}"?`)) return;
     try {
-      await api.post(`/admin/user/${selectedUser}/grant-admin`, {});
-      toast.success("Utilizador promovido a administrador!");
+      const { data } = await api.post(`/admin/user/${selectedUser}/role`, { role });
+      toast.success(data.message || `Função atualizada para ${label}`);
       handleSelectUser(selectedUser);
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Erro ao promover utilizador");
+      toast.error(e.response?.data?.detail || "Erro ao alterar função");
     }
   };
 
-  const handleRevokeAdmin = async () => {
-    if (!window.confirm("Tem certeza? Este utilizador perderá acesso ao painel administrativo.")) return;
-    try {
-      await api.post(`/admin/user/${selectedUser}/revoke-admin`, {});
-      toast.success("Acesso de administrador removido!");
-      handleSelectUser(selectedUser);
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Erro ao remover acesso de administrador");
-    }
-  };
-
-  if (user?.role !== "admin") {
+  if (!isStaff) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Alert className="w-96 border-red-500/50 bg-red-500/10">
@@ -175,15 +184,33 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-black to-zinc-950 p-6">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-black to-zinc-950 p-3 sm:p-6">
       <div className="mx-auto max-w-7xl">
         {/* Cabeçalho */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-            <Settings className="h-8 w-8 text-amber-500" />
-            Painel Administrativo
-          </h1>
-          <p className="text-zinc-500 mt-1">Gestão de utilizadores, recursos e servidor</p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:mb-8">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-white sm:gap-3 sm:text-4xl">
+              <Settings className="h-6 w-6 shrink-0 text-amber-500 sm:h-8 sm:w-8" />
+              <span className="truncate">Painel Administrativo</span>
+            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-sm text-zinc-500 sm:text-base">Gestão de utilizadores, recursos e servidor</p>
+              {!isAdmin && (
+                <Badge variant="outline" className="gap-1 border-blue-500/40 bg-blue-500/10 font-mono text-[10px] uppercase text-blue-300" data-testid="readonly-badge">
+                  <Eye size={11} /> Modo leitura
+                </Badge>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { window.location.href = "/"; }}
+            className="shrink-0 gap-1.5 border-white/10 bg-black/40 text-zinc-300 hover:text-white"
+            data-testid="back-to-game-button"
+          >
+            <ArrowLeft size={14} /> Voltar ao jogo
+          </Button>
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
@@ -284,17 +311,15 @@ export default function AdminPanel() {
                         : "bg-black/30 border border-white/5 hover:border-white/20"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-white font-semibold">{u.email}</p>
-                        <p className="text-zinc-500 text-sm">{u.name}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-white font-semibold">{u.email}</p>
+                        <p className="truncate text-zinc-500 text-sm">{u.name}</p>
                       </div>
-                      <div className="text-right">
-                        <Badge variant={u.role === "admin" ? "default" : "secondary"} className="mb-1">
-                          {u.role}
-                        </Badge>
+                      <div className="shrink-0 text-right">
+                        <RoleBadge role={u.role} />
                         {u.player_id && (
-                          <p className="text-amber-400 font-mono text-xs">Nível {u.player_level}</p>
+                          <p className="mt-1 text-amber-400 font-mono text-xs">Nível {u.player_level}</p>
                         )}
                       </div>
                     </div>
@@ -342,7 +367,7 @@ export default function AdminPanel() {
                     </div>
                     <div>
                       <p className="text-zinc-500">Função</p>
-                      <Badge>{userDetails.user.role}</Badge>
+                      <RoleBadge role={userDetails.user.role} />
                     </div>
                     <div>
                       <p className="text-zinc-500">Criado em</p>
@@ -416,7 +441,7 @@ export default function AdminPanel() {
                         placeholder="0"
                       />
                     </div>
-                    <Button onClick={handleGrantResources} className="w-full bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleGrantResources} variant="success" className="w-full">
                       Conceder
                     </Button>
                   </div>
@@ -441,7 +466,7 @@ export default function AdminPanel() {
                     <p className="text-zinc-500 text-xs">
                       Isto vai limpar todas as equipas, operacionais, veículos, propriedades e operações.
                     </p>
-                    <Button onClick={handleResetProgress} className="w-full bg-orange-600 hover:bg-orange-700">
+                    <Button onClick={handleResetProgress} variant="outline" className="w-full border-orange-500/50 bg-gradient-to-b from-orange-500 to-orange-700 text-white hover:border-orange-400/70 hover:from-orange-400 hover:to-orange-600 hover:text-white">
                       <RotateCcw size={16} className="mr-2" />
                       Resetar Tudo
                     </Button>
@@ -455,7 +480,7 @@ export default function AdminPanel() {
                     {userDetails.user.role === "admin" ? (
                       <>
                         <p className="text-green-400 text-sm font-semibold">✓ Utilizador é administrador</p>
-                        <Button onClick={handleRevokeAdmin} className="w-full bg-amber-600 hover:bg-amber-700">
+                        <Button onClick={handleRevokeAdmin} variant="outline" className="w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white">
                           <Lock size={16} className="mr-2" />
                           Remover Admin
                         </Button>
@@ -463,7 +488,7 @@ export default function AdminPanel() {
                     ) : (
                       <>
                         <p className="text-zinc-400 text-sm">Utilizador é jogador normal</p>
-                        <Button onClick={handleGrantAdmin} className="w-full bg-green-600 hover:bg-green-700">
+                        <Button onClick={handleGrantAdmin} variant="success" className="w-full">
                           <Unlock size={16} className="mr-2" />
                           Tornar Admin
                         </Button>
@@ -486,7 +511,7 @@ export default function AdminPanel() {
                           placeholder="Ex: Comportamento abusivo, spam, etc..."
                         />
                       </div>
-                      <Button onClick={handleBanUser} className="w-full bg-red-600 hover:bg-red-700">
+                      <Button onClick={handleBanUser} variant="destructive" className="w-full">
                         <Lock size={16} className="mr-2" />
                         Banir Utilizador
                       </Button>

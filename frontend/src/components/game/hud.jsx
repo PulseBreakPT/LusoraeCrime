@@ -14,19 +14,44 @@ import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
 const SIDE_ALIGN_OFFSET = { top: 6, bottom: 6, left: 6, right: 6 };
 
+// Deteção de ambiente com rato real (hover + ponteiro fino). Em ecrãs táteis o
+// browser emula mouseenter/click no toque, o que fazia os tooltips abrirem e
+// ficarem presos no ecrã sempre que se tocava num botão de ação.
+const hasFinePointer = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
 // Radix Tooltip só abre com hover/foco — em ecrãs táteis (sem hover) isso
 // deixa os ícones/textos informativos sem forma de mostrar a explicação.
 // Popover resolve isto: abre ao clicar/tocar (e continua a abrir com hover
 // no ambiente secretário), fecha ao clicar fora — tal como funcionava antes.
+// Regra tátil: se o conteúdo do Tip for um elemento interativo (botão/link),
+// o toque executa apenas a ação — o tooltip não abre nem fica preso. Chips e
+// células meramente informativas continuam a abrir a explicação com um toque.
 export const Tip = ({ tip, side = "top", align = "center", block = false, className = "", children }) => {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const interactiveRef = useRef(false);
+  useEffect(() => {
+    if (triggerRef.current) {
+      interactiveRef.current = !!triggerRef.current.querySelector(
+        'button, a, [role="button"], input, select, textarea'
+      );
+    }
+  });
   if (!tip || getDisplayPrefs().showTooltips === false) return children;
+  const handleOpenChange = (o) => {
+    if (o && !hasFinePointer() && interactiveRef.current) return;
+    setOpen(o);
+  };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <span
+          ref={triggerRef}
           className={`${block ? "block" : "inline-flex"} ${className}`}
-          onMouseEnter={() => setOpen(true)}
+          onMouseEnter={() => { if (hasFinePointer()) setOpen(true); }}
           onMouseLeave={() => setOpen(false)}
         >
           {children}
@@ -58,7 +83,7 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
     <Badge
       data-testid={testId}
       variant="outline"
-      className="gap-1 rounded border-white/10 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[9px] font-normal text-zinc-400"
+      className="gap-1 rounded-md border-white/10 bg-white/[0.06] px-2 py-0.5 font-mono text-[10px] font-normal text-zinc-400"
     >
       {Icon && <Icon size={9} style={{ color }} />}
       {label && <span className="uppercase tracking-wider text-zinc-500">{label}</span>}
@@ -69,23 +94,82 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <Card data-testid={testId} className="h-full rounded-lg border-white/10 bg-card p-2 shadow-none">
-      <p className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-zinc-500">
-        {Icon && <Icon size={9} style={{ color }} />} <span className="truncate">{label}</span>
+    <Card data-testid={testId} className="h-full rounded-lg lus-card p-2.5 shadow-none">
+      <p className="flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
+        {Icon && <Icon size={10} style={{ color }} />} <span className="truncate">{label}</span>
       </p>
-      <p className="mt-0.5 truncate font-mono text-[11px] font-bold leading-tight" style={{ color }}>{value}</p>
-      {sub != null && <p className="truncate font-mono text-[9px] leading-tight" style={{ color: subColor }}>{sub}</p>}
-      {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1" height="h-0.5" />}
+      <p className="mt-1 truncate font-mono text-sm font-bold leading-tight" style={{ color }}>{value}</p>
+      {sub != null && <p className="mt-0.5 truncate font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
+      {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1.5" height="h-0.5" />}
     </Card>
   </Tip>
 );
 
+// Em mobile as tiras de 4+ KPIs ficavam com células tão estreitas que os
+// rótulos truncavam ("LEALD…", "DISPO…") — abaixo de `sm` passam a grelha 2×N.
+const STRIP_COLS = {
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-2 sm:grid-cols-4",
+  5: "grid-cols-2 sm:grid-cols-5",
+  6: "grid-cols-3 sm:grid-cols-6",
+};
+
 export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => (
   <div
     data-testid={testId}
-    className={`grid gap-1.5 ${className}`}
-    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+    className={`grid gap-1.5 ${STRIP_COLS[cols] || ""} ${className}`}
+    style={STRIP_COLS[cols] ? undefined : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
   >
+    {children}
+  </div>
+);
+
+// Cabeçalho de secção padronizado de TODOS os painéis — título tático com
+// traço divisor que se estende até à margem (hierarquia + organização),
+// meta opcional à direita (contagens, totais) e slot de ação.
+export const SectionHeader = ({ icon: Icon, title, meta, action, tip, className = "", testId }) => (
+  <div data-testid={testId} className={`mb-2.5 flex items-center gap-2 ${className}`}>
+    <Tip tip={tip}>
+      <h3 className="flex min-w-0 shrink-0 items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300">
+        {Icon && <Icon size={12} className="shrink-0 text-red-500/90" />}
+        <span className="truncate">{title}</span>
+      </h3>
+    </Tip>
+    <span className="h-px min-w-3 flex-1 bg-gradient-to-r from-white/[0.14] via-white/[0.06] to-transparent" aria-hidden="true" />
+    {meta != null && <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">{meta}</span>}
+    {action}
+  </div>
+);
+
+// Micro-etiqueta acima do título dos painéis — dá contexto de secção com um
+// traço laser vermelho, no estilo dos kickers de HUD militar.
+export const PanelKicker = ({ children, className = "" }) => (
+  <p className={`flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-red-500/90 ${className}`}>
+    <span className="inline-block h-px w-4 bg-red-500 shadow-[0_0_6px_rgba(220,38,38,0.8)]" aria-hidden="true" />
+    {children}
+  </p>
+);
+
+// Ícone gigante e quase invisível no canto do header — identidade da secção
+// sem peso visual (marca de água).
+export const PanelWatermark = ({ icon: Icon }) => (
+  <span className="lus-watermark" aria-hidden="true">
+    <Icon strokeWidth={1.5} />
+  </span>
+);
+
+// Empty state tático partilhado — moldura tracejada, ícone com glow e voz noir.
+// Substitui os <p> soltos "Sem X" espalhados pelos painéis.
+export const EmptyState = ({ icon: Icon, title, sub, testId, className = "", children }) => (
+  <div data-testid={testId} className={`lus-empty ${className}`}>
+    {Icon && (
+      <span className="lus-empty-icon">
+        <Icon size={17} />
+      </span>
+    )}
+    {title && <p className="font-display text-sm font-bold uppercase tracking-wider text-zinc-300">{title}</p>}
+    {sub && <p className="max-w-[280px] font-mono text-[10px] leading-relaxed text-zinc-500">{sub}</p>}
     {children}
   </div>
 );

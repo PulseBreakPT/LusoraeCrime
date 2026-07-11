@@ -37,9 +37,13 @@ class Player(BaseDocument):
     pool_refresh_at: Optional[str] = None
     quests_daily_at: Optional[str] = None
     quests_weekly_at: Optional[str] = None
+    quest_streak: dict = {}
+    quest_perf: dict = {}
     temp_bonus: Optional[dict] = None
     stats: dict = {}
-    hq: dict
+    hq: Optional[dict] = None
+    region: str = ""
+    districts: List[dict] = []
     last_tick: str
     created_at: str
     type_cooldowns: dict = {}
@@ -60,6 +64,11 @@ class Team(BaseDocument):
     available_at: Optional[str] = None
     roster_stable_since: Optional[str] = None
     last_type_key: Optional[str] = None
+    # QI das equipas (SSS v4) — campos persistidos pelo motor e agora expostos
+    # no /state para a UI mostrar momentum, entrosamento e familiaridade.
+    streak: int = 0
+    roster_missions: int = 0
+    category_missions: dict = {}
 
 
 class Employee(BaseDocument):
@@ -226,6 +235,13 @@ class Mission(BaseDocument):
     escape_chance: float = 0.0
     chase_outcome: Optional[str] = None
     fine: int = 0
+    # Operação em direto (SSS): guião narrativo com timestamps absolutos —
+    # o frontend revela cada linha quando o relógio do servidor a alcança.
+    # live_chance_delta = efeito acumulado das complicações na chance final
+    # (aplicado em engine._roll_outcome); final_chance = chance efetiva rolada.
+    live_log: List[dict] = []
+    live_chance_delta: float = 0.0
+    final_chance: Optional[float] = None
 
 
 class Event(BaseDocument):

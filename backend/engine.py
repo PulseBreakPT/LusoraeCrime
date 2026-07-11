@@ -40,8 +40,8 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
                        RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
                        PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
-                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, PAYROLL_MORALE_REGEN,
-                       FUEL_PRICES, random_employee_name,
+                       REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
+                       FUEL_PRICES,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS,
                        WEAPON_MODELS, WEAPON_CATEGORY_WEIGHTS,
                        WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX,
@@ -54,13 +54,57 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        VEHICLE_MISMATCH_PENALTY, WEAPON_MISMATCH_PENALTY_MAX,
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S,
-                       PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT)
-from quests import process_quests, make_instance
+                       PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT,
+                       CHANCE_FLOOR, CHANCE_CEILING, CHANCE_SOFT_KNEE, CHANCE_SOFT_SPAN,
+                       RISK_PENALTY_LINEAR, RISK_PENALTY_QUADRATIC,
+                       PRIMARY_ATTR_WEIGHT_MAIN, PRIMARY_ATTR_WEIGHT_SECONDARY,
+                       MENTOR_MIN_RANK, MENTOR_NEWBIE_RELIEF,
+                       FATIGUE_CURVE_EXP, MORALE_PENALTY_ASYMMETRY,
+                       TEAM_SYNERGY_MAX, TEAM_SYNERGY_BASELINE, TEAM_SYNERGY_SPREAD,
+                       STEALTH_SYNERGY_BONUS, STEALTH_SYNERGY_PENALTY,
+                       STEALTH_VEHICLE_DISCRETION_MIN, NOISY_VEHICLE_DISCRETION_MAX,
+                       WEAPON_SKILL_FLOOR, WEAPON_SKILL_ATTR_CAP,
+                       WEAPON_DURABILITY_WEAR_REF, WEAPON_CONDITION_SOFT_KNEE,
+                       WEAPON_JAM_RELIABILITY_WEIGHT, WEAPON_JAM_CONDITION_THRESHOLD,
+                       WEAPON_JAM_CONDITION_WEIGHT, WEAPON_JAM_MAX,
+                       WEAPON_JAM_CHANCE_PENALTY, WEAPON_JAM_CHANCE_PENALTY_CAP,
+                       WEAPON_JAM_EXTRA_WEAR,
+                       WEAPON_INTIMIDATION_ESCAPE_MAX, WEAPON_STEALTH_DISCRETION_REF,
+                       VEHICLE_SPEED_FLOOR, VEHICLE_SPEED_CURVE_EXP,
+                       VEHICLE_WEAR_BASE, VEHICLE_WEAR_PER_RISK, VEHICLE_WEAR_PER_KM,
+                       ESCAPE_SPEED_BASELINE, ESCAPE_SPEED_BONUS_PER_UNIT, ESCAPE_SPEED_BONUS_MAX,
+                       CHASE_DISCRETION_RELIEF, CHASE_HEAT_SPAN, CHASE_HEAT_EXP,
+                       ESCAPE_HEAT_SPAN, ESCAPE_HEAT_EXP,
+                       POLICE_PROB_BASE, POLICE_PROB_SPAN, POLICE_PROB_EXP, POLICE_PROB_CAP,
+                       HEAT_DECAY_BASE_PER_MIN, HEAT_DECAY_SLOPE)
+from economy_constants import (
+    DISTRICT_ATTENTION_MAX, DISTRICT_ATTENTION_SUCCESS, DISTRICT_ATTENTION_PARTIAL,
+    DISTRICT_ATTENTION_FAILURE, DISTRICT_ATTENTION_POLICE, DISTRICT_ATTENTION_PER_RISK,
+    DISTRICT_ATTENTION_DECAY_PER_MIN, DISTRICT_ATTENTION_PENALTY_MAX,
+    DISTRICT_ATTENTION_CHASE_MAX, DISTRICT_ATTENTION_SPAWN_MIN_W, DISTRICT_ATTENTION_HOT,
+    TEAM_MOMENTUM_BONUS_PER_WIN, TEAM_MOMENTUM_BONUS_MAX,
+    TEAM_MOMENTUM_PENALTY_PER_LOSS, TEAM_MOMENTUM_PENALTY_MAX,
+    TEAM_MOMENTUM_ESCAPE_BONUS_MAX,
+    PARTIAL_SUCCESS_WINDOW, PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX,
+    PARTIAL_RESPECT_FRACTION, PARTIAL_HEAT_MULT, PARTIAL_XP_FRACTION, PARTIAL_CHASE_MULT,
+    RARE_PITY_PER_SPAWN, RARE_PITY_CAP, SPAWN_DEMAND_SPEC_BOOST, SPAWN_DEMAND_BOOST_MAX,
+    SPAWN_ANTIFARM_PENALTY_PER, SPAWN_ANTIFARM_PENALTY_MAX,
+    STREAK_SPECIAL_THRESHOLD, STREAK_SPECIAL_REWARD_MULT,
+    TEAM_FAMILIARITY_BONUS_MAX, TEAM_FAMILIARITY_RAMP_MISSIONS, TEAM_FAMILIARITY_MIN_MISSIONS,
+    COORDINATION_RAMP_MISSIONS,
+    DRIVER_ATTR_BASELINE, DRIVER_ESCAPE_BONUS_PER_POINT, DRIVER_ESCAPE_BONUS_MAX,
+    STRATEGIST_MIN_INT, STRATEGIST_RELIEF_FRAC, STRATEGIST_RELIEF_MAX,
+    MEDIC_INJURY_MULT, MEDIC_RECOVERY_MULT, LAWYER_ARREST_MULT,
+    CLUTCH_SAVE_MAX, SMART_WARN_HEAT_DELTA,
+)
+from quests import process_quests, make_instance, effective_quest_rewards
+from live_ops import build_return_script, update_memory
 from quests_data import QUEST_DEFS
 
 logger = logging.getLogger(__name__)
 
-OUTCOME_PT = {"success": "sucesso", "failure": "falhou", "police": "intercetado pela polícia"}
+OUTCOME_PT = {"success": "sucesso", "partial": "sucesso parcial", "failure": "falhou",
+              "police": "intercetado pela polícia"}
 REST_DURATION_S = 90
 
 
@@ -347,44 +391,16 @@ async def push_history(db, emp_id, text):
     }})
 
 
-# River Tejo shoreline approximation (west→east). A sampled point is on land when its
-# latitude is north of the interpolated shore at that longitude. Coarse but effective.
-_TEJO_SHORE = [
-    (-9.240, 38.690),  # west of Belém
-    (-9.200, 38.694),  # Belém
-    (-9.180, 38.700),  # Alcântara docks
-    (-9.150, 38.703),  # Cais do Sodré waterfront
-    (-9.130, 38.706),  # Terreiro do Paço
-    (-9.110, 38.711),  # Alfama waterfront
-    (-9.100, 38.720),  # Santa Apolónia bend
-    (-9.093, 38.750),  # Marvila / P. das Nações south
-    (-9.093, 38.780),  # P. das Nações north (river ends)
-]
-
-_LISBON_BOUNDS = {"lat_min": 38.685, "lat_max": 38.800, "lng_min": -9.240, "lng_max": -9.085}
+# Validação geográfica real: polígono oficial de Portugal (continente +
+# Madeira + Açores) + exclusão dos grandes corpos de água interiores com
+# geometria OSM (estuários do Tejo/Sado/Douro, rias de Aveiro/Formosa,
+# Alqueva, lagoas). Substitui a antiga aproximação da margem do Tejo.
+from geo import is_on_land_pt
 
 
 def is_on_land(lat, lng):
-    """Reject points that fall on the Tejo or outside Lisbon's coarse bounds."""
-    b = _LISBON_BOUNDS
-    if not (b["lat_min"] <= lat <= b["lat_max"] and b["lng_min"] <= lng <= b["lng_max"]):
-        return False
-    # Interpolate the shore latitude at this longitude.
-    pts = _TEJO_SHORE
-    if lng <= pts[0][0]:
-        shore = pts[0][1]
-    elif lng >= pts[-1][0]:
-        shore = pts[-1][1]
-    else:
-        for i in range(1, len(pts)):
-            if lng <= pts[i][0]:
-                x0, y0 = pts[i - 1]
-                x1, y1 = pts[i]
-                t = (lng - x0) / max(1e-9, (x1 - x0))
-                shore = y0 + t * (y1 - y0)
-                break
-    # Give the shore a ~110m buffer so pins don't visually sit at the water's edge.
-    return lat >= shore + 0.0010
+    """Terra firme portuguesa — fora do mar, dos estuários e do estrangeiro."""
+    return is_on_land_pt(lat, lng)
 
 
 def _sample_on_land(spot):
@@ -398,10 +414,14 @@ def _sample_on_land(spot):
     return spot["lat"], spot["lng"]
 
 
-def nearest_district(lat, lng):
-    """Rótulo de distrito mais próximo (só para exibição) para um ponto
-    escolhido manualmente pelo jogador — não é uma chave estrangeira."""
-    return min(LISBON_SPOTS, key=lambda s: haversine_m(lat, lng, s["lat"], s["lng"]))["name"]
+def nearest_district(lat, lng, spots=None):
+    """Rótulo de zona mais próxima (só para exibição/fallback) para um ponto
+    escolhido manualmente pelo jogador — não é uma chave estrangeira. Usa as
+    zonas geradas à volta do QG do jogador; cai nas de Lisboa se em falta."""
+    pool = [s for s in (spots or LISBON_SPOTS) if s.get("name")]
+    if not pool:
+        pool = LISBON_SPOTS
+    return min(pool, key=lambda s: haversine_m(lat, lng, s["lat"], s["lng"]))["name"]
 
 
 def _sample_around_property(center_lat, center_lng, radius_km):
@@ -537,26 +557,62 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
     ]
     if not keys:
         return
-    weights = [OPPORTUNITY_TYPES[k]["weight"] for k in keys]
+    # Spawn Director (SSS v3): o mix de tipos deixa de ser cego —
+    # 1) procura: categorias em que o jogador TEM equipas especializadas pesam
+    #    mais (conteúdo acionável), sem nunca zerar as restantes (exploração);
+    # 2) anti-farm: tipos despachados repetidamente há pouco tempo perdem peso.
+    teams = await db.teams.find({"player_id": pid}).to_list(50)
+    spec_counts = {}
+    for tm in teams:
+        sp = tm.get("spec")
+        if sp:
+            spec_counts[sp] = spec_counts.get(sp, 0) + 1
+    recent_counts = {}
+    for k in (player.get("recent_type_keys") or []):
+        recent_counts[k] = recent_counts.get(k, 0) + 1
+    weights = []
+    for k in keys:
+        w = float(OPPORTUNITY_TYPES[k]["weight"])
+        n_spec = spec_counts.get(OPPORTUNITY_TYPES[k]["category"], 0)
+        if n_spec:
+            w *= 1 + min(SPAWN_DEMAND_BOOST_MAX, SPAWN_DEMAND_SPEC_BOOST * n_spec)
+        if recent_counts.get(k):
+            w *= 1 - min(SPAWN_ANTIFARM_PENALTY_MAX, SPAWN_ANTIFARM_PENALTY_PER * recent_counts[k])
+        weights.append(max(0.05, w))
     hq = player["hq"]
-    # Centros candidatos: os 16 spots fixos de Lisboa (peso base) mais um
-    # centro sintético por propriedade possuída (peso maior, atenuado por
-    # densidade local) — sem propriedades, a distribuição é idêntica à de
-    # sempre; à medida que o jogador expande, a densidade desloca-se para
-    # as suas bases.
-    centers = [(spot, LISBON_SPOT_WEIGHT, None) for spot in LISBON_SPOTS]
+    # Centros candidatos: as zonas de operação geradas à volta do QG do
+    # jogador (apenas as já batizadas com nomes reais — nunca mostramos nomes
+    # inventados) mais um centro sintético por propriedade possuída (peso
+    # maior, atenuado por densidade local). Zonas com atenção policial
+    # acumulada recebem menos oportunidades — o crime desloca-se para onde a
+    # polícia não está. Jogadores antigos (pré-migração) caem nas zonas de Lisboa.
+    district_spots = [d for d in (player.get("districts") or LISBON_SPOTS) if d.get("named", True) and d.get("name")]
+    att_map = player.get("district_attention") or {}
+
+    def _att_weight(name):
+        att = float(att_map.get(attention_key(name), 0.0))
+        return max(DISTRICT_ATTENTION_SPAWN_MIN_W,
+                   1 - (att / DISTRICT_ATTENTION_MAX) * (1 - DISTRICT_ATTENTION_SPAWN_MIN_W))
+
+    centers = [(spot, LISBON_SPOT_WEIGHT * _att_weight(spot["name"]), None) for spot in district_spots]
     for p in props:
         centers.append(({"name": p["name"], "lat": p["lat"], "lng": p["lng"]},
-                         _property_spawn_weight(p, props), str(p["_id"])))
+                         _property_spawn_weight(p, props) * _att_weight(p["name"]), str(p["_id"])))
+    if not centers:
+        # QG acabado de colocar e nenhuma zona batizada ainda — o batismo em
+        # background termina em segundos; sem centros não há onde gerar missões.
+        return
     center_weights = [w for _, w, _ in centers]
-    docs = []
-    for _ in range(max(0, target - active)):
-        key = random.choices(keys, weights=weights)[0]
+    # Pity de raras (SSS v3): cada spawn sem uma oportunidade rara acumula um
+    # pequeno bónus de probabilidade — a sorte nunca seca indefinidamente.
+    spawns_since_rare = int(player.get("spawns_since_rare", 0) or 0)
+    eff_rare_chance = min(RARE_PITY_CAP, rare_chance + RARE_PITY_PER_SPAWN * spawns_since_rare)
+
+    def _build_doc(key, rare, extra_mult=1.0, special=False, expires_range=(240, 600)):
         t = OPPORTUNITY_TYPES[key]
         spot, _, origin_prop_id = random.choices(centers, weights=center_weights)[0]
         duration_s = random.randint(*t["duration_s"])
-        mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s)
-        rare = random.random() < rare_chance
+        mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s) * extra_mult
         if rare:
             mult *= 2.0
         if origin_prop_id:
@@ -569,8 +625,9 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         dist_km = haversine_m(hq["lat"], hq["lng"], lat, lng) / 1000
         risk = min(5, t["risk"] + distance_risk_bump(dist_km))
         mult *= distance_reward_mult(dist_km)
-        docs.append({
-            "player_id": pid, "type_key": key, "name": t["name"],
+        return {
+            "player_id": pid, "type_key": key,
+            "name": (f"Golpe de Oportunidade: {t['name']}" if special else t["name"]),
             "category": t["category"], "district": spot["name"],
             "lat": lat,
             "lng": lng,
@@ -578,14 +635,43 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             "reward": int(t["base_reward"] * mult),
             "respect": int(t["respect"] * (1 + 0.15 * (level - 1)) * (1.5 if rare else 1.0)),
             "risk": risk, "heat": t["heat"], "pays": t["pays"], "rare": rare,
+            "special": special,
             "required_models": t.get("required_models", []),
             "duration_s": duration_s,
             "min_level": t["min_level"], "min_members": min_members_for(risk),
             "status": "active",
-            "expires_at": (now + timedelta(seconds=random.randint(240, 600))).isoformat(),
+            "expires_at": (now + timedelta(seconds=random.randint(*expires_range))).isoformat(),
             "created_at": now.isoformat(),
             "generated_by_property_id": origin_prop_id,
-        })
+        }
+
+    docs = []
+    player_updates = {}
+    # Reação do mundo à série de vitórias: um Golpe de Oportunidade especial —
+    # o tipo mais valioso disponível, rara garantida e recompensa amplificada.
+    if player.get("streak_op_pending"):
+        best_key = max(keys, key=lambda k: OPPORTUNITY_TYPES[k]["base_reward"])
+        special_doc = _build_doc(best_key, rare=True, extra_mult=STREAK_SPECIAL_REWARD_MULT,
+                                 special=True, expires_range=(480, 720))
+        docs.append(special_doc)
+        player["streak_op_pending"] = False
+        player_updates["streak_op_pending"] = False
+        await add_event(db, pid, "intel",
+                        f"GOLPE DE OPORTUNIDADE: {special_doc['name']} em {special_doc['district']} — recompensa excecional, janela curta.")
+    rare_spawned = False
+    for _ in range(max(0, target - active)):
+        key = random.choices(keys, weights=weights)[0]
+        rare = random.random() < eff_rare_chance
+        rare_spawned = rare_spawned or rare
+        docs.append(_build_doc(key, rare))
+    n_regular = max(0, target - active)
+    if n_regular > 0:
+        new_since = 0 if rare_spawned else spawns_since_rare + n_regular
+        if new_since != spawns_since_rare:
+            player["spawns_since_rare"] = new_since
+            player_updates["spawns_since_rare"] = new_since
+    if player_updates:
+        await db.players.update_one({"_id": player["_id"]}, {"$set": player_updates})
     if docs:
         await db.opportunities.insert_many(docs)
 
@@ -593,10 +679,13 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
 # ---------------- Combate / resolução ----------------
 
 def effective_speed(vehicle):
-    c = vehicle["condition"]
-    if c >= 50:
-        return vehicle["speed"]
-    return vehicle["speed"] * (0.6 + 0.4 * c / 50)
+    """Física contínua (SSS v2): a condição afeta a velocidade em curva suave
+    em vez do antigo degrau nos 50% — um veículo a 65% já se ressente, um a
+    100% rende o máximo. floor + span*(condição/100)^exp, com o mesmo mínimo
+    de sempre (60%) a condição 0."""
+    c = max(0.0, min(100.0, vehicle["condition"]))
+    factor = VEHICLE_SPEED_FLOOR + (1 - VEHICLE_SPEED_FLOOR) * (c / 100) ** VEHICLE_SPEED_CURVE_EXP
+    return vehicle["speed"] * factor
 
 
 BASE_CHANCE = 0.92
@@ -614,20 +703,40 @@ def _dim_scale(category, dim):
     return DIMENSION_SWING_CAP.get(dim, 0.0) * weights.get(dim, 0.0)
 
 
+def _weighted_category_attr(attrs, aks):
+    """Atributo relevante ponderado (SSS v2): o 1º atributo da categoria pesa
+    PRIMARY_ATTR_WEIGHT_MAIN, o 2º PRIMARY_ATTR_WEIGHT_SECONDARY — um
+    assaltante vive do tiro, a força é apoio. Fallback para média simples em
+    categorias sem exatamente 2 atributos definidos."""
+    if aks and len(aks) == 2:
+        return attrs.get(aks[0], 2) * PRIMARY_ATTR_WEIGHT_MAIN + attrs.get(aks[1], 2) * PRIMARY_ATTR_WEIGHT_SECONDARY
+    if aks:
+        return sum(attrs.get(a, 2) for a in aks) / len(aks)
+    return sum(attrs.values()) / max(1, len(attrs)) if attrs else 2
+
+
+def _has_mentor(members):
+    """Há um veterano (ou superior) na equipa? Mentores encurtam a adaptação
+    dos recém-contratados (ver MENTOR_NEWBIE_RELIEF)."""
+    try:
+        mentor_idx = RANKS.index(MENTOR_MIN_RANK)
+    except ValueError:
+        return False
+    return any(RANKS.index(e["rank"]) >= mentor_idx for e in members if e.get("rank") in RANKS)
+
+
 def team_effectiveness(members, category, now=None):
     """Score de competência da equipa usado pela mecânica de perseguição
     policial pós-sucesso (_compute_chase_chance/_compute_escape_chance) —
     NÃO alimenta chance_breakdown (que decompõe a equipa nos seus próprios
     modificadores nomeados, mod_team_*, para dar transparência ao jogador)."""
     now = now or now_utc()
+    mentor = _has_mentor(members)
 
     def eff(e):
         attrs = e.get("attrs") or {}
         aks = CATEGORY_ATTRS.get(category)
-        if aks:
-            attr = sum(attrs.get(a, 2) for a in aks) / len(aks)
-        else:
-            attr = sum(attrs.values()) / max(1, len(attrs)) if attrs else 2
+        attr = _weighted_category_attr(attrs, aks)
         match = e.get("spec") == category or category == "especial"
         morale = e.get("morale", 70)
         morale_f = 0.75 + morale / 400
@@ -638,12 +747,13 @@ def team_effectiveness(members, category, now=None):
         except ValueError:
             rank_f = 1.0
         # Recém-contratados ainda se estão a adaptar — pequena penalização que
-        # desvanece nas primeiras horas ao serviço.
+        # desvanece nas primeiras horas ao serviço (mais depressa com mentor).
         newbie_f = 1.0
         hired_at = e.get("hired_at")
         if hired_at:
             elapsed_s = max(0.0, (now - parse_dt(hired_at)).total_seconds())
-            newbie_f -= NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            newbie_pen = NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            newbie_f -= newbie_pen * (MENTOR_NEWBIE_RELIEF if mentor else 1.0)
         return (e["level"] * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * (1 - e["fatigue"] / 250) * morale_f * rank_f * newbie_f
     return sum(eff(e) for e in members) / len(members) + 0.3 * (len(members) - 1)
 
@@ -704,6 +814,54 @@ def weapon_compatibility_factor(emp, model):
     return max(WEAPON_COMPATIBILITY_MIN_FACTOR, 1.0 - shortfall * 0.3)
 
 
+def weapon_condition_factor(condition):
+    """Curva de condição das armas (SSS v5): linear até ao joelho
+    (WEAPON_CONDITION_SOFT_KNEE), quadrática abaixo dele — uma arma a 20% não
+    é 'meio útil', é quase sucata (e candidata a encravar)."""
+    c = max(0.0, min(100.0, float(condition if condition is not None else 100))) / 100.0
+    knee = WEAPON_CONDITION_SOFT_KNEE / 100.0
+    if c >= knee or knee <= 0:
+        return c
+    return c * (c / knee)
+
+
+def weapon_jam_risk(model, condition):
+    """Risco de encravamento por missão (SSS v5): fiabilidade do modelo +
+    défice de condição abaixo do limiar de manutenção. Armas sem mecanismo
+    (carregador < 2 e silenciosas, ex.: faca/taser) nunca encravam; uma
+    caçadeira serrada aos 30% é uma roleta-russa."""
+    if model.get("magazine_capacity", 0) < 2 and not model.get("loud"):
+        return 0.0
+    rel = max(0.0, min(100.0, float(model.get("reliability", 100)))) / 100.0
+    risk = (1.0 - rel) * WEAPON_JAM_RELIABILITY_WEIGHT
+    cond = max(0.0, min(100.0, float(condition if condition is not None else 100)))
+    if cond < WEAPON_JAM_CONDITION_THRESHOLD:
+        risk += (WEAPON_JAM_CONDITION_THRESHOLD - cond) / WEAPON_JAM_CONDITION_THRESHOLD * WEAPON_JAM_CONDITION_WEIGHT
+    return max(0.0, min(WEAPON_JAM_MAX, risk))
+
+
+def weapon_effective_score(emp, weapon_doc, model, category):
+    """Score efetivo de uma arma NAS MÃOS de um operacional concreto para uma
+    categoria de operação (SSS v5): qualidade do modelo ponderada pela
+    categoria × adequação best_for × condição (curva não-linear) × fiabilidade
+    × compatibilidade de requisitos × habilidade do portador + proficiência.
+    É a MESMA régua em todo o lado: mod_weapon_score (chance de missão),
+    /weapons/auto_assign e /weapons/optimize — o que o jogador vê no painel é
+    o que a missão usa."""
+    score = weapon_combat_score(model, category)
+    best_for = model.get("best_for", [])
+    best_for_mult = 1.3 if category in best_for else 0.7
+    condition = weapon_condition_factor((weapon_doc or {}).get("condition", 100))
+    reliability = model.get("reliability", 100) / 100
+    compat = weapon_compatibility_factor(emp, model)
+    skill = _weapon_skill_factor(emp, model)
+    proficiency = (emp.get("weapon_proficiency") or {}).get(model.get("category"), 0)
+    # Curva de proficiência com raiz quadrada (SSS v2): ganhos rápidos no
+    # início, rendimentos decrescentes perto da mestria.
+    proficiency_bonus = math.sqrt(max(0.0, proficiency) / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
+    return score * best_for_mult * condition * reliability * compat * skill * WEAPON_COMBAT_SCORE_SCALE + proficiency_bonus
+
+
 # ---------------- Modificadores de chance (sistema modular) ----------------
 # Cada modificador lê o mesmo `ctx` (montado em _prepare_dispatch) e devolve
 # None (não aplicável) ou {"key","label","pct","tip"}. Acrescentar um
@@ -711,20 +869,33 @@ def weapon_compatibility_factor(emp, model):
 # só afecta a ordem de exibição (a soma é comutativa), nunca a lógica de
 # agregação/clamping em chance_breakdown.
 
+def _risk_penalty(risk):
+    """Curva de risco convexa (SSS v2): linear + quadrática — r1..r5 penaliza
+    5.6/12.4/20.4/29.6/40.0% (antes: 7/14/21/28/35, linear). A mediana (r3)
+    mantém-se; operações fáceis ficam mais acessíveis, as de topo exigem
+    investimento real."""
+    return RISK_PENALTY_LINEAR * risk + RISK_PENALTY_QUADRATIC * risk * risk
+
+
 def mod_risk_type(ctx):
     bump = distance_risk_bump(ctx.get("dist_km", 0.0))
     base_risk = max(0, ctx["risk"] - bump)
     if base_risk <= 0:
         return None
-    return {"key": "risco_base", "category": "missao", "label": "Risco da operação", "pct": -base_risk * 0.07,
-            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão — é intrínseco à operação, não há como reduzi-lo além de escolher outra missão."}
+    return {"key": "risco_base", "category": "missao", "label": "Risco da operação", "pct": -_risk_penalty(base_risk),
+            "tip": f"Nível de risco base {base_risk}/5 deste tipo de missão — a penalização cresce em curva (operações de topo exigem preparação de topo)."}
 
 
 def mod_risk_distance(ctx):
     bump = distance_risk_bump(ctx.get("dist_km", 0.0))
     if bump <= 0:
         return None
-    return {"key": "distancia", "category": "missao", "label": "Distância excessiva", "pct": -bump * 0.07,
+    risk = ctx["risk"]
+    base_risk = max(0, risk - bump)
+    # Custo marginal real: penalização(risco total) - penalização(risco base) —
+    # na curva convexa, a distância dói mais em operações já arriscadas.
+    pct = -( _risk_penalty(risk) - _risk_penalty(base_risk) )
+    return {"key": "distancia", "category": "missao", "label": "Distância excessiva", "pct": pct,
             "tip": f"Alvo a {ctx.get('dist_km', 0.0):.1f}km do QG — escolhe uma operação mais próxima para evitar esta penalização."}
 
 
@@ -741,11 +912,12 @@ def mod_team_quality(ctx):
     if not members:
         return None
     category, now = ctx["category"], ctx["now"]
+    mentor = _has_mentor(members)
 
     def quality(e):
         attrs = e.get("attrs") or {}
         aks = CATEGORY_ATTRS.get(category)
-        attr = (sum(attrs.get(a, 2) for a in aks) / len(aks)) if aks else (sum(attrs.values()) / max(1, len(attrs)) if attrs else 2)
+        attr = _weighted_category_attr(attrs, aks)
         match = e.get("spec") == category or category == "especial"
         try:
             rank_f = 1 + 0.02 * RANKS.index(e.get("rank", "recruta"))
@@ -755,15 +927,21 @@ def mod_team_quality(ctx):
         hired_at = e.get("hired_at")
         if hired_at:
             elapsed_s = max(0.0, (now - parse_dt(hired_at)).total_seconds())
-            newbie_f -= NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            newbie_pen = NEWBIE_PENALTY_MAX * max(0.0, 1 - min(1.0, elapsed_s / NEWBIE_RAMP_S))
+            # Mentoria (SSS v2): um veterano na equipa acelera a adaptação
+            # dos recém-contratados — a penalização de novato é reduzida.
+            newbie_f -= newbie_pen * (MENTOR_NEWBIE_RELIEF if mentor else 1.0)
         return (e.get("level", 1) * 0.5 + attr * 0.45) * (1.25 if match else 1.0) * rank_f * newbie_f
 
     avg_quality = sum(quality(e) for e in members) / len(members)
     baseline = (3 * 0.5 + 4 * 0.45)  # recruta nível 3, atributo médio 4, sem match nem bónus
     raw = max(-1.0, min(1.0, (avg_quality - baseline) / max(1.0, baseline)))
     pct = raw * _dim_scale(category, "team")
+    tip = "Nível médio, atributos relevantes (o principal da categoria pesa mais) e patente dos operacionais."
+    if mentor:
+        tip += " Um veterano presente acelera a adaptação dos novatos."
     return {"key": "nivel_especializacao", "category": "equipa", "label": "Nível e especialização da equipa", "pct": pct,
-            "tip": "Nível médio, atributos relevantes para esta categoria e patente dos operacionais."}
+            "tip": tip}
 
 
 def mod_team_size(ctx):
@@ -794,12 +972,14 @@ def mod_team_fatigue(ctx):
     avg_fatigue = sum(e.get("fatigue", 0) for e in members) / len(members)
     if avg_fatigue <= 30:
         return None
-    raw = -min(1.0, (avg_fatigue - 30) / 70)
+    # Curva convexa (SSS v2): fadiga moderada penaliza pouco, extrema penaliza
+    # desproporcionalmente — equipas exaustas são um risco real.
+    raw = -min(1.0, ((avg_fatigue - 30) / 70) ** FATIGUE_CURVE_EXP)
     pct = raw * _dim_scale(ctx["category"], "team")
     if abs(pct) < 0.0005:
         return None
     return {"key": "fadiga", "category": "moral", "label": "Fadiga elevada", "pct": pct,
-            "tip": f"Fadiga média de {round(avg_fatigue)}% — reduz a atenção e a coordenação da equipa. Manda os operacionais descansar antes de despachar."}
+            "tip": f"Fadiga média de {round(avg_fatigue)}% — a penalização cresce em curva; perto do limite a equipa torna-se um perigo. Manda os operacionais descansar antes de despachar."}
 
 
 def mod_team_morale(ctx):
@@ -809,12 +989,16 @@ def mod_team_morale(ctx):
     avg_morale = sum(e.get("morale", 70) for e in members) / len(members)
     raw = max(-1.0, min(1.0, (avg_morale - 70) / 30))
     pct = raw * _dim_scale(ctx["category"], "team") * 0.6
+    # Assimetria psicológica (SSS v2): moral baixa mina a operação mais do que
+    # moral alta a impulsiona — o lado negativo pesa mais.
+    if pct < 0:
+        pct *= MORALE_PENALTY_ASYMMETRY
     if abs(pct) < 0.0005:
         return None
     label = "Moral elevada" if raw > 0 else "Moral baixa"
     tip = f"Moral média de {round(avg_morale)}%."
     if raw <= 0:
-        tip += " Dá um bónus aos operacionais ou deixa-os descansar para subir a moral."
+        tip += " Moral baixa pesa mais do que moral alta ajuda — dá um bónus aos operacionais ou deixa-os descansar."
     return {"key": "moral", "category": "moral", "label": label, "pct": pct, "tip": tip}
 
 
@@ -867,15 +1051,127 @@ def mod_team_uniform_spec(ctx):
 
 
 def mod_team_coordination(ctx):
+    """Coordenação híbrida (SSS v4): 50% tempo de plantel estável + 50%
+    operações reais feitas com este plantel — treinar no terreno constrói
+    entrosamento mais depressa do que apenas esperar. Mudar membros reinicia
+    ambos os contadores."""
     roster_stable_since = ctx.get("roster_stable_since")
-    if not roster_stable_since:
-        return None
-    stable_s = max(0.0, (ctx["now"] - parse_dt(roster_stable_since)).total_seconds())
-    pct = COORDINATION_BONUS_MAX * min(1.0, stable_s / COORDINATION_RAMP_S)
+    time_frac = 0.0
+    if roster_stable_since:
+        stable_s = max(0.0, (ctx["now"] - parse_dt(roster_stable_since)).total_seconds())
+        time_frac = min(1.0, stable_s / COORDINATION_RAMP_S)
+    mission_frac = min(1.0, ctx.get("roster_missions", 0) / COORDINATION_RAMP_MISSIONS)
+    pct = COORDINATION_BONUS_MAX * (0.5 * time_frac + 0.5 * mission_frac)
     if pct < 0.0005:
         return None
-    return {"key": "coordenacao", "category": "equipa", "label": "Equipa há muito tempo junta", "pct": pct,
-            "tip": "Tempo desde a última alteração de membros — mais tempo junto, melhor coordenação."}
+    return {"key": "coordenacao", "category": "equipa", "label": "Entrosamento do plantel", "pct": pct,
+            "tip": f"Tempo com o plantel estável ({round(time_frac * 100)}%) e operações feitas juntos ({ctx.get('roster_missions', 0)}/{COORDINATION_RAMP_MISSIONS}) — mudar membros reinicia a coordenação."}
+
+
+def mod_team_familiarity(ctx):
+    """A equipa aprende (SSS v4): operações concluídas nesta categoria criam
+    rotinas e reflexos — bónus com curva sqrt (ganhos rápidos no início,
+    mestria lenta), capado. Complementa a especialização individual: aqui é a
+    EQUIPA enquanto unidade que domina o tipo de trabalho."""
+    count = int(ctx.get("team_cat_missions", 0) or 0)
+    if count < TEAM_FAMILIARITY_MIN_MISSIONS:
+        return None
+    frac = min(1.0, count / TEAM_FAMILIARITY_RAMP_MISSIONS)
+    pct = TEAM_FAMILIARITY_BONUS_MAX * math.sqrt(frac)
+    if pct < 0.0005:
+        return None
+    mastery = count >= TEAM_FAMILIARITY_RAMP_MISSIONS
+    label = "Mestria da categoria" if mastery else "Familiaridade com a categoria"
+    return {"key": "familiaridade", "category": "equipa", "label": label, "pct": pct,
+            "tip": f"Esta equipa já concluiu {count} operações desta categoria ({min(count, TEAM_FAMILIARITY_RAMP_MISSIONS)}/{TEAM_FAMILIARITY_RAMP_MISSIONS} para a mestria) — a experiência coletiva conta."}
+
+
+def mod_team_strategist(ctx):
+    """Estratega na equipa (SSS v4): um operacional com inteligência alta
+    estuda o alvo e planeia rotas de entrada/saída — recupera uma fração da
+    penalização de risco da operação. Quanto mais arriscada a operação, mais
+    o planeamento vale (o alívio escala com a própria penalização, capado)."""
+    members = ctx["members"]
+    if not members:
+        return None
+    best_int = max(((e.get("attrs") or {}).get("inteligencia", 0) for e in members), default=0)
+    if best_int < STRATEGIST_MIN_INT:
+        return None
+    risk = ctx.get("risk", 0)
+    if risk <= 0:
+        return None
+    # Escala com a inteligência acima do limiar: 7 → 25%, 10 → 100% do alívio.
+    scale = (best_int - (STRATEGIST_MIN_INT - 1)) / (10 - (STRATEGIST_MIN_INT - 1))
+    pct = min(STRATEGIST_RELIEF_MAX, _risk_penalty(risk) * STRATEGIST_RELIEF_FRAC * scale)
+    if pct < 0.0005:
+        return None
+    return {"key": "estratega", "category": "equipa", "label": "Estratega no terreno", "pct": pct,
+            "tip": f"Um operacional com inteligência {best_int}/10 planeou a operação — parte da penalização de risco é recuperada (vale mais em operações arriscadas)."}
+
+
+def mod_team_synergy(ctx):
+    """Química da equipa (SSS v2): cobertura dos atributos-chave da categoria
+    pelos MELHORES membros (60%) + diversidade de papéis (40%), centrada num
+    baseline neutro — uma equipa mediana fica a ~0%, só composições
+    genuinamente complementares ganham o bónus (e monoculturas fracas perdem)."""
+    members, category = ctx["members"], ctx["category"]
+    if len(members) < 2:
+        return None
+    aks = CATEGORY_ATTRS.get(category)
+    if aks:
+        coverage = sum(max(e.get("attrs", {}).get(a, 2) for e in members) for a in aks) / (len(aks) * 10)
+    else:
+        # "especial": cobertura dos 3 melhores atributos globais da equipa.
+        best = sorted((max(e.get("attrs", {}).get(a, 2) for e in members) for a in ATTR_KEYS), reverse=True)
+        coverage = sum(best[:3]) / 30
+    diversity = len({e.get("role_key") for e in members}) / len(members)
+    raw = 0.6 * coverage + 0.4 * diversity - TEAM_SYNERGY_BASELINE
+    pct = max(-1.0, min(1.0, raw / TEAM_SYNERGY_SPREAD)) * TEAM_SYNERGY_MAX
+    if abs(pct) < 0.0005:
+        return None
+    label = "Boa química de equipa" if pct > 0 else "Composição pouco complementar"
+    tip = "Cobertura dos atributos-chave desta categoria pelos melhores membros e diversidade de papéis."
+    if pct <= 0:
+        tip += " Junta especialistas complementares (papéis diferentes, atributos fortes na categoria) para o bónus."
+    return {"key": "sinergia", "category": "equipa", "label": label, "pct": pct, "tip": tip}
+
+
+def mod_stealth_synergy(ctx):
+    """Sinergia furtiva arma+veículo (SSS v2): em operações discretas, um
+    perfil TOTALMENTE silencioso (veículo discreto + nenhuma arma 'loud')
+    ganha bónus; qualquer elemento ruidoso no conjunto penaliza — as duas
+    dimensões deixam de ser avaliadas em silos."""
+    if ctx["category"] not in DISCREET_CATEGORIES:
+        return None
+    vehicle = ctx.get("vehicle")
+    model = VEHICLE_MODELS.get(vehicle.get("model_key")) if vehicle else None
+    if not model:
+        return None
+    weapons = [WEAPON_MODELS.get(w.get("model_key")) for w in (ctx.get("weapons_by_employee_id") or {}).values()]
+    weapons = [w for w in weapons if w]
+    any_loud = any(w.get("loud") for w in weapons)
+    disc = model.get("discretion", 50)
+    if disc >= STEALTH_VEHICLE_DISCRETION_MIN and not any_loud:
+        # SSS v5: o bónus deixa de ser binário — escala com a discrição média
+        # das armas transportadas (mãos vazias contam como discrição total).
+        w_disc = [w.get("discretion", 50) for w in weapons]
+        stealth_frac = 1.0 if not w_disc else min(1.0, (sum(w_disc) / len(w_disc)) / WEAPON_STEALTH_DISCRETION_REF)
+        pct = STEALTH_SYNERGY_BONUS * max(0.35, stealth_frac)
+        tip = "Veículo discreto e nenhuma arma ruidosa — o conjunto passa despercebido nesta operação."
+        if w_disc and stealth_frac < 1.0:
+            tip += " Armas mais discretas (ex.: silenciadas) aumentariam ainda mais este bónus."
+        return {"key": "furtividade", "category": "especializacoes", "label": "Perfil totalmente furtivo",
+                "pct": pct, "tip": tip}
+    if any_loud or disc <= NOISY_VEHICLE_DISCRETION_MAX:
+        reasons = []
+        if any_loud:
+            reasons.append("armas ruidosas")
+        if disc <= NOISY_VEHICLE_DISCRETION_MAX:
+            reasons.append("veículo espalhafatoso")
+        return {"key": "furtividade", "category": "especializacoes", "label": "Perfil ruidoso em operação discreta",
+                "pct": -STEALTH_SYNERGY_PENALTY,
+                "tip": f"{' e '.join(reasons).capitalize()} numa operação que exige discrição — troca por equipamento silencioso."}
+    return None
 
 
 def mod_vehicle_condition(ctx):
@@ -945,6 +1241,18 @@ def mod_vehicle_capacity(ctx):
     return {"key": "veiculo_capacidade", "category": "veiculos", "label": label, "pct": pct, "tip": tip}
 
 
+def _weapon_skill_factor(emp, model):
+    """A arma certa na mão errada rende pouco (SSS v2): a eficácia escala com
+    o atributo relevante do operacional — o 1º requisito da arma (requires_attr),
+    senão tiro para armas de fogo / discrição para silenciosas. Um recruta com
+    Rifle de Precisão extrai WEAPON_SKILL_FLOOR do potencial; um especialista
+    (atributo >= WEAPON_SKILL_ATTR_CAP) extrai 100%."""
+    reqs = model.get("requires_attr") or {}
+    skill_attr = next(iter(reqs), None) or ("tiro" if model.get("loud") else "discricao")
+    attr_val = (emp.get("attrs") or {}).get(skill_attr, 2)
+    return WEAPON_SKILL_FLOOR + (1 - WEAPON_SKILL_FLOOR) * min(1.0, attr_val / WEAPON_SKILL_ATTR_CAP)
+
+
 def mod_weapon_score(ctx):
     members = ctx["members"]
     weapons_by_employee_id = ctx.get("weapons_by_employee_id") or {}
@@ -960,18 +1268,12 @@ def mod_weapon_score(ctx):
         if not model:
             continue
         equipped += 1
-        score = weapon_combat_score(model, category)
         best_for = model.get("best_for", [])
-        best_for_mult = 1.3 if category in best_for else 0.7
         if best_for and category not in best_for:
             mismatch = True
-        condition_factor = weapon.get("condition", 100) / 100
-        reliability_factor = model.get("reliability", 100) / 100
-        compat = weapon_compatibility_factor(e, model)
-        proficiency = e.get("weapon_proficiency", {}).get(model["category"], 0)
-        proficiency_bonus = (proficiency / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
-        total += score * best_for_mult * condition_factor * reliability_factor * compat * WEAPON_COMBAT_SCORE_SCALE
-        total += proficiency_bonus
+        # Régua única (SSS v5): o mesmo score efetivo usado pelo auto-assign e
+        # pelo otimizador de arsenal — inclui a curva de condição não-linear.
+        total += weapon_effective_score(e, weapon, model, category)
     if equipped == 0:
         return None
     avg = total / len(members)
@@ -982,9 +1284,9 @@ def mod_weapon_score(ctx):
     if abs(pct) < 0.0005:
         return None
     label = "Armas adequadas" if pct > 0 else "Armas pouco adequadas"
-    tip = f"{equipped}/{len(members)} operacional(is) equipados; qualidade e adequação da arma a esta categoria."
+    tip = f"{equipped}/{len(members)} operacional(is) equipados; qualidade da arma, adequação à categoria e habilidade de quem a usa."
     if pct <= 0:
-        tip += " Equipa uma arma mais adequada a esta categoria de missão."
+        tip += " Equipa uma arma mais adequada — e nas mãos de quem tem o atributo certo para a dominar."
     return {"key": "armamento", "category": "armamento", "label": label, "pct": pct, "tip": tip}
 
 
@@ -1019,23 +1321,68 @@ def mod_talents(ctx):
             "tip": "Um operacional da equipa tem o talento Pontaria Letal."}
 
 
+def attention_key(district):
+    """Chave segura para o mapa de atenção policial (Mongo não aceita '.')."""
+    return (district or "").replace(".", "").strip() or "desconhecido"
+
+
+def district_attention_of(player, district):
+    return float((player.get("district_attention") or {}).get(attention_key(district), 0.0))
+
+
+def mod_district_attention(ctx):
+    """Memória do mundo (SSS v3): operar repetidamente na mesma zona deixa a
+    polícia local em alerta — a atenção acumulada penaliza a chance em curva
+    suave e só arrefece com o tempo. Incentiva a rotação geográfica real."""
+    att = ctx.get("district_attention", 0.0)
+    if att < 5:
+        return None
+    frac = min(1.0, att / DISTRICT_ATTENTION_MAX)
+    pct = -DISTRICT_ATTENTION_PENALTY_MAX * frac ** 1.2
+    if abs(pct) < 0.0005:
+        return None
+    hot = att >= DISTRICT_ATTENTION_HOT
+    label = "Zona sob vigilância apertada" if hot else "Polícia atenta à zona"
+    return {"key": "atencao_distrito", "category": "mundo", "label": label, "pct": pct,
+            "tip": f"Operações recentes em {ctx.get('district', 'esta zona')} deixaram a polícia local em alerta ({round(att)}%) — deixa a zona arrefecer ou opera noutro distrito."}
+
+
+def mod_team_momentum(ctx):
+    """Momentum (SSS v3): séries de vitórias dão confiança operacional (bónus
+    modesto e capado); séries de falhas minam-na. Uma vitória limpa repõe tudo."""
+    streak = ctx.get("team_streak", 0)
+    if streak >= 2:
+        pct = min(TEAM_MOMENTUM_BONUS_MAX, TEAM_MOMENTUM_BONUS_PER_WIN * streak)
+        return {"key": "momentum", "category": "equipa", "label": f"Momentum: {streak} vitórias seguidas", "pct": pct,
+                "tip": "A equipa está confiante — série de operações bem-sucedidas sem falhas. Uma falha apaga a série."}
+    if streak <= -2:
+        pct = -min(TEAM_MOMENTUM_PENALTY_MAX, TEAM_MOMENTUM_PENALTY_PER_LOSS * (-streak))
+        return {"key": "momentum", "category": "moral", "label": "Confiança abalada", "pct": pct,
+                "tip": f"{-streak} falhas consecutivas desta equipa — uma vitória limpa restaura a confiança."}
+    return None
+
+
 MODIFIERS = [
-    mod_risk_type, mod_risk_distance, mod_heat,
+    mod_risk_type, mod_risk_distance, mod_heat, mod_district_attention,
     mod_team_quality, mod_team_size, mod_team_fatigue, mod_team_morale, mod_team_loyalty,
-    mod_team_leader, mod_team_uniform_spec, mod_team_coordination,
+    mod_team_leader, mod_team_uniform_spec, mod_team_coordination, mod_team_synergy,
+    mod_team_momentum, mod_team_familiarity, mod_team_strategist,
     mod_vehicle_condition, mod_vehicle_fit, mod_vehicle_capacity,
-    mod_weapon_score, mod_environment_night, mod_hq_level, mod_talents,
+    mod_weapon_score, mod_stealth_synergy, mod_environment_night, mod_hq_level, mod_talents,
 ]
 
 
 def chance_breakdown(ctx):
-    """Sistema modular de probabilidade de sucesso: soma o ponto de partida
-    (BASE_CHANCE) com cada modificador aplicável de MODIFIERS, todos lidos do
-    mesmo `ctx`. Devolve (chance 0-1, items[]) — items começa sempre por
-    "base" e só inclui modificadores com efeito real (não-zero), pela ordem
-    de MODIFIERS. Acrescentar um modificador novo no futuro é acrescentar uma
-    função a MODIFIERS; a soma é comutativa, a ordem só afecta a exibição, a
-    lógica de agregação/clamping nunca muda."""
+    """Sistema modular de probabilidade de sucesso (SSS v2): soma o ponto de
+    partida (BASE_CHANCE) com cada modificador aplicável de MODIFIERS, todos
+    lidos do mesmo `ctx`, e aplica no fim uma compressão de rendimentos
+    decrescentes — acima de CHANCE_SOFT_KNEE cada ponto extra de bónus vale
+    exponencialmente menos (assimptota em CHANCE_CEILING), e a chance nunca
+    desce abaixo de CHANCE_FLOOR (há sempre uma réstia de sorte) nem atinge a
+    certeza absoluta. A compressão, quando aplicada, aparece como um item
+    próprio no breakdown ("rendimentos_decrescentes") para manter a soma dos
+    itens igual à chance final — transparência total para o jogador.
+    Devolve (chance 0-1, items[])."""
     items = [{"key": "base", "category": "base", "label": "Base da missão", "pct": round(BASE_CHANCE, 4),
               "tip": "Ponto de partida antes de qualquer ajuste."}]
     total = BASE_CHANCE
@@ -1048,7 +1395,17 @@ def chance_breakdown(ctx):
             continue
         total += pct
         items.append({**result, "pct": round(pct, 4)})
-    chance = max(0.0, min(1.0, total))
+    # Rendimentos decrescentes acima do joelho: compressão exponencial suave.
+    if total > CHANCE_SOFT_KNEE:
+        excess = total - CHANCE_SOFT_KNEE
+        softened = CHANCE_SOFT_KNEE + CHANCE_SOFT_SPAN * (1 - math.exp(-excess / CHANCE_SOFT_SPAN))
+        delta = softened - total
+        if delta <= -0.0005:
+            items.append({"key": "rendimentos_decrescentes", "category": "base",
+                          "label": "Rendimentos decrescentes", "pct": round(delta, 4),
+                          "tip": "Acima de ~90%, cada bónus extra vale cada vez menos — nenhuma operação é uma certeza absoluta."})
+        total = softened
+    chance = max(CHANCE_FLOOR, min(CHANCE_CEILING, total))
     return chance, items
 
 
@@ -1062,13 +1419,54 @@ def _roll_outcome(player, m):
         # uma recomputação parcial e inconsistente.
         logger.warning("Mission %s sem success_chance persistida — a usar valor neutro (0.5).", m.get("id") or m.get("_id"))
         chance = 0.5
-    if random.random() <= chance:
+    # Operação em direto (SSS): as complicações reveladas durante a operação
+    # têm efeito REAL — o delta acumulado (pré-rolado no despacho e mostrado
+    # ao jogador em tempo real) ajusta a chance antes do roll.
+    live_delta = float(m.get("live_chance_delta", 0) or 0)
+    if live_delta:
+        chance = max(0.05, min(0.97, chance + live_delta))
+    # Encravamento (SSS v5): cada arma leva um risco por missão (fiabilidade ×
+    # condição, persistido no despacho em weapon_jam_profile). Uma arma que
+    # encrava a meio da ação custa pontos de chance — e o relatório final diz
+    # de quem era e qual foi.
+    jams = [wj for wj in (m.get("weapon_jam_profile") or [])
+            if random.random() < float(wj.get("jam_risk", 0) or 0)]
+    if jams:
+        m["weapon_jams"] = [
+            {"weapon_id": wj.get("weapon_id"), "weapon_name": wj.get("weapon_name"),
+             "emp_name": wj.get("emp_name")}
+            for wj in jams
+        ]
+        penalty = min(WEAPON_JAM_CHANCE_PENALTY_CAP, WEAPON_JAM_CHANCE_PENALTY * len(jams))
+        chance = max(0.02, chance - penalty)
+    # Chance efetiva (base + complicações + encravamentos) — persistida para o
+    # relatório e para o painel de operação em direto.
+    m["final_chance"] = round(chance, 3)
+    r = random.random()
+    if r <= chance:
         return "success"
     # Numa falha, o calor atual decide se foi só azar ou se a polícia estava
-    # mesmo à espera: mais calor, mais provável que a falha vire interceção
-    # (prisão + multa) em vez de um falhanço sem consequências extra.
-    police_prob = min(0.65, 0.20 + player.get("heat", 0) * 0.0045)
-    return "police" if random.random() < police_prob else "failure"
+    # mesmo à espera (SSS v2, curva convexa): com calor baixo a polícia quase
+    # não conta (16% base); com calor alto a probabilidade dispara até ao cap.
+    heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
+    police_prob = min(POLICE_PROB_CAP, POLICE_PROB_BASE + POLICE_PROB_SPAN * heat_frac ** POLICE_PROB_EXP)
+    if random.random() < police_prob:
+        return "police"
+    # Near-miss (SSS v3): falhar "por pouco" (dentro da janela acima da chance)
+    # e sem interceção policial vira sucesso parcial — a equipa aborta a meio
+    # mas salva parte do saque. O resultado deixa de ser tudo-ou-nada.
+    if r <= chance + PARTIAL_SUCCESS_WINDOW:
+        return "partial"
+    # Clutch save do líder (SSS v4): numa falha franca sem polícia, um líder
+    # presente com sangue-frio alto pode ainda salvar a operação para um
+    # sucesso parcial — improvisa, corta perdas e traz parte do saque.
+    if m.get("has_leader"):
+        cool = float(m.get("leader_cool", 0) or 0)
+        clutch_prob = CLUTCH_SAVE_MAX * max(0.0, min(1.0, cool / 10.0))
+        if clutch_prob > 0 and random.random() < clutch_prob:
+            m["clutch_save"] = True
+            return "partial"
+    return "failure"
 
 
 def _apply_outcome(player, m, outcome):
@@ -1076,6 +1474,14 @@ def _apply_outcome(player, m, outcome):
     stats = player.setdefault("stats", default_stats())
     stats["missions_total"] += 1
     stats["by_category"][t["category"]] = stats["by_category"].get(t["category"], 0) + 1
+    # Memória do mundo (SSS v3): a zona onde a operação aconteceu aquece —
+    # quanto pior o desfecho e maior o risco, mais atenção policial acumula.
+    att = player.setdefault("district_attention", {})
+    att_gain = {"success": DISTRICT_ATTENTION_SUCCESS, "partial": DISTRICT_ATTENTION_PARTIAL,
+                "failure": DISTRICT_ATTENTION_FAILURE, "police": DISTRICT_ATTENTION_POLICE}.get(outcome, 0.0)
+    att_gain *= 1 + DISTRICT_ATTENTION_PER_RISK * t.get("risk", 3)
+    akey = attention_key(t.get("district"))
+    att[akey] = round(min(DISTRICT_ATTENTION_MAX, att.get(akey, 0.0) + att_gain), 2)
     heat_mult = 0.5 if ("fantasma_digital" in m.get("talents", []) and t["category"] == "tecnica") else 1.0
     if m.get("vehicle_luxury") and t["category"] in DISCREET_CATEGORIES:
         heat_mult *= LUXURY_HEAT_MULT
@@ -1101,6 +1507,23 @@ def _apply_outcome(player, m, outcome):
             m["chase_active"] = True
             m["escape_chance"] = _compute_escape_chance(player, m)
         m["chase_chance"] = round(chase_chance, 3)
+    elif outcome == "partial":
+        # Sucesso parcial (SSS v3): a equipa abortou a meio mas salvou parte do
+        # saque — paga menos, faz mais barulho e a polícia fica mais desconfiada.
+        stats["missions_partial"] = stats.get("missions_partial", 0) + 1
+        frac = random.uniform(PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX)
+        m["pending_reward"] = int(t["reward"] * frac)
+        m["pending_pays"] = t["pays"]
+        m["partial_fraction"] = round(frac, 2)
+        base_rep = m.get("reward_reputation", t["respect"])
+        player["respect"] += max(1, int(base_rep * PARTIAL_RESPECT_FRACTION))
+        player["heat"] = min(100, player["heat"] + t["heat"] * PARTIAL_HEAT_MULT * heat_mult)
+        # Golpe interrompido = polícia já alertada: perseguição mais provável.
+        chase_chance = min(0.9, _compute_chase_chance(player, m) * PARTIAL_CHASE_MULT)
+        if random.random() < chase_chance:
+            m["chase_active"] = True
+            m["escape_chance"] = _compute_escape_chance(player, m)
+        m["chase_chance"] = round(chase_chance, 3)
     elif outcome == "failure":
         stats["missions_failure"] += 1
         # Reputação por falha: 25% do valor de sucesso (usando novo cálculo se disponível)
@@ -1120,28 +1543,38 @@ def _apply_outcome(player, m, outcome):
 
 
 def _compute_chase_chance(player, m):
-    """Base chance the police tail the crew back to base after a successful heist."""
+    """Probabilidade de a polícia seguir a equipa após o golpe (SSS v3): base
+    por risco, calor em curva convexa (CHASE_HEAT_*), atenção policial da zona
+    (zonas vigiadas têm patrulhas à espera), aliviada por talentos, skill da
+    equipa e — em operações discretas — por um veículo que passa despercebido."""
     t = m["opportunity"]
     risk = t.get("risk", 3)
-    heat = player.get("heat", 0)
-    # Base by risk (0..0.35), heat contribution up to +0.25.
+    heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
     base = 0.05 + (risk / 5) * 0.30
-    heat_bonus = (heat / 100) * 0.25
-    # Talents & skill mitigate: "fantasma_digital" and technical categories are stealthier.
+    # Curva convexa: calor baixo quase não conta, calor alto conta muito.
+    base += CHASE_HEAT_SPAN * heat_frac ** CHASE_HEAT_EXP
+    # Memória do mundo: zonas com atenção acumulada atraem perseguições.
+    att = district_attention_of(player, t.get("district"))
+    base += DISTRICT_ATTENTION_CHASE_MAX * min(1.0, att / DISTRICT_ATTENTION_MAX)
     talents = m.get("talents", []) or []
     reduction = 0.0
     if "fantasma_digital" in talents:
         reduction += 0.10
     if "motorista_fantasma" in talents:
         reduction += 0.05
-    # Team skill matters a bit.
+    # Veículo discreto em operação discreta: menos olhos em cima.
+    if m.get("vehicle_discreet") and t.get("category") in DISCREET_CATEGORIES:
+        reduction += CHASE_DISCRETION_RELIEF
     skill = m.get("team_skill", 3)
     reduction += min(0.10, max(0.0, (skill - 3) * 0.03))
-    return max(0.02, min(0.85, base + heat_bonus - reduction))
+    return max(0.02, min(0.85, base - reduction))
 
 
 def _compute_escape_chance(player, m):
-    """Chance of losing the police tail before reaching HQ."""
+    """Probabilidade de despistar a polícia antes do QG (SSS v3): risco e calor
+    (convexo, ESCAPE_HEAT_*) contra skill, talentos, momentum da equipa e —
+    finalmente — o próprio carro de fuga: velocidade efetiva acima do baseline
+    ajuda a fugir (ESCAPE_SPEED_*), um supercarro em bom estado vale ~+15%."""
     t = m["opportunity"]
     risk = t.get("risk", 3)
     skill = m.get("team_skill", 3)
@@ -1152,8 +1585,30 @@ def _compute_escape_chance(player, m):
         base += 0.08
     if "motorista_fantasma" in talents:
         base += 0.10
-    heat = player.get("heat", 0)
-    base -= (heat / 100) * 0.10
+    # O carro de fuga conta: velocidade efetiva (condição incluída) do despacho.
+    speed = m.get("vehicle_speed_effective")
+    if speed:
+        base += min(ESCAPE_SPEED_BONUS_MAX,
+                    max(0.0, (speed - ESCAPE_SPEED_BASELINE) * ESCAPE_SPEED_BONUS_PER_UNIT))
+    # Quem conduz também conta (SSS v4): o melhor condutor da equipa despista
+    # a polícia com manobras que o carro sozinho não faz.
+    driver = float(m.get("best_driver", 0) or 0)
+    if driver > DRIVER_ATTR_BASELINE:
+        base += min(DRIVER_ESCAPE_BONUS_MAX,
+                    (driver - DRIVER_ATTR_BASELINE) * DRIVER_ESCAPE_BONUS_PER_POINT)
+    # Momentum: equipas em série de vitórias fogem com mais sangue-frio.
+    streak = m.get("team_streak", 0)
+    if streak > 0:
+        base += min(TEAM_MOMENTUM_ESCAPE_BONUS_MAX, streak * 0.01)
+    # Intimidação (SSS v5): em assaltos, poder de fogo visível dissuade
+    # testemunhas e patrulhas — ganha segundos preciosos na fuga. É a
+    # contrapartida real do calor extra que as armas ruidosas custam.
+    if t.get("category") == "assalto":
+        power_avg = float(m.get("weapon_power_avg", 0) or 0)
+        if power_avg > 0:
+            base += WEAPON_INTIMIDATION_ESCAPE_MAX * min(1.0, power_avg / 100.0)
+    heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
+    base -= ESCAPE_HEAT_SPAN * heat_frac ** ESCAPE_HEAT_EXP
     return max(0.10, min(0.95, base))
 
 
@@ -1180,7 +1635,9 @@ async def _resolve_chase(db, player, m):
     if m.get("member_ids") and random.random() < 0.4:
         victim_id = random.choice(m["member_ids"])
         bonuses = await get_org_bonuses(db, m["player_id"])
-        until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]))).isoformat()
+        # Advogado na equipa (SSS v4): trata da papelada mal chegam à esquadra.
+        lawyer_mult = LAWYER_ARREST_MULT if m.get("has_lawyer") else 1.0
+        until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]) * lawyer_mult)).isoformat()
         await db.employees.update_one(
             {"_id": ObjectId(victim_id)},
             {"$set": {"status": "arrested", "status_until": until}},
@@ -1188,8 +1645,9 @@ async def _resolve_chase(db, player, m):
         emp = await db.employees.find_one({"_id": ObjectId(victim_id)})
         if emp:
             await push_history(db, emp["_id"], "Preso na perseguição de regresso à base.")
+            suffix = " O advogado da equipa já está a tratar da libertação." if m.get("has_lawyer") else ""
             await add_event(db, m["player_id"], "police",
-                            f"{emp['name']} foi PRESO durante a perseguição policial!")
+                            f"{emp['name']} foi PRESO durante a perseguição policial!{suffix}")
     await add_event(db, m["player_id"], "police",
                     f"POLÍCIA APANHOU {m['team_name']} antes do QG — perdeu {lost:,} € do assalto.")
     return "caught"
@@ -1229,11 +1687,32 @@ async def _pay_pending_reward(db, player, m):
                         f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.")
 
 
+def _failure_cause_suffix(m):
+    """Forense pós-operação (SSS v3): aponta o fator negativo mais pesado do
+    despacho — o jogador aprende PORQUÊ falhou, não apenas QUE falhou."""
+    cause = (m.get("top_negatives") or [None])[0]
+    if not cause:
+        return ""
+    return f" Fator crítico: {cause['label']} ({round(cause['pct'] * 100)}%)."
+
+
+def _jam_suffix(m):
+    """Relatório de encravamento (SSS v5): o jogador fica a saber QUAL arma
+    encravou e DE QUEM era — para reparar, substituir ou vender."""
+    jams = m.get("weapon_jams") or []
+    if not jams:
+        return ""
+    if len(jams) == 1:
+        j = jams[0]
+        return f" A {j.get('weapon_name', 'arma')} de {j.get('emp_name', '?')} ENCRAVOU no pior momento."
+    return f" {len(jams)} armas ENCRAVARAM durante a ação — o arsenal precisa de manutenção."
+
+
 def _outcome_message(m, outcome):
     t = m["opportunity"]
+    symbol = "€ limpos" if t["pays"] == "clean" else "€ sujos"
     if outcome == "success":
         reward = int(m.get("pending_reward", t.get("reward", 0)) or 0)
-        symbol = "€ limpos" if t["pays"] == "clean" else "€ sujos"
         chase = m.get("chase_active")
         base = f"{m['team_name']} concluiu {t['name']} em {t['district']}: leva {reward:,} {symbol}"
         if chase:
@@ -1241,11 +1720,22 @@ def _outcome_message(m, outcome):
         else:
             base += ", regressa em segurança"
         base += f", +{t['respect']} respeito."
-        return base
+        return base + _jam_suffix(m)
+    if outcome == "partial":
+        reward = int(m.get("pending_reward", 0) or 0)
+        frac = int(m.get("partial_fraction", 0.6) * 100)
+        if m.get("clutch_save"):
+            base = f"O líder de {m['team_name']} manteve o sangue-frio quando tudo parecia perdido em {t['name']} ({t['district']}) — improvisou e salvou {reward:,} {symbol} ({frac}% do saque)"
+        else:
+            base = f"{m['team_name']} teve de abortar {t['name']} em {t['district']} a meio — salvou {reward:,} {symbol} ({frac}% do saque)"
+        if m.get("chase_active"):
+            base += f" — POLÍCIA em perseguição (escape ≈ {int((m.get('escape_chance', 0.5)) * 100)}%)"
+        base += "."
+        return base + _jam_suffix(m)
     if outcome == "failure":
-        return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada."
+        return f"{m['team_name']} falhou {t['name']} em {t['district']}. A operação foi abortada.{_failure_cause_suffix(m)}{_jam_suffix(m)}"
     fine = m.get("fine", 0)
-    return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €."
+    return f"A polícia intercetou {m['team_name']} durante {t['name']} em {t['district']}. Multa de {fine:,} €.{_failure_cause_suffix(m)}{_jam_suffix(m)}"
 
 
 async def _crew_returns(db, player, m, outcome):
@@ -1272,6 +1762,10 @@ async def _crew_returns(db, player, m, outcome):
         if outcome == "success":
             xp_gain = int(base_xp * (1.5 if match else 1.0))
             d_morale, d_loyal = 2, 1
+        elif outcome == "partial":
+            # Salvar parte do saque ainda ensina — mas deixa um travo amargo.
+            xp_gain = max(1, int(base_xp * PARTIAL_XP_FRACTION * (1.5 if match else 1.0)))
+            d_morale, d_loyal = -1, 0
         elif outcome == "failure":
             xp_gain = max(1, int(base_xp * 0.2))
             d_morale, d_loyal = -4, 0
@@ -1345,7 +1839,15 @@ async def _crew_returns(db, player, m, outcome):
         await db.employees.update_one({"_id": emp["_id"]}, {"$set": sets})
         await push_history(db, emp["_id"], f"{t['name']} em {t['district']}: {OUTCOME_PT[outcome]}.")
         if weapon:
-            wear = WEAPON_WEAR_PER_MISSION + t["risk"] * WEAPON_WEAR_RISK_MULT
+            w_model = WEAPON_MODELS.get(weapon["model_key"], {})
+            # Durabilidade finalmente ligada (SSS v5): modelos robustos desgastam
+            # devagar, modelos frágeis desfazem-se depressa — e uma arma que
+            # encravou durante a ação perde condição extra.
+            durability = max(30.0, float(w_model.get("durability", WEAPON_DURABILITY_WEAR_REF)))
+            wear = (WEAPON_WEAR_PER_MISSION + t["risk"] * WEAPON_WEAR_RISK_MULT) * (WEAPON_DURABILITY_WEAR_REF / durability)
+            jammed_ids = {j.get("weapon_id") for j in (m.get("weapon_jams") or [])}
+            if str(weapon["_id"]) in jammed_ids:
+                wear += WEAPON_JAM_EXTRA_WEAR
             new_w_condition = max(0.0, weapon.get("condition", 100.0) - wear)
             await db.weapons.update_one({"_id": weapon["_id"]}, {
                 "$set": {"condition": new_w_condition},
@@ -1356,17 +1858,27 @@ async def _crew_returns(db, player, m, outcome):
         if outcome == "failure":
             victim = random.choice(members)
             p = 0.35 if victim["fatigue"] > 70 else 0.2
+            # Médico na equipa (SSS v4): estabiliza no terreno — ferimentos menos
+            # prováveis e recuperação mais rápida.
+            has_medic = m.get("has_medic", False)
+            if has_medic:
+                p *= MEDIC_INJURY_MULT
             if random.random() < p:
-                until = (now_utc() + timedelta(seconds=300 * (1 - bonuses["heal"]))).isoformat()
+                duration = 300 * (1 - bonuses["heal"]) * (MEDIC_RECOVERY_MULT if has_medic else 1.0)
+                until = (now_utc() + timedelta(seconds=duration)).isoformat()
                 await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "injured", "status_until": until}})
                 await push_history(db, victim["_id"], "Ferido em operação.")
-                await add_event(db, pid, "police", f"{victim['name']} ficou ferido durante {t['name']}!")
+                suffix = " O médico da equipa estabilizou-o — recupera mais depressa." if has_medic else ""
+                await add_event(db, pid, "police", f"{victim['name']} ficou ferido durante {t['name']}!{suffix}")
         elif outcome == "police" and random.random() < 0.3:
             victim = random.choice(members)
-            until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]))).isoformat()
+            # Advogado na equipa (SSS v4): a prisão dura menos.
+            lawyer_mult = LAWYER_ARREST_MULT if m.get("has_lawyer") else 1.0
+            until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]) * lawyer_mult)).isoformat()
             await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "arrested", "status_until": until}})
             await push_history(db, victim["_id"], "Preso pela polícia.")
-            await add_event(db, pid, "police", f"{victim['name']} foi PRESO durante {t['name']}!")
+            suffix = " O advogado da equipa já está a tratar da libertação." if m.get("has_lawyer") else ""
+            await add_event(db, pid, "police", f"{victim['name']} foi PRESO durante {t['name']}!{suffix}")
 
     if m.get("vehicle_id"):
         veh = await db.vehicles.find_one({"_id": ObjectId(m["vehicle_id"])})
@@ -1376,7 +1888,11 @@ async def _crew_returns(db, player, m, outcome):
             wear_mult = 1 + (WEAR_KM_MAX_MULT - 1) * min(1.0, veh.get("km_total", 0) / WEAR_KM_RAMP)
             missions_since_repair = veh.get("missions_since_repair", 0)
             wear_mult += WEAR_PER_MISSION_SINCE_REPAIR * min(missions_since_repair, WEAR_MISSIONS_SINCE_REPAIR_CAP)
-            wear = (2 + t["risk"] * 1.5) * wear_mult
+            # Desgaste re-derivado (SSS v3, constantes v2 finalmente ligadas):
+            # componente fixa + risco + km reais percorridos — expedições longas
+            # desgastam mais, operações à porta do QG desgastam menos.
+            wear = (VEHICLE_WEAR_BASE + t["risk"] * VEHICLE_WEAR_PER_RISK
+                    + VEHICLE_WEAR_PER_KM * float(m.get("round_km") or 0.0)) * wear_mult
             # Pequeno imprevisto: avaria inesperada após uma operação arriscada.
             if random.random() < UNEXPECTED_REPAIR_CHANCE_PER_RISK * t["risk"]:
                 wear += UNEXPECTED_REPAIR_CONDITION_HIT
@@ -1399,6 +1915,15 @@ async def _progress_mission(db, player, m, now):
         phase = "operating"
         updates["phase"] = phase
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "operating"}})
+        # Aviso inteligente do líder (SSS v4): se o calor disparou desde a
+        # partida, o líder reporta do alvo — o jogador fica a saber que as
+        # condições pioraram (a equipa mantém sempre a operação).
+        heat_then = m.get("heat_at_dispatch")
+        if m.get("has_leader") and heat_then is not None:
+            heat_now = player.get("heat", 0)
+            if heat_now - heat_then >= SMART_WARN_HEAT_DELTA:
+                await add_event(db, m["player_id"], "intel",
+                                f"Líder de {m['team_name']} reporta do alvo: o calor subiu de {round(heat_then)}% para {round(heat_now)}% desde a partida — condições piores do que o planeado. A equipa mantém a operação.")
     if phase == "operating" and now >= parse_dt(m["finish_at"]):
         outcome = _roll_outcome(player, m)
         _apply_outcome(player, m, outcome)
@@ -1406,12 +1931,27 @@ async def _progress_mission(db, player, m, now):
         phase = "returning"
         updates.update({"phase": phase, "outcome": outcome})
         # Persist pending reward and chase state so the front-end can display them.
-        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance", "escape_chance", "fine", "bonus_loot"):
+        for k in ("pending_reward", "pending_pays", "chase_active", "chase_chance",
+                  "escape_chance", "fine", "bonus_loot", "partial_fraction", "clutch_save",
+                  "weapon_jams", "final_chance"):
             if k in m:
                 updates[k] = m[k]
+        # Guião de regresso em direto (SSS live ops): o desfecho e a perseguição
+        # só são conhecidos agora — anexar os beats do regresso ao live_log.
+        try:
+            ret_entries, ret_used = build_return_script(
+                m, parse_dt(m["finish_at"]), parse_dt(m["return_at"]),
+                memory=player.get("phrase_memory"),
+            )
+            if ret_entries:
+                updates["live_log"] = (m.get("live_log") or []) + ret_entries
+            if ret_used:
+                player["phrase_memory"] = update_memory(player.get("phrase_memory"), ret_used)
+        except Exception:
+            logger.exception("Falha a gerar o guião de regresso da missão %s", m.get("_id"))
         # Track success now (before pay-out): the operation succeeded, delivery is separate.
+        stats = player.setdefault("stats", default_stats())
         if outcome == "success":
-            stats = player.setdefault("stats", default_stats())
             stats["missions_success"] = stats.get("missions_success", 0) + 1
             # Métricas usadas pelas missões (quests) de categoria e alto valor —
             # sem estes incrementos, 19 quests ficavam impossíveis de completar.
@@ -1424,12 +1964,37 @@ async def _progress_mission(db, player, m, now):
             # Conquistas permanentes: cada marco de missões bem-sucedidas concede
             # um pequeno bónus passivo de recompensa, para sempre.
             player["achievement_bonus_pct"] = achievement_bonus_pct(stats["missions_success"])
-        await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "returning"}, "$inc": {"missions_done": 1}})
-        kind = "success" if outcome == "success" else ("police" if outcome == "police" else "failure")
+            # Série de vitórias da organização (SSS v3): ao atingir o marco, o
+            # mundo reage — o próximo tick gera um Golpe de Oportunidade especial.
+            stats["current_success_streak"] = stats.get("current_success_streak", 0) + 1
+            if stats["current_success_streak"] == STREAK_SPECIAL_THRESHOLD and not player.get("streak_op_pending"):
+                player["streak_op_pending"] = True
+                await add_event(db, m["player_id"], "intel",
+                                f"As ruas falam da tua série de {STREAK_SPECIAL_THRESHOLD} vitórias — um Golpe de Oportunidade vai aparecer no mapa.")
+        elif outcome in ("failure", "police"):
+            stats["current_success_streak"] = 0
+        # Momentum da equipa (SSS v3): vitórias somam, falhas invertem o sinal,
+        # sucesso parcial não mexe — nem herói nem culpado.
+        team_doc = await db.teams.find_one({"_id": team_oid})
+        old_streak = int((team_doc or {}).get("streak", 0) or 0)
+        if outcome == "success":
+            new_streak = old_streak + 1 if old_streak >= 0 else 1
+        elif outcome in ("failure", "police"):
+            new_streak = old_streak - 1 if old_streak <= 0 else -1
+        else:
+            new_streak = old_streak
+        await db.teams.update_one({"_id": team_oid}, {
+            "$set": {"status": "returning", "streak": new_streak},
+            # A equipa aprende (SSS v4): qualquer operação concluída conta para a
+            # familiaridade da categoria e para o entrosamento do plantel atual.
+            "$inc": {"missions_done": 1, "roster_missions": 1,
+                     f"category_missions.{m['opportunity'].get('category', 'especial')}": 1},
+        })
+        kind = "success" if outcome in ("success", "partial") else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))
     if phase == "returning" and now >= parse_dt(m["return_at"]):
         # Resolve chase (if any) and pay pending reward on arrival at HQ.
-        if m.get("outcome") == "success":
+        if m.get("outcome") in ("success", "partial"):
             await _resolve_chase(db, player, m)
             for k in ("pending_reward", "chase_outcome"):
                 if k in m:
@@ -1839,7 +2404,12 @@ async def _auto_claim_quests(db, player, now):
         d = QUEST_DEFS.get(q["quest_key"])
         if not d:
             continue
-        parts = await grant_quest_rewards(db, player, d.get("rewards", {}))
+        # Recompensas dinâmicas (SSS v3): nível × dificuldade × tier adaptativo
+        # × streak — o mesmo cálculo do claim manual, para consistência total.
+        rewards, streak_note = effective_quest_rewards(player, q, d, now)
+        parts = await grant_quest_rewards(db, player, rewards)
+        if streak_note:
+            parts.append(streak_note)
         await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
         if q["quest_key"] == "c2_front":
             await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
@@ -2108,10 +2678,23 @@ async def advance(db, player):
     await _complete_refuels(db, player, vehicles, now)
     await _complete_vehicle_transfers(db, player, vehicles, {str(p["_id"]): p for p in props}, now)
     await process_quests(db, player, {"employees": employees, "props": props,
-                                      "vehicles": vehicles, "minutes": minutes})
+                                      "vehicles": vehicles, "minutes": minutes,
+                                      "dirty_cap": dirty_money_cap(player["level"])})
     await process_automations(db, player, employees, vehicles, props, bonuses, now)
 
-    player["heat"] = round(max(0.0, player["heat"] - minutes * 1.2), 3)
+    # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
+    # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
+    decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
+    player["heat"] = round(max(0.0, player["heat"] - minutes * decay_rate), 3)
+    # A atenção policial por distrito arrefece com o tempo — zonas quentes
+    # voltam gradualmente a ser operáveis.
+    if minutes > 0 and player.get("district_attention"):
+        cooled = {}
+        for k, v in player["district_attention"].items():
+            nv = round(min(DISTRICT_ATTENTION_MAX, float(v)) - minutes * DISTRICT_ATTENTION_DECAY_PER_MIN, 2)
+            if nv > 0.5:
+                cooled[k] = nv
+        player["district_attention"] = cooled
     apply_dirty_money_heat(player, minutes / 60)
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
@@ -2131,6 +2714,13 @@ async def advance(db, player):
         "frac_launder": player.get("frac_launder", 0.0),
         "type_cooldowns": player.get("type_cooldowns", {}),
         "achievement_bonus_pct": player.get("achievement_bonus_pct", 0.0),
+        "district_attention": player.get("district_attention", {}),
+        "streak_op_pending": player.get("streak_op_pending", False),
+        "quest_streak": player.get("quest_streak", {}),
+        "quest_perf": player.get("quest_perf", {}),
+        "quest_offer_history": player.get("quest_offer_history", {}),
+        "pending_chains": player.get("pending_chains", []),
+        "phrase_memory": player.get("phrase_memory", []),
     }})
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player

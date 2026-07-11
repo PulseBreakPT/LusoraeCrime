@@ -28,4 +28,60 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ---------------------------------------------------------------------------
+// Recuperação automática de sessão expirada: em respostas 401 (fora dos
+// endpoints de autenticação) tenta renovar o access token uma única vez com
+// o refresh token e repete o pedido original. Se a renovação falhar, limpa a
+// sessão local e emite um evento global para a app redirecionar para o login
+// com aviso de "sessão expirada" — nunca fica em loading infinito.
+// ---------------------------------------------------------------------------
+const AUTH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
+let refreshPromise = null;
+
+const expireSession = () => {
+  clearTokens();
+  try {
+    sessionStorage.setItem("lus_session_expired", "1");
+  } catch (_e) {
+    // sessionStorage indisponível — o evento continua a ser emitido
+  }
+  window.dispatchEvent(new CustomEvent("lus:session-expired"));
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const { config, response } = error;
+    const url = config?.url || "";
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((e) => url.includes(e));
+
+    if (response?.status === 401 && !isAuthEndpoint && !config._retried) {
+      config._retried = true;
+      try {
+        if (!refreshPromise) {
+          const refresh = getRefreshToken();
+          refreshPromise = axios
+            .post(
+              `${API}/auth/refresh`,
+              {},
+              {
+                timeout: 8000,
+                headers: refresh ? { Authorization: `Bearer ${refresh}` } : {},
+              }
+            )
+            .finally(() => {
+              refreshPromise = null;
+            });
+        }
+        const res = await refreshPromise;
+        if (res.data?.access_token) setTokens(res.data.access_token, null);
+        return api(config);
+      } catch (_refreshErr) {
+        expireSession();
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export { API };

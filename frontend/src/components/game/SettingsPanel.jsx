@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useAuth } from "../../context/AuthContextV2";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
-import { ConfirmButton } from "./hud";
+import { evaluatePassword } from "../../lib/passwordStrength";
+import { ConfirmButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { haptics } from "../../lib/haptics";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -47,7 +48,7 @@ const Section = ({ icon: Icon, title, children, testId }) => (
     <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
       <Icon size={12} /> {title}
     </h3>
-    <Card className="space-y-2 border-white/10 bg-white/[0.03] p-3 shadow-none">{children}</Card>
+    <Card className="space-y-2 lus-card p-3 shadow-none">{children}</Card>
   </div>
 );
 
@@ -106,7 +107,10 @@ const ChangePasswordForm = () => {
 
   const submit = async () => {
     setError("");
-    if (next.length < 6) return setError("A nova palavra-passe precisa de pelo menos 6 caracteres.");
+    const evaluation = evaluatePassword(next);
+    if (!evaluation.meetsPolicy) {
+      return setError("A nova palavra-passe precisa de 8+ caracteres, 1 maiúscula, 1 minúscula e 1 número.");
+    }
     if (next !== confirm) return setError("As palavras-passe novas não coincidem.");
     setBusy(true);
     const res = await changePassword(current, next);
@@ -197,7 +201,8 @@ const ClaimAdminForm = () => {
         data-testid="settings-claim-admin-button"
         onClick={run}
         disabled={busy}
-        className="mt-2 w-full bg-amber-600 text-xs font-bold uppercase tracking-wider text-white hover:bg-amber-700"
+        variant="outline"
+        className="mt-2 w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-xs font-bold uppercase tracking-wider text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white"
       >
         <ShieldCheck size={14} className="mr-1.5" /> Tornar-me Administrador
       </Button>
@@ -297,7 +302,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
     showSeconds, setShowSeconds, compactNumbers, setCompactNumbers,
     showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
     rememberFilters, setRememberFilters, rememberSort, setRememberSort,
-    confirmIrreversible, setConfirmIrreversible,
+    confirmIrreversible, setConfirmIrreversible, showFps, setShowFps,
     autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
     hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
     autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
@@ -312,8 +317,10 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
+          <PanelWatermark icon={Settings} />
+          <PanelKicker>Sistema · Preferências</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições
           </SheetTitle>
@@ -326,8 +333,8 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Button
             data-testid="logout-button"
             onClick={logout}
-            variant="outline"
-            className="w-full border-white/10 bg-transparent text-xs font-bold uppercase tracking-wider text-zinc-400 hover:bg-white/5 hover:text-white"
+            variant="destructive"
+            className="w-full text-xs font-bold uppercase tracking-wider"
           >
             <LogOut size={14} className="mr-1.5" /> Terminar sessão
           </Button>
@@ -362,6 +369,9 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           </Row>
           <Row label="Confirmar apenas ações irreversíveis" hint="Desliga para executar de imediato, sem confirmação" testId="settings-row-confirm-irreversible">
             <ToggleSwitch testId="settings-toggle-confirm-irreversible" checked={confirmIrreversible} onChange={setConfirmIrreversible} />
+          </Row>
+          <Row label="Mostrar contador de FPS" hint="Indicador de fluidez no canto do ecrã" testId="settings-row-show-fps">
+            <ToggleSwitch testId="settings-toggle-show-fps" checked={showFps} onChange={setShowFps} />
           </Row>
         </Section>
 

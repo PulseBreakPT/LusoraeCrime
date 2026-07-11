@@ -1,23 +1,105 @@
 import os
+import re
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
 from db import db
-from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
+from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY, LISBON_SPOTS
 from engine import now_utc, add_event, vehicle_doc, starting_employee
+from legal_data import current_version
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 JWT_ALGORITHM = "HS256"
 MAX_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+
+# ---------------------------------------------------------------------------
+# Política de palavras-passe (aplicada no registo e na alteração — contas
+# existentes continuam a poder iniciar sessão com as palavras-passe antigas)
+# ---------------------------------------------------------------------------
+PASSWORD_MIN_LENGTH = 8
+# Caracteres proibidos em nomes de organização (controlo + injeção de markup)
+ORG_NAME_FORBIDDEN = re.compile(r"[<>{}\[\]\\/;`\x00-\x1f\x7f]")
+
+
+def password_policy_errors(password: str) -> list:
+    """Devolve a lista de requisitos em falta (vazia = palavra-passe válida)."""
+    errors = []
+    if len(password) < PASSWORD_MIN_LENGTH:
+        errors.append(f"mínimo {PASSWORD_MIN_LENGTH} caracteres")
+    if not re.search(r"[a-z]", password):
+        errors.append("pelo menos 1 letra minúscula")
+    if not re.search(r"[A-Z]", password):
+        errors.append("pelo menos 1 letra maiúscula")
+    if not re.search(r"[0-9]", password):
+        errors.append("pelo menos 1 número")
+    return errors
+
+
+def validate_password_or_400(password: str):
+    errors = password_policy_errors(password)
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail="Palavra-passe fraca: falta " + ", ".join(errors) + ".",
+        )
+
+
+def sanitize_org_name(name: str) -> str:
+    """Normaliza espaços e valida caracteres do nome da organização."""
+    cleaned = re.sub(r"\s+", " ", name or "").strip()
+    if len(cleaned) < 3:
+        raise HTTPException(status_code=400, detail="O nome da organização deve ter pelo menos 3 caracteres")
+    if len(cleaned) > 40:
+        raise HTTPException(status_code=400, detail="O nome da organização não pode exceder 40 caracteres")
+    if ORG_NAME_FORBIDDEN.search(cleaned):
+        raise HTTPException(status_code=400, detail="O nome da organização contém caracteres não permitidos")
+    return cleaned
+
+
+async def org_name_taken(name: str, exclude_user_id: str | None = None) -> bool:
+    """Verificação de unicidade case-insensitive do nome da organização."""
+    query = {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+    existing = await db.users.find_one(query)
+    if not existing:
+        return False
+    if exclude_user_id and str(existing["_id"]) == exclude_user_id:
+        return False
+    return True
+
+
+def terms_acceptance_record(ip: str) -> dict:
+    """Regista a aceitação dos documentos legais com data, hora e versões."""
+    terms = current_version("terms") or {}
+    privacy = current_version("privacy") or {}
+    return {
+        "accepted_at": now_utc().isoformat(),
+        "terms_version": terms.get("version", "1.0"),
+        "privacy_version": privacy.get("version", "1.0"),
+        "ip": ip,
+    }
 # Única conta autorizada a auto-promover-se a administrador pelo botão do
 # frontend — qualquer outra conta recebe 403 ao chamar /claim-admin.
 SELF_CLAIM_ADMIN_EMAIL = "geral@lusorae.pt"
+
+# Sistema de funções (roles) da plataforma:
+#   player    — jogador normal, sem acesso a ferramentas de gestão
+#   moderator — acesso de LEITURA ao painel de administração (dashboard,
+#               utilizadores, registos, estatísticas); nunca pode alterar nada
+#   admin     — acesso total, incluindo mutações e gestão de funções
+VALID_ROLES = ("player", "moderator", "admin")
+STAFF_ROLES = ("moderator", "admin")
+
+
+def root_admin_email() -> str:
+    """Conta raiz criada pelo seed — protegida contra despromoção/banimento."""
+    return os.environ.get("ADMIN_EMAIL", "admin@lusorae.com")
 
 
 def hash_password(password: str) -> str:
@@ -64,6 +146,10 @@ async def get_current_user(request: Request) -> dict:
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="Utilizador não encontrado")
+        # Contas banidas perdem o acesso imediatamente, mesmo com sessão válida —
+        # sem isto, um banido manteria acesso até o refresh token expirar (7 dias).
+        if user.get("banned"):
+            raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'sem motivo indicado')}")
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
@@ -76,17 +162,23 @@ async def get_current_user(request: Request) -> dict:
 class RegisterInput(BaseModel):
     org_name: str = Field(min_length=3, max_length=40)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
+    accept_terms: bool = False
 
 
 class LoginInput(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AvailabilityInput(BaseModel):
+    org_name: str | None = Field(default=None, max_length=60)
+    email: str | None = Field(default=None, max_length=254)
 
 
 class ChangePasswordInput(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128)
 
 
 class DeleteAccountInput(BaseModel):
@@ -95,22 +187,37 @@ class DeleteAccountInput(BaseModel):
 
 def user_public(user: dict) -> dict:
     return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", ""),
-            "role": user.get("role", "player")}
+            "role": user.get("role", "player"),
+            # Disclaimer de ficção: aceite UMA única vez por conta (no primeiro
+            # registo/entrada). O frontend usa este campo para nunca repetir o
+            # aviso — a fonte de verdade é o registo de auditoria gravado por
+            # POST /legal/disclaimer-ack (last_disclaimer).
+            "disclaimer_accepted": bool((user.get("last_disclaimer") or {}).get("accepted"))}
 
 
-async def create_player_for_user(user_id: str, org_name: str):
+async def create_player_for_user(user_id: str, org_name: str, with_default_hq: bool = False):
     # SAFEGUARD: never overwrite existing player data on restart/redeploy
     existing = await db.players.find_one({"user_id": user_id})
     if existing:
         return str(existing["_id"])
 
     now = now_utc().isoformat()
+    # Novos jogadores escolhem onde montar o 1º Quartel-General (em Portugal,
+    # nunca no mar) — o jogo só arranca depois do POST /game/hq/place.
+    # `with_default_hq` mantém o comportamento antigo para a conta admin seeded.
+    if with_default_hq:
+        hq = {**HQ_LOCATION, "level": 1, "upgrading_until": None, "upgrade_history": []}
+        districts = [{"key": f"d{i + 1}", "name": s["name"], "lat": s["lat"], "lng": s["lng"], "named": True}
+                     for i, s in enumerate(LISBON_SPOTS)]
+        region = "Lisboa"
+    else:
+        hq, districts, region = None, [], ""
     result = await db.players.insert_one({
         "user_id": user_id, "org_name": org_name,
         "clean_money": 75000, "dirty_money": 5000,
         "respect": 0, "level": 1, "heat": 0.0,
         "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0, "v2": True,
-        "hq": {**HQ_LOCATION, "level": 1, "upgrading_until": None, "upgrade_history": []},
+        "hq": hq, "districts": districts, "region": region,
         "priorities": {"active": HQ_DEFAULT_PRIORITY},
         "last_tick": now, "created_at": now,
     })
@@ -125,29 +232,66 @@ async def create_player_for_user(user_id: str, org_name: str):
     await db.teams.update_one({"_id": team_res.inserted_id}, {"$set": {"vehicle_id": str(veh_res.inserted_id)}})
     for role in ("assaltante", "motorista"):
         await db.employees.insert_one(starting_employee(pid, role, now, team_id=tid))
-    await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa com 75.000 € limpos e 5.000 € sujos de capital inicial.")
+    await add_event(db, pid, "system", f"{org_name} foi fundada com 75.000 € limpos e 5.000 € sujos de capital inicial.")
     await add_event(db, pid, "team", "Crew Alfa está pronta: um assaltante, um motorista e um Sedan Usado na garagem.")
     return pid
 
 
 @router.post("/register")
-async def register(body: RegisterInput, response: Response):
+async def register(body: RegisterInput, request: Request, response: Response):
+    # 1. Aceitação obrigatória dos documentos legais
+    if not body.accept_terms:
+        raise HTTPException(
+            status_code=400,
+            detail="É necessário aceitar os Termos de Serviço e a Política de Privacidade para criar conta",
+        )
+    # 2. Validação e sanitização no servidor (nunca confiar só no cliente)
+    org_name = sanitize_org_name(body.org_name)
+    validate_password_or_400(body.password)
     email = body.email.lower().strip()
+
+    # 3. Unicidade
     existing = await db.users.find_one({"email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Este email já está registado")
+    if await org_name_taken(org_name):
+        raise HTTPException(status_code=400, detail="Este nome de organização já está a ser utilizado")
+
+    ip = request.client.host if request.client else "unknown"
     now = now_utc().isoformat()
-    result = await db.users.insert_one({
-        "email": email, "password_hash": hash_password(body.password),
-        "name": body.org_name, "role": "player", "created_at": now,
-    })
+    try:
+        result = await db.users.insert_one({
+            "email": email, "password_hash": hash_password(body.password),
+            "name": org_name, "role": "player", "created_at": now,
+            "terms_acceptance": terms_acceptance_record(ip),
+        })
+    except DuplicateKeyError:
+        # Proteção contra pedidos duplicados/simultâneos (índice único no email)
+        raise HTTPException(status_code=400, detail="Este email já está registado")
     user_id = str(result.inserted_id)
-    await create_player_for_user(user_id, body.org_name)
+    await create_player_for_user(user_id, org_name)
     access = create_access_token(user_id, email)
     refresh_tok = create_refresh_token(user_id)
     set_auth_cookies(response, access, refresh_tok)
-    return {"id": user_id, "email": email, "name": body.org_name, "role": "player",
+    return {"id": user_id, "email": email, "name": org_name, "role": "player",
             "access_token": access, "refresh_token": refresh_tok}
+
+
+@router.post("/check-availability")
+async def check_availability(body: AvailabilityInput):
+    """Verificação em tempo real de disponibilidade (registo)."""
+    result = {}
+    if body.email is not None:
+        email = body.email.lower().strip()
+        valid = bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email))
+        taken = bool(await db.users.find_one({"email": email})) if valid else False
+        result["email"] = {"valid": valid, "available": valid and not taken}
+    if body.org_name is not None:
+        cleaned = re.sub(r"\s+", " ", body.org_name).strip()
+        valid = 3 <= len(cleaned) <= 40 and not ORG_NAME_FORBIDDEN.search(cleaned)
+        taken = await org_name_taken(cleaned) if valid else False
+        result["org_name"] = {"valid": valid, "available": valid and not taken}
+    return result
 
 
 @router.post("/login")
@@ -158,8 +302,14 @@ async def login(body: LoginInput, request: Request, response: Response):
     attempt = await db.login_attempts.find_one({"identifier": identifier})
     if attempt and attempt.get("count", 0) >= MAX_ATTEMPTS:
         locked_until = datetime.fromisoformat(attempt["locked_until"])
-        if datetime.now(timezone.utc) < locked_until:
-            raise HTTPException(status_code=429, detail="Demasiadas tentativas. Tenta novamente em alguns minutos.")
+        now = datetime.now(timezone.utc)
+        if now < locked_until:
+            remaining = max(1, int((locked_until - now).total_seconds()))
+            raise HTTPException(
+                status_code=429,
+                detail="Demasiadas tentativas falhadas. Por segurança, o acesso está temporariamente bloqueado.",
+                headers={"Retry-After": str(remaining)},
+            )
         await db.login_attempts.delete_one({"identifier": identifier})
 
     user = await db.users.find_one({"email": email})
@@ -220,6 +370,7 @@ async def claim_admin(user: dict = Depends(get_current_user)):
 
 @router.post("/change-password")
 async def change_password(body: ChangePasswordInput, user: dict = Depends(get_current_user)):
+    validate_password_or_400(body.new_password)
     full_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
     if not full_user or not verify_password(body.current_password, full_user["password_hash"]):
         raise HTTPException(status_code=400, detail="Palavra-passe atual incorreta")
@@ -278,6 +429,6 @@ async def seed_admin():
             "name": "Sindicato Lusorae", "role": "admin",
             "created_at": now_utc().isoformat(),
         })
-        await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae")
+        await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae", with_default_hq=True)
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})

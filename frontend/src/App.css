@@ -2,6 +2,12 @@
     min-height: 100vh;
 }
 
+/* ============================================================
+   LUSORAE — Design System "Noir Tático" (SSS tier)
+   Obsidiana + vermelho sangue + ouro velho, vidro profundo,
+   linhas laser, grain cinematográfico e HUD tático.
+   ============================================================ */
+
 /* ---------- Animations ---------- */
 @keyframes slide-up {
     from {
@@ -36,12 +42,41 @@
     }
 }
 
+@keyframes lus-sweep {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes lus-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes lus-kenburns {
+    from {
+        transform: scale(1.02) translate(0, 0);
+    }
+    to {
+        transform: scale(1.1) translate(-1.5%, -1%);
+    }
+}
+
 .animate-slide-up {
-    animation: slide-up 0.35s ease-out both;
+    animation: slide-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .animate-slide-down {
-    animation: slide-down 0.35s ease-out both;
+    animation: slide-down 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.lus-kenburns {
+    animation: lus-kenburns 30s ease-in-out infinite alternate;
+    will-change: transform;
 }
 
 @keyframes lus-flash {
@@ -61,15 +96,20 @@
 
 /* ---------- Leaflet overrides ---------- */
 .leaflet-container {
-    background: #0a0a0a;
+    background: #060608;
     font-family: "Inter", sans-serif;
 }
 
+/* Color grade subtil dos tiles — levanta o mapa do preto absoluto e dá
+   profundidade cinematográfica sem o tornar claro. */
+.leaflet-tile {
+    filter: brightness(1.14) contrast(1.07) saturate(1.22);
+}
+
 .leaflet-control-attribution {
-    background: rgba(5, 5, 5, 0.7) !important;
+    background: rgba(5, 5, 5, 0.78) !important;
     color: #52525b !important;
     font-size: 9px !important;
-    backdrop-filter: blur(6px);
 }
 
 .leaflet-control-attribution a {
@@ -90,23 +130,45 @@
     width: 34px;
     height: 34px;
     border-radius: 9999px;
-    background: rgba(5, 5, 5, 0.88);
+    background:
+        radial-gradient(120% 120% at 30% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 45%),
+        rgba(6, 6, 8, 0.92);
     border: 1.5px solid var(--mk, #fff);
     color: var(--mk, #fff);
-    box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
+    box-shadow:
+        0 6px 16px rgba(0, 0, 0, 0.75),
+        0 0 14px -3px var(--mk, #fff);
     cursor: pointer;
     transition:
-        transform 0.2s ease,
+        transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
         box-shadow 0.2s ease;
 }
 
 .opp-pin:hover {
     transform: scale(1.15);
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.8),
+        0 0 20px -2px var(--mk, #fff);
 }
 
 .opp-pin-selected {
     transform: scale(1.2);
-    box-shadow: 0 0 18px var(--mk, #fff);
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.8),
+        0 0 22px -1px var(--mk, #fff);
+}
+
+/* Anel tático rotativo à volta do pin selecionado */
+.opp-pin-selected::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    border: 1.5px dashed var(--mk, #fff);
+    opacity: 0.85;
+    animation: lus-spin 7s linear infinite;
+    pointer-events: none;
+    will-change: transform;
 }
 
 .opp-pin-taken {
@@ -149,16 +211,22 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: #fff;
+    background: linear-gradient(160deg, #ffffff 0%, #e7e5e4 100%);
     color: #050505;
     border: 2px solid #050505;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
+    box-shadow:
+        0 0 0 1px rgba(212, 168, 83, 0.55),
+        0 0 22px rgba(255, 255, 255, 0.35),
+        0 8px 18px rgba(0, 0, 0, 0.6);
     cursor: pointer;
     transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .hq-pin:hover {
-    box-shadow: 0 0 26px rgba(255, 255, 255, 0.6);
+    box-shadow:
+        0 0 0 1px rgba(212, 168, 83, 0.85),
+        0 0 30px rgba(255, 255, 255, 0.55),
+        0 8px 18px rgba(0, 0, 0, 0.6);
     transform: scale(1.06);
 }
 
@@ -170,10 +238,12 @@
     width: 28px;
     height: 28px;
     border-radius: 7px;
-    background: rgba(18, 18, 18, 0.92);
-    color: #a1a1aa;
+    background: linear-gradient(170deg, rgba(34, 34, 38, 0.95) 0%, rgba(14, 14, 16, 0.95) 100%);
+    color: #d4d4d8;
     border: 1.5px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 4px 12px rgba(0, 0, 0, 0.65);
 }
 
 /* ---------- Placement preview pin (colocação manual de propriedades) ---------- */
@@ -203,24 +273,51 @@
     box-shadow: 0 0 12px var(--mk, #22d3ee);
 }
 
+/* PERF: animar box-shadow diretamente força repaint a cada frame. O pulso
+   passa a viver num pseudo-elemento com o glow pré-rasterizado, animando só
+   a opacity — corre inteiramente no compositor (GPU). */
 .unit-operating {
-    animation: unit-blink 1s ease-in-out infinite alternate;
+    position: relative;
+    box-shadow: 0 0 10px var(--mk, #ef4444);
 }
 
-@keyframes unit-blink {
-    from {
-        box-shadow: 0 0 8px var(--mk, #ef4444);
-    }
-    to {
-        box-shadow: 0 0 20px var(--mk, #ef4444);
-    }
+.unit-operating::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    box-shadow: 0 0 18px 3px var(--mk, #ef4444);
+    animation: lus-glow-breathe 1s ease-in-out infinite alternate;
+    pointer-events: none;
+    will-change: opacity;
 }
 
 .unit-chased {
-    animation: unit-alarm 0.7s ease-in-out infinite alternate;
+    position: relative;
     background: #ef4444 !important;
     color: #fff !important;
     border-color: #050505 !important;
+    box-shadow: 0 0 10px #ef4444, 0 0 20px rgba(239, 68, 68, 0.65);
+}
+
+.unit-chased::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 9999px;
+    box-shadow: 0 0 24px 4px rgba(239, 68, 68, 0.9);
+    animation: lus-glow-breathe 0.7s ease-in-out infinite alternate;
+    pointer-events: none;
+    will-change: opacity;
+}
+
+@keyframes lus-glow-breathe {
+    from {
+        opacity: 0.25;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .unit-siren {
@@ -230,6 +327,7 @@
     border: 2px solid #ef4444;
     animation: siren-ring 1s ease-out infinite;
     pointer-events: none;
+    will-change: transform, opacity;
 }
 
 .unit-pulse {
@@ -239,15 +337,7 @@
     border: 1.5px solid #fff;
     animation: pulse-ring 2s ease-out infinite;
     pointer-events: none;
-}
-
-@keyframes unit-alarm {
-    from {
-        box-shadow: 0 0 6px #ef4444, 0 0 16px rgba(239, 68, 68, 0.6);
-    }
-    to {
-        box-shadow: 0 0 14px #ef4444, 0 0 28px rgba(239, 68, 68, 0.9);
-    }
+    will-change: transform, opacity;
 }
 
 @keyframes siren-ring {
@@ -298,15 +388,3600 @@
 
 /* ---------- Map hover tooltips ---------- */
 .lus-map-tip {
-    background: rgba(8, 8, 8, 0.95) !important;
+    background: rgba(8, 8, 8, 0.96) !important;
     border: 1px solid rgba(255, 255, 255, 0.14) !important;
     border-radius: 8px !important;
     color: #e4e4e7 !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65) !important;
+    box-shadow:
+        0 1px 0 rgba(220, 38, 38, 0.35) inset,
+        0 10px 30px rgba(0, 0, 0, 0.7) !important;
     padding: 6px 9px !important;
     font-family: "Inter", sans-serif;
 }
 
 .lus-map-tip::before {
     display: none !important;
+}
+
+
+/* ============================================================
+   Superfícies partilhadas (usadas por todos os painéis/cartões)
+   ============================================================ */
+
+/* Painel lateral (Sheet) e cartão flutuante — vidro obsidiana premium
+   com linha laser vermelho/ouro no topo. */
+.lus-panel {
+    background-color: rgba(8, 8, 10, 0.95);
+    background-image:
+        radial-gradient(140% 90px at 50% 0%, rgba(220, 38, 38, 0.09) 0%, transparent 100%),
+        radial-gradient(100% 60px at 100% 0%, rgba(212, 168, 83, 0.05) 0%, transparent 100%),
+        linear-gradient(180deg, rgba(28, 28, 32, 0.9) 0%, rgba(8, 8, 10, 0.95) 180px);
+    border-color: rgba(255, 255, 255, 0.1);
+    /* PERF: blur moderado (os painéis abrem por instantes); o HUD permanente
+       usa .lus-hud-solid, sem qualquer backdrop-filter. */
+    backdrop-filter: blur(14px) saturate(1.35);
+    -webkit-backdrop-filter: blur(14px) saturate(1.35);
+    box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.8),
+        0 0 40px rgba(220, 38, 38, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* HUD permanente sobre o mapa (feed, chips) — nunca desfoca o fundo. */
+.lus-hud-solid {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(9, 9, 11, 0.96);
+}
+
+/* Linha laser no topo de cada painel */
+.lus-panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 1;
+    background: linear-gradient(90deg, transparent 2%, rgba(220, 38, 38, 0.75) 30%, rgba(212, 168, 83, 0.55) 65%, transparent 98%);
+    pointer-events: none;
+}
+
+/* Cartão interno standard de todos os painéis */
+.lus-card {
+    border-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.02);
+    background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.014) 55%, rgba(220, 38, 38, 0.022) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 10px rgba(0, 0, 0, 0.3);
+    transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.lus-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 8px 26px rgba(0, 0, 0, 0.5),
+        0 0 16px rgba(220, 38, 38, 0.06);
+}
+
+/* ---------- Barra de recursos no topo do mapa ---------- */
+/* PERF: sem backdrop-filter — desfocar o fundo sobre um mapa em movimento
+   obrigava a GPU a re-desfocar a cada frame. O "vidro" é agora sólido, em
+   camadas (obsidiana + glows vermelho/ouro + realce interior). */
+.lus-topbar {
+    position: relative;
+    border-color: rgba(255, 255, 255, 0.06);
+    background-color: rgba(9, 9, 11, 0.97);
+    background-image:
+        radial-gradient(80% 130% at 50% 0%, rgba(220, 38, 38, 0.11) 0%, transparent 60%),
+        radial-gradient(38% 100% at 94% 0%, rgba(212, 168, 83, 0.07) 0%, transparent 70%),
+        linear-gradient(180deg, rgba(38, 38, 42, 0.94) 0%, rgba(9, 9, 11, 0.98) 100%);
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.7),
+        0 2px 16px rgba(220, 38, 38, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Borda em gradiente (vermelho → aço → ouro) via máscara */
+.lus-topbar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(115deg, rgba(220, 38, 38, 0.55) 0%, rgba(255, 255, 255, 0.16) 28%, rgba(255, 255, 255, 0.07) 62%, rgba(212, 168, 83, 0.45) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Linha de acento laser sob a topbar — estática (PERF: o varrimento animado
+   por background-position pintava a barra a cada frame, para sempre). */
+.lus-topbar::after {
+    content: "";
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 8%, rgba(220, 38, 38, 0.8) 50%, transparent 92%);
+    pointer-events: none;
+}
+
+/* ---------- Vinheta cinematográfica + scanlines sobre o mapa ---------- */
+.lus-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+        radial-gradient(60% 45% at 50% 0%, rgba(220, 38, 38, 0.05) 0%, transparent 70%),
+        radial-gradient(130% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.48) 100%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, transparent 12%, transparent 86%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+/* ---------- Botões HUD premium (standalone: Intel/Definições/legendas) ---------- */
+.lus-hud-btn {
+    background-image: linear-gradient(180deg, rgba(40, 40, 46, 0.92) 0%, rgba(10, 10, 12, 0.96) 100%);
+    border-color: rgba(255, 255, 255, 0.13) !important;
+    box-shadow:
+        0 10px 28px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.11);
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.lus-hud-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    box-shadow:
+        0 16px 36px rgba(0, 0, 0, 0.7),
+        0 0 18px rgba(220, 38, 38, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.lus-hud-btn:active {
+    transform: translateY(0);
+}
+
+.lus-hud-btn-active {
+    background-image: linear-gradient(180deg, rgba(170, 30, 30, 0.6) 0%, rgba(69, 10, 10, 0.75) 100%) !important;
+    border-color: rgba(239, 68, 68, 0.65) !important;
+    box-shadow:
+        0 0 24px rgba(220, 38, 38, 0.5),
+        0 10px 28px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+/* ============================================================
+   Dock de navegação inferior — consola tática flutuante
+   ============================================================ */
+/* PERF: sem backdrop-filter (ver .lus-topbar) — vidro sólido em camadas. */
+.lus-dock {
+    position: relative;
+    border-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(9, 9, 11, 0.97);
+    background-image:
+        radial-gradient(70% 140% at 50% 100%, rgba(220, 38, 38, 0.1) 0%, transparent 60%),
+        linear-gradient(0deg, rgba(32, 32, 36, 0.94) 0%, rgba(9, 9, 11, 0.98) 100%);
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.7),
+        0 2px 16px rgba(220, 38, 38, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.lus-dock::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(115deg, rgba(212, 168, 83, 0.4) 0%, rgba(255, 255, 255, 0.14) 35%, rgba(255, 255, 255, 0.07) 65%, rgba(220, 38, 38, 0.5) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Linha de acento laser no topo do dock — estática (PERF, ver .lus-topbar) */
+.lus-dock::after {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    top: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 8%, rgba(220, 38, 38, 0.7) 50%, transparent 92%);
+    pointer-events: none;
+}
+
+/* Dentro do dock, os botões ficam planos (segmentos) — só o ativo brilha */
+.lus-dock .lus-hud-btn {
+    background-image: none;
+    background-color: transparent;
+    border-color: transparent !important;
+    box-shadow: none;
+}
+
+.lus-dock .lus-hud-btn:hover {
+    transform: none;
+    background-color: rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+}
+
+.lus-dock .lus-hud-btn-active {
+    background-image: linear-gradient(180deg, rgba(170, 30, 30, 0.65) 0%, rgba(69, 10, 10, 0.8) 100%) !important;
+    box-shadow:
+        0 0 20px rgba(220, 38, 38, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+}
+
+/* ---------- Título cinematográfico (Auth) ---------- */
+.lus-title {
+    background: linear-gradient(180deg, #ffffff 25%, #e4e4e7 60%, #8e8e93 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 4px 24px rgba(220, 38, 38, 0.35));
+}
+
+/* ============================================================
+   Boot / Loading SSS — sala de operações cinematográfica
+   Grain, CRT, varrimento ambiente, sonar, vinheta e HUD de
+   moldura do ecrã (réguas, canal cifrado, coordenadas, sessão).
+   ============================================================ */
+.lus-boot-bg {
+    background-color: #040405;
+    background-image:
+        radial-gradient(75% 58% at 50% 36%, rgba(220, 38, 38, 0.1) 0%, transparent 68%),
+        radial-gradient(120% 100% at 50% 100%, rgba(212, 168, 83, 0.05) 0%, transparent 58%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: auto, auto, 44px 44px, 44px 44px, 220px 220px, 220px 220px;
+}
+
+/* Grain de filme animado (feTurbulence, quase impercetível) */
+.lus-boot-noise {
+    position: absolute;
+    inset: -60px;
+    pointer-events: none;
+    opacity: 0.055;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='260' height='260' filter='url(%23n)'/></svg>");
+    animation: lus-grain 1.1s steps(4) infinite;
+}
+
+@keyframes lus-grain {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-2%, 1%); }
+    50% { transform: translate(1%, -2%); }
+    75% { transform: translate(-1%, 2%); }
+}
+
+/* Micro-scanlines CRT sobre todo o ecrã */
+.lus-boot-crt {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.22) 0px,
+        rgba(0, 0, 0, 0.22) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+}
+
+/* Feixe ambiente gigante em rotação lenta (torre de vigia) */
+.lus-boot-sweep {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: 170vmax;
+    height: 170vmax;
+    pointer-events: none;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        rgba(220, 38, 38, 0.05) 16deg,
+        rgba(220, 38, 38, 0.02) 30deg,
+        transparent 46deg
+    );
+    animation: lus-boot-sweep-spin 16s linear infinite;
+}
+
+@keyframes lus-boot-sweep-spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Anéis de sonar a expandir por trás da moldura central */
+.lus-boot-sonar {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 560px;
+    height: 560px;
+    max-width: 96vw;
+    max-height: 96vw;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.lus-boot-sonar::before,
+.lus-boot-sonar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    animation: lus-sonar 5.2s ease-out infinite;
+}
+
+.lus-boot-sonar::after {
+    animation-delay: 2.6s;
+    border-color: rgba(212, 168, 83, 0.18);
+}
+
+@keyframes lus-sonar {
+    from { transform: scale(0.16); opacity: 0.75; }
+    to { transform: scale(1); opacity: 0; }
+}
+
+/* Vinheta cinematográfica */
+.lus-boot-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(115% 90% at 50% 44%, transparent 52%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+/* HUD de moldura do ecrã (topo/base) com réguas de ticks */
+.lus-boot-hud {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 18px;
+    pointer-events: none;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(161, 161, 170, 0.6);
+    white-space: nowrap;
+}
+
+.lus-boot-hud-top { top: 0; }
+.lus-boot-hud-bottom { bottom: 0; }
+
+.lus-boot-ruler {
+    flex: 1;
+    height: 7px;
+    min-width: 40px;
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.14) 0,
+        rgba(255, 255, 255, 0.14) 1px,
+        transparent 1px,
+        transparent 14px
+    );
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+}
+
+.lus-boot-rec {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.lus-boot-rec-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    animation: lus-blink 1.4s steps(2, start) infinite;
+}
+
+@keyframes lus-logo-pulse {
+    0%, 100% {
+        filter: drop-shadow(0 4px 22px rgba(220, 38, 38, 0.3));
+    }
+    50% {
+        filter: drop-shadow(0 4px 36px rgba(220, 38, 38, 0.55));
+    }
+}
+
+/* ---------- Barra de uplink tática ---------- */
+.lus-progress-track {
+    position: relative;
+}
+
+.lus-progress-shell {
+    position: relative;
+    height: 10px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+/* Divisores de segmento a cada 10% */
+.lus-progress-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent 0,
+        transparent calc(10% - 1px),
+        rgba(0, 0, 0, 0.7) calc(10% - 1px),
+        rgba(0, 0, 0, 0.7) 10%
+    );
+}
+
+.lus-progress-fill {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, #7f1d1d 0%, #dc2626 55%, #f59e0b 100%);
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.5);
+    transition: width 0.3s ease;
+}
+
+.lus-progress-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: lus-sweep 1.6s linear infinite;
+}
+
+/* Ponto de cabeça incandescente (fora do clip para brilhar) */
+.lus-progress-head {
+    position: absolute;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin-left: -3.5px;
+    transform: translateY(-50%);
+    border-radius: 9999px;
+    background: #fbbf24;
+    box-shadow:
+        0 0 10px rgba(245, 158, 11, 0.9),
+        0 0 24px rgba(220, 38, 38, 0.6);
+    transition: left 0.3s ease;
+    pointer-events: none;
+}
+
+.lus-progress-pct {
+    min-width: 3.4ch;
+    text-align: right;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fafafa;
+    text-shadow: 0 0 18px rgba(220, 38, 38, 0.45);
+}
+
+/* ============================================================
+   Micro-polish global
+   ============================================================ */
+
+/* Cartão de oportunidade: a linha laser do topo assume a cor da categoria */
+.lus-opp-card {
+    overflow: hidden;
+}
+
+.lus-opp-card::before {
+    background: linear-gradient(90deg, transparent 2%, var(--mk, #dc2626) 35%, rgba(212, 168, 83, 0.5) 70%, transparent 98%);
+    opacity: 0.85;
+}
+
+/* Conteúdo de tabs troca instantaneamente (sem deslize/fade) */
+
+/* Scrollbar com acento vermelho ao pairar */
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(220, 38, 38, 0.55) !important;
+}
+
+/* ============================================================
+   Loading SSS — radar, moldura de vidro tática, scan e terminal
+   ============================================================ */
+
+/* Varrimento vertical de scan sobre todo o ecrã de arranque */
+.lus-scanline {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.lus-scanline::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 140px;
+    top: -25%;
+    background: linear-gradient(180deg, transparent, rgba(220, 38, 38, 0.04) 40%, rgba(220, 38, 38, 0.11) 50%, rgba(220, 38, 38, 0.04) 60%, transparent);
+    animation: lus-scan-y 4.2s linear infinite;
+}
+
+@keyframes lus-scan-y {
+    from { top: -25%; }
+    to { top: 115%; }
+}
+
+/* Moldura de vidro profundo com cantos táticos animados */
+.lus-frame {
+    position: relative;
+    padding: 26px 28px 24px;
+    background: linear-gradient(180deg, rgba(14, 14, 17, 0.88) 0%, rgba(7, 7, 9, 0.94) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.65),
+        0 0 70px rgba(220, 38, 38, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* Linha laser no topo da moldura */
+.lus-frame-topline {
+    position: absolute;
+    top: -1px;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.9) 32%, rgba(212, 168, 83, 0.75) 68%, transparent);
+    box-shadow: 0 0 14px rgba(220, 38, 38, 0.55);
+}
+
+.lus-frame::before,
+.lus-frame::after,
+.lus-corner-tr,
+.lus-corner-bl,
+.lus-corner-tl,
+.lus-corner-br {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    pointer-events: none;
+    animation: lus-corner-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+@keyframes lus-corner-in {
+    from {
+        opacity: 0;
+        transform: translate(var(--cx, 0), var(--cy, 0));
+    }
+    to {
+        opacity: 1;
+        transform: translate(0, 0);
+    }
+}
+
+.lus-frame::before {
+    content: "";
+    top: -5px;
+    left: -5px;
+    --cx: -10px;
+    --cy: -10px;
+    border-top: 2px solid rgba(220, 38, 38, 0.85);
+    border-left: 2px solid rgba(220, 38, 38, 0.85);
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.55));
+}
+
+.lus-frame::after {
+    content: "";
+    bottom: -5px;
+    right: -5px;
+    --cx: 10px;
+    --cy: 10px;
+    border-bottom: 2px solid rgba(212, 168, 83, 0.7);
+    border-right: 2px solid rgba(212, 168, 83, 0.7);
+    filter: drop-shadow(0 0 6px rgba(212, 168, 83, 0.4));
+}
+
+.lus-corner-tr {
+    top: -5px;
+    right: -5px;
+    --cx: 10px;
+    --cy: -10px;
+    border-top: 2px solid rgba(212, 168, 83, 0.7);
+    border-right: 2px solid rgba(212, 168, 83, 0.7);
+    filter: drop-shadow(0 0 6px rgba(212, 168, 83, 0.4));
+}
+
+.lus-corner-bl {
+    bottom: -5px;
+    left: -5px;
+    --cx: -10px;
+    --cy: 10px;
+    border-bottom: 2px solid rgba(220, 38, 38, 0.85);
+    border-left: 2px solid rgba(220, 38, 38, 0.85);
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.55));
+}
+
+/* Cantos standalone (para qualquer contentor relative, ex.: Auth) */
+.lus-corner-tl {
+    top: -5px;
+    left: -5px;
+    --cx: -10px;
+    --cy: -10px;
+    border-top: 2px solid rgba(220, 38, 38, 0.85);
+    border-left: 2px solid rgba(220, 38, 38, 0.85);
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.55));
+}
+
+.lus-corner-br {
+    bottom: -5px;
+    right: -5px;
+    --cx: 10px;
+    --cy: 10px;
+    border-bottom: 2px solid rgba(212, 168, 83, 0.7);
+    border-right: 2px solid rgba(212, 168, 83, 0.7);
+    filter: drop-shadow(0 0 6px rgba(212, 168, 83, 0.4));
+}
+
+/* Ticks laterais da moldura */
+.lus-frame-ticks {
+    position: absolute;
+    top: 22%;
+    bottom: 22%;
+    width: 5px;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.16) 0,
+        rgba(255, 255, 255, 0.16) 1px,
+        transparent 1px,
+        transparent 12px
+    );
+}
+
+.lus-frame-ticks-l { left: 7px; }
+.lus-frame-ticks-r { right: 7px; }
+
+/* Cabeçalho da moldura: título + estado em direto */
+.lus-frame-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: -8px -6px 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.09);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #71717a;
+}
+
+.lus-frame-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #f87171;
+}
+
+.lus-frame-status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: lus-blink 1.2s steps(2, start) infinite;
+}
+
+.lus-frame-status-error {
+    color: #fbbf24;
+}
+
+/* ---------- Radar tático SSS: órbita, graus, cardeais, feixe ---------- */
+.lus-radar-wrap {
+    position: relative;
+    width: 168px;
+    height: 168px;
+    margin: 0 auto;
+}
+
+/* Órbita exterior tracejada em rotação lenta inversa */
+.lus-radar-orbit {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1px dashed rgba(212, 168, 83, 0.28);
+    animation: lus-spin-rev 26s linear infinite;
+}
+
+@keyframes lus-spin-rev {
+    to { transform: rotate(-360deg); }
+}
+
+/* Letras cardeais */
+.lus-radar-cardinal {
+    position: absolute;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 8px;
+    letter-spacing: 0;
+    color: rgba(212, 168, 83, 0.65);
+    line-height: 1;
+}
+
+.lus-radar-n { top: -3px; left: 50%; transform: translateX(-50%); }
+.lus-radar-s { bottom: -3px; left: 50%; transform: translateX(-50%); }
+.lus-radar-e { right: -2px; top: 50%; transform: translateY(-50%); }
+.lus-radar-w { left: -2px; top: 50%; transform: translateY(-50%); }
+
+.lus-radar {
+    position: absolute;
+    inset: 14px;
+    border-radius: 9999px;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: radial-gradient(circle, rgba(220, 38, 38, 0.14) 0%, transparent 62%);
+    box-shadow:
+        0 0 40px rgba(220, 38, 38, 0.16),
+        inset 0 0 30px rgba(220, 38, 38, 0.08);
+    overflow: hidden;
+}
+
+/* Anel de graus (ticks) junto à borda interior */
+.lus-radar-ticks {
+    position: absolute;
+    inset: 2px;
+    border-radius: 9999px;
+    background: repeating-conic-gradient(
+        rgba(239, 68, 68, 0.4) 0deg 0.9deg,
+        transparent 0.9deg 6deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 85%, #000 86%);
+    mask: radial-gradient(circle, transparent 85%, #000 86%);
+}
+
+.lus-radar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background:
+        radial-gradient(circle, transparent 54%, rgba(239, 68, 68, 0.22) 55%, transparent 57%),
+        radial-gradient(circle, transparent 29%, rgba(239, 68, 68, 0.22) 30%, transparent 32%),
+        linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15)) center / 100% 1px no-repeat,
+        linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15)) center / 1px 100% no-repeat;
+}
+
+/* Feixe em varrimento com cauda longa */
+.lus-radar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: conic-gradient(
+        from 0deg,
+        rgba(239, 68, 68, 0.55) 0deg,
+        rgba(239, 68, 68, 0.2) 42deg,
+        rgba(239, 68, 68, 0.06) 85deg,
+        transparent 115deg
+    );
+    animation: lus-spin 3.2s linear infinite;
+}
+
+.lus-radar-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    margin: -2.5px 0 0 -2.5px;
+    border-radius: 9999px;
+    background: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+    z-index: 1;
+}
+
+/* Anel de pulso a emanar do centro */
+.lus-radar-dot::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    border-radius: 9999px;
+    border: 1px solid rgba(239, 68, 68, 0.6);
+    animation: pulse-ring 2.2s ease-out infinite;
+}
+
+.lus-radar-blip {
+    position: absolute;
+    left: 66%;
+    top: 28%;
+    width: 4px;
+    height: 4px;
+    border-radius: 9999px;
+    background: #f59e0b;
+    box-shadow: 0 0 7px #f59e0b;
+    animation: lus-blip 3.2s ease-out infinite;
+    z-index: 1;
+}
+
+.lus-radar-blip-2 {
+    left: 30%;
+    top: 62%;
+    background: #ef4444;
+    box-shadow: 0 0 7px #ef4444;
+    animation-delay: 1.1s;
+}
+
+.lus-radar-blip-3 {
+    left: 58%;
+    top: 70%;
+    width: 3px;
+    height: 3px;
+    background: #d4a853;
+    box-shadow: 0 0 6px #d4a853;
+    animation-delay: 2.2s;
+}
+
+@keyframes lus-blip {
+    0%, 12% { opacity: 0; transform: scale(0.6); }
+    22%, 55% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.8); }
+}
+
+/* Wordmark SSS: metal escovado + reveal + sheen + pulso de brasa */
+.lus-boot-logo {
+    background-image:
+        linear-gradient(110deg, transparent 42%, rgba(255, 255, 255, 0.9) 50%, transparent 58%),
+        linear-gradient(180deg, #ffffff 22%, #e4e4e7 55%, #8e8e93 100%);
+    background-size: 260% 100%, 100% 100%;
+    background-position: 135% 0, 0 0;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation:
+        lus-logo-in 1s cubic-bezier(0.22, 1, 0.36, 1) both,
+        lus-logo-sheen 4s ease-in-out 1.4s infinite,
+        lus-logo-pulse 2.6s ease-in-out 1s infinite;
+}
+
+@keyframes lus-logo-in {
+    from {
+        opacity: 0;
+        letter-spacing: 0.35em;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        letter-spacing: -0.02em;
+        transform: translateY(0);
+    }
+}
+
+@keyframes lus-logo-sheen {
+    0%, 55% { background-position: 135% 0, 0 0; }
+    85%, 100% { background-position: -35% 0, 0 0; }
+}
+
+/* Eyebrow com linhas laterais em degradê */
+.lus-eyebrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.lus-eyebrow-line {
+    display: inline-block;
+    width: 34px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.7));
+}
+
+.lus-eyebrow-line-r {
+    transform: scaleX(-1);
+}
+
+/* Cursor de terminal a piscar após o texto de fase */
+.lus-cursor::after {
+    content: "▌";
+    margin-left: 3px;
+    color: #ef4444;
+    animation: lus-blink 1s steps(2, start) infinite;
+}
+
+@keyframes lus-blink {
+    50% { opacity: 0; }
+}
+
+/* Frases de ambiente rotativas (CSS-only crossfade) */
+.lus-flavor {
+    position: relative;
+    height: 1.3em;
+    overflow: hidden;
+}
+
+.lus-flavor span {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    animation: lus-flavor-cycle 9s infinite;
+}
+
+.lus-flavor span:nth-child(2) { animation-delay: 3s; }
+.lus-flavor span:nth-child(3) { animation-delay: 6s; }
+
+@keyframes lus-flavor-cycle {
+    0% { opacity: 0; transform: translateY(7px); }
+    6%, 27% { opacity: 1; transform: translateY(0); }
+    33%, 100% { opacity: 0; transform: translateY(-7px); }
+}
+
+/* ---------- Terminal de registo de sistema ---------- */
+.lus-term {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.lus-term-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #71717a;
+}
+
+.lus-term-dots {
+    display: inline-flex;
+    gap: 5px;
+}
+
+.lus-term-dots i {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+}
+
+.lus-term-dots i:nth-child(1) { background: rgba(220, 38, 38, 0.7); }
+.lus-term-dots i:nth-child(2) { background: rgba(212, 168, 83, 0.6); }
+.lus-term-dots i:nth-child(3) { background: rgba(113, 113, 122, 0.5); }
+
+.lus-term-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+}
+
+.lus-term-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 7px;
+    border-left: 2px solid transparent;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #52525b;
+    transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.lus-term-idx {
+    width: 18px;
+    flex-shrink: 0;
+    font-size: 9px;
+    color: #3f3f46;
+}
+
+.lus-term-leader {
+    flex: 1;
+    align-self: center;
+    height: 1px;
+    margin: 0 4px;
+    border-bottom: 1px dotted rgba(255, 255, 255, 0.12);
+}
+
+.lus-term-row-active {
+    position: relative;
+    overflow: hidden;
+    border-left-color: #ef4444;
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.16), transparent 72%);
+    color: #fecaca;
+}
+
+.lus-term-row-active::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 20%, rgba(255, 255, 255, 0.07) 50%, transparent 80%);
+    background-size: 200% 100%;
+    animation: lus-sweep 1.4s linear infinite;
+    pointer-events: none;
+}
+
+.lus-term-row-done {
+    border-left-color: rgba(16, 185, 129, 0.5);
+    color: rgba(110, 231, 183, 0.75);
+}
+
+.lus-term-row-error {
+    border-left-color: #b91c1c;
+    background: rgba(127, 29, 29, 0.2);
+    color: #fca5a5;
+}
+
+.lus-term-ok {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: #34d399;
+}
+
+.lus-term-err {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: #f87171;
+}
+
+.lus-term-run {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: #ef4444;
+    animation: lus-blink 0.9s steps(2, start) infinite;
+}
+
+.lus-term-wait {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: #3f3f46;
+}
+
+/* Ícone de alerta com anel de pulso (estados de erro) */
+.lus-alert-icon {
+    position: relative;
+    display: inline-flex;
+}
+
+.lus-alert-icon::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 9999px;
+    border: 1px solid rgba(239, 68, 68, 0.55);
+    animation: pulse-ring 1.8s ease-out infinite;
+}
+
+/* ============================================================
+   Botões SSS — física de interação, sheen e orlas metálicas
+   ============================================================ */
+
+/* Base: transições com curva spring + tap highlight limpo */
+.lus-btn {
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.22s ease,
+        border-color 0.22s ease,
+        background-color 0.22s ease,
+        filter 0.22s ease,
+        color 0.15s ease;
+}
+
+/* Sheen: banda de luz diagonal que varre o botão no hover.
+   Implementado com background-position (nunca sai da caixa),
+   por isso não corta badges posicionados fora do botão. */
+.lus-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 36%, rgba(255, 255, 255, 0.2) 46%, rgba(255, 255, 255, 0.38) 50%, rgba(255, 255, 255, 0.2) 54%, transparent 64%);
+    background-size: 240% 100%;
+    background-position: 145% 0;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.lus-btn:hover::after {
+    opacity: 1;
+    background-position: -55% 0;
+    transition: background-position 0.85s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.12s ease;
+}
+
+.lus-btn:disabled::after,
+.lus-btn-link::after,
+.lus-btn-ghost::after {
+    display: none;
+}
+
+/* Press físico: afunda + encolhe ligeiramente, resposta imediata */
+.lus-btn:active:not(:disabled) {
+    transform: translateY(1px) scale(0.98);
+    filter: brightness(0.92);
+    transition-duration: 0.05s;
+}
+
+/* CTAs preenchidos levitam 1px no hover */
+.lus-btn-primary:hover:not(:disabled):not(:active),
+.lus-btn-success:hover:not(:disabled):not(:active),
+.lus-btn-danger:hover:not(:disabled):not(:active) {
+    transform: translateY(-1px);
+}
+
+/* Orla metálica: anel em gradiente (luz no topo → dourado → sombra)
+   desenhado por cima do border com mask ring de 1px */
+.lus-btn-primary::before,
+.lus-btn-success::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 3;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+.lus-btn-primary::before {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.6) 0%, rgba(252, 165, 165, 0.22) 30%, rgba(212, 168, 83, 0.45) 58%, rgba(127, 29, 29, 0.55) 100%);
+}
+
+.lus-btn-success::before {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.6) 0%, rgba(167, 243, 208, 0.22) 30%, rgba(212, 168, 83, 0.32) 60%, rgba(6, 78, 59, 0.6) 100%);
+}
+
+/* Ícones dos botões HUD: glow na cor própria + leve zoom */
+.lus-hud-btn svg {
+    transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.lus-hud-btn:hover svg {
+    filter: drop-shadow(0 0 5px currentColor);
+    transform: scale(1.1);
+}
+
+.lus-hud-btn-active svg {
+    filter: drop-shadow(0 0 6px currentColor);
+}
+
+/* Dock: risca-indicador luminosa por baixo do separador ativo */
+.lus-dock .lus-hud-btn-active::before {
+    content: "";
+    position: absolute;
+    left: 22%;
+    right: 22%;
+    bottom: 2px;
+    height: 2px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, transparent, #fca5a5 28%, #fef2f2 50%, #fca5a5 72%, transparent);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    pointer-events: none;
+}
+
+/* ============================================================
+   SSS ronda 7 — interações de mapa (sem animações de entrada:
+   tudo aparece instantaneamente por pedido do utilizador)
+   ============================================================ */
+
+@keyframes lus-hq-halo {
+    0% { transform: scale(0.9); opacity: 0.9; }
+    70%, 100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* Pins de propriedades e unidades respondem ao rato como os de missão */
+.prop-pin,
+.unit-pin {
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.prop-pin:hover {
+    transform: scale(1.12);
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 6px 16px rgba(0, 0, 0, 0.75);
+}
+
+.unit-pin:hover {
+    transform: scale(1.12);
+}
+
+/* Halo dourado pulsante a marcar o QG no mapa */
+.hq-pin {
+    position: relative;
+}
+
+.hq-pin::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(212, 168, 83, 0.6);
+    animation: lus-hq-halo 3s ease-out infinite;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hq-pin::after {
+        animation: none !important;
+    }
+}
+
+/* ============================================================
+   Polish global SSS — seleção, scrollbars, tipografia, superfícies
+   ============================================================ */
+
+/* Seleção de texto na cor da marca */
+::selection {
+    background: rgba(220, 38, 38, 0.45);
+    color: #fff;
+}
+
+/* Scrollbars finas e discretas em toda a app */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+/* Números alinhados em colunas (dados táticos) */
+.font-mono,
+code,
+kbd {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Dropdowns/popovers do radix por cima do mapa com sombra profunda */
+[data-radix-popper-content-wrapper] {
+    z-index: 60 !important;
+}
+
+/* ---------- Acessibilidade: reduzir movimento ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .lus-kenburns,
+    .lus-topbar::after,
+    .lus-dock::after,
+    .lus-boot-logo,
+    .lus-progress-fill::after,
+    .lus-scanline::after,
+    .lus-radar::after,
+    .lus-radar-blip,
+    .lus-radar-orbit,
+    .lus-radar-dot::after,
+    .lus-boot-noise,
+    .lus-boot-sweep,
+    .lus-boot-sonar::before,
+    .lus-boot-sonar::after,
+    .lus-boot-rec-dot,
+    .lus-frame-status-dot,
+    .lus-term-row-active::after,
+    .lus-term-run,
+    .lus-flavor span,
+    .lus-cursor::after,
+    .opp-pin-selected::after {
+        animation: none !important;
+    }
+
+    .lus-btn,
+    .lus-btn::after,
+    .lus-hud-btn svg {
+        transition: none !important;
+    }
+
+    .lus-btn::after {
+        display: none;
+    }
+}
+
+/* ============================================================
+   SSS ronda 8 — Cockpit Cinemático + Voz Noir
+   Moldura HUD, grelha tática, radar do QG, toasts "transmissão",
+   carimbo de despacho, flashes de valor e empty states táticos.
+   ============================================================ */
+
+/* ---------- Moldura HUD do viewport (4 cantos táticos) ---------- */
+.lus-hud-frame {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.lus-hud-frame span {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid rgba(220, 38, 38, 0.5);
+    opacity: 0.75;
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.35));
+}
+
+.lus-hud-frame .c-tl { top: 8px; left: 8px; border-right: none; border-bottom: none; border-top-left-radius: 4px; }
+.lus-hud-frame .c-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; border-top-right-radius: 4px; }
+.lus-hud-frame .c-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; border-bottom-left-radius: 4px; }
+.lus-hud-frame .c-br { bottom: 8px; right: 8px; border-left: none; border-top: none; border-bottom-right-radius: 4px; }
+
+/* ---------- Grelha tática — visível só perto das bordas ---------- */
+.lus-grid {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0.55;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
+    background-size: 96px 96px;
+    -webkit-mask-image: radial-gradient(115% 85% at 50% 50%, transparent 42%, #000 95%);
+    mask-image: radial-gradient(115% 85% at 50% 50%, transparent 42%, #000 95%);
+}
+
+/* ---------- Radar tático a emanar do QG (marcador no mapa) ---------- */
+.lus-radar-hq {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 9999px;
+    overflow: hidden;
+    pointer-events: none;
+    border: 1px solid rgba(220, 38, 38, 0.16);
+    background: radial-gradient(circle, rgba(220, 38, 38, 0.045) 25%, transparent 70%);
+}
+
+.lus-radar-hq::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: conic-gradient(from 0deg, rgba(220, 38, 38, 0.25) 0deg, rgba(220, 38, 38, 0.06) 55deg, transparent 80deg);
+    animation: lus-spin 7s linear infinite;
+    will-change: transform;
+}
+
+.lus-radar-hq::after {
+    content: "";
+    position: absolute;
+    inset: 31%;
+    border-radius: 9999px;
+    border: 1px dashed rgba(220, 38, 38, 0.22);
+}
+
+/* ---------- Flash do registo mais recente do feed ---------- */
+@keyframes lus-feed-flash {
+    0% {
+        background-color: rgba(220, 38, 38, 0.22);
+        box-shadow: inset 2px 0 0 rgba(239, 68, 68, 0.9);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: inset 2px 0 0 transparent;
+    }
+}
+
+.lus-feed-new {
+    animation: lus-feed-flash 2.4s ease-out;
+    border-radius: 4px;
+}
+
+/* ---------- Flashes de valor (topbar) — âmbar (sujo) e azul (respeito) ---------- */
+@keyframes lus-flash-amber {
+    0% { background-color: rgba(245, 158, 11, 0.2); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4); }
+    100% { background-color: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+
+.lus-flash-amber { animation: lus-flash-amber 2.2s ease-out; }
+
+@keyframes lus-flash-blue {
+    0% { background-color: rgba(10, 132, 255, 0.2); box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.4); }
+    100% { background-color: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+
+.lus-flash-blue { animation: lus-flash-blue 2.2s ease-out; }
+
+/* ---------- Empty states táticos ---------- */
+.lus-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    text-align: center;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 22px 16px;
+    background:
+        repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.013) 0 8px, transparent 8px 16px),
+        rgba(255, 255, 255, 0.015);
+}
+
+.lus-empty-icon {
+    display: flex;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    background: rgba(220, 38, 38, 0.08);
+    color: #f87171;
+    box-shadow: 0 0 18px rgba(220, 38, 38, 0.15);
+}
+
+/* ---------- Watermark do ícone da secção nos headers dos painéis ---------- */
+.lus-watermark {
+    position: absolute;
+    right: 46px;
+    top: -8px;
+    opacity: 0.05;
+    pointer-events: none;
+    color: #ffffff;
+    transform: rotate(-8deg);
+}
+
+.lus-watermark svg {
+    width: 68px;
+    height: 68px;
+}
+
+/* ---------- Título dos painéis com gradiente metálico ---------- */
+.lus-sheet-title {
+    background: linear-gradient(180deg, #ffffff 30%, #e4e4e7 65%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* ============================================================
+   Toasts SSS — "transmissão tática" (sonner)
+   Vidro de consola + orla metálica mask-ring + espinha luminosa
+   por tipo + sheen de entrada + barra de vida sincronizada (4s).
+   NOTA: nunca usar ::after no root — o sonner usa-o como ponte
+   invisível de hover entre toasts empilhados.
+   ============================================================ */
+.lus-toast {
+    --lt-rgb: 220 38 38;
+    position: relative;
+    padding: 10px 34px 10px 12px !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 11px !important;
+    color: #fff !important;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    backdrop-filter: blur(14px) saturate(1.25);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    /* Camadas: sheen de entrada / scanlines / espinha lateral / brilho ambiente do tipo / corpo */
+    background:
+        linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.05) 46%, rgba(255, 255, 255, 0.13) 50%, rgba(255, 255, 255, 0.05) 54%, transparent 62%) no-repeat,
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, rgb(var(--lt-rgb) / 0) 0%, rgb(var(--lt-rgb) / 0.9) 22%, rgb(var(--lt-rgb) / 0.9) 78%, rgb(var(--lt-rgb) / 0) 100%) no-repeat,
+        radial-gradient(130% 160% at 0% 0%, rgb(var(--lt-rgb) / 0.14) 0%, transparent 52%),
+        linear-gradient(180deg, rgba(30, 30, 36, 0.93) 0%, rgba(13, 13, 16, 0.97) 55%, rgba(7, 7, 9, 0.98) 100%) !important;
+    background-size: 250% 100%, auto, 3px calc(100% - 14px), 100% 100%, 100% 100% !important;
+    background-position: 160% 0, 0 0, 0 7px, 0 0, 0 0 !important;
+    box-shadow:
+        0 14px 34px rgba(0, 0, 0, 0.62),
+        0 4px 12px rgba(0, 0, 0, 0.45),
+        0 0 20px rgb(var(--lt-rgb) / 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    animation: lus-toast-sheen 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+
+/* Sheen de entrada: banda de luz varre uma vez via background-position */
+@keyframes lus-toast-sheen {
+    0% { background-position: 165% 0, 0 0, 0 9px, 0 0, 0 0; }
+    100% { background-position: -85% 0, 0 0, 0 9px, 0 0, 0 0; }
+}
+
+/* Orla metálica 1px (luz no topo → tinta do tipo → dourado → sombra) */
+.lus-toast::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 3;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.5) 0%, rgb(var(--lt-rgb) / 0.32) 32%, rgba(212, 168, 83, 0.32) 60%, rgba(0, 0, 0, 0.55) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+/* Cores por tipo (rgb triplets para alphas compostos) */
+.lus-toast[data-type="success"] { --lt-rgb: 16 185 129; }
+.lus-toast[data-type="error"] { --lt-rgb: 239 68 68; }
+.lus-toast[data-type="warning"] { --lt-rgb: 245 158 11; }
+.lus-toast[data-type="info"] { --lt-rgb: 10 132 255; }
+.lus-toast[data-type="loading"] { --lt-rgb: 161 161 170; }
+
+/* Título com gradiente metálico (linguagem dos painéis SSS) */
+.lus-toast [data-title] {
+    font-weight: 800;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    background: linear-gradient(180deg, #ffffff 30%, #e4e4e7 65%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+}
+
+.lus-toast [data-description] {
+    color: #9f9fa8 !important;
+    font-size: 11px;
+    letter-spacing: 0.01em;
+}
+
+/* Ícone: cor do tipo + glow + pop com mola */
+.lus-toast [data-icon] {
+    color: rgb(var(--lt-rgb));
+    filter: drop-shadow(0 0 7px rgb(var(--lt-rgb) / 0.55));
+}
+
+.lus-toast-ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: lus-toast-ico-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.12s both;
+}
+
+@keyframes lus-toast-ico-pop {
+    0% { transform: scale(0.35) rotate(-12deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Barra de vida: esvazia em 4s (= duration), pausa no hover.
+   Vive em [data-content]::after para não tocar no ::after do root. */
+.lus-toast [data-content]::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    right: 13px;
+    bottom: 5px;
+    height: 2px;
+    border-radius: 2px;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgb(var(--lt-rgb) / 0.95), rgb(var(--lt-rgb) / 0.4));
+    box-shadow: 0 0 8px rgb(var(--lt-rgb) / 0.5);
+    transform-origin: left center;
+    animation: lus-toast-life 4s linear 0.1s both;
+}
+
+@keyframes lus-toast-life {
+    0% { transform: scaleX(1); }
+    100% { transform: scaleX(0); }
+}
+
+.lus-toast:hover [data-content]::after {
+    animation-play-state: paused;
+}
+
+.lus-toast[data-type="loading"] [data-content]::after {
+    display: none;
+}
+
+/* Botão de fecho: chip metálico escuro, hover na cor do tipo */
+.lus-toast [data-close-button] {
+    z-index: 4;
+    background: linear-gradient(180deg, #232329, #101013) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    color: #c9c9d1 !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lus-toast [data-close-button]:hover {
+    background: linear-gradient(180deg, #2c2c33, #131316) !important;
+    border-color: rgb(var(--lt-rgb) / 0.7) !important;
+    color: #ffffff !important;
+    transform: scale(1.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65), 0 0 10px rgb(var(--lt-rgb) / 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-toast,
+    .lus-toast-ico {
+        animation: none !important;
+    }
+    .lus-toast [data-content]::after {
+        display: none;
+    }
+}
+
+/* ---------- Carimbo de despacho — celebração breve no centro do ecrã ---------- */
+.lus-stamp {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.lus-stamp-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 34px;
+    border: 2px solid rgba(16, 185, 129, 0.8);
+    border-radius: 8px;
+    background: rgba(4, 10, 8, 0.9);
+    box-shadow:
+        0 0 44px rgba(16, 185, 129, 0.28),
+        inset 0 0 26px rgba(16, 185, 129, 0.08);
+    transform: rotate(-4deg);
+    animation: lus-stamp-in 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes lus-stamp-in {
+    0% { opacity: 0; transform: rotate(-4deg) scale(1.9); }
+    14% { opacity: 1; transform: rotate(-4deg) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(-4deg) scale(0.98); }
+}
+
+/* ---------- Relógio da rede (topbar) ---------- */
+.lus-clock {
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px rgba(220, 38, 38, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-radar-hq::before,
+    .unit-operating::after,
+    .unit-chased::after,
+    .lus-feed-new,
+    .lus-flash-amber,
+    .lus-flash-blue {
+        animation: none !important;
+    }
+    .lus-stamp-box {
+        animation: lus-stamp-in 1.6s step-end both;
+    }
+}
+
+/* ============================================================
+   SSS — Páginas de documento (Termos/Privacidade/RGPD/Changelog)
+   Mesma identidade Noir Tático do jogo, adaptada a leitura longa.
+   ============================================================ */
+
+/* Scroll suave nas âncoras do índice */
+html:has(.lus-page-bg) {
+    scroll-behavior: smooth;
+}
+
+.lus-page-bg {
+    background-color: #060607;
+}
+
+/* Grelha tática desvanecida a partir do topo */
+.lus-page-grid {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(75% 60% at 50% 0%, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
+    mask-image: radial-gradient(75% 60% at 50% 0%, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
+}
+
+/* Glows ambiente vermelho/ouro + vinheta inferior */
+.lus-page-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(55% 38% at 50% 0%, rgba(220, 38, 38, 0.085) 0%, transparent 70%),
+        radial-gradient(32% 26% at 88% 10%, rgba(212, 168, 83, 0.05) 0%, transparent 70%),
+        radial-gradient(45% 32% at 8% 55%, rgba(220, 38, 38, 0.03) 0%, transparent 70%),
+        linear-gradient(180deg, transparent 70%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+/* Header fixo — vidro obsidiana com varrimento laser na base */
+.lus-page-header {
+    position: sticky;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background-color: rgba(7, 7, 8, 0.82);
+    background-image:
+        radial-gradient(60% 150% at 50% 0%, rgba(220, 38, 38, 0.06) 0%, transparent 65%),
+        linear-gradient(180deg, rgba(26, 26, 30, 0.72) 0%, rgba(7, 7, 8, 0.92) 100%);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow:
+        0 14px 44px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.lus-page-header::after {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 15%, rgba(220, 38, 38, 0.85) 50%, transparent 85%);
+    background-size: 200% 100%;
+    animation: lus-sweep 8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+/* Link de navegação ativo — sublinhado laser */
+.lus-doc-nav-active {
+    position: relative;
+}
+
+.lus-doc-nav-active::after {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: 1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.95), transparent);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+    pointer-events: none;
+}
+
+/* Hairline gradiente (separadores de header/footer) */
+.lus-hairline {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 2%, rgba(220, 38, 38, 0.4) 30%, rgba(212, 168, 83, 0.3) 65%, transparent 98%);
+}
+
+/* Cartão de sumário do documento — vidro com cantos HUD */
+.lus-doc-summary {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.015) 55%, rgba(220, 38, 38, 0.035) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 32px rgba(0, 0, 0, 0.45);
+}
+
+.lus-doc-summary::before,
+.lus-doc-summary::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(239, 68, 68, 0.55);
+    pointer-events: none;
+}
+
+.lus-doc-summary::before {
+    top: -1px;
+    left: -1px;
+    border-right: none;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+}
+
+.lus-doc-summary::after {
+    bottom: -1px;
+    right: -1px;
+    border-left: none;
+    border-top: none;
+    border-bottom-right-radius: 6px;
+}
+
+/* Índice lateral — consola de navegação em vidro */
+.lus-toc {
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 8px 26px rgba(0, 0, 0, 0.35);
+}
+
+.lus-toc a {
+    border-left: 2px solid transparent;
+    transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, padding-left 0.18s ease;
+}
+
+.lus-toc a:hover {
+    border-left-color: rgba(239, 68, 68, 0.75);
+    background-color: rgba(255, 255, 255, 0.035);
+    padding-left: 14px;
+}
+
+/* Título de secção com marcador laser */
+.lus-sec-heading {
+    position: relative;
+    padding-left: 15px;
+}
+
+.lus-sec-heading::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 72%;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #ef4444 0%, rgba(212, 168, 83, 0.85) 100%);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.45);
+}
+
+/* Cartões de versão do changelog */
+.lus-version-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.012) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 8px 28px rgba(0, 0, 0, 0.4);
+    transition: border-color 0.25s ease, box-shadow 0.3s ease, transform 0.25s ease;
+}
+
+.lus-version-card:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.09),
+        0 16px 44px rgba(0, 0, 0, 0.55),
+        0 0 26px rgba(220, 38, 38, 0.07);
+}
+
+/* Versão atual — realce laser vermelho */
+.lus-version-current {
+    border-color: rgba(239, 68, 68, 0.3);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 34px rgba(0, 0, 0, 0.5),
+        0 0 32px rgba(220, 38, 38, 0.1);
+}
+
+.lus-version-current::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 2%, rgba(220, 38, 38, 0.8) 35%, rgba(212, 168, 83, 0.55) 70%, transparent 98%);
+    pointer-events: none;
+}
+
+/* Nó da timeline da versão atual — pulso luminoso */
+@keyframes lus-node-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4), 0 0 12px rgba(239, 68, 68, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 0 7px rgba(239, 68, 68, 0), 0 0 20px rgba(239, 68, 68, 0.75);
+    }
+}
+
+.lus-node-current {
+    animation: lus-node-pulse 2.4s ease-in-out infinite;
+}
+
+/* ============================================================
+   SSS — Mapa: urgência e modo seguir
+   ============================================================ */
+
+/* Anel de urgência — oportunidade prestes a expirar */
+.opp-pin-urgent {
+    position: absolute;
+    inset: -7px;
+    border-radius: 9999px;
+    border: 2px solid rgba(251, 191, 36, 0.9);
+    box-shadow:
+        0 0 14px rgba(251, 191, 36, 0.55),
+        inset 0 0 8px rgba(251, 191, 36, 0.2);
+    animation: lus-urgent-pulse 1.1s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes lus-urgent-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.92); }
+    50% { opacity: 1; transform: scale(1.06); }
+}
+
+/* Rotação do ícone da unidade — aplicada por rAF (lerp em JS); a transição
+   CSS antiga atrasava-se atrás do rumo real. */
+.unit-pin svg {
+    will-change: transform;
+}
+
+/* Chip "a seguir unidade" no topo do mapa */
+.lus-follow-chip {
+    position: absolute;
+    top: calc(5.2rem + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 12px;
+    border-radius: 9999px;
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    background: rgba(6, 10, 12, 0.95);
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.6),
+        0 0 18px rgba(34, 211, 238, 0.15);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #a5f3fc;
+    white-space: nowrap;
+}
+
+.lus-follow-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: #22d3ee;
+    box-shadow: 0 0 8px #22d3ee;
+    animation: lus-follow-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes lus-follow-blink {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+}
+
+.lus-follow-chip button {
+    display: flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    color: #67e8f9;
+    background: rgba(34, 211, 238, 0.12);
+    transition: background-color 0.15s ease;
+}
+
+.lus-follow-chip button:hover {
+    background-color: rgba(34, 211, 238, 0.28);
+}
+
+/* ============================================================
+   PERF/SSS — Contador de FPS (Definições → Interface)
+   ============================================================ */
+.lus-fps {
+    position: fixed;
+    right: 8px;
+    top: calc(12rem + env(safe-area-inset-top, 0px));
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 7px 11px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(26, 26, 30, 0.96), rgba(9, 9, 11, 0.98));
+    box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: "JetBrains Mono", monospace;
+    pointer-events: none;
+    contain: content;
+}
+
+.lus-fps-value {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1;
+    color: #34d399;
+    font-variant-numeric: tabular-nums;
+}
+
+.lus-fps-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #71717a;
+}
+
+/* ============================================================
+   SSS — Cartões de missão (QuestsPanel)
+   ============================================================ */
+
+/* Laser lateral com a cor da dificuldade (--mk) */
+.lus-quest-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12%;
+    bottom: 12%;
+    width: 3px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, transparent, var(--mk, #71717a) 30%, var(--mk, #71717a) 70%, transparent);
+    box-shadow: 0 0 10px var(--mk, transparent);
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* Contrato em destaque — tratamento hero vermelho/ouro */
+.lus-quest-featured {
+    border-color: rgba(239, 68, 68, 0.45) !important;
+    background-color: rgba(12, 7, 7, 0.7);
+    background-image:
+        radial-gradient(130% 90px at 18% 0%, rgba(220, 38, 38, 0.16) 0%, transparent 70%),
+        linear-gradient(165deg, rgba(255, 255, 255, 0.05) 0%, rgba(220, 38, 38, 0.045) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.09),
+        0 10px 30px rgba(0, 0, 0, 0.5),
+        0 0 28px rgba(220, 38, 38, 0.12);
+}
+
+.lus-quest-featured::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 2%, rgba(239, 68, 68, 0.9) 30%, rgba(212, 168, 83, 0.6) 70%, transparent 98%);
+    pointer-events: none;
+}
+
+/* Missão concluída por reclamar — glow esmeralda estático (PERF: animar
+   box-shadow em loop repaintava o cartão a cada frame com o painel aberto). */
+.lus-quest-completed {
+    border-color: rgba(16, 185, 129, 0.45) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 22px rgba(16, 185, 129, 0.26);
+}
+
+/* Bloqueada — dossier selado */
+.lus-quest-locked {
+    border-style: dashed !important;
+    filter: grayscale(0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html:has(.lus-page-bg) {
+        scroll-behavior: auto;
+    }
+    .lus-page-header::after,
+    .lus-node-current,
+    .opp-pin-urgent,
+    .lus-follow-dot {
+        animation: none !important;
+    }
+    .lus-version-card,
+    .lus-toc a,
+    .unit-pin svg {
+        transition: none;
+    }
+}
+
+/* ============================================================
+   Auth SSS — Acesso à rede (login/registo cinematográfico)
+   ============================================================ */
+
+/* Wordmark metálico (estático — o sheen animado causava repaint contínuo) */
+.lus-auth-logo {
+    background: linear-gradient(105deg, #ffffff 18%, #d4d4d8 36%, #ffecec 48%, #9f9fa6 60%, #f4f4f5 78%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 6px 30px rgba(220, 38, 38, 0.4));
+}
+
+/* Régua vermelha pulsante sob o wordmark */
+.lus-auth-rule {
+    height: 2px;
+    background: linear-gradient(90deg, #dc2626, rgba(220, 38, 38, 0.45) 55%, transparent);
+    box-shadow: 0 0 16px rgba(220, 38, 38, 0.55);
+}
+
+/* Ticker de interceção (linhas rotativas) */
+.lus-intel-lines {
+    position: relative;
+    height: 17px;
+    overflow: hidden;
+}
+
+.lus-intel-lines span {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    opacity: 0;
+    animation: lus-intel-cycle 16s infinite;
+}
+
+.lus-intel-lines span:nth-child(2) { animation-delay: 4s; }
+.lus-intel-lines span:nth-child(3) { animation-delay: 8s; }
+.lus-intel-lines span:nth-child(4) { animation-delay: 12s; }
+
+@keyframes lus-intel-cycle {
+    0% { opacity: 0; transform: translateY(8px); }
+    3%, 22% { opacity: 1; transform: translateY(0); }
+    26%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* Cartões de feature com barra laser no hover */
+.lus-auth-feature {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+    overflow: hidden;
+    transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.lus-auth-feature::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14%;
+    bottom: 14%;
+    width: 2px;
+    background: linear-gradient(180deg, transparent, rgba(220, 38, 38, 0.9), transparent);
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.6);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.lus-auth-feature:hover {
+    border-color: rgba(220, 38, 38, 0.3);
+    transform: translateX(3px);
+}
+
+.lus-auth-feature:hover::before { opacity: 1; }
+
+/* Tabs segmentadas com glider deslizante */
+.lus-auth-tabs {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.35));
+    box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.lus-auth-glider {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: linear-gradient(180deg, #ef4444, #b91c1c 55%, #7f1d1d);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 2px 12px rgba(0, 0, 0, 0.5),
+        0 0 22px rgba(220, 38, 38, 0.45);
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-auth-tabs[data-mode="register"] .lus-auth-glider {
+    transform: translateX(100%);
+}
+
+.lus-auth-tab {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 38px;
+    border-radius: 7px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8e8e93;
+    transition: color 0.25s ease;
+}
+
+.lus-auth-tab:hover { color: #d4d4d8; }
+
+.lus-auth-tab[data-active="true"] {
+    color: #ffffff;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+.lus-auth-tab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.45);
+}
+
+/* Campos com ícone que acende no foco */
+.lus-auth-field { position: relative; }
+
+.lus-auth-field-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #52525b;
+    pointer-events: none;
+    transition: color 0.2s ease, filter 0.2s ease;
+}
+
+.lus-auth-field:focus-within .lus-auth-field-icon {
+    color: #f87171;
+    filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.6));
+}
+
+/* Medidor de força — segmentos angulados */
+.lus-seg {
+    height: 6px;
+    flex: 1;
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+    transition: background-color 0.3s ease, filter 0.3s ease;
+}
+
+.lus-seg-on {
+    filter: brightness(1.15) drop-shadow(0 0 6px rgba(255, 255, 255, 0.12));
+}
+
+/* Alertas tipo transmissão tática */
+.lus-auth-alert {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid #ef4444;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(0, 0, 0, 0.28) 62%);
+}
+
+.lus-auth-alert-amber {
+    border-left-color: #f59e0b;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(0, 0, 0, 0.28) 62%);
+}
+
+.lus-auth-alert-kicker {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+/* Transição suave ao alternar Entrar ↔ Criar Império */
+.lus-auth-swap {
+    animation: lus-auth-swap-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes lus-auth-swap-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-intel-lines span,
+    .lus-auth-swap {
+        animation: none !important;
+    }
+
+    .lus-intel-lines span:first-child { opacity: 1; transform: none; }
+    .lus-auth-glider { transition: none; }
+    .lus-auth-feature { transition: none; }
+}
+
+/* ==================== SSS — Últimos registos (ActivityFeed) ==================== */
+
+/* Fila de chips de filtro — scroll horizontal sem scrollbar visível. */
+.lus-feed-chiprow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lus-feed-chiprow::-webkit-scrollbar {
+    display: none;
+}
+
+.lus-feed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #a1a1aa;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lus-feed-chip:hover {
+    color: #e4e4e7;
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.lus-feed-chip.is-active {
+    border-color: rgba(239, 68, 68, 0.55);
+    background: linear-gradient(180deg, rgba(220, 38, 38, 0.28), rgba(127, 29, 29, 0.18));
+    color: #fecaca;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lus-feed-chip-n {
+    color: #71717a;
+    font-weight: 700;
+}
+
+.lus-feed-chip.is-active .lus-feed-chip-n {
+    color: #fca5a5;
+}
+
+/* Quadrado tingido do ícone de cada registo (cor inline vinda do classifyEvent). */
+.lus-feed-ico {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Linha de registo — acento lateral por severidade via ::before. */
+.lus-feed-row {
+    position: relative;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+}
+
+.lus-feed-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: transparent;
+}
+
+.lus-feed-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.lus-feed-row[data-sev="crit"]::before { background: rgba(239, 68, 68, 0.75); }
+.lus-feed-row[data-sev="warn"]::before { background: rgba(245, 158, 11, 0.6); }
+.lus-feed-row[data-sev="pos"]::before { background: rgba(52, 211, 153, 0.55); }
+.lus-feed-row[data-sev="gold"]::before { background: rgba(251, 191, 36, 0.55); }
+
+.lus-feed-row[data-sev="crit"] {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+.lus-feed-row[data-sev="crit"]:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Separador temporal (Agora / Últimos 10 min / Última hora / ...). */
+.lus-feed-sep {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 2px 2px;
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #52525b;
+}
+
+.lus-feed-sep::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent);
+}
+
+/* Badge de registos não lidos — pulso vermelho tático. */
+.lus-feed-unread {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    background: linear-gradient(180deg, rgba(220, 38, 38, 0.85), rgba(153, 27, 27, 0.85));
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.35);
+    animation: lus-feed-unread-pulse 2s ease-in-out infinite;
+}
+
+@keyframes lus-feed-unread-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(220, 38, 38, 0.25); }
+    50% { box-shadow: 0 0 14px rgba(220, 38, 38, 0.5); }
+}
+
+/* Contador ×N de eventos repetidos colapsados. */
+.lus-feed-xn {
+    padding: 0 4px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.07);
+    color: #d4d4d8;
+    font-weight: 700;
+}
+
+/* Botão de ícone pequeno (expandir/reduzir altura). */
+.lus-feed-iconbtn {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #a1a1aa;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.lus-feed-iconbtn:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-feed-unread {
+        animation: none;
+    }
+
+    .lus-feed-chip,
+    .lus-feed-row,
+    .lus-feed-iconbtn {
+        transition: none;
+    }
+}
+
+/* ---------------- Arsenal SSS — cartões de arma ----------------
+   Cada cartão recebe a cor do tier via --wtier (Rua/Profissional/Militar/
+   Pesado) — alimenta a orla esquerda, o brilho ambiente e a placa da
+   silhueta. Conteúdo interativo fica em z-index 1 acima do ::before. */
+.lus-weapon-card {
+    position: relative;
+    overflow: hidden;
+    border-left: 2px solid color-mix(in srgb, var(--wtier, #a1a1aa) 55%, transparent);
+}
+
+.lus-weapon-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--wtier, #a1a1aa) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--wtier, #a1a1aa) 4%, transparent), transparent 70%);
+    pointer-events: none;
+}
+
+.lus-weapon-card:hover {
+    border-left-color: color-mix(in srgb, var(--wtier, #a1a1aa) 85%, transparent);
+}
+
+/* Placa da silhueta: fundo blindado com grelha diagonal + halo do tier. */
+.lus-weapon-plate {
+    background:
+        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--wtier, #a1a1aa) 15%, transparent), transparent 76%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+}
+
+/* Varrimento de luz sobre a placa quando o cartão recebe hover. */
+.lus-weapon-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
+    background-size: 240% 100%;
+    background-position: 130% 0;
+    pointer-events: none;
+}
+
+.lus-weapon-card:hover .lus-weapon-plate::after {
+    background-position: -80% 0;
+    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-weapon-glyph {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
+}
+
+/* ---------------- Equipas SSS — cartões dossier de unidade ----------------
+   Mesmo tratamento dos cartões de arma: a cor do tier da equipa (Recruta/
+   Operacional/Veterana/Lendária) entra via --ttier e alimenta a orla
+   esquerda, o brilho ambiente e a placa do emblema. */
+.lus-team-card {
+    position: relative;
+    overflow: hidden;
+    border-left: 2px solid color-mix(in srgb, var(--ttier, #a1a1aa) 55%, transparent);
+}
+
+.lus-team-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--ttier, #a1a1aa) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--ttier, #a1a1aa) 4%, transparent), transparent 70%);
+    pointer-events: none;
+}
+
+.lus-team-card:hover {
+    border-left-color: color-mix(in srgb, var(--ttier, #a1a1aa) 85%, transparent);
+}
+
+/* Placa do emblema: fundo blindado com grelha diagonal + halo do tier. */
+.lus-team-plate {
+    background:
+        radial-gradient(58px 30px at 50% 52%, color-mix(in srgb, var(--ttier, #a1a1aa) 16%, transparent), transparent 78%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+}
+
+/* Varrimento de luz sobre a placa quando o cartão recebe hover. */
+.lus-team-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
+    background-size: 240% 100%;
+    background-position: 130% 0;
+    pointer-events: none;
+}
+
+.lus-team-card:hover .lus-team-plate::after {
+    background-position: -80% 0;
+    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-team-glyph {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-team-card:hover .lus-team-plate::after {
+        transition: none;
+        background-position: 130% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-weapon-card:hover .lus-weapon-plate::after {
+        transition: none;
+        background-position: 130% 0;
+    }
+}
+
+
+/* ============================================================
+   Execução visual das missões — operacionais no terreno
+   ============================================================ */
+
+/* Pin de operacional — puramente visual (não interativo). A posição vem do
+   loop rAF (setLatLng); opacidade/escala são aplicadas diretamente a este
+   elemento interno para os fades de entrada/saída do veículo e o modo
+   "dentro do edifício" — tudo no compositor, sem repaints. */
+.op-pin {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: #fafafa;
+    color: #09090b;
+    border: 1.5px solid rgba(5, 5, 5, 0.9);
+    box-shadow: 0 0 8px rgba(250, 250, 250, 0.55);
+    will-change: transform, opacity;
+}
+
+.op-pin svg {
+    display: block;
+}
+
+/* Passada — bob subtil só enquanto caminha (classe gerida pelo loop rAF) */
+.op-walking svg {
+    animation: op-bob 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes op-bob {
+    from {
+        transform: translateY(-0.7px);
+    }
+    to {
+        transform: translateY(0.7px);
+    }
+}
+
+/* Saque no regresso (assaltos/cobranças com sucesso) */
+.op-carry-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #f59e0b;
+    color: #000;
+    font: 800 7px/1 ui-monospace, SFMono-Regular, monospace;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.9);
+}
+
+.op-carrying .op-carry-badge {
+    display: flex;
+}
+
+/* Tinturas ligeiras por arquetipo — leitura instantânea do tipo de operação */
+.op-heist,
+.op-spread,
+.op-combat {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.op-stealth {
+    background: #ddd6fe;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.55);
+}
+
+.op-tech {
+    background: #cffafe;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
+}
+
+.op-cargo {
+    background: #fde68a;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.op-vip {
+    background: #fef3c7;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+/* Veículo estacionado junto ao alvo (equipa no terreno) */
+.unit-parked {
+    background: #0e7490;
+    color: #cffafe;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+}
+
+/* ============================================================
+   Veículo top-down (unit-car) — corpo rodado pelo rumo da via
+   ============================================================ */
+.unit-car {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+}
+
+/* Corpo do carro visto de cima — a rotação (rumo) é aplicada pelo loop rAF
+   diretamente a este elemento (compositor, sem repaints). A frente é o topo. */
+.unit-car-body {
+    position: relative;
+    display: block;
+    width: 11px;
+    height: 21px;
+    border-radius: 5px 5px 4px 4px / 7px 7px 4px 4px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--mk, #22d3ee) 80%, #fff) 0%,
+        var(--mk, #22d3ee) 42%,
+        color-mix(in srgb, var(--mk, #22d3ee) 62%, #000) 100%
+    );
+    border: 1px solid rgba(5, 5, 5, 0.92);
+    box-shadow: 0 0 10px var(--mk, #22d3ee);
+    will-change: transform;
+}
+
+/* Para-brisas + vidro traseiro */
+.unit-car-glass {
+    position: absolute;
+    left: 1.5px;
+    right: 1.5px;
+    top: 4px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(6, 16, 24, 0.85);
+}
+
+.unit-car-glass::after {
+    content: "";
+    position: absolute;
+    left: 0.5px;
+    right: 0.5px;
+    top: 10px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(6, 16, 24, 0.6);
+}
+
+/* Estacionado — mais discreto, badge P por cima (sem rodar com o corpo) */
+.unit-car-parked .unit-car-body {
+    box-shadow: 0 0 6px rgba(34, 211, 238, 0.4);
+}
+
+.unit-car .unit-parked-badge {
+    top: 0;
+    right: 1px;
+    z-index: 2;
+}
+
+/* Em perseguição — carro a vermelho com glow pulsante (compositor) */
+.unit-car-chased .unit-car-body {
+    background: linear-gradient(180deg, #fca5a5 0%, #ef4444 42%, #7f1d1d 100%);
+    box-shadow: 0 0 10px #ef4444, 0 0 20px rgba(239, 68, 68, 0.65);
+}
+
+/* ============================================================
+   Alvo físico da missão — marcador vermelho persistente
+   ============================================================ */
+.mission-target {
+    position: relative;
+    width: 30px;
+    height: 30px;
+}
+
+.mission-target-ring {
+    position: absolute;
+    inset: 4px;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(239, 68, 68, 0.55);
+    box-shadow: inset 0 0 8px rgba(239, 68, 68, 0.18);
+}
+
+.mission-target-cross {
+    position: absolute;
+    inset: 0;
+}
+
+/* Ticks de mira (topo/base e esquerda/direita) */
+.mission-target-cross::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    transform: translateX(-0.5px);
+    background: linear-gradient(
+        180deg,
+        rgba(239, 68, 68, 0.85) 0 5px,
+        transparent 5px calc(100% - 5px),
+        rgba(239, 68, 68, 0.85) calc(100% - 5px) 100%
+    );
+}
+
+.mission-target-cross::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    transform: translateY(-0.5px);
+    background: linear-gradient(
+        90deg,
+        rgba(239, 68, 68, 0.85) 0 5px,
+        transparent 5px calc(100% - 5px),
+        rgba(239, 68, 68, 0.85) calc(100% - 5px) 100%
+    );
+}
+
+.mission-target-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 9999px;
+    background: #ef4444;
+    border: 1px solid rgba(5, 5, 5, 0.9);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    animation: target-beat 1.8s ease-in-out infinite;
+    will-change: transform, opacity;
+}
+
+/* Em execução — bate mais depressa e o anel acende */
+.mission-target-hot .mission-target-dot {
+    animation-duration: 0.9s;
+}
+
+.mission-target-hot .mission-target-ring {
+    border-color: rgba(239, 68, 68, 0.95);
+    box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.3), 0 0 12px rgba(239, 68, 68, 0.35);
+}
+
+@keyframes target-beat {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.35);
+        opacity: 0.72;
+    }
+}
+
+.unit-parked-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: #22d3ee;
+    color: #04262e;
+    font: 800 7px/1 ui-monospace, SFMono-Regular, monospace;
+    border: 1px solid rgba(5, 5, 5, 0.8);
+}
+
+/* Halo de atividade no local exato da missão — anéis que animam apenas
+   transform/opacity (compositor). Cor e ritmo variam por arquetipo. */
+.lus-sitefx {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    pointer-events: none;
+}
+
+.lus-sitefx::before,
+.lus-sitefx::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 9999px;
+    border: 1.5px solid var(--fx, #ef4444);
+    animation: sitefx-ring 2.2s ease-out infinite;
+    will-change: transform, opacity;
+}
+
+.lus-sitefx::after {
+    animation-delay: 1.1s;
+}
+
+@keyframes sitefx-ring {
+    0% {
+        transform: scale(0.35);
+        opacity: 0.85;
+    }
+    100% {
+        transform: scale(1.15);
+        opacity: 0;
+    }
+}
+
+.lus-sitefx-heist,
+.lus-sitefx-spread {
+    --fx: #ef4444;
+}
+
+.lus-sitefx-combat {
+    --fx: #ef4444;
+}
+
+.lus-sitefx-combat::before {
+    animation-duration: 0.9s;
+}
+
+.lus-sitefx-combat::after {
+    animation-delay: 0.45s;
+    animation-duration: 0.9s;
+}
+
+.lus-sitefx-cargo {
+    --fx: #f59e0b;
+}
+
+.lus-sitefx-collect {
+    --fx: #34d399;
+}
+
+.lus-sitefx-stealth {
+    --fx: #a78bfa;
+}
+
+.lus-sitefx-stealth::before,
+.lus-sitefx-stealth::after {
+    animation-duration: 3.6s;
+    border-style: dashed;
+}
+
+.lus-sitefx-tech {
+    --fx: #22d3ee;
+}
+
+.lus-sitefx-vip {
+    --fx: #fbbf24;
+}
+
+.lus-sitefx-vip::before,
+.lus-sitefx-vip::after {
+    animation-duration: 3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-sitefx::before,
+    .lus-sitefx::after {
+        animation: none;
+        opacity: 0.35;
+        transform: scale(0.8);
+    }
+    .op-walking svg {
+        animation: none;
+    }
+}
+
+/* ============================================================
+   Coreografia v3 — orientação do olhar, rádio, corrida, líder,
+   objetos transportados, portas do veículo, transições de fase
+   ============================================================ */
+
+/* Orientação do olhar — wedge rodado pelo loop rAF (compositor). */
+.op-face-wrap {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.op-face {
+    position: absolute;
+    top: -4.5px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    margin-left: -2.5px;
+    border-left: 2.5px solid transparent;
+    border-right: 2.5px solid transparent;
+    border-bottom: 4px solid rgba(250, 250, 250, 0.95);
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+}
+
+.op-stealth .op-face {
+    border-bottom-color: rgba(221, 214, 254, 0.95);
+}
+
+.op-tech .op-face {
+    border-bottom-color: rgba(207, 250, 254, 0.95);
+}
+
+.op-cargo .op-face {
+    border-bottom-color: rgba(253, 230, 138, 0.95);
+}
+
+/* Corrida (apenas na retirada) — passada mais rápida e enérgica. */
+.op-running svg {
+    animation: op-bob 0.3s ease-in-out infinite alternate;
+}
+
+/* Líder de facto — anel dourado subtil + ponto de comando. */
+.op-leader {
+    border-color: rgba(251, 191, 36, 0.95);
+    box-shadow: 0 0 9px rgba(251, 191, 36, 0.65);
+}
+
+.op-leader::before {
+    content: "";
+    position: absolute;
+    bottom: -4.5px;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 9999px;
+    background: #fbbf24;
+    box-shadow: 0 0 4px rgba(251, 191, 36, 0.9);
+}
+
+/* Retaguarda — orla avermelhada discreta (protege a retirada). */
+.op-rear {
+    border-color: rgba(239, 68, 68, 0.75);
+}
+
+/* Ping de rádio — anel a expandir sobre quem está a transmitir. */
+.op-radio::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(34, 211, 238, 0.9);
+    animation: op-radio-ping 0.9s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes op-radio-ping {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.95;
+    }
+    100% {
+        transform: scale(2.1);
+        opacity: 0;
+    }
+}
+
+/* Objetos transportados — saque (€), caixa (carga), documentos/dispositivo. */
+.op-carry-money .op-carry-badge::after {
+    content: "€";
+}
+
+.op-carry-box .op-carry-badge {
+    border-radius: 2px;
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.9);
+}
+
+.op-carry-doc .op-carry-badge {
+    width: 7px;
+    height: 9px;
+    border-radius: 1.5px;
+    background: #fafafa;
+    box-shadow: 0 0 6px rgba(250, 250, 250, 0.8);
+}
+
+/* Portas do veículo — flaps que abrem no desembarque/embarque e fecham
+   antes da partida (classe unit-doors-open gerida pelo loop rAF). */
+.unit-car-door {
+    position: absolute;
+    top: 6px;
+    width: 3px;
+    height: 6px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--mk, #22d3ee) 75%, #fff);
+    border: 0.5px solid rgba(5, 5, 5, 0.9);
+    opacity: 0;
+    transition: transform 0.35s ease, opacity 0.35s ease;
+    pointer-events: none;
+}
+
+.unit-car-door-l {
+    left: -3px;
+    transform-origin: right top;
+    transform: rotate(0deg);
+}
+
+.unit-car-door-r {
+    right: -3px;
+    transform-origin: left top;
+    transform: rotate(0deg);
+}
+
+.unit-doors-open .unit-car-door {
+    opacity: 1;
+}
+
+.unit-doors-open .unit-car-door-l {
+    transform: rotate(-42deg);
+}
+
+.unit-doors-open .unit-car-door-r {
+    transform: rotate(42deg);
+}
+
+/* Transições de fase no halo do local — cada grupo de fase remonta o ícone
+   e dispara uma animação de entrada própria. */
+.lus-sitefx-stage-deploy {
+    animation: sitefx-in-deploy 0.9s ease-out;
+}
+
+.lus-sitefx-stage-execute {
+    animation: sitefx-in-execute 0.7s ease-out;
+}
+
+.lus-sitefx-stage-withdraw {
+    animation: sitefx-in-withdraw 0.9s ease-out;
+}
+
+@keyframes sitefx-in-deploy {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes sitefx-in-execute {
+    0% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes sitefx-in-withdraw {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    35% {
+        transform: scale(0.85);
+        opacity: 0.55;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .op-running svg,
+    .op-radio::after,
+    .lus-sitefx-stage-deploy,
+    .lus-sitefx-stage-execute,
+    .lus-sitefx-stage-withdraw {
+        animation: none;
+    }
+    .op-radio::after {
+        opacity: 0.6;
+        transform: scale(1.2);
+    }
+    .unit-car-door {
+        transition: none;
+    }
+}
+
+/* ============================================================
+   Força policial viva — viatura, barra de luzes, agentes
+   (PoliceLayer.jsx + lib/police.js; reutiliza unit-car-glass,
+   unit-car-door, op-pin, op-face, op-radio, op-walking)
+   ============================================================ */
+.police-car {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+}
+
+/* Corpo top-down PSP — branco com faixa azul; rodado pelo loop rAF */
+.police-car-body {
+    position: relative;
+    display: block;
+    width: 11px;
+    height: 21px;
+    border-radius: 5px 5px 4px 4px / 7px 7px 4px 4px;
+    background: linear-gradient(
+        180deg,
+        #f1f5f9 0%,
+        #cbd5e1 32%,
+        #1d4ed8 42%,
+        #1e3a8a 58%,
+        #94a3b8 68%,
+        #64748b 100%
+    );
+    border: 1px solid rgba(5, 5, 5, 0.92);
+    box-shadow: 0 0 7px rgba(96, 165, 250, 0.45);
+    will-change: transform;
+}
+
+/* Barra de luzes no tejadilho — 2 células; alternam quando .police-lights */
+.police-lightbar {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    top: 8.5px;
+    height: 3px;
+    display: flex;
+    gap: 1px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.police-lightbar i {
+    flex: 1;
+    border-radius: 1px;
+    background: #16326e;
+}
+
+.police-lights .police-lightbar i:first-child {
+    animation: police-flash-a 0.55s steps(1) infinite;
+}
+
+.police-lights .police-lightbar i:last-child {
+    animation: police-flash-b 0.55s steps(1) infinite;
+}
+
+@keyframes police-flash-a {
+    0%, 49% { background: #93c5fd; box-shadow: 0 0 6px #3b82f6, 0 0 10px rgba(59, 130, 246, 0.8); }
+    50%, 100% { background: #16326e; box-shadow: none; }
+}
+
+@keyframes police-flash-b {
+    0%, 49% { background: #16326e; box-shadow: none; }
+    50%, 100% { background: #bfdbfe; box-shadow: 0 0 6px #60a5fa, 0 0 10px rgba(59, 130, 246, 0.8); }
+}
+
+.police-lights .police-car-body {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), 0 0 22px rgba(59, 130, 246, 0.45);
+}
+
+/* Anel de emergência — pulsa em azul a responder, em vermelho em perseguição */
+.police-pulse {
+    position: absolute;
+    inset: 4px;
+    border-radius: 9999px;
+    border: 1.6px solid rgba(59, 130, 246, 0.75);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.police-lights .police-pulse {
+    animation: police-pulse 1.15s ease-out infinite;
+}
+
+.police-pursuit .police-pulse {
+    border-color: rgba(239, 68, 68, 0.85);
+    animation-duration: 0.75s;
+}
+
+.police-pursuit .police-car-body {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), 0 0 24px rgba(239, 68, 68, 0.5);
+}
+
+@keyframes police-pulse {
+    0% { transform: scale(0.5); opacity: 0.9; }
+    100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* Agente da polícia — pin azul-claro; herda op-face/op-walking/op-radio */
+.police-op {
+    background: #bfdbfe;
+    border-color: rgba(11, 30, 75, 0.95);
+    color: #0b1e4b;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.7);
+}
+
+.police-op .op-face {
+    border-bottom-color: rgba(59, 130, 246, 0.95);
+}
+
+/* ---- Variante GNR (zonas rurais/vilas) — corpo branco com faixa VERDE.
+   As luzes de emergência mantêm-se azuis (realidade portuguesa): só a
+   identidade do corpo, o glow e os agentes mudam de cor. ---- */
+.police-force-gnr .police-car-body {
+    background: linear-gradient(
+        180deg,
+        #f1f5f9 0%,
+        #cbd5e1 32%,
+        #15803d 42%,
+        #14532d 58%,
+        #94a3b8 68%,
+        #64748b 100%
+    );
+    box-shadow: 0 0 7px rgba(34, 197, 94, 0.45);
+}
+
+.police-force-gnr .police-lightbar i {
+    background: #14532d;
+}
+
+.police-force-gnr.police-lights .police-car-body {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), 0 0 22px rgba(34, 197, 94, 0.5);
+}
+
+/* Militar da GNR — pin verde-claro */
+.police-op-gnr {
+    background: #bbf7d0;
+    border-color: rgba(9, 55, 30, 0.95);
+    color: #09371e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+}
+
+.police-op-gnr .op-face {
+    border-bottom-color: rgba(34, 197, 94, 0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .police-lights .police-lightbar i:first-child,
+    .police-lights .police-lightbar i:last-child,
+    .police-lights .police-pulse {
+        animation: none;
+    }
+    .police-lights .police-lightbar i {
+        background: #93c5fd;
+        box-shadow: 0 0 6px #3b82f6;
+    }
+}
+
+
+/* ============================================================================
+   Operação em Direto (LiveOpsDock) — dock inferior estilo transmissão
+   ============================================================================ */
+
+.lus-lo-wrap {
+    bottom: calc(7.6rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+    .lus-lo-wrap {
+        bottom: 4.7rem;
+    }
+}
+
+.lus-lo {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(12, 12, 15, 0.93), rgba(7, 7, 9, 0.97));
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Linha laser vermelha no topo — assinatura "em direto" */
+.lus-lo::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.85) 30%, rgba(239, 68, 68, 0.85) 70%, transparent);
+    z-index: 1;
+}
+
+/* Varrimento vertical subtil (scanline) */
+.lus-lo-scan {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.025) 48%, transparent 52%);
+    background-size: 100% 220%;
+    animation: lus-lo-scan 5.5s linear infinite;
+}
+
+@keyframes lus-lo-scan {
+    0% { background-position: 0 -120%; }
+    100% { background-position: 0 120%; }
+}
+
+/* Ponto REC a pulsar */
+.lus-lo-rec {
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+    flex-shrink: 0;
+    animation: lus-lo-blink 1.15s steps(2, start) infinite;
+}
+
+@keyframes lus-lo-blink {
+    0%, 55% { opacity: 1; }
+    56%, 100% { opacity: 0.25; }
+}
+
+/* Entrada de cada linha do feed rádio */
+.lus-lo-line {
+    animation: lus-lo-line-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lus-lo-line-in {
+    0% { opacity: 0; transform: translateY(6px); }
+    60% { opacity: 1; }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Cursor de terminal na linha mais recente */
+.lus-lo-caret {
+    display: inline-block;
+    width: 6px;
+    height: 11px;
+    margin-left: 4px;
+    vertical-align: -1px;
+    background: currentColor;
+    animation: lus-lo-caret 0.75s steps(2, start) infinite;
+}
+
+@keyframes lus-lo-caret {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* Segmentos da timeline de fases */
+.lus-lo-seg {
+    height: 4px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+
+.lus-lo-seg-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* Pulso do número da chance quando uma complicação acaba de ser revelada */
+.lus-lo-chance-pulse {
+    animation: lus-lo-chance 0.9s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+@keyframes lus-lo-chance {
+    0% { transform: scale(1); filter: brightness(1); }
+    100% { transform: scale(1.12); filter: brightness(1.35); }
+}
+
+/* Scrollbar fina no feed */
+.lus-lo-feed {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.lus-lo-feed::-webkit-scrollbar {
+    width: 4px;
+}
+
+.lus-lo-feed::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-lo-scan,
+    .lus-lo-rec,
+    .lus-lo-caret,
+    .lus-lo-chance-pulse,
+    .lus-lo-line {
+        animation: none;
+    }
+}
+
+/* ---------------- Dossier SSS genérico (frota/imóveis/efetivo/contratos) ----
+   Mesmo tratamento dos cartões de arma/equipa, com a cor do tier do módulo a
+   entrar via --dtier — orla esquerda, brilho ambiente e placa da silhueta. */
+.lus-doss-card {
+    position: relative;
+    overflow: hidden;
+    border-left: 2px solid color-mix(in srgb, var(--dtier, #a1a1aa) 55%, transparent);
+}
+
+.lus-doss-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--dtier, #a1a1aa) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--dtier, #a1a1aa) 4%, transparent), transparent 70%);
+    pointer-events: none;
+}
+
+.lus-doss-card:hover {
+    border-left-color: color-mix(in srgb, var(--dtier, #a1a1aa) 85%, transparent);
+}
+
+.lus-doss-plate {
+    background:
+        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--dtier, #a1a1aa) 15%, transparent), transparent 76%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+}
+
+.lus-doss-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
+    background-size: 240% 100%;
+    background-position: 130% 0;
+    pointer-events: none;
+}
+
+.lus-doss-card:hover .lus-doss-plate::after {
+    background-position: -80% 0;
+    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lus-doss-glyph {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-doss-card:hover .lus-doss-plate::after {
+        transition: none;
+        background-position: 130% 0;
+    }
 }

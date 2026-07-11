@@ -5,6 +5,12 @@ import { useBoot } from "./BootContext";
 
 const AuthContext = createContext(null);
 
+// Disclaimer de ficção ("é apenas um jogo") — mostrado UMA única vez por
+// conta, no primeiro registo/entrada. A fonte de verdade é o servidor
+// (user.disclaimer_accepted, derivado do trilho de auditoria gravado por
+// POST /legal/disclaimer-ack); depois de aceite, nunca mais reaparece —
+// nem noutro login, nem noutro dispositivo.
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [gameState, setGameState] = useState(null);
@@ -127,6 +133,18 @@ export function AuthProvider({ children }) {
     []
   );
 
+  // Normaliza erros de autenticação para a UI (rede, lockout 429, validação)
+  const buildAuthError = useCallback((err) => {
+    const status = err.response?.status || null;
+    const retryAfterRaw = err.response?.headers?.["retry-after"];
+    const retryAfter = retryAfterRaw ? parseInt(retryAfterRaw, 10) : null;
+    const isNetwork = !err.response;
+    const errorMsg = isNetwork
+      ? "Sem ligação ao servidor. Verifica a tua internet e tenta novamente."
+      : formatApiErrorDetail(err.response?.data?.detail) || err.message;
+    return { ok: false, error: errorMsg, status, retryAfter, isNetwork };
+  }, []);
+
   // Login
   const login = useCallback(
     async (email, password) => {
@@ -136,42 +154,52 @@ export function AuthProvider({ children }) {
           localStorage.setItem("lusorae_access_token", res.data.access_token);
           localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
         }
-
         // Start boot sequence
         await startBoot(performBoot);
         return { ok: true };
       } catch (err) {
-        const errorMsg = formatApiErrorDetail(err.response?.data?.detail) || err.message;
-        return { ok: false, error: errorMsg };
+        return buildAuthError(err);
       }
     },
-    [startBoot, performBoot]
+    [startBoot, performBoot, buildAuthError]
   );
 
   // Register
   const register = useCallback(
-    async (orgName, email, password) => {
+    async (orgName, email, password, acceptTerms) => {
       try {
         const res = await api.post(
           "/auth/register",
-          { org_name: orgName, email, password },
+          { org_name: orgName, email, password, accept_terms: !!acceptTerms },
           { timeout: 10000 }
         );
         if (res.data.access_token) {
           localStorage.setItem("lusorae_access_token", res.data.access_token);
           localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
         }
+        // Conta nova → user.disclaimer_accepted vem false do servidor e o
+        // disclaimer de ficção aparece na primeira entrada no jogo.
 
         // Start boot sequence
         await startBoot(performBoot);
         return { ok: true };
       } catch (err) {
-        const errorMsg = formatApiErrorDetail(err.response?.data?.detail) || err.message;
-        return { ok: false, error: errorMsg };
+        return buildAuthError(err);
       }
     },
-    [startBoot, performBoot]
+    [startBoot, performBoot, buildAuthError]
   );
+
+  // Verificação de disponibilidade em tempo real (registo)
+  const checkAvailability = useCallback(async (payload) => {
+    try {
+      const res = await api.post("/auth/check-availability", payload, { timeout: 6000 });
+      return { ok: true, data: res.data };
+    } catch (_err) {
+      // Não-crítico: em caso de falha a UI simplesmente não mostra o estado
+      return { ok: false, data: null };
+    }
+  }, []);
 
   // Logout
   const logout = useCallback(async () => {
@@ -182,7 +210,10 @@ export function AuthProvider({ children }) {
     }
     localStorage.removeItem("lusorae_access_token");
     localStorage.removeItem("lusorae_refresh_token");
-    setUser(null);
+    // `false` = "sem sessão" → o ProtectedRoute redireciona para /auth.
+    // (`null` significa "ainda a determinar" e deixava a app presa num
+    // spinner infinito após terminar sessão.)
+    setUser(false);
     setGameState(null);
     setCatalog(null);
     resetBoot();
@@ -217,6 +248,19 @@ export function AuthProvider({ children }) {
       });
   }, [startBoot, performBoot]);
 
+  // Sessão expirada (emitido pelo interceptor da API quando o refresh falha):
+  // limpa o estado e devolve o utilizador ao ecrã de login com aviso.
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(false);
+      setGameState(null);
+      setCatalog(null);
+      resetBoot();
+    };
+    window.addEventListener("lus:session-expired", onExpired);
+    return () => window.removeEventListener("lus:session-expired", onExpired);
+  }, [resetBoot]);
+
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     try {
       await api.post(
@@ -250,6 +294,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Disclaimer de ficção aceite — atualiza o estado local imediatamente para
+  // o modal não voltar a montar nesta sessão; a persistência real já foi
+  // gravada no servidor pelo próprio modal (POST /legal/disclaimer-ack), pelo
+  // que em qualquer login/dispositivo futuro /auth/me devolve o campo a true.
+  const markDisclaimerAccepted = useCallback(() => {
+    setUser((u) => (u ? { ...u, disclaimer_accepted: true } : u));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -258,10 +310,12 @@ export function AuthProvider({ children }) {
         catalog,
         login,
         register,
+        checkAvailability,
         logout,
         changePassword,
         deleteAccount,
         claimAdmin,
+        markDisclaimerAccepted,
       }}
     >
       {children}

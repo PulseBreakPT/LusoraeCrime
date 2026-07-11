@@ -621,6 +621,33 @@ WEAPON_BONUS_MIN = -0.05                  # limite inferior do bónus total de a
 WEAPON_BONUS_MAX = 0.12                   # limite superior do bónus total de armamento
 WEAPON_COMPATIBILITY_MIN_FACTOR = 0.4     # factor mínimo quando os requisitos de atributo não são cumpridos
 
+# ---------------- SSS v5 — QI das Armas ----------------
+# Durabilidade finalmente ligada ao desgaste: modelos robustos (durability
+# alta) desgastam-se devagar, modelos frágeis desfazem-se depressa.
+# wear_mult = WEAPON_DURABILITY_WEAR_REF / durability (durability 90 ⇒ 0.78x,
+# durability 45 ⇒ 1.56x).
+WEAPON_DURABILITY_WEAR_REF = 70.0
+# Curva de condição não-linear: acima do joelho a eficácia é linear; abaixo
+# degrada quadraticamente — uma arma a 20% não é "meio útil", é quase sucata.
+WEAPON_CONDITION_SOFT_KNEE = 40.0
+# Encravamento: risco por missão = (1 - fiabilidade) * peso + défice de
+# condição abaixo do limiar * peso. Armas sem munições (carregador < 2 e não
+# ruidosas) nunca encravam. Cada encravamento corta chance e desgasta extra.
+WEAPON_JAM_RELIABILITY_WEIGHT = 0.40
+WEAPON_JAM_CONDITION_THRESHOLD = 60.0
+WEAPON_JAM_CONDITION_WEIGHT = 0.25
+WEAPON_JAM_MAX = 0.35                     # risco máximo de encravar por missão
+WEAPON_JAM_CHANCE_PENALTY = 0.04          # perda de chance por arma encravada
+WEAPON_JAM_CHANCE_PENALTY_CAP = 0.10      # perda de chance máxima por missão
+WEAPON_JAM_EXTRA_WEAR = 6.0               # condição extra perdida pela arma que encravou
+WEAPON_JAM_WARN_RISK = 0.15               # a partir deste risco, o preview avisa o jogador
+# Intimidação: em assaltos, o poder de fogo médio da equipa dissuade
+# perseguições na fuga — contrapartida real do calor extra das armas ruidosas.
+WEAPON_INTIMIDATION_ESCAPE_MAX = 0.06
+# Sinergia furtiva gradual: o bónus de perfil furtivo escala com a discrição
+# média das armas transportadas (referência = discrição 80).
+WEAPON_STEALTH_DISCRETION_REF = 80.0
+
 # ---------------- Reformulação do cálculo de chance (sistema modular) ----------------
 LOYALTY_BONUS_MAX = 0.04                  # bónus máx. quando a lealdade média está bem acima do padrão (70)
 LOYALTY_PENALTY_MAX = 0.06                # penalização máx. quando a lealdade média está muito abaixo do padrão
@@ -663,6 +690,214 @@ NIGHT_STEALTH_HOURS = (0, 6)
 NIGHT_STEALTH_BONUS = 0.04
 
 EMP_LEVEL_XP = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]
+
+# ============================================================================
+# SSS-TIER FORMULA ENGINE (v2) — curvas, sinergias e rendimentos decrescentes
+# Reformulação de TODAS as fórmulas para curvas não-lineares calibradas para
+# manter a dificuldade média actual: cenários típicos rendem ~o mesmo, mas os
+# extremos (stacking de bónus, calor máximo, fadiga extrema, armas na mão de
+# amadores) passam a comportar-se de forma inteligente e justa.
+# ============================================================================
+
+# --- Agregação de chance com rendimentos decrescentes -----------------------
+# Acima do "joelho", cada ponto extra de bónus vale menos (curva exponencial
+# assimptótica) — é impossível "encher" 100% empilhando bónus. O tecto real é
+# CHANCE_SOFT_KNEE + CHANCE_SOFT_SPAN (assimptótico), nunca a certeza absoluta.
+CHANCE_FLOOR = 0.02              # nunca 0% — há sempre uma réstia de sorte
+CHANCE_CEILING = 0.97            # nunca 100% — há sempre risco residual
+CHANCE_SOFT_KNEE = 0.90          # a partir daqui, bónus rendem cada vez menos
+CHANCE_SOFT_SPAN = 0.07          # amplitude assimptótica acima do joelho
+
+# --- Curva de risco convexa (substitui o linear -7%/risco) ------------------
+# penalização(r) = LINEAR*r + QUADRATIC*r² → r1..r5: 5.6/12.4/20.4/29.6/40.0%
+# (antes: 7/14/21/28/35). Média preservada (~21% no risco mediano 3); operações
+# de baixo risco ficam ligeiramente mais acessíveis, as de topo exigem
+# investimento real em equipa/equipamento.
+RISK_PENALTY_LINEAR = 0.05
+RISK_PENALTY_QUADRATIC = 0.006
+
+# --- Atributos primários ponderados (0.6/0.4 em vez de média simples) -------
+# O 1º atributo da categoria (ex: tiro no assalto) pesa mais que o 2º (força).
+PRIMARY_ATTR_WEIGHT_MAIN = 0.6
+PRIMARY_ATTR_WEIGHT_SECONDARY = 0.4
+
+# --- Mentoria: veteranos aceleram a adaptação de novatos ---------------------
+MENTOR_MIN_RANK = "veterano"     # patente mínima para contar como mentor
+MENTOR_NEWBIE_RELIEF = 0.5       # multiplicador da penalização de novato com mentor presente
+
+# --- Curvas de estado da equipa ----------------------------------------------
+FATIGUE_CURVE_EXP = 1.35         # fadiga moderada penaliza menos, extrema penaliza mais
+MORALE_PENALTY_ASYMMETRY = 1.25  # moral baixa dói mais do que moral alta ajuda
+
+# --- Sinergia e química da equipa --------------------------------------------
+# Cobertura dos atributos-chave da categoria pelos MELHORES membros (60%) +
+# diversidade de papéis (40%), centrada num baseline neutro para uma equipa
+# típica — só composições genuinamente complementares ganham o bónus.
+TEAM_SYNERGY_MAX = 0.03          # oscilação máxima (±3%)
+TEAM_SYNERGY_BASELINE = 0.62     # score neutro de uma equipa mediana
+TEAM_SYNERGY_SPREAD = 0.38       # amplitude de normalização do desvio
+
+# --- Sinergia furtiva arma+veículo (categorias discretas) --------------------
+STEALTH_SYNERGY_BONUS = 0.03     # veículo discreto + só armas silenciosas
+STEALTH_SYNERGY_PENALTY = 0.025  # arma "loud" ou veículo espalhafatoso
+STEALTH_VEHICLE_DISCRETION_MIN = 70
+NOISY_VEHICLE_DISCRETION_MAX = 30
+
+# --- Armas na mão certa -------------------------------------------------------
+# A eficácia da arma escala com a habilidade real do operacional no atributo
+# relevante (requires_attr, senão tiro para armas de fogo / discrição para
+# silenciosas): um recruta com Rifle de Precisão rende WEAPON_SKILL_FLOOR do
+# potencial; um especialista (atributo >= CAP) extrai 100%.
+WEAPON_SKILL_FLOOR = 0.55
+WEAPON_SKILL_ATTR_CAP = 8
+
+# --- Frota: física contínua ---------------------------------------------------
+# Velocidade efetiva contínua (sem o degrau nos 50%): floor + span*(c/100)^exp.
+VEHICLE_SPEED_FLOOR = 0.6
+VEHICLE_SPEED_CURVE_EXP = 0.9
+# Desgaste por missão re-derivado: componente fixa + risco + km reais
+# percorridos — operações próximas desgastam menos, expedições longas mais
+# (média calibrada para igualar o desgaste antigo numa missão típica).
+VEHICLE_WEAR_BASE = 1.2          # antes: 2.0 fixo
+VEHICLE_WEAR_PER_RISK = 1.2      # antes: 1.5
+VEHICLE_WEAR_PER_KM = 0.10       # novo: proporcional à ida-e-volta real
+
+# --- Perseguições conscientes do veículo --------------------------------------
+ESCAPE_SPEED_BASELINE = 12       # velocidade a partir da qual o veículo ajuda a fugir
+ESCAPE_SPEED_BONUS_PER_UNIT = 0.011
+ESCAPE_SPEED_BONUS_MAX = 0.15    # supercarro em bom estado ≈ +15% de fuga
+CHASE_DISCRETION_RELIEF = 0.05   # em op. discretas, veículo discreto atrai menos perseguição
+CHASE_HEAT_SPAN = 0.25           # contribuição máxima do calor para a perseguição
+CHASE_HEAT_EXP = 1.2             # convexa: calor baixo quase não conta, alto conta muito
+ESCAPE_HEAT_SPAN = 0.12
+ESCAPE_HEAT_EXP = 1.2
+
+# --- Polícia: probabilidade de interceção convexa -----------------------------
+# prob = BASE + SPAN*(heat/100)^EXP, capada — a calor 0: 16% (antes 20%);
+# a calor 100: 65% (igual). Principiantes menos punidos, calor alto igual.
+POLICE_PROB_BASE = 0.16
+POLICE_PROB_SPAN = 0.49
+POLICE_PROB_EXP = 1.3
+POLICE_PROB_CAP = 0.65
+
+# --- Decaimento de calor não-linear --------------------------------------------
+# taxa/min = BASE − SLOPE*(heat/100) → calor 50: 1.2/min (igual à média antiga),
+# calor baixo dissipa mais depressa, calor alto "cola-se" — picos têm peso real.
+HEAT_DECAY_BASE_PER_MIN = 1.45
+HEAT_DECAY_SLOPE = 0.5
+
+# ============================================================================
+# SSS-TIER MISSION IQ (v3) — mundo com memória, momentum e resultados nuance
+# ============================================================================
+
+# --- Atenção policial por distrito (memória do mundo) ------------------------
+# Cada operação resolvida aquece a zona onde aconteceu; a atenção decai com o
+# tempo. Zonas quentes penalizam a chance, atraem perseguições e recebem menos
+# oportunidades novas (o crime desloca-se) — repetir a mesma zona tem custo real.
+DISTRICT_ATTENTION_MAX = 100.0
+DISTRICT_ATTENTION_SUCCESS = 5.0      # subida base por sucesso limpo
+DISTRICT_ATTENTION_PARTIAL = 8.0      # golpe interrompido faz mais barulho
+DISTRICT_ATTENTION_FAILURE = 10.0     # falhas deixam rasto
+DISTRICT_ATTENTION_POLICE = 16.0      # interceção = zona marcada
+DISTRICT_ATTENTION_PER_RISK = 0.15    # multiplicador extra por nível de risco
+DISTRICT_ATTENTION_DECAY_PER_MIN = 0.35
+DISTRICT_ATTENTION_PENALTY_MAX = 0.08 # penalização máxima de chance (atenção 100)
+DISTRICT_ATTENTION_CHASE_MAX = 0.10   # contribuição máxima para a perseguição
+DISTRICT_ATTENTION_SPAWN_MIN_W = 0.35 # peso mínimo de spawn numa zona ao rubro
+DISTRICT_ATTENTION_HOT = 40.0         # limiar "zona vigiada" (UI e labels)
+
+# --- Momentum de equipa -------------------------------------------------------
+# Séries de vitórias dão confiança (bónus modesto, capado); séries de falhas
+# minam-na. Uma vitória limpa repõe a confiança a zero+1.
+TEAM_MOMENTUM_BONUS_PER_WIN = 0.012
+TEAM_MOMENTUM_BONUS_MAX = 0.06
+TEAM_MOMENTUM_PENALTY_PER_LOSS = 0.02
+TEAM_MOMENTUM_PENALTY_MAX = 0.06
+TEAM_MOMENTUM_ESCAPE_BONUS_MAX = 0.05
+
+# --- Sucesso parcial (near-miss) ----------------------------------------------
+# Falhar "por pouco" (dentro da janela acima da chance) deixa de ser tudo-ou-
+# -nada: a equipa aborta a meio e salva parte do saque, mas faz barulho.
+PARTIAL_SUCCESS_WINDOW = 0.10
+PARTIAL_REWARD_MIN = 0.55
+PARTIAL_REWARD_MAX = 0.75
+PARTIAL_RESPECT_FRACTION = 0.5
+PARTIAL_HEAT_MULT = 1.2
+PARTIAL_XP_FRACTION = 0.6
+PARTIAL_CHASE_MULT = 1.25
+
+# --- Spawn Director (geração inteligente de oportunidades) --------------------
+RARE_PITY_PER_SPAWN = 0.006           # pity: cada spawn sem rara aumenta a chance
+RARE_PITY_CAP = 0.20
+SPAWN_DEMAND_SPEC_BOOST = 0.30        # peso extra por equipa especializada na categoria
+SPAWN_DEMAND_BOOST_MAX = 0.60
+SPAWN_ANTIFARM_RECENT_N = 10          # janela de type_keys recentes (anti-farm)
+SPAWN_ANTIFARM_PENALTY_PER = 0.06
+SPAWN_ANTIFARM_PENALTY_MAX = 0.40
+STREAK_SPECIAL_THRESHOLD = 5          # vitórias seguidas para o Golpe de Oportunidade
+STREAK_SPECIAL_REWARD_MULT = 1.6
+
+# ============================================================================
+# SSS-TIER TEAM IQ (v4) — equipas que aprendem, decidem e têm papéis internos
+# ============================================================================
+
+# --- Familiaridade por categoria (a equipa aprende) ---------------------------
+# Cada operação concluída numa categoria ensina a equipa: bónus de chance com
+# curva sqrt (ganhos rápidos no início, mestria lenta), capado.
+TEAM_FAMILIARITY_BONUS_MAX = 0.05      # bónus máximo à mestria total
+TEAM_FAMILIARITY_RAMP_MISSIONS = 25    # nº de operações da categoria para mestria
+TEAM_FAMILIARITY_MIN_MISSIONS = 3      # só conta a partir da 3ª operação
+
+# --- Coordenação híbrida (tempo + missões juntos) ------------------------------
+# A coordenação deixa de ser só relógio: 50% tempo de plantel estável + 50%
+# operações reais feitas com este plantel. Mudar o plantel reinicia ambos.
+COORDINATION_RAMP_MISSIONS = 8         # missões juntos para a metade "prática"
+
+# --- Papéis internos inteligentes ----------------------------------------------
+# Condutor: o melhor atributo de condução da equipa reduz o tempo de viagem e
+# ajuda a despistar perseguições — quem conduz importa, não só o carro.
+DRIVER_ATTR_BASELINE = 5               # a partir deste valor o condutor faz diferença
+DRIVER_TRAVEL_REDUCTION_PER_POINT = 0.024
+DRIVER_TRAVEL_REDUCTION_MAX = 0.12     # condutor 10/10 ≈ -12% de viagem
+DRIVER_ESCAPE_BONUS_PER_POINT = 0.012
+DRIVER_ESCAPE_BONUS_MAX = 0.06         # condutor 10/10 ≈ +6% de fuga
+# Estratega: um operacional com inteligência alta planeia melhor — recupera
+# parte da penalização de risco da operação (fração, capada).
+STRATEGIST_MIN_INT = 7                 # inteligência mínima para contar como estratega
+STRATEGIST_RELIEF_FRAC = 0.35          # fração da penalização de risco recuperável
+STRATEGIST_RELIEF_MAX = 0.06           # tecto absoluto do alívio
+# Médico na equipa: ferimentos menos prováveis e recuperação mais rápida.
+MEDIC_INJURY_MULT = 0.5                # multiplica a prob. de ferimento em falha
+MEDIC_RECOVERY_MULT = 0.7              # multiplica a duração do ferimento
+# Advogado na equipa: prisões (interceção ou perseguição) duram menos.
+LAWYER_ARREST_MULT = 0.6               # multiplica a duração da prisão
+
+# --- Clutch save do líder --------------------------------------------------------
+# Numa falha iminente (sem interceção policial), um líder presente com
+# sangue-frio alto tem uma pequena chance de salvar a operação para parcial.
+CLUTCH_SAVE_MAX = 0.18                 # prob. máxima (líder com sangue-frio 10/10)
+
+# --- Aviso inteligente do líder ---------------------------------------------------
+# Ao chegar ao alvo, se o calor subiu muito desde a partida, o líder reporta —
+# o jogador fica a saber que as condições pioraram (a equipa nunca aborta).
+SMART_WARN_HEAT_DELTA = 12             # subida de calor (pontos) que dispara o aviso
+
+# --- Recomendações por valor esperado real ---------------------------------------
+# O ranking das recomendações passa a considerar o valor esperado completo:
+# chance*recompensa + parciais esperados − perdas esperadas em falha − combustível.
+EV_FAILURE_LOSS_FRAC = 0.15            # proxy de perdas numa falha (desgaste, calor, fadiga)
+
+# --- QI das missões (quests): recompensas dinâmicas, streaks e tiers ----------
+QUEST_LEVEL_REWARD_PCT_PER_LEVEL = 0.10  # +10%/nível de organização acima de 1
+QUEST_LEVEL_REWARD_CAP = 1.5             # bónus máximo de nível (+150%)
+QUEST_DIFFICULTY_MULTS = {"facil": 0.9, "normal": 1.0, "dificil": 1.15, "elite": 1.35, "lendaria": 1.6}
+QUEST_STREAK_BONUS_PER_DAY = 0.04        # +4% por dia consecutivo com diária reclamada
+QUEST_STREAK_BONUS_CAP = 0.40
+QUEST_WEEKLY_STREAK_BONUS_PER_WEEK = 0.08
+QUEST_WEEKLY_STREAK_BONUS_CAP = 0.40
+QUEST_PERF_EMA_ALPHA = 0.35              # peso do dia mais recente na taxa de conclusão
+QUEST_MONEY_TARGET_PCT_PER_LEVEL = 0.30  # alvos monetários escalam com o nível
+QUEST_OFFER_REPEAT_PENALTY_H = 48        # oferecer a mesma missão em <48h é penalizado
 
 # ============================================================================
 # SUMMARY OF REDESIGNED VALUES

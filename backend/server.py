@@ -14,6 +14,7 @@ from db import client, db
 from auth import router as auth_router, seed_admin
 from routes_game import router as game_router
 from routes_admin import router as admin_router
+from routes_legal import router as legal_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
 
@@ -22,6 +23,7 @@ app = FastAPI(title="Lusorae API")
 app.include_router(auth_router)
 app.include_router(game_router)
 app.include_router(admin_router)
+app.include_router(legal_router)
 
 
 @app.get("/api/")
@@ -65,9 +67,12 @@ async def migrate_v2():
             "v2": True, "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0,
         }})
     await db.players.update_many({"stats": {"$exists": False}}, {"$set": {"stats": default_stats()}})
-    await db.players.update_many({"hq.level": {"$exists": False}}, {"$set": {
-        "hq.level": 1, "hq.upgrading_until": None, "hq.upgrade_history": [],
-    }})
+    # Nota: contas em onboarding têm hq=null (ainda sem QG escolhido) — o
+    # filtro exige um hq objeto para não tentar criar campos dentro de null.
+    await db.players.update_many(
+        {"hq": {"$type": "object"}, "hq.level": {"$exists": False}},
+        {"$set": {"hq.level": 1, "hq.upgrading_until": None, "hq.upgrade_history": []}},
+    )
     await db.players.update_many({"priorities": {"$exists": False}}, {"$set": {
         "priorities": {"active": HQ_DEFAULT_PRIORITY},
     }})

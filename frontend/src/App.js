@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContextV2";
 import { GameProvider } from "./context/GameContextV2";
 import { BootProvider, useBoot } from "./context/BootContext";
@@ -11,8 +11,26 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
 import GamePage from "./pages/GamePage";
 import AdminPanel from "./pages/AdminPanel";
+import LegalPage from "./pages/LegalPage";
+import ChangelogPage from "./pages/ChangelogPage";
+import DevLoadingPreview from "./pages/DevLoadingPreview";
+import DevOperationPreview from "./pages/DevOperationPreview";
 import { LoadingScreen } from "./components/LoadingScreen";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2, OctagonAlert, TriangleAlert, Info } from "lucide-react";
+
+const toastIcon = (Icon, spin = false) => (
+  <span className="lus-toast-ico">
+    <Icon className={spin ? "h-[17px] w-[17px] animate-spin" : "h-[17px] w-[17px]"} strokeWidth={2.4} />
+  </span>
+);
+
+const TOAST_ICONS = {
+  success: toastIcon(CheckCircle2),
+  error: toastIcon(OctagonAlert),
+  warning: toastIcon(TriangleAlert),
+  info: toastIcon(Info),
+  loading: toastIcon(Loader2, true),
+};
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -68,7 +86,8 @@ const AdminRoute = ({ children }) => {
     );
   }
   if (user === false) return <Navigate to="/auth" replace />;
-  if (user.role !== "admin") return <Navigate to="/" replace />;
+  // Administradores têm acesso total; moderadores entram em modo de leitura.
+  if (user.role !== "admin" && user.role !== "moderator") return <Navigate to="/" replace />;
   return children;
 };
 
@@ -81,6 +100,12 @@ function App() {
             <BootScreen />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
+              <Route path="/termos" element={<LegalPage />} />
+              <Route path="/privacidade" element={<LegalPage />} />
+              <Route path="/rgpd" element={<LegalPage />} />
+              <Route path="/changelog" element={<ChangelogPage />} />
+              <Route path="/dev/loading" element={<DevLoadingPreview />} />
+              <Route path="/dev/operation" element={<DevOperationPreview />} />
               <Route
                 path="/"
                 element={
@@ -112,8 +137,14 @@ function App() {
               position="top-center"
               theme="dark"
               closeButton
+              gap={8}
+              visibleToasts={3}
+              duration={3500}
+              mobileOffset={{ top: 10, left: 10, right: 10 }}
               swipeDirections={["up", "left", "right"]}
-              toastOptions={{ style: { background: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", backdropFilter: "blur(12px)" } }}
+              icons={TOAST_ICONS}
+              style={{ "--width": "330px" }}
+              toastOptions={{ className: "lus-toast", duration: 3500 }}
             />
           </BrowserRouter>
         </LoadingProvider>

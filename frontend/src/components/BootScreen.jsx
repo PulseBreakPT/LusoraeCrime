@@ -2,145 +2,129 @@ import { useBoot } from "../context/BootContext";
 import { AlertTriangle, RotateCcw, LogOut } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
+import {
+  LoadingBackdrop,
+  TacticalFrame,
+  TacticalRadar,
+  BootWordmark,
+  UplinkProgress,
+  TerminalLog,
+  FlavorRotator,
+} from "./loading/LoadingChrome";
+
+const PHASES = [
+  ["VALIDATING", "Verificar credenciais", "A verificar credenciais…"],
+  ["LOADING_PROFILE", "Carregar dossiê", "A carregar dossiê…"],
+  ["LOADING_ORG", "Carregar organização", "A carregar organização…"],
+  ["LOADING_RESOURCES", "Carregar património", "A carregar património…"],
+  ["LOADING_TEAMS", "Carregar equipas", "A carregar equipas e frota…"],
+  ["LOADING_MISSIONS", "Carregar operações", "A carregar operações…"],
+  ["PREPARING_UI", "Preparar posto de comando", "A preparar posto de comando…"],
+];
 
 export function BootScreen() {
   const { isBootLoading, isBootError, error, progress, currentPhase, elapsedTime } = useBoot();
   const navigate = useNavigate();
 
-  const phaseLabels = {
-    VALIDATING: "A verificar credenciais…",
-    LOADING_PROFILE: "A carregar dossiê…",
-    LOADING_ORG: "A carregar organização…",
-    LOADING_RESOURCES: "A carregar património…",
-    LOADING_TEAMS: "A carregar equipas e frota…",
-    LOADING_MISSIONS: "A carregar operações…",
-    PREPARING_UI: "A preparar posto de comando…",
-  };
-
   if (!isBootLoading && !isBootError) return null;
 
   if (isBootError) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/95 z-50 backdrop-blur-sm">
-        <div className="max-w-md w-full mx-4 space-y-6">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-10 w-10 text-destructive flex-shrink-0" />
-            <div>
-              <p className="font-bold text-white text-lg">Falha na ligação à organização</p>
-              <p className="text-xs text-zinc-400 mt-1">
-                {error?.phase ? `Falha em: ${error.phase.replace(/_/g, " ").toLowerCase()}` : "Erro desconhecido"}
-              </p>
+      <LoadingBackdrop>
+        <TacticalFrame header="Falha de uplink" status="Interrompido" tone="error">
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
+              <span className="lus-alert-icon">
+                <AlertTriangle className="h-9 w-9 flex-shrink-0 text-destructive" />
+              </span>
+              <div>
+                <p className="font-display text-lg font-bold uppercase tracking-wide text-white">Falha na ligação à organização</p>
+                <p className="mt-1 font-mono text-xs text-zinc-400">
+                  {error?.phase ? `Falha em: ${error.phase.replace(/_/g, " ").toLowerCase()}` : "Erro desconhecido"}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="bg-red-950/30 border border-red-800/50 rounded p-4 space-y-2">
-            <p className="text-xs text-red-200 font-mono">{error?.message || "Erro desconhecido"}</p>
-            {error?.details && (
-              <p className="text-[10px] text-zinc-400 font-mono opacity-75">
-                {error.details.name}: {error.details.message}
-              </p>
-            )}
-          </div>
+            <div className="space-y-2 rounded border border-red-800/50 bg-red-950/30 p-4">
+              <p className="font-mono text-xs text-red-200">{error?.message || "Erro desconhecido"}</p>
+              {error?.details && (
+                <p className="font-mono text-[10px] text-zinc-400 opacity-75">
+                  {error.details.name}: {error.details.message}
+                </p>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Button onClick={() => window.location.reload()} className="w-full" size="sm">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Tentar Novamente
-            </Button>
-            <Button
-              onClick={() => navigate("/auth")}
-              variant="outline"
-              className="w-full"
-              size="sm"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Voltar ao Login
-            </Button>
-          </div>
+            <div className="space-y-2">
+              <Button onClick={() => window.location.reload()} className="w-full" size="sm">
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Tentar Novamente
+              </Button>
+              <Button onClick={() => navigate("/auth")} variant="outline" className="w-full" size="sm">
+                <LogOut className="mr-2 h-4 w-4" />
+                Voltar ao Login
+              </Button>
+            </div>
 
-          <details className="text-[10px] text-zinc-500">
-            <summary className="cursor-pointer hover:text-zinc-400">Detalhes Técnicos</summary>
-            <pre className="mt-2 bg-black/50 p-2 rounded overflow-auto max-h-40 font-mono text-[8px] whitespace-pre-wrap break-words">
-              {JSON.stringify(error, null, 2)}
-            </pre>
-          </details>
-        </div>
-      </div>
+            <details className="text-[10px] text-zinc-500">
+              <summary className="cursor-pointer font-mono uppercase tracking-widest hover:text-zinc-400">Detalhes Técnicos</summary>
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/50 p-2 font-mono text-[8px]">
+                {JSON.stringify(error, null, 2)}
+              </pre>
+            </details>
+          </div>
+        </TacticalFrame>
+      </LoadingBackdrop>
     );
   }
 
   // Show skip button if loading takes too long (>8 seconds)
   const showSkip = elapsedTime > 8;
+  const isComplete = progress >= 100;
+  const currentIdx = PHASES.findIndex(([key]) => key === currentPhase);
+  const activePhase = currentIdx >= 0 ? PHASES[currentIdx] : null;
+
+  const rows = PHASES.map(([key, label], i) => ({
+    key,
+    label,
+    status:
+      isComplete || (currentIdx >= 0 && i < currentIdx)
+        ? "done"
+        : i === currentIdx
+        ? "active"
+        : "pending",
+  }));
+  const doneCount = rows.filter((r) => r.status === "done").length;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/95 z-50 backdrop-blur-sm">
-      <div className="max-w-md w-full mx-4 space-y-6">
-        <div className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <p className="font-bold text-white text-base">A entrar em Lusorae</p>
-            <p className="text-xs text-zinc-500 font-mono">{progress}%</p>
-          </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            {phaseLabels[currentPhase] || "Inicializando…"}
-            {currentPhase && <span className="ml-2 text-[10px] text-zinc-600">({currentPhase})</span>}
-          </p>
-          <p className="text-[10px] text-zinc-600 mt-1">Tempo: {elapsedTime}s</p>
-        </div>
+    <LoadingBackdrop>
+      <TacticalFrame>
+        <div className="space-y-5">
+          <TacticalRadar />
+          <BootWordmark statusText={activePhase ? activePhase[2] : "A inicializar…"} />
+          <UplinkProgress
+            progress={progress}
+            label="Ligação segura"
+            meta={`${String(doneCount).padStart(2, "0")}/${String(rows.length).padStart(2, "0")} fases`}
+          />
+          <TerminalLog title="Sequência de arranque" rows={rows} />
+          <FlavorRotator />
 
-        <div className="space-y-3">
-          <div className="w-full h-2.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
-            <div
-              className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          <div className="text-xs text-zinc-500 text-center font-mono">
+          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-zinc-700">
             {elapsedTime}s decorridos
-          </div>
-        </div>
+          </p>
 
-        <div className="space-y-1 text-[11px]">
-          {Object.entries({
-            VALIDATING: "Verificar credenciais",
-            LOADING_PROFILE: "Carregar dossiê",
-            LOADING_ORG: "Carregar organização",
-            LOADING_RESOURCES: "Carregar património",
-            LOADING_TEAMS: "Carregar equipas",
-            LOADING_MISSIONS: "Carregar operações",
-            PREPARING_UI: "Preparar posto de comando",
-          }).map(([key, label]) => {
-            const isActive = key === currentPhase;
-            const isComplete = progress >= 100;
-            return (
-              <div
-                key={key}
-                className={`flex items-center gap-2 px-2 py-1 rounded transition-colors ${
-                  isActive
-                    ? "bg-blue-500/20 text-blue-300"
-                    : isComplete
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : "bg-zinc-900/50 text-zinc-500"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-current" />
-                <span>{label}</span>
-              </div>
-            );
-          })}
+          {showSkip && (
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="w-full text-xs"
+              size="sm"
+            >
+              Ligação lenta — recarregar
+            </Button>
+          )}
         </div>
-
-        {showSkip && (
-          <Button
-            onClick={() => window.location.reload()}
-            variant="outline"
-            className="w-full text-xs"
-            size="sm"
-          >
-            ⚠️ Ligação lenta — recarregar
-          </Button>
-        )}
-      </div>
-    </div>
+      </TacticalFrame>
+    </LoadingBackdrop>
   );
 }

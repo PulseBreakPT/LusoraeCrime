@@ -2,26 +2,33 @@ import asyncio
 import math
 import random
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import timedelta
 
 from db import db
 from auth import get_current_user
+from geo import (is_valid_hq_location, is_in_portugal, in_water_body,
+                 distance_to_boundary_m)
+from geocode import reverse_geocode, street_label, locality_label
+from world_gen import generate_district_points, name_districts_task, ensure_naming_scheduled
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
-                    team_effectiveness,
+                    team_effectiveness, district_attention_of, vehicle_mission_score,
                     age_decay_mult, member_split_mult, property_active, property_condition_factor,
                     local_presence_reduction_s, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
                     record_tx, property_stack_ranks, property_stack_mult,
                     dirty_money_cap, grant_quest_rewards,
-                    weapon_combat_score,
+                    weapon_combat_score, weapon_effective_score, weapon_jam_risk,
+                    weapon_condition_factor,
                     _unlink_employee_weapon,
                     is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage)
-from quests import make_instance, enrich_quest, locked_principals
-from quests_data import QUEST_DEFS
+from quests import (make_instance, enrich_quest, locked_principals, effective_quest_rewards,
+                    LEVEL_MONEY_SLOPE, LEVEL_RESPECT_SLOPE, TIER_BONUS, STREAK_BONUS,
+                    STREAK_BONUS_MAX, SPEED_BONUS, TOTAL_MULT_CAP, MOMENTUM_CLAIM)
+from quests_data import QUEST_DEFS, DIFFICULTY_MULT
 from models import Player, Team, Employee, Candidate, Vehicle, Weapon, Property, Opportunity, Mission, Event, Quest, Transaction
 from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS, RARITIES,
                        RARITY_MIN_RESPECT, RANKS, RANK_REQ_LEVEL, TALENTS, RECRUIT_SOURCES,
@@ -39,10 +46,52 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        ACHIEVEMENT_MILESTONES, ACHIEVEMENT_BONUS_PCT_PER_MILESTONE,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS, HQ_PRIORITIES, HQ_DEFAULT_PRIORITY,
                        HQ_DEPARTMENTS, WEAPON_MODELS, WEAPON_CATEGORIES, WEAPON_REPAIR_COST_MULTIPLIER,
+                       WEAPON_CATEGORY_WEIGHTS, WEAPON_SKILL_FLOOR, WEAPON_SKILL_ATTR_CAP,
+                       WEAPON_PROFICIENCY_MAX, WEAPON_PROFICIENCY_BONUS_MAX_PCT,
+                       WEAPON_COMPATIBILITY_MIN_FACTOR, WEAPON_CONDITION_SOFT_KNEE,
+                       WEAPON_JAM_RELIABILITY_WEIGHT, WEAPON_JAM_CONDITION_THRESHOLD,
+                       WEAPON_JAM_CONDITION_WEIGHT, WEAPON_JAM_MAX, WEAPON_JAM_WARN_RISK,
+                       WEAPON_DURABILITY_WEAR_REF,
+                       WEAPON_WEAR_PER_MISSION, WEAPON_WEAR_RISK_MULT,
+                       WEAPON_COMBAT_SCORE_SCALE, WEAPON_BONUS_MIN, WEAPON_BONUS_MAX,
+                       WEAPON_LOUD_HEAT_MULT, WEAPON_PROFICIENCY_GAIN_PER_MISSION,
+                       WEAPON_JAM_CHANCE_PENALTY, WEAPON_JAM_CHANCE_PENALTY_CAP,
+                       WEAPON_JAM_EXTRA_WEAR, WEAPON_MISMATCH_PENALTY_MAX,
                        LOW_CHANCE_CONFIRM_THRESHOLD,
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
-                       VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S)
+                       VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S,
+                       # QI da frota/imóveis (SSS v6) — réguas expostas no /catalog
+                       VEHICLE_CATEGORY_WEIGHTS, VEHICLE_MISMATCH_PENALTY,
+                       VEHICLE_CONDITION_PENALTY_THRESHOLD, VEHICLE_SPEED_FLOOR,
+                       VEHICLE_SPEED_CURVE_EXP, PRIMARY_ATTR_WEIGHT_MAIN,
+                       PRIMARY_ATTR_WEIGHT_SECONDARY)
 from reward_engine import calculate_full_reward
+from live_ops import build_dispatch_script, build_recall_script, update_memory
+from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
+                               DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
+                               DRIVER_TRAVEL_REDUCTION_MAX,
+                               PARTIAL_SUCCESS_WINDOW, PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX,
+                               EV_FAILURE_LOSS_FRAC,
+                               # QI das equipas (SSS v4) — réguas expostas no /catalog
+                               # (team_meta) para o frontend espelhar as fórmulas do motor.
+                               NO_LEADER_PENALTY, SOLO_MEMBER_PENALTY, UNIFORM_SPEC_BONUS,
+                               COORDINATION_BONUS_MAX, COORDINATION_RAMP_S, COORDINATION_RAMP_MISSIONS,
+                               TEAM_FAMILIARITY_BONUS_MAX, TEAM_FAMILIARITY_RAMP_MISSIONS,
+                               TEAM_FAMILIARITY_MIN_MISSIONS,
+                               TEAM_MOMENTUM_BONUS_PER_WIN, TEAM_MOMENTUM_BONUS_MAX,
+                               TEAM_MOMENTUM_PENALTY_PER_LOSS, TEAM_MOMENTUM_PENALTY_MAX,
+                               TEAM_MOMENTUM_ESCAPE_BONUS_MAX,
+                               STRATEGIST_MIN_INT, STRATEGIST_RELIEF_FRAC, STRATEGIST_RELIEF_MAX,
+                               DRIVER_ESCAPE_BONUS_PER_POINT, DRIVER_ESCAPE_BONUS_MAX,
+                               MEDIC_INJURY_MULT, MEDIC_RECOVERY_MULT, LAWYER_ARREST_MULT,
+                               CLUTCH_SAVE_MAX, TEAM_SYNERGY_MAX, TEAM_SYNERGY_BASELINE,
+                               TEAM_SYNERGY_SPREAD, FATIGUE_CURVE_EXP, MORALE_PENALTY_ASYMMETRY,
+                               LOYALTY_BONUS_MAX, LOYALTY_PENALTY_MAX,
+                               INCOMPLETE_CREW_PENALTY_PER_MISSING, INCOMPLETE_CREW_PENALTY_MAX,
+                               CATEGORY_ATTRS,
+                               # Réguas de imóveis (SSS v6) — expostas no /catalog (property_meta)
+                               PROPERTY_MAINTENANCE_PCT_PER_DAY, PROPERTY_STACK_DIMINISH,
+                               PROPERTY_CONDITION_RECOVERY_PER_HOUR, PROPERTY_CONDITION_DECAY_PER_HOUR)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -51,12 +100,22 @@ POOL_REFRESH_COST = 500
 HEAL_BASE_COST = 2500
 RELEASE_BASE_COST = 2000
 REST_DURATION_S = 90
+# Fração do preço de catálogo recuperada ao vender uma arma (antes do fator
+# de condição) — exposta no /catalog (weapon_meta.sell_fraction) para o
+# frontend usar a MESMA régua que a rota /weapons/sell.
+WEAPON_SELL_FRACTION = 0.4
 
 
-async def get_player(user: dict) -> dict:
+async def get_player(user: dict, allow_pending: bool = False) -> dict:
     player = await db.players.find_one({"user_id": user["_id"]})
     if not player:
         raise HTTPException(status_code=404, detail="Organização não encontrada")
+    if not player.get("hq"):
+        # Conta nova: o jogo só arranca depois de o jogador escolher onde
+        # montar o Quartel-General (POST /game/hq/place).
+        if allow_pending:
+            return player
+        raise HTTPException(status_code=409, detail="Estabelece primeiro o teu Quartel-General")
     player["hq"].setdefault("level", 1)
     player["hq"].setdefault("upgrading_until", None)
     player["hq"].setdefault("upgrade_history", [])
@@ -228,13 +287,146 @@ async def catalog():
         "hq_departments": HQ_DEPARTMENTS,
         "weapon_models": WEAPON_MODELS,
         "weapon_categories": WEAPON_CATEGORIES,
+        # QI das armas (SSS v5): pesos e fórmulas expostos para o frontend
+        # calcular match %, risco de encravamento e adequação — a MESMA régua
+        # que o motor usa na chance de missão.
+        "weapon_category_weights": WEAPON_CATEGORY_WEIGHTS,
+        "weapon_meta": {
+            "skill_floor": WEAPON_SKILL_FLOOR,
+            "skill_attr_cap": WEAPON_SKILL_ATTR_CAP,
+            "proficiency_max": WEAPON_PROFICIENCY_MAX,
+            "proficiency_bonus_max_pct": WEAPON_PROFICIENCY_BONUS_MAX_PCT,
+            "compatibility_min_factor": WEAPON_COMPATIBILITY_MIN_FACTOR,
+            "condition_soft_knee": WEAPON_CONDITION_SOFT_KNEE,
+            "jam_reliability_weight": WEAPON_JAM_RELIABILITY_WEIGHT,
+            "jam_condition_threshold": WEAPON_JAM_CONDITION_THRESHOLD,
+            "jam_condition_weight": WEAPON_JAM_CONDITION_WEIGHT,
+            "jam_max": WEAPON_JAM_MAX,
+            "jam_warn_risk": WEAPON_JAM_WARN_RISK,
+            "durability_wear_ref": WEAPON_DURABILITY_WEAR_REF,
+            "repair_cost_multiplier": WEAPON_REPAIR_COST_MULTIPLIER,
+            # SSS — restantes réguas do motor expostas para a UI do arsenal
+            # (desgaste, escala do bónus, penalizações de encravamento, venda).
+            "wear_per_mission": WEAPON_WEAR_PER_MISSION,
+            "wear_risk_mult": WEAPON_WEAR_RISK_MULT,
+            "combat_score_scale": WEAPON_COMBAT_SCORE_SCALE,
+            "bonus_min": WEAPON_BONUS_MIN,
+            "bonus_max": WEAPON_BONUS_MAX,
+            "loud_heat_mult": WEAPON_LOUD_HEAT_MULT,
+            "proficiency_gain_per_mission": WEAPON_PROFICIENCY_GAIN_PER_MISSION,
+            "jam_chance_penalty": WEAPON_JAM_CHANCE_PENALTY,
+            "jam_chance_penalty_cap": WEAPON_JAM_CHANCE_PENALTY_CAP,
+            "jam_extra_wear": WEAPON_JAM_EXTRA_WEAR,
+            "mismatch_penalty_max": WEAPON_MISMATCH_PENALTY_MAX,
+            "sell_fraction": WEAPON_SELL_FRACTION,
+        },
+        # QI das equipas (SSS v4): réguas do motor expostas para o frontend
+        # mostrar momentum, entrosamento, familiaridade e papéis a bordo com
+        # EXATAMENTE os mesmos números que a chance de missão usa.
+        "team_meta": {
+            "leader_min_rank": TEAM_LEADER_MIN_RANK,
+            "no_leader_penalty": NO_LEADER_PENALTY,
+            "clutch_save_max": CLUTCH_SAVE_MAX,
+            "medic_injury_mult": MEDIC_INJURY_MULT,
+            "medic_recovery_mult": MEDIC_RECOVERY_MULT,
+            "lawyer_arrest_mult": LAWYER_ARREST_MULT,
+            "driver_attr_baseline": DRIVER_ATTR_BASELINE,
+            "driver_travel_reduction_per_point": DRIVER_TRAVEL_REDUCTION_PER_POINT,
+            "driver_travel_reduction_max": DRIVER_TRAVEL_REDUCTION_MAX,
+            "driver_escape_bonus_per_point": DRIVER_ESCAPE_BONUS_PER_POINT,
+            "driver_escape_bonus_max": DRIVER_ESCAPE_BONUS_MAX,
+            "strategist_min_int": STRATEGIST_MIN_INT,
+            "strategist_relief_frac": STRATEGIST_RELIEF_FRAC,
+            "strategist_relief_max": STRATEGIST_RELIEF_MAX,
+            "momentum_bonus_per_win": TEAM_MOMENTUM_BONUS_PER_WIN,
+            "momentum_bonus_max": TEAM_MOMENTUM_BONUS_MAX,
+            "momentum_penalty_per_loss": TEAM_MOMENTUM_PENALTY_PER_LOSS,
+            "momentum_penalty_max": TEAM_MOMENTUM_PENALTY_MAX,
+            "momentum_escape_bonus_max": TEAM_MOMENTUM_ESCAPE_BONUS_MAX,
+            "coordination_bonus_max": COORDINATION_BONUS_MAX,
+            "coordination_ramp_s": COORDINATION_RAMP_S,
+            "coordination_ramp_missions": COORDINATION_RAMP_MISSIONS,
+            "familiarity_bonus_max": TEAM_FAMILIARITY_BONUS_MAX,
+            "familiarity_ramp_missions": TEAM_FAMILIARITY_RAMP_MISSIONS,
+            "familiarity_min_missions": TEAM_FAMILIARITY_MIN_MISSIONS,
+            "uniform_spec_bonus": UNIFORM_SPEC_BONUS,
+            "solo_member_penalty": SOLO_MEMBER_PENALTY,
+            "incomplete_penalty_per_missing": INCOMPLETE_CREW_PENALTY_PER_MISSING,
+            "incomplete_penalty_max": INCOMPLETE_CREW_PENALTY_MAX,
+            "synergy_max": TEAM_SYNERGY_MAX,
+            "synergy_baseline": TEAM_SYNERGY_BASELINE,
+            "synergy_spread": TEAM_SYNERGY_SPREAD,
+            "fatigue_curve_exp": FATIGUE_CURVE_EXP,
+            "morale_penalty_asymmetry": MORALE_PENALTY_ASYMMETRY,
+            "loyalty_bonus_max": LOYALTY_BONUS_MAX,
+            "loyalty_penalty_max": LOYALTY_PENALTY_MAX,
+            "category_attrs": CATEGORY_ATTRS,
+            "reorg_after_roster_change_s": REORG_AFTER_ROSTER_CHANGE_S,
+        },
         "low_chance_confirm_threshold": LOW_CHANCE_CONFIRM_THRESHOLD,
+        # QI da frota (SSS v6): pesos e réguas do motor expostos para o frontend
+        # calcular adequação por categoria, velocidade efetiva e custos com a
+        # MESMA régua que a chance de missão usa.
+        "vehicle_category_weights": VEHICLE_CATEGORY_WEIGHTS,
+        "fleet_meta": {
+            "speed_floor": VEHICLE_SPEED_FLOOR,
+            "speed_curve_exp": VEHICLE_SPEED_CURVE_EXP,
+            "condition_penalty_threshold": VEHICLE_CONDITION_PENALTY_THRESHOLD,
+            "mismatch_penalty": VEHICLE_MISMATCH_PENALTY,
+            "max_speed_ref": 26.0,           # supercarro — referência do score de velocidade
+            "sell_fraction": 0.4,            # espelho da rota /vehicles/sell
+            "repair_cost_pct": 0.002,        # espelho da rota /vehicles/repair
+            "transfer_cost_per_km": VEHICLE_TRANSFER_COST_PER_KM,
+        },
+        # QI dos imóveis (SSS v6): manutenção, condição, obras e rendimentos
+        # decrescentes — os mesmos números do motor de rendimento passivo.
+        "property_meta": {
+            "maintenance_pct_per_day": PROPERTY_MAINTENANCE_PCT_PER_DAY,
+            "condition_recovery_per_hour": PROPERTY_CONDITION_RECOVERY_PER_HOUR,
+            "condition_decay_per_hour": PROPERTY_CONDITION_DECAY_PER_HOUR,
+            "upgrade_base_s": PROPERTY_UPGRADE_BASE_S,
+            "upgrade_per_level_s": PROPERTY_UPGRADE_PER_LEVEL_S,
+            "stack_diminish": PROPERTY_STACK_DIMINISH,
+            "sell_fraction": 0.7,            # espelho da rota /properties/sell
+            "upgrade_cost_pct": 0.6,         # espelho da rota /properties/upgrade
+        },
+        # QI dos contratos (SSS v3/v6): fórmula das recompensas dinâmicas
+        # exposta para a UI decompor o multiplicador com os números do motor.
+        "quest_meta": {
+            "level_money_slope": LEVEL_MONEY_SLOPE,
+            "level_respect_slope": LEVEL_RESPECT_SLOPE,
+            "tier_bonus": TIER_BONUS,
+            "streak_bonus": STREAK_BONUS,
+            "streak_bonus_max": STREAK_BONUS_MAX,
+            "speed_bonus": SPEED_BONUS,
+            "total_mult_cap": TOTAL_MULT_CAP,
+            "difficulty_mults": DIFFICULTY_MULT,
+            "momentum_claim": MOMENTUM_CLAIM,
+        },
     }
 
 
 @router.get("/state")
 async def get_state(user: dict = Depends(get_current_user), skip_advance: bool = False):
-    player = await get_player(user)
+    player = await get_player(user, allow_pending=True)
+    if not player.get("hq"):
+        # Onboarding: o jogador ainda não escolheu onde montar o QG — o
+        # frontend mostra o mapa de Portugal para a escolha do local.
+        return {
+            "hq_pending": True,
+            "server_time": now_utc().isoformat(),
+            "player": {
+                "id": str(player["_id"]),
+                "org_name": player.get("org_name", ""),
+                "clean_money": player.get("clean_money", 0),
+                "dirty_money": player.get("dirty_money", 0),
+                "level": player.get("level", 1),
+            },
+        }
+    # Retoma o batismo de zonas se alguma ficou sem nome (ex.: Nominatim
+    # indisponível na altura da colocação do QG) — operação barata (no-op
+    # quando está tudo batizado ou já há uma tarefa em curso).
+    ensure_naming_scheduled(db, player)
     if not skip_advance:
         player = await advance(db, player)
     pid = str(player["_id"])
@@ -270,7 +462,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         d["betrayal_risk"] = betrayal_risk_of(e)
         emp_dumps.append(d)
 
-    quests_out = [enrich_quest(Quest.from_mongo(q).model_dump()) for q in quest_docs]
+    quests_out = [enrich_quest(Quest.from_mongo(q).model_dump(), player) for q in quest_docs]
     quests_out += locked_principals({q["quest_key"] for q in quest_docs}, player["level"])
 
     return {
@@ -371,6 +563,13 @@ async def _prepare_dispatch(player, opp, team):
     member_talents = sorted({t for e in members for t in e.get("talents", [])})
     if "motorista_fantasma" in member_talents:
         travel_s *= 0.9
+    # Condutor de topo (SSS v4): o melhor atributo de condução da equipa
+    # reduz o tempo de viagem — quem vai ao volante importa, não só o carro.
+    best_driver = max(((e.get("attrs") or {}).get("conducao", 0) for e in members), default=0)
+    if best_driver > DRIVER_ATTR_BASELINE:
+        driver_reduction = min(DRIVER_TRAVEL_REDUCTION_MAX,
+                               (best_driver - DRIVER_ATTR_BASELINE) * DRIVER_TRAVEL_REDUCTION_PER_POINT)
+        travel_s = max(20, travel_s * (1 - driver_reduction))
 
     mult = 1.0
     prop_ranks = property_stack_ranks(props)
@@ -393,18 +592,70 @@ async def _prepare_dispatch(player, opp, team):
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
+    # Inteligência da equipa (SSS v4): papéis internos e memória, lidos uma vez
+    # aqui e usados na chance, nas perseguições e nas consequências pós-missão.
+    try:
+        leader_idx = RANKS.index(TEAM_LEADER_MIN_RANK)
+    except ValueError:
+        leader_idx = len(RANKS) - 1
+    leaders = [e for e in members if e.get("rank") in RANKS and RANKS.index(e["rank"]) >= leader_idx]
+    has_leader = bool(leaders)
+    leader_cool = max(((e.get("attrs") or {}).get("sangue_frio", 0) for e in leaders), default=0)
+    member_roles = {e.get("role_key") for e in members}
+    has_medic = "medico" in member_roles
+    has_lawyer = "advogado" in member_roles
+    team_streak = int(team.get("streak", 0) or 0)
+    team_cat_missions = int((team.get("category_missions") or {}).get(opp["category"], 0) or 0)
+    roster_missions = int(team.get("roster_missions", 0) or 0)
+    vehicle_discreet = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("discretion", 50) >= STEALTH_VEHICLE_DISCRETION_MIN
     chance_ctx = {
         "heat": player["heat"], "risk": opp["risk"], "dist_km": opp.get("dist_km", 0.0),
         "category": opp["category"], "members": members, "min_members": opp.get("min_members", 1),
         "vehicle": vehicle, "weapons_by_employee_id": weapons_by_employee_id,
         "roster_stable_since": team.get("roster_stable_since"), "hq_level": player["hq"]["level"],
+        # SSS v4: memória do mundo e da equipa, finalmente ligadas à chance.
+        "district": opp.get("district"),
+        "district_attention": district_attention_of(player, opp.get("district")),
+        "team_streak": team_streak,
+        "team_cat_missions": team_cat_missions,
+        "roster_missions": roster_missions,
         "now": now,
     }
     chance, breakdown = chance_breakdown(chance_ctx)
+    # Forense pré-falha (SSS v4): os 3 fatores mais negativos do despacho, para
+    # o relatório de falha explicar PORQUÊ ("Fator crítico: ...").
+    top_negatives = [
+        {"key": i["key"], "label": i["label"], "pct": i["pct"]}
+        for i in sorted((i for i in breakdown if i["pct"] < 0 and i["key"] != "rendimentos_decrescentes"),
+                        key=lambda i: i["pct"])[:3]
+    ]
     weapon_loud = any(
         WEAPON_MODELS.get(w.get("model_key"), {}).get("loud", False)
         for w in weapons_by_employee_id.values()
     )
+    # QI das armas (SSS v5): perfil de encravamento e poder de fogo médio,
+    # persistidos com a missão — alimentam o roll de encravamento na ação,
+    # a intimidação na fuga e os avisos do preview.
+    weapon_jam_profile = []
+    weapon_powers = []
+    emp_by_id = {str(e["_id"]): e for e in members}
+    for eid, w in weapons_by_employee_id.items():
+        wm = WEAPON_MODELS.get(w.get("model_key"))
+        if not wm:
+            continue
+        weapon_powers.append(wm.get("power", 0))
+        jr = weapon_jam_risk(wm, w.get("condition", 100))
+        if jr > 0:
+            emp = emp_by_id.get(eid)
+            weapon_jam_profile.append({
+                "weapon_id": str(w["_id"]), "weapon_name": w.get("name", wm["name"]),
+                "emp_name": (emp or {}).get("name", "?"), "jam_risk": round(jr, 3),
+            })
+    weapon_power_avg = round(sum(weapon_powers) / len(members), 1) if weapon_powers else 0.0
+    weapon_alerts = [
+        f"{wj['weapon_name']} de {wj['emp_name']}: risco de encravar ≈ {round(wj['jam_risk'] * 100)}%"
+        for wj in weapon_jam_profile if wj["jam_risk"] >= WEAPON_JAM_WARN_RISK
+    ]
 
     # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
     # opp["duration_s"] é sempre um único int (gerado em spawn_opportunities), não um intervalo.
@@ -444,6 +695,15 @@ async def _prepare_dispatch(player, opp, team):
         "spec_match": spec_match, "chance": chance, "breakdown": breakdown,
         "talents": member_talents, "min_members": opp.get("min_members", 1),
         "weapon_loud": weapon_loud, "origin": origin,
+        # SSS v4: inteligência da equipa persistida com a missão.
+        "team_streak": team_streak, "vehicle_discreet": vehicle_discreet,
+        "has_leader": has_leader, "leader_cool": leader_cool,
+        "has_medic": has_medic, "has_lawyer": has_lawyer,
+        "best_driver": best_driver, "top_negatives": top_negatives,
+        # QI das armas (SSS v5): encravamento, intimidação e avisos.
+        "weapon_jam_profile": weapon_jam_profile,
+        "weapon_power_avg": weapon_power_avg,
+        "weapon_alerts": weapon_alerts,
     }
 
 
@@ -484,6 +744,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "talents": prep["talents"],
         "min_members": prep["min_members"],
         "min_members_met": len(prep["members"]) >= prep["min_members"],
+        "weapon_alerts": prep.get("weapon_alerts", []),
     }
 
 
@@ -522,15 +783,47 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     ret = finish + timedelta(seconds=travel_s)
     member_ids = [str(e["_id"]) for e in members]
 
+    # Operação em direto (SSS): guião narrativo da ida+operação com timestamps
+    # absolutos e 0–2 complicações com efeito REAL na chance final (o delta é
+    # aplicado em engine._roll_outcome). Gerado uma única vez e persistido.
+    vehicle_name = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("name") or vehicle.get("model_key")
+    live_log, live_delta, live_used_keys = build_dispatch_script(
+        team_name=team["name"],
+        opp={"name": opp["name"], "district": opp["district"],
+             "category": opp["category"], "risk": opp["risk"],
+             "type_key": opp["type_key"]},
+        members=members, incidents=incidents,
+        depart=depart, arrive=arrive, finish=finish,
+        heat=player.get("heat", 0), has_leader=prep.get("has_leader", False),
+        vehicle_name=vehicle_name, memory=player.get("phrase_memory"),
+    )
+
     mission = {
         "player_id": pid, "team_id": str(team["_id"]), "team_name": team["name"],
         "team_skill": round(prep["team_skill"], 2), "spec_match": prep["spec_match"],
         "success_chance": round(prep["chance"], 3),
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
+        "vehicle_name": vehicle_name,
         "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
         "weapon_loud": prep.get("weapon_loud", False),
         "repeat_type": repeat_type,
         "talents": prep["talents"],
+        # QI da equipa (SSS v4): campos que alimentam perseguições, clutch save,
+        # papéis internos, aviso do líder e forense de falha.
+        "team_streak": prep.get("team_streak", 0),
+        "vehicle_speed_effective": round(prep["speed"], 1),
+        "vehicle_discreet": prep.get("vehicle_discreet", False),
+        "has_leader": prep.get("has_leader", False),
+        "leader_cool": prep.get("leader_cool", 0),
+        "has_medic": prep.get("has_medic", False),
+        "has_lawyer": prep.get("has_lawyer", False),
+        "best_driver": prep.get("best_driver", 0),
+        "top_negatives": prep.get("top_negatives", []),
+        "heat_at_dispatch": player.get("heat", 0),
+        # QI das armas (SSS v5): perfil de encravamento (roll na ação) e
+        # poder de fogo médio (intimidação na fuga).
+        "weapon_jam_profile": prep.get("weapon_jam_profile", []),
+        "weapon_power_avg": prep.get("weapon_power_avg", 0.0),
         "opportunity_id": str(opp["_id"]),
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
@@ -547,6 +840,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "phase": "en_route", "outcome": None,
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
         "finish_at": finish.isoformat(), "return_at": ret.isoformat(),
+        "live_log": live_log, "live_chance_delta": live_delta,
     }
     result = await db.missions.insert_one(mission)
     await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
@@ -559,7 +853,14 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         {"_id": {"$in": [ObjectId(i) for i in member_ids]}},
         {"$set": {"status": "on_mission"}},
     )
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"stats.ops_dispatched": 1}})
+    # Anti-repetição narrativa: guardar as frases usadas no guião de despacho
+    # na memória da organização (mantida com um teto) — o regresso e as
+    # próximas missões preferem voz nova.
+    new_memory = update_memory(player.get("phrase_memory"), live_used_keys)
+    await db.players.update_one(
+        {"_id": player["_id"]},
+        {"$inc": {"stats.ops_dispatched": 1}, "$set": {"phrase_memory": new_memory}},
+    )
     await add_event(db, pid, "dispatch", f"{team['name']} ({len(members)} membros) destacada para {opp['name']} em {opp['district']}.")
     return {"mission_id": str(result.inserted_id)}
 
@@ -574,20 +875,39 @@ async def _try_prepare_dispatch(player, opp, team):
         return None
 
 
+def _expected_value(prep):
+    """Valor esperado real de um despacho (SSS v4): chance*recompensa + saque
+    esperado dos sucessos parciais (janela near-miss) − perdas esperadas numa
+    falha franca (desgaste, calor, fadiga — proxy) − custo real do combustível.
+    É isto que um consigliere calcularia, não apenas 'chance alta'."""
+    chance = prep["chance"]
+    reward = prep["reward"]
+    partial_ev = PARTIAL_SUCCESS_WINDOW * ((PARTIAL_REWARD_MIN + PARTIAL_REWARD_MAX) / 2) * reward
+    fail_prob = max(0.0, 1.0 - chance - PARTIAL_SUCCESS_WINDOW)
+    fuel_type = (prep.get("vehicle") or {}).get("fuel_type")
+    fuel_cost = prep.get("fuel_needed", 0.0) * FUEL_PRICES.get(fuel_type, 1.8)
+    return chance * reward + partial_ev - fail_prob * reward * EV_FAILURE_LOSS_FRAC - fuel_cost
+
+
 def _rank_key(prep, priority=HQ_DEFAULT_PRIORITY):
     # Critério principal depende da prioridade global da organização; os
-    # restantes campos servem de desempate, na mesma ordem de sempre (maior
-    # probabilidade de sucesso, depois mais perto, depois maior recompensa).
+    # restantes campos servem de desempate. SSS v4: o valor esperado real
+    # (_expected_value) substitui a recompensa bruta — uma operação de 10k a
+    # 40% de chance deixa de "ganhar" a uma de 6k a 95%.
+    ev = _expected_value(prep)
     if priority == "lucro":
-        return (-prep["reward"], -prep["chance"], prep["dist"])
+        return (-ev, -prep["chance"], prep["dist"])
     if priority == "velocidade":
-        return (prep["travel_s"], -prep["chance"], -prep["reward"])
+        return (prep["travel_s"], -prep["chance"], -ev)
     if priority == "reputacao":
-        return (-prep.get("reward_reputation", 0), -prep["chance"], -prep["reward"])
+        return (-prep.get("reward_reputation", 0), -prep["chance"], -ev)
     if priority == "complexidade":
-        return (-prep.get("reward_difficulty_score", 0), -prep["chance"], -prep["reward"])
-    # "custos" e "equilibrio" (por omissão): comportamento clássico.
-    return (-prep["chance"], prep["dist"], -prep["reward"])
+        return (-prep.get("reward_difficulty_score", 0), -prep["chance"], -ev)
+    if priority == "custos":
+        return (round(prep.get("fuel_needed", 0.0), 1), -prep["chance"], -ev)
+    # "equilibrio" (por omissão): segurança primeiro (chance em degraus de 1%),
+    # e dentro do mesmo degrau decide o valor esperado — o melhor dos dois mundos.
+    return (-round(prep["chance"], 2), -ev, prep["dist"])
 
 
 @router.post("/dispatch/recommend_opportunity")
@@ -728,11 +1048,21 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
     o, tg = m["origin"], m["target"]
     turn_point = {"lat": o["lat"] + (tg["lat"] - o["lat"]) * t, "lng": o["lng"] + (tg["lng"] - o["lng"]) * t}
     ret = now + timedelta(seconds=elapsed)
+    # Live ops: corta a narrativa futura (a operação nunca vai acontecer) e
+    # anexa o guião curto de regresso antecipado.
+    now_iso = now.isoformat()
+    kept_log = [e for e in (m.get("live_log") or []) if e.get("at", "") <= now_iso]
+    recall_entries, recall_used = build_recall_script(m, now, ret, memory=player.get("phrase_memory"))
+    kept_log += recall_entries
     await db.missions.update_one({"_id": m["_id"]}, {"$set": {
         "phase": "returning", "outcome": "recalled",
         "target": turn_point, "arrive_at": now.isoformat(), "finish_at": now.isoformat(),
-        "return_at": ret.isoformat(),
+        "return_at": ret.isoformat(), "live_log": kept_log,
     }})
+    await db.players.update_one(
+        {"_id": player["_id"]},
+        {"$set": {"phrase_memory": update_memory(player.get("phrase_memory"), recall_used)}},
+    )
     await db.teams.update_one({"_id": ObjectId(m["team_id"])}, {"$set": {"status": "returning"}})
     if m.get("opportunity_id"):
         await db.opportunities.update_one(
@@ -773,6 +1103,8 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         "player_id": pid, "name": name, "spec": body.spec, "status": "idle",
         "vehicle_id": None, "missions_done": 0, "created_at": created,
         "available_at": None, "roster_stable_since": created,
+        # SSS v4: memória da equipa — momentum, familiaridade e entrosamento.
+        "streak": 0, "category_missions": {}, "roster_missions": 0,
     })
     await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €.")
     await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", player["clean_money"] - TEAM_CREATE_COST, f"Nova equipa: {name}")
@@ -864,7 +1196,7 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
         reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
         await db.teams.update_many(
             {"_id": {"$in": [ObjectId(tid) for tid in affected_ids]}, "player_id": pid},
-            {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until}},
+            {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until, "roster_missions": 0}},
         )
     return {"ok": True}
 
@@ -1034,6 +1366,87 @@ async def rename_employee(body: EmployeeRenameInput, user: dict = Depends(get_cu
     if name != old_name:
         await push_history(db, emp["_id"], f"Renomeado de {old_name} para {name}.")
     return {"ok": True}
+
+
+# ---------------- Veículos ----------------
+
+@router.post("/employees/optimize")
+async def optimize_employees(user: dict = Depends(get_current_user)):
+    """QI do efetivo (SSS v6): preenche as vagas das equipas disponíveis com os
+    operacionais disponíveis SEM equipa, maximizando a aptidão para a
+    especialização de cada equipa — a mesma régua da eficácia de missão
+    (atributo ponderado da categoria + match de especialização + nível).
+    Nunca move membros entre equipas (protege o entrosamento); só preenche
+    lugares vazios com quem está de fora."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    employees = await db.employees.find({"player_id": pid}).to_list(300)
+    free = [e for e in employees if e.get("status") == "idle" and not e.get("team_id")]
+    if not free:
+        raise HTTPException(status_code=400, detail="Nenhum operacional disponível sem equipa para colocar")
+    teams = await db.teams.find({"player_id": pid, "status": "idle"}).to_list(100)
+    if not teams:
+        raise HTTPException(status_code=400, detail="Nenhuma equipa disponível (todas em operação)")
+    counts = {}
+    for e in employees:
+        tid = e.get("team_id")
+        if tid:
+            counts[tid] = counts.get(tid, 0) + 1
+    slots = {str(t["_id"]): TEAM_MAX_MEMBERS - counts.get(str(t["_id"]), 0) for t in teams}
+    open_teams = [t for t in teams if slots[str(t["_id"])] > 0]
+    if not open_teams:
+        raise HTTPException(status_code=400, detail="Todas as equipas disponíveis já estão completas")
+
+    def fit_score(emp, team):
+        # A mesma régua de team_effectiveness: atributo relevante ponderado
+        # (1.º atributo da categoria pesa mais) × match de especialização.
+        spec = team.get("spec") or "especial"
+        attrs = emp.get("attrs") or {}
+        aks = CATEGORY_ATTRS.get(spec)
+        if aks and len(aks) == 2:
+            attr = attrs.get(aks[0], 2) * PRIMARY_ATTR_WEIGHT_MAIN + attrs.get(aks[1], 2) * PRIMARY_ATTR_WEIGHT_SECONDARY
+        elif aks:
+            attr = sum(attrs.get(a, 2) for a in aks) / len(aks)
+        else:
+            attr = sum(attrs.values()) / max(1, len(attrs)) if attrs else 2
+        match = 1.25 if (emp.get("spec") == spec or spec == "especial") else 1.0
+        return (emp.get("level", 1) * 0.5 + attr * 0.45) * match
+
+    pairs = []
+    for e in free:
+        for t in open_teams:
+            pairs.append((fit_score(e, t), str(e["_id"]), str(t["_id"])))
+    pairs.sort(key=lambda p: p[0], reverse=True)
+    emp_by_id = {str(e["_id"]): e for e in free}
+    team_by_id = {str(t["_id"]): t for t in open_teams}
+    plan, used_e = {}, set()
+    remaining = dict(slots)
+    for score, eid, tid in pairs:
+        if eid in used_e or remaining.get(tid, 0) <= 0:
+            continue
+        plan[eid] = tid
+        used_e.add(eid)
+        remaining[tid] -= 1
+    if not plan:
+        return {"ok": True, "changes": [], "message": "O efetivo já está na distribuição ótima."}
+
+    changes = []
+    affected = set()
+    for eid, tid in plan.items():
+        await db.employees.update_one({"_id": ObjectId(eid)}, {"$set": {"team_id": tid}})
+        affected.add(tid)
+        changes.append({"employee": emp_by_id[eid].get("name", "?"), "to": team_by_id[tid].get("name", "?")})
+    # Mudar o plantel quebra a coordenação — mesmo efeito do assign manual.
+    now_iso = now_utc().isoformat()
+    reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
+    await db.teams.update_many(
+        {"_id": {"$in": [ObjectId(tid) for tid in affected]}, "player_id": pid},
+        {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until, "roster_missions": 0}},
+    )
+    await add_event(db, pid, "team",
+                    f"Efetivo otimizado — {len(changes)} operacional(is) colocado(s) nas equipas mais adequadas.")
+    return {"ok": True, "changes": changes,
+            "message": f"{len(changes)} operacional(is) colocado(s) por aptidão à especialização."}
 
 
 # ---------------- Veículos ----------------
@@ -1248,6 +1661,124 @@ async def _weapon_free(pid, weapon):
     return True
 
 
+@router.post("/vehicles/optimize")
+async def optimize_vehicles(user: dict = Depends(get_current_user)):
+    """QI da frota (SSS v6): redistribui os veículos disponíveis pelas equipas
+    disponíveis maximizando a adequação global — a mesma régua da chance de
+    missão (vehicle_mission_score da especialização, best_for, condição,
+    combustível e aproveitamento de lugares). Só mexe em veículos cuja equipa
+    está disponível e nunca deixa uma equipa com menos lugares que membros."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    vehicles = await db.vehicles.find({"player_id": pid}).to_list(200)
+    if not vehicles:
+        raise HTTPException(status_code=400, detail="Não tens veículos na frota")
+    teams = await db.teams.find({"player_id": pid}).to_list(100)
+    idle_teams = [t for t in teams if t.get("status") == "idle"]
+    if not idle_teams:
+        raise HTTPException(status_code=400, detail="Nenhuma equipa disponível para receber veículos")
+    employees = await db.employees.find({"player_id": pid}).to_list(300)
+    members_count = {}
+    for e in employees:
+        tid = e.get("team_id")
+        if tid:
+            members_count[tid] = members_count.get(tid, 0) + 1
+    now = now_utc()
+    teams_by_id = {str(t["_id"]): t for t in teams}
+
+    def movable_vehicle(v):
+        tr = v.get("transfer")
+        if tr and tr.get("ends_at") and parse_dt(tr["ends_at"]) > now:
+            return False  # em trânsito entre bases
+        t = teams_by_id.get(v.get("team_id") or "")
+        return t is None or t.get("status") == "idle"
+
+    movable = [v for v in vehicles if movable_vehicle(v)]
+    if not movable:
+        raise HTTPException(status_code=400, detail="Nenhum veículo disponível para redistribuir (equipas em operação)")
+    # Equipas cujo veículo atual não é móvel (ex.: em trânsito) ficam de fora —
+    # atribuir-lhes outro veículo desligaria o que está a caminho.
+    eligible_teams = []
+    for t in idle_teams:
+        cur = t.get("vehicle_id")
+        if cur and not any(str(v["_id"]) == cur for v in movable) and any(str(v["_id"]) == cur for v in vehicles):
+            continue
+        eligible_teams.append(t)
+    if not eligible_teams:
+        raise HTTPException(status_code=400, detail="Nenhuma equipa elegível para trocar de veículo")
+
+    def pair_score(v, t):
+        model = VEHICLE_MODELS.get(v.get("model_key"))
+        if not model:
+            return None
+        n = members_count.get(str(t["_id"]), 0)
+        seats = model.get("seats", 2)
+        if n > seats:
+            return None  # despacho ficaria bloqueado por falta de lugares
+        spec = t.get("spec") or "especial"
+        base = vehicle_mission_score(model, spec)
+        best = model.get("best_for") or []
+        fit = 1.15 if spec in best else (0.9 if best else 1.0)
+        cond = 0.7 + 0.3 * max(0.0, min(100.0, v.get("condition", 100.0))) / 100.0
+        fuel = 0.9 + 0.1 * (v.get("fuel_l", 0.0) / max(1.0, v.get("tank_l", 1.0)))
+        seat_fit = 1.0
+        if n > 0:
+            seat_fit = 0.85 + 0.15 * min(1.0, (n / seats) / 0.75)
+        return base * fit * cond * fuel * seat_fit
+
+    pairs = []
+    v_by_id = {str(v["_id"]): v for v in movable}
+    for v in movable:
+        for t in eligible_teams:
+            s = pair_score(v, t)
+            if s is not None:
+                pairs.append((s, str(v["_id"]), str(t["_id"])))
+    if not pairs:
+        raise HTTPException(status_code=400, detail="Nenhuma combinação válida (lugares insuficientes para as equipas)")
+    pairs.sort(key=lambda p: p[0], reverse=True)
+    plan, used_v, used_t = {}, set(), set()
+    for score, vid, tid in pairs:
+        if vid in used_v or tid in used_t:
+            continue
+        plan[vid] = tid
+        used_v.add(vid)
+        used_t.add(tid)
+
+    team_name = {str(t["_id"]): t.get("name", "?") for t in teams}
+    changes = []
+    for vid, tid in plan.items():
+        v = v_by_id[vid]
+        if v.get("team_id") == tid:
+            continue
+        changes.append({
+            "vehicle": v.get("name", "?"),
+            "from": team_name.get(v.get("team_id") or ""),
+            "to": team_name.get(tid, "?"),
+        })
+    benched = [v_by_id[vid].get("name", "?") for vid in v_by_id
+               if vid not in plan and v_by_id[vid].get("team_id")
+               and str(v_by_id[vid].get("team_id")) in {str(t["_id"]) for t in eligible_teams}]
+    if not changes and not benched:
+        return {"ok": True, "changes": [], "message": "A frota já está na distribuição ótima."}
+
+    # Aplicar de forma atómica: limpar vínculos móveis e ligar o plano.
+    eligible_ids = [t["_id"] for t in eligible_teams]
+    await db.vehicles.update_many(
+        {"_id": {"$in": [ObjectId(vid) for vid in v_by_id]}},
+        {"$set": {"team_id": None}},
+    )
+    await db.teams.update_many({"_id": {"$in": eligible_ids}}, {"$set": {"vehicle_id": None}})
+    for vid, tid in plan.items():
+        await db.vehicles.update_one({"_id": ObjectId(vid)}, {"$set": {"team_id": tid}})
+        await db.teams.update_one({"_id": ObjectId(tid)}, {"$set": {"vehicle_id": vid}})
+    moved = len(changes)
+    await add_event(db, pid, "vehicle",
+                    f"Frota otimizada — {moved} veículo(s) redistribuído(s) pelas equipas mais adequadas."
+                    + (f" {len(benched)} veículo(s) voltaram à garagem." if benched else ""))
+    return {"ok": True, "changes": changes, "benched": benched,
+            "message": f"{moved} veículo(s) redistribuído(s)." if moved else "Frota arrumada — sem trocas necessárias."}
+
+
 @router.post("/weapons/buy")
 async def buy_weapon(body: WeaponBuyInput, user: dict = Depends(get_current_user)):
     if body.model_key not in WEAPON_MODELS:
@@ -1280,7 +1811,7 @@ async def sell_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user
     if not await _weapon_free(pid, weapon):
         raise HTTPException(status_code=400, detail="O funcionário equipado está em operação")
     model = WEAPON_MODELS.get(weapon["model_key"], {})
-    value = int(model.get("price", 0) * 0.4 * weapon.get("condition", 100) / 100)
+    value = int(model.get("price", 0) * WEAPON_SELL_FRACTION * weapon.get("condition", 100) / 100)
     if weapon.get("employee_id"):
         await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
     await db.weapons.delete_one({"_id": weapon["_id"]})
@@ -1353,10 +1884,11 @@ async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_cu
 
 @router.post("/weapons/auto_assign")
 async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
-    """Sugere e atribui automaticamente a arma ao funcionário mais adequado:
-    idle, compatível (especialização própria ou da equipa actual corresponde
-    à categoria da arma), mais experiente, e com pior equipamento actual —
-    mirror do padrão de ordenação por tuplo já usado em recommend_team."""
+    """Atribui automaticamente a arma ao operacional disponível com o maior
+    GANHO MARGINAL de score efetivo (SSS v5) — a mesma régua da chance de
+    missão: adequação à especialização, compatibilidade de requisitos,
+    habilidade, proficiência e condição da arma, descontando o que o
+    operacional já rende com a arma atual."""
     player = await get_player(user)
     pid = str(player["_id"])
     weapon = await db.weapons.find_one({"_id": _oid(body.weapon_id, "Arma inválida"), "player_id": pid})
@@ -1368,19 +1900,23 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
     candidates = await db.employees.find({"player_id": pid, "status": "idle"}).to_list(300)
     if not candidates:
         raise HTTPException(status_code=400, detail="Não há operacionais disponíveis para equipar")
-    teams_by_id = {str(t["_id"]): t for t in await db.teams.find({"player_id": pid}).to_list(100)}
     current_weapons = {w["employee_id"]: w for w in await db.weapons.find({"player_id": pid, "employee_id": {"$ne": None}}).to_list(300)}
 
     def rank_key(emp):
-        team = teams_by_id.get(emp.get("team_id"))
-        spec_match = emp.get("spec") in model.get("best_for", [])
-        team_match = bool(team) and team.get("spec") in model.get("best_for", [])
+        # QI das armas (SSS v5): ganho marginal REAL — score efetivo desta arma
+        # nas mãos deste operacional (compatibilidade, habilidade, proficiência
+        # e condição incluídas) menos o que ele já rende com a arma atual.
+        # É a mesma régua que a chance de missão usa (weapon_effective_score).
+        spec = emp.get("spec") or "especial"
+        new_score = weapon_effective_score(emp, weapon, model, spec)
         current = current_weapons.get(str(emp["_id"]))
         current_score = 0.0
         if current:
-            current_model = WEAPON_MODELS.get(current["model_key"], {})
-            current_score = weapon_combat_score(current_model, emp.get("spec", "")) if current_model else 0.0
-        return (-int(spec_match), -int(team_match), -emp.get("level", 1), current_score)
+            current_model = WEAPON_MODELS.get(current["model_key"])
+            if current_model:
+                current_score = weapon_effective_score(emp, current, current_model, spec)
+        gain = new_score - current_score
+        return (-round(gain, 6), -new_score, -emp.get("level", 1))
 
     best = min(candidates, key=rank_key)
     if best.get("weapon_id"):
@@ -1390,6 +1926,93 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
     await db.employees.update_one({"_id": best["_id"]}, {"$set": {"weapon_id": str(weapon["_id"])}})
     await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"employee_id": str(best["_id"])}})
     return {"ok": True, "employee_id": str(best["_id"]), "employee_name": best["name"]}
+
+
+@router.post("/weapons/optimize")
+async def optimize_weapons(user: dict = Depends(get_current_user)):
+    """QI das armas (SSS v5): redistribui TODO o arsenal disponível pelos
+    operacionais disponíveis maximizando o score efetivo global — atribuição
+    gulosa por score (a mesma régua da chance de missão). Só mexe em armas
+    cujo portador atual está disponível; quem está em serviço não larga a
+    arma. Armas a mais ficam no inventário, sempre as piores combinações."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    weapons = await db.weapons.find({"player_id": pid}).to_list(300)
+    if not weapons:
+        raise HTTPException(status_code=400, detail="Não tens armas no arsenal")
+    employees = await db.employees.find({"player_id": pid}).to_list(300)
+    emp_by_id = {str(e["_id"]): e for e in employees}
+    idle = [e for e in employees if e.get("status") == "idle"]
+    if not idle:
+        raise HTTPException(status_code=400, detail="Nenhum operacional disponível para equipar")
+    movable = []
+    for w in weapons:
+        holder = emp_by_id.get(w.get("employee_id") or "")
+        if holder is None or holder.get("status") == "idle":
+            movable.append(w)
+    if not movable:
+        raise HTTPException(status_code=400, detail="Nenhuma arma disponível para redistribuir (portadores em serviço)")
+
+    # Todas as combinações (arma, operacional) avaliadas pela régua única e
+    # atribuídas gulosamente por ordem decrescente de score efetivo.
+    pairs = []
+    weapons_by_id = {}
+    for w in movable:
+        wm = WEAPON_MODELS.get(w.get("model_key"))
+        if not wm:
+            continue
+        wid = str(w["_id"])
+        weapons_by_id[wid] = w
+        for e in idle:
+            spec = e.get("spec") or "especial"
+            pairs.append((weapon_effective_score(e, w, wm, spec), wid, str(e["_id"])))
+    if not pairs:
+        raise HTTPException(status_code=400, detail="Nenhuma combinação válida para otimizar")
+    pairs.sort(key=lambda p: p[0], reverse=True)
+    plan, used_w, used_e = {}, set(), set()
+    for score, wid, eid in pairs:
+        if wid in used_w or eid in used_e:
+            continue
+        plan[wid] = eid
+        used_w.add(wid)
+        used_e.add(eid)
+
+    changes = []
+    for wid, eid in plan.items():
+        w = weapons_by_id[wid]
+        old_eid = w.get("employee_id")
+        if old_eid == eid:
+            continue
+        changes.append({
+            "weapon": w.get("name", "?"),
+            "from": emp_by_id.get(old_eid, {}).get("name") if old_eid else None,
+            "to": emp_by_id.get(eid, {}).get("name", "?"),
+        })
+    # Armas móveis que ficam sem portador (mais armas do que operacionais).
+    benched = [weapons_by_id[wid].get("name", "?") for wid in weapons_by_id
+               if wid not in plan and weapons_by_id[wid].get("employee_id")]
+    if not changes and not benched:
+        return {"ok": True, "changes": [], "message": "O arsenal já está na distribuição ótima."}
+
+    # Aplicar: limpar vínculos das armas móveis e dos operacionais disponíveis,
+    # depois ligar o plano — evita estados intermédios inconsistentes.
+    await db.weapons.update_many(
+        {"_id": {"$in": [ObjectId(wid) for wid in weapons_by_id]}},
+        {"$set": {"employee_id": None}},
+    )
+    await db.employees.update_many(
+        {"_id": {"$in": [e["_id"] for e in idle]}},
+        {"$set": {"weapon_id": None}},
+    )
+    for wid, eid in plan.items():
+        await db.weapons.update_one({"_id": ObjectId(wid)}, {"$set": {"employee_id": eid}})
+        await db.employees.update_one({"_id": ObjectId(eid)}, {"$set": {"weapon_id": wid}})
+    moved = len(changes)
+    await add_event(db, pid, "weapon",
+                    f"Arsenal otimizado — {moved} arma(s) redistribuída(s) pelos operacionais mais aptos."
+                    + (f" {len(benched)} arma(s) voltaram ao inventário." if benched else ""))
+    return {"ok": True, "changes": changes, "benched": benched,
+            "message": f"{moved} arma(s) redistribuída(s)." if moved else "Arsenal arrumado — sem trocas necessárias."}
 
 
 # ---------------- Propriedades ----------------
@@ -1497,7 +2120,162 @@ async def rename_property(body: PropertyRenameInput, user: dict = Depends(get_cu
     return {"ok": True}
 
 
+@router.post("/properties/optimize")
+async def optimize_properties(user: dict = Depends(get_current_user)):
+    """QI do património (SSS v6): lança as melhorias com melhor retorno real,
+    respeitando uma reserva de caixa para o próximo ciclo salarial. Imóveis
+    produtivos (laboratórios/lavagem) ordenados por payback (custo ÷ ganho/h
+    à condição atual); imóveis de capacidade/bónus a seguir, do mais barato
+    para o mais caro."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    now = now_utc()
+    props = await db.properties.find({"player_id": pid}).to_list(200)
+    if not props:
+        raise HTTPException(status_code=400, detail="Não tens imóveis para melhorar")
+    upgradable = [
+        p for p in props
+        if p["level"] < PROPERTY_MAX_LEVEL
+        and not (p.get("upgrading_until") and parse_dt(p["upgrading_until"]) > now)
+        and p["type_key"] in PROPERTY_TYPES
+    ]
+    if not upgradable:
+        raise HTTPException(status_code=400, detail="Nenhum imóvel elegível — tudo no nível máximo ou já em obras")
+    employees = await db.employees.find({"player_id": pid}).to_list(300)
+    reserve = sum(e.get("salary", 0) for e in employees)
+
+    def plan_for(p):
+        pt = PROPERTY_TYPES[p["type_key"]]
+        cost = int(pt["price"] * 0.6 * (p["level"] + 1))
+        # Ganho por hora de subir 1 nível (lavagem devolve 90%), à condição atual.
+        rate = (pt.get("dirty_per_h") or 0) + (pt.get("launder_per_h") or 0) * 0.9
+        gain_h = rate * property_condition_factor(p)
+        payback_h = (cost / gain_h) if gain_h > 0 else None
+        return {"prop": p, "pt": pt, "cost": cost, "gain_h": gain_h, "payback_h": payback_h}
+
+    plans = [plan_for(p) for p in upgradable]
+    income = sorted([x for x in plans if x["payback_h"]], key=lambda x: x["payback_h"])
+    other = sorted([x for x in plans if not x["payback_h"]], key=lambda x: x["cost"])
+    ordered = income + other
+
+    budget = player["clean_money"] - reserve
+    actions = []
+    for x in ordered:
+        if x["cost"] > budget:
+            continue
+        p, pt = x["prop"], x["pt"]
+        target_level = p["level"] + 1
+        duration_s = PROPERTY_UPGRADE_BASE_S + PROPERTY_UPGRADE_PER_LEVEL_S * target_level
+        until = (now + timedelta(seconds=duration_s)).isoformat()
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -x["cost"], "stats.properties_upgraded": 1}})
+        await db.properties.update_one({"_id": p["_id"]}, {"$set": {"upgrading_until": until}})
+        player["clean_money"] -= x["cost"]
+        await record_tx(db, pid, "property_upgrade", -x["cost"], "clean", player["clean_money"], f"Melhoria de {p['name']} (otimização)")
+        budget -= x["cost"]
+        actions.append({
+            "property": p.get("name", pt["name"]), "to_level": target_level, "cost": x["cost"],
+            "payback_h": round(x["payback_h"], 1) if x["payback_h"] else None,
+        })
+    if not actions:
+        return {"ok": True, "actions": [],
+                "message": f"Sem verba livre — mantida uma reserva de {reserve:,} € para o ciclo salarial."}
+    names = ", ".join(f"{a['property']} → N{a['to_level']}" for a in actions)
+    await add_event(db, pid, "property",
+                    f"Património otimizado — {len(actions)} melhoria(s) lançada(s) por melhor retorno: {names}.")
+    return {"ok": True, "actions": actions,
+            "message": f"{len(actions)} melhoria(s) lançada(s) — reserva salarial de {reserve:,} € preservada."}
+
+
 # ---------------- Quartel-General ----------------
+
+# Margem mínima de terra firme entre o QG e a costa/fronteira — protege
+# contra a margem de erro do polígono simplificado junto ao mar (mesma
+# régua do geo.is_valid_hq_location).
+HQ_MIN_INLAND_M = 120.0
+
+
+class HqPlaceInput(BaseModel):
+    lat: float
+    lng: float
+
+
+def _hq_location_verdict(lat: float, lng: float):
+    """Razão exata pela qual um ponto (não) serve para o QG — alimenta o
+    feedback específico do ecrã de escolha. Regra do jogo: em Portugal
+    (continente, Madeira ou Açores), NUNCA no mar/estuários/albufeiras e
+    afastado da linha de costa pelo menos ~120 m."""
+    if not (math.isfinite(lat) and math.isfinite(lng)
+            and -90.0 <= lat <= 90.0 and -180.0 <= lng <= 180.0):
+        return False, "Coordenadas inválidas."
+    if not is_in_portugal(lat, lng):
+        return False, ("Este ponto está fora de território português — mar ou estrangeiro. "
+                       "O Quartel-General tem de ficar em terra firme de Portugal "
+                       "(continente, Madeira ou Açores).")
+    if in_water_body(lat, lng):
+        return False, ("Este ponto está na água — estuário, ria ou albufeira. "
+                       "O Quartel-General precisa de terra firme.")
+    if distance_to_boundary_m(lat, lng) < HQ_MIN_INLAND_M:
+        return False, ("Demasiado colado à linha de costa ou fronteira — recua um pouco "
+                       "para o interior (mínimo ~120 m de terra firme).")
+    return True, ""
+
+
+@router.post("/hq/validate")
+async def validate_hq_spot(body: HqPlaceInput, user: dict = Depends(get_current_user)):
+    """Validação em direto de um ponto candidato a QG (onboarding). Devolve a
+    razão exata quando inválido; quando válido, devolve o nome REAL do local
+    (Nominatim com cache Mongo — nunca inventa nomes)."""
+    valid, reason = _hq_location_verdict(body.lat, body.lng)
+    label, locality = None, None
+    if valid:
+        g = await reverse_geocode(db, body.lat, body.lng, zoom=16)
+        label = street_label(g)
+        locality = locality_label(g)
+    return {"valid": valid, "reason": reason or None, "label": label, "locality": locality}
+
+
+@router.post("/hq/place")
+async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
+    """Coloca o PRIMEIRO Quartel-General (onboarding de conta nova). Regras
+    estritas: só uma vez; só em terra firme portuguesa — o mar é estritamente
+    proibido. Gera as zonas de operação em anéis à volta do QG e agenda o
+    batismo com moradas reais em background; as missões começam a aparecer
+    assim que a primeira zona tem nome."""
+    player = await get_player(user, allow_pending=True)
+    if player.get("hq"):
+        raise HTTPException(status_code=409, detail="O Quartel-General já está estabelecido — não pode ser mudado.")
+    valid, reason = _hq_location_verdict(body.lat, body.lng)
+    if not valid or not is_valid_hq_location(body.lat, body.lng, min_inland_m=HQ_MIN_INLAND_M):
+        raise HTTPException(status_code=422, detail=reason or "Localização inválida para o Quartel-General.")
+    lat, lng = round(float(body.lat), 6), round(float(body.lng), 6)
+
+    # Nome real do local (melhor esforço — sem rede fica o rótulo genérico;
+    # nunca inventamos moradas).
+    g = await reverse_geocode(db, lat, lng, zoom=16)
+    label = street_label(g)
+    region = locality_label(g) or ""
+    hq_name = f"QG · {label}" if label else "Quartel-General"
+
+    districts = generate_district_points(lat, lng)
+    now_iso = now_utc().isoformat()
+    hq = {"name": hq_name, "lat": lat, "lng": lng, "level": 1,
+          "upgrading_until": None, "upgrade_history": []}
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "hq": hq, "districts": districts, "region": region,
+        "hq_placed_at": now_iso,
+        # Reset do relógio do motor: o tempo parado no onboarding não conta
+        # como tempo de jogo (salários, decaimentos, spawns).
+        "last_tick": now_iso,
+    }})
+    pid = str(player["_id"])
+    where = label or f"{lat:.4f}, {lng:.4f}"
+    suffix = f" ({region})" if region and region not in where else ""
+    await add_event(db, pid, "system",
+                    f"Quartel-General estabelecido em {where}{suffix}. A rede está a mapear as zonas de operação em redor.")
+    # Batismo das zonas com moradas reais em background (Nominatim ~1 req/s).
+    asyncio.create_task(name_districts_task(db, player["_id"]))
+    return {"ok": True, "hq": hq, "region": region, "districts": len(districts)}
+
 
 @router.post("/hq/upgrade")
 async def upgrade_hq(user: dict = Depends(get_current_user)):
@@ -1632,14 +2410,58 @@ async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_us
     d = QUEST_DEFS.get(q["quest_key"])
     if not d:
         raise HTTPException(status_code=400, detail="Missão desconhecida")
-    parts = await grant_quest_rewards(db, player, d.get("rewards", {}))
+    # Recompensas dinâmicas SSS v3 — nível × dificuldade × tier adaptativo ×
+    # série diária × execução rápida (mesma fórmula do auto-reclamar).
+    rewards, mult_note = effective_quest_rewards(player, q, d, now_utc())
+    parts = await grant_quest_rewards(db, player, rewards)
+    if mult_note:
+        parts.append(mult_note)
+    # effective_quest_rewards mutou série/desempenho — persistir já.
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "quest_streak": player.get("quest_streak", {}),
+        "quest_perf": player.get("quest_perf", {}),
+    }})
     await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}})
     if q["quest_key"] == "c2_front":
         await db.quests.insert_one(make_instance(pid, "dec_informador", now_utc(), player.get("stats", {}), expires_s=3600))
         await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
     msg = f"Recompensa reclamada — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada."
     await add_event(db, pid, "success", msg)
-    return {"ok": True, "rewards": parts, "unlocks": d.get("unlocks_text")}
+    return {"ok": True, "rewards": parts, "unlocks": d.get("unlocks_text"), "mult_note": mult_note}
+
+
+@router.post("/quests/claim_all")
+async def claim_all_quests(user: dict = Depends(get_current_user)):
+    """Reclama TODAS as missões concluídas de uma vez — a mesma fórmula
+    dinâmica do claim individual (nível × dificuldade × tier × série ×
+    execução rápida), com a série/momentum persistidos uma única vez no fim."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    now = now_utc()
+    qs = await db.quests.find({"player_id": pid, "status": "completed"}).to_list(100)
+    claimable = [q for q in qs if QUEST_DEFS.get(q.get("quest_key"))]
+    if not claimable:
+        raise HTTPException(status_code=400, detail="Nenhuma missão concluída por reclamar")
+    all_parts = []
+    for q in claimable:
+        d = QUEST_DEFS[q["quest_key"]]
+        rewards, mult_note = effective_quest_rewards(player, q, d, now)
+        parts = await grant_quest_rewards(db, player, rewards)
+        if mult_note:
+            parts.append(mult_note)
+        await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
+        if q["quest_key"] == "c2_front":
+            await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
+            await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
+        all_parts.append(f"{d['name']}: " + ", ".join(parts) if parts else d["name"])
+    # effective_quest_rewards mutou série/desempenho a cada claim — persistir uma vez.
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "quest_streak": player.get("quest_streak", {}),
+        "quest_perf": player.get("quest_perf", {}),
+    }})
+    await add_event(db, pid, "success",
+                    f"Recompensas reclamadas — {len(claimable)} contrato(s) fechado(s) de uma vez.")
+    return {"ok": True, "claimed": len(claimable), "rewards": all_parts}
 
 
 @router.post("/quests/choose")
@@ -1678,6 +2500,15 @@ async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_
         inc["respect"] = eff["respect"]
     if eff.get("heat"):
         sets["heat"] = max(0.0, min(100.0, player["heat"] + eff["heat"]))
+    # Cadeias de consequências (SSS v3): certas escolhas plantam um evento
+    # futuro — o mundo lembra-se do que fizeste e responde com atraso.
+    chain = res.get("chain")
+    if chain and QUEST_DEFS.get(chain.get("key")) and random.random() <= chain.get("p", 1.0):
+        lo, hi = chain.get("delay_s", [120, 480])
+        due = (now_utc() + timedelta(seconds=random.randint(int(lo), int(hi)))).isoformat()
+        chains = list(player.get("pending_chains") or [])
+        chains.append({"key": chain["key"], "at": due})
+        sets["pending_chains"] = chains
     update = {}
     if inc:
         update["$inc"] = inc

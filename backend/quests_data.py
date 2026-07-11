@@ -564,6 +564,27 @@ QUEST_DEFS = {
         "trigger": {"kind": "avg_morale_below", "value": 50},
         "rewards": {"respect": 100},
     },
+    "dyn_fuel": {
+        "name": "Depósitos no Vermelho", "type": "dinamica", "category": "frota", "difficulty": "facil",
+        "desc": "Metade da frota anda a fumos. Abastece 2 veículos antes que uma fuga morra na estrada.",
+        "objective": {"kind": "counter", "metric": "vehicles_refueled", "target": 2, "label": "Abastecer 2 veículos"},
+        "trigger": {"kind": "fleet_fuel_low", "count": 2, "below_pct": 25},
+        "rewards": {"dirty": 1800},
+    },
+    "dyn_dirty_cap": {
+        "name": "Cofre a Transbordar", "type": "dinamica", "category": "economia", "difficulty": "normal",
+        "desc": "O cofre de dinheiro sujo está quase no limite — tudo o que entrar a mais evapora. Lava 8.000 € já.",
+        "objective": {"kind": "counter", "metric": "laundered_total", "target": 8000, "label": "Lavar 8.000 €"},
+        "trigger": {"kind": "dirty_near_cap", "fraction": 0.85},
+        "rewards": {"clean": 2500, "respect": 40},
+    },
+    "dyn_arrested": {
+        "name": "Ninguém Fica Para Trás", "type": "dinamica", "category": "funcionarios", "difficulty": "dificil",
+        "desc": "Tens gente atrás das grades. Liberta todos os operacionais presos — advogado ou suborno, mas ninguém apodrece na cela.",
+        "objective": {"kind": "state", "metric": "arrested_count", "target": 0, "label": "Nenhum operacional preso", "direction": "lte"},
+        "trigger": {"kind": "arrested_employees", "count": 1},
+        "rewards": {"respect": 120, "dirty": 2500},
+    },
 
     # ---------- Eventos ----------
     "ev_santo_antonio": {
@@ -591,6 +612,29 @@ QUEST_DEFS = {
         "rewards": {"clean": 5000},
     },
 
+    # ---------- Eventos-consequência (só ativados por cadeias de decisões) ----------
+    "ev_carga_marcada": {
+        "name": "Carga Marcada", "type": "evento", "category": "economia", "difficulty": "dificil",
+        "duration_s": 3600, "chain_only": True,
+        "desc": "As notas da carga que compraste estavam marcadas pela polícia. Lava 5.000 € depressa para apagar o rasto.",
+        "objective": {"kind": "counter", "metric": "laundered_total", "target": 5000, "label": "Lavar 5.000 €"},
+        "rewards": {"heat": -10, "respect": 60},
+    },
+    "ev_represalia": {
+        "name": "Represália", "type": "evento", "category": "operacao", "difficulty": "dificil",
+        "duration_s": 3600, "chain_only": True,
+        "desc": "O gang rival respondeu à tua provocação — mostraram-se nas tuas ruas. Conclui 2 operações para provar quem manda.",
+        "objective": {"kind": "counter", "metric": "missions_success", "target": 2, "label": "Concluir 2 operações"},
+        "rewards": {"respect": 120, "dirty": 3000},
+    },
+    "ev_vinganca": {
+        "name": "A Vingança do Morto", "type": "evento", "category": "operacao", "difficulty": "elite",
+        "duration_s": 2700, "chain_only": True,
+        "desc": "A crew do informador que eliminaste quer sangue. Mantém a máquina a rolar: 2 operações concluídas sem vacilar.",
+        "objective": {"kind": "counter", "metric": "missions_success", "target": 2, "label": "Concluir 2 operações"},
+        "rewards": {"respect": 100, "dirty": 2500},
+    },
+
     # ---------- Decisões ----------
     "dec_informador": {
         "name": "O Informador", "type": "decisao", "category": "geral", "difficulty": "normal", "min_level": 2,
@@ -607,7 +651,8 @@ QUEST_DEFS = {
             "ignorar": {"label": "Ignorar", "effects": {},
                         "outcome": "Deixaste passar a oportunidade. Sem consequências."},
             "eliminar": {"label": "Eliminar o contacto", "effects": {"heat": 6, "respect": 60},
-                         "outcome": "A mensagem foi enviada às ruas (+60 respeito), mas a polícia reparou (+6 calor)."},
+                         "outcome": "A mensagem foi enviada às ruas (+60 respeito), mas a polícia reparou (+6 calor).",
+                         "chain": {"key": "ev_vinganca", "p": 0.6, "delay_s": [120, 480]}},
         },
     },
     "dec_policia": {
@@ -626,6 +671,44 @@ QUEST_DEFS = {
             ]},
         },
     },
+    "dec_carga": {
+        "name": "Carga Barata", "type": "decisao", "category": "economia", "difficulty": "normal", "min_level": 2,
+        "desc": "Um contrabandista do Cais oferece uma carga de notas a metade do preço. Demasiado bom para ser verdade?",
+        "objective": {"kind": "state", "metric": "level_at_least", "target": 1, "label": "Tomar uma decisão"},
+        "rewards": {},
+        "options": {
+            "comprar": {"label": "Comprar por 4.000 €", "cost_clean": 4000, "random": [
+                {"p": 0.6, "effects": {"dirty": 7000},
+                 "outcome": "Negócio limpo — 7.000 € sujos por 4.000 limpos. O contrabandista desapareceu na noite."},
+                {"p": 0.4, "effects": {"dirty": 6000},
+                 "outcome": "A carga chegou... mas as notas cheiram a tinta fresca. Isto não vai acabar aqui.",
+                 "chain": {"key": "ev_carga_marcada", "p": 1.0, "delay_s": [60, 240]}},
+            ]},
+            "recusar": {"label": "Recusar", "effects": {},
+                        "outcome": "Negócios demasiado bons costumam sair caros. Ficaste de fora."},
+            "denunciar": {"label": "Dar a dica à polícia", "effects": {"heat": -8, "respect": -30},
+                          "outcome": "A polícia apanhou o contrabandista (-8 calor), mas as ruas não perdoam bufos (-30 respeito)."},
+        },
+    },
+    "dec_rival": {
+        "name": "Território Disputado", "type": "decisao", "category": "geral", "difficulty": "dificil", "min_level": 3,
+        "desc": "Um gang rival montou banca numa das tuas ruas. As tuas crews esperam ordens.",
+        "objective": {"kind": "state", "metric": "level_at_least", "target": 1, "label": "Tomar uma decisão"},
+        "rewards": {},
+        "options": {
+            "expulsar": {"label": "Expulsar à força", "random": [
+                {"p": 0.55, "effects": {"respect": 90, "heat": 6},
+                 "outcome": "As tuas crews varreram a rua (+90 respeito), mas houve barulho (+6 calor)."},
+                {"p": 0.45, "effects": {"respect": 60, "heat": 8},
+                 "outcome": "Expulsaste-os (+60 respeito, +8 calor)... mas juraram voltar. Mantém as crews por perto.",
+                 "chain": {"key": "ev_represalia", "p": 1.0, "delay_s": [180, 600]}},
+            ]},
+            "subornar": {"label": "Comprar a rua (3.500 €)", "cost_clean": 3500, "effects": {"respect": 40},
+                         "outcome": "Pagaste ao gang para desaparecer. Sem sangue, sem sirenes (+40 respeito)."},
+            "ignorar": {"label": "Deixar andar", "effects": {"respect": -40},
+                        "outcome": "As ruas repararam que recuaste (-40 respeito). Isto vai custar-te caro na reputação."},
+        },
+    },
 }
 
 QUEST_ORDER = {k: i for i, k in enumerate(QUEST_DEFS)}
@@ -640,6 +723,10 @@ DAILY_POOL = ["d_ops3", "d_launder3k", "d_refuel", "d_train1", "d_rest1",
 WEEKLY_POOL = ["w_ops15", "w_launder20k", "w_recruit2", "w_highvalue2", "w_earn30k",
               "w_promote3", "w_train5", "w_repair5", "w_refuel8", "w_bonus5",
               "w_bribe3", "w_property1", "w_vehicles_bought2", "w_ops_assalto8", "w_ops_tecnica8"]
-DYNAMIC_KEYS = ["dyn_fleet", "dyn_launder", "dyn_fatigue", "dyn_heat", "dyn_morale"]
+DYNAMIC_KEYS = ["dyn_fleet", "dyn_launder", "dyn_fatigue", "dyn_heat", "dyn_morale",
+                "dyn_fuel", "dyn_dirty_cap", "dyn_arrested"]
 EVENT_KEYS = ["ev_santo_antonio", "ev_cidade_quente", "ev_greve", "ev_tempestade"]
-DECISION_KEYS = ["dec_informador", "dec_policia"]
+DECISION_KEYS = ["dec_informador", "dec_policia", "dec_carga", "dec_rival"]
+
+# SSS v3 — multiplicadores por dificuldade (fórmula de recompensas dinâmicas).
+DIFFICULTY_MULT = {"facil": 1.0, "normal": 1.15, "dificil": 1.35, "elite": 1.6, "lendaria": 2.0}

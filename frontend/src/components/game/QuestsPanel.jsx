@@ -3,16 +3,17 @@ import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, QUEST_STATUS_LABELS, QUEST_STATUS_COLORS,
   DIFFICULTY_LABELS, DIFFICULTY_COLORS, CHAPTER_LABELS, QUEST_TYPE_LABELS,
+  QUEST_TIER_LABELS, QUEST_TIER_COLORS, questMultBreakdown,
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { MiniBar } from "./hud";
+import { MiniBar, PanelKicker, PanelWatermark, SectionHeader, SummaryStrip, Kpi, Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
-import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles } from "lucide-react";
+import { Target, Lock, Clock, Gift, MapPin, Star, Sparkles, Flame, Gauge, Zap } from "lucide-react";
 
 const useTick = (active) => {
   const [, setT] = useState(0);
@@ -72,17 +73,20 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
   return (
     <Card
       data-testid={`quest-card-${q.id || q.quest_key}`}
-      className={`p-3 shadow-none ${
-        featured
-          ? "border-red-500/40 bg-red-500/[0.06]"
-          : "border-white/10 bg-white/[0.03]"
-      } ${dim || locked ? "opacity-50" : ""}`}
+      className={`lus-quest-card relative overflow-hidden p-3 shadow-none ${
+        featured ? "lus-quest-featured" : "lus-card"
+      } ${q.status === "completed" ? "lus-quest-completed" : ""} ${locked ? "lus-quest-locked" : ""} ${dim || locked ? "opacity-50" : ""}`}
+      style={{ "--mk": q.status === "completed" ? "#10B981" : DIFFICULTY_COLORS[q.difficulty] || "#71717a" }}
     >
+      {featured && (
+        <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-red-400">
+          <Star size={9} fill="currentColor" /> Contrato em destaque
+        </p>
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-sm font-bold text-white">
+          <p className="flex items-center gap-1.5 font-display text-sm font-bold uppercase tracking-wide text-white">
             {locked && <Lock size={12} className="shrink-0 text-zinc-500" />}
-            {featured && <Star size={12} className="shrink-0 text-red-400" />}
             <span className="truncate">{q.name}</span>
           </p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
@@ -111,6 +115,26 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
 
       {chips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
+          {q.reward_mult > 1.01 && (() => {
+            const bd = questMultBreakdown(state?.player, q, catalog?.quest_meta);
+            const parts = [
+              `nível ×${bd.level.toFixed(2)}`,
+              `dificuldade ×${bd.difficulty.toFixed(2)}`,
+              bd.tierN > 0 ? `tier ${QUEST_TIER_LABELS[bd.tierN]} ×${bd.tier.toFixed(2)}` : null,
+              bd.streak > 1 ? `série ${bd.streakCount}d ×${bd.streak.toFixed(2)}` : null,
+            ].filter(Boolean).join(" · ");
+            return (
+              <Tip tip={`Recompensa dinâmica ×${q.reward_mult.toFixed(2)} — decomposição do motor: ${parts}. Concluir na 1.ª metade do prazo dá +${Math.round(bd.speedBonus * 100)}% extra (teto global ×${bd.cap}).`}>
+                <Badge
+                  variant="outline"
+                  data-testid={`quest-mult-${q.id || q.quest_key}`}
+                  className="gap-0.5 border-transparent bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300"
+                >
+                  <Zap size={9} /> ×{q.reward_mult.toFixed(2)}
+                </Badge>
+              </Tip>
+            );
+          })()}
           {chips.map((c, i) => (
             <Badge key={i} variant="outline" className="gap-0.5 border-transparent bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-normal text-emerald-300">
               <Gift size={9} /> {c}
@@ -188,7 +212,7 @@ const TABS = [
 ];
 
 export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusTabConsumed }) => {
-  const { state, serverNow, claimQuest } = useGame();
+  const { state, serverNow, claimAllQuests } = useGame();
   const { rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("questsTab", "historia", rememberSort);
   useTick(open);
@@ -205,7 +229,9 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   const quests = state.quests || [];
   const close = () => onOpenChange(false);
-  const claimAll = () => quests.filter((q) => q.status === "completed").forEach((q) => claimQuest(q.id));
+  // Uma única chamada ao motor (/quests/claim_all) — aplica multiplicadores,
+  // série e momentum de uma vez, em vez de reclamar contrato a contrato.
+  const claimAll = () => claimAllQuests();
 
   const principals = quests.filter((q) => q.type === "principal").sort((a, b) => a.order - b.order);
   const featured = principals.find((q) => q.status === "completed") || principals.find((q) => q.status === "active");
@@ -230,6 +256,17 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
   const dailyMs = state.player.quests_daily_at ? Date.parse(state.player.quests_daily_at) - serverNow() : null;
   const weeklyMs = state.player.quests_weekly_at ? Date.parse(state.player.quests_weekly_at) - serverNow() : null;
 
+  // SSS v3 — desempenho do jogador no sistema de contratos
+  const streak = state.player.quest_streak || {};
+  const perf = state.player.quest_perf || {};
+  const tier = perf.tier || 0;
+  const momentum = Math.round(perf.momentum || 0);
+  const streakBonusPct = Math.min(40, 4 * (streak.count || 0));
+  const activeMults = quests
+    .filter((q) => q.status === "active" || q.status === "completed")
+    .map((q) => q.reward_mult || 1);
+  const bestMult = activeMults.length ? Math.max(...activeMults) : 1;
+
   const chapters = {};
   principals.forEach((q) => {
     (chapters[q.chapter] = chapters[q.chapter] || []).push(q);
@@ -237,8 +274,10 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto border-border bg-background/95 backdrop-blur-xl sm:max-w-md" data-testid="quests-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel" data-testid="quests-panel">
         <SheetHeader>
+          <PanelWatermark icon={Target} />
+          <PanelKicker>Contratos · Objetivos</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-primary" /> Missões
             {claimable > 0 && (
@@ -259,9 +298,38 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
             )}
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            Há sempre algo importante para fazer em Lisboa.
+            Lisboa paga bem a quem cumpre — reclama o que é teu.
           </SheetDescription>
         </SheetHeader>
+
+        <SummaryStrip cols={3} testId="quests-summary" className="mt-3">
+          <Kpi
+            icon={Flame}
+            label="Série diária"
+            value={`${streak.count || 0} ${(streak.count || 0) === 1 ? "dia" : "dias"}`}
+            sub={`melhor ${streak.best || 0}d · +${streakBonusPct}%`}
+            color={(streak.count || 0) > 0 ? "#F59E0B" : "#A1A1AA"}
+            tip="Reclama pelo menos uma diária por dia para manter a série. Cada dia soma +4% às recompensas de diárias e semanais (máx. +40%). Falhar um dia reinicia a série."
+          />
+          <Kpi
+            icon={Gauge}
+            label="Tier de contratos"
+            value={QUEST_TIER_LABELS[tier]}
+            sub={`momentum ${momentum}/100`}
+            color={QUEST_TIER_COLORS[tier]}
+            bar={momentum}
+            barColor={QUEST_TIER_COLORS[tier]}
+            tip="O momentum sobe ao reclamar contratos e desce quando expiram. Tiers altos pagam +8% por tier, trazem contratos mais exigentes, desbloqueiam uma 4.ª diária (Veterano) e uma 3.ª semanal (Lenda)."
+          />
+          <Kpi
+            icon={Zap}
+            label="Multiplicador"
+            value={`até ×${bestMult.toFixed(2)}`}
+            sub={`nível ×${(1 + 0.15 * Math.max(0, (state.player.level || 1) - 1)).toFixed(2)} base`}
+            color={bestMult > 1.01 ? "#F59E0B" : "#A1A1AA"}
+            tip="Cada contrato mostra o multiplicador real aplicado às recompensas: nível × dificuldade × tier × série × execução rápida (concluir na 1.ª metade do prazo dá +10%). Máximo ×4."
+          />
+        </SummaryStrip>
 
         {featured && (
           <div className="mt-3" data-testid="quest-featured">
@@ -296,9 +364,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
           <div className="mt-3 space-y-4" data-testid="quests-historia">
             {Object.entries(chapters).map(([ch, qs]) => (
               <div key={ch}>
-                <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  {CHAPTER_LABELS[ch] || `Capítulo ${ch}`}
-                </h3>
+                <SectionHeader title={CHAPTER_LABELS[ch] || `Capítulo ${ch}`} meta={`${qs.length}`} />
                 <div className="space-y-2">
                   {qs.map((q) => (
                     <QuestCard key={q.id || q.quest_key} q={q} onClose={close} onNavigate={onNavigate} />
@@ -315,7 +381,12 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
               Novas diárias em <span className="text-white">{dailyMs !== null ? fmtDuration(Math.max(0, dailyMs / 1000)) : "—"}</span>
             </p>
             <div className="space-y-2">
-              {dailies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Sem missões diárias de momento.</p>}
+              {dailies.length === 0 && (
+                <div className="lus-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
+                  <Clock size={20} className="lus-empty-icon text-zinc-600" />
+                  <p className="font-mono text-[11px] text-zinc-500">Contratos diários esgotados — novos ao nascer do dia.</p>
+                </div>
+              )}
               {dailies.map((q) => (
                 <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
               ))}
@@ -329,7 +400,12 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
               Novas semanais em <span className="text-white">{weeklyMs !== null ? fmtDuration(Math.max(0, weeklyMs / 1000)) : "—"}</span>
             </p>
             <div className="space-y-2">
-              {weeklies.length === 0 && <p className="font-mono text-[11px] text-zinc-600">Sem missões semanais de momento.</p>}
+              {weeklies.length === 0 && (
+                <div className="lus-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
+                  <Clock size={20} className="lus-empty-icon text-zinc-600" />
+                  <p className="font-mono text-[11px] text-zinc-500">Contratos semanais fechados — a próxima leva chega com a semana.</p>
+                </div>
+              )}
               {weeklies.map((q) => (
                 <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />
               ))}
@@ -340,9 +416,12 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
         {tab === "alertas" && (
           <div className="mt-3 space-y-2" data-testid="quests-alertas">
             {alerts.length === 0 && (
-              <p className="font-mono text-[11px] text-zinc-600">
-                Sem alertas ativos. Missões sugeridas, eventos e decisões aparecem aqui conforme o estado do teu império.
-              </p>
+              <div className="lus-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
+                <Target size={20} className="lus-empty-icon text-zinc-600" />
+                <p className="max-w-[240px] font-mono text-[11px] text-zinc-500">
+                  Silêncio nos alertas. Missões sugeridas, eventos e decisões aparecem aqui quando o império mexer.
+                </p>
+              </div>
             )}
             {alerts.map((q) => (
               <QuestCard key={q.id} q={q} onClose={close} onNavigate={onNavigate} />

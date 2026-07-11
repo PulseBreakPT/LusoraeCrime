@@ -104,6 +104,17 @@ export function GameProvider({ children }) {
         offsetRef.current = Date.parse(data.server_time) - Date.now();
       }
 
+      // Onboarding: conta ainda sem QG — o /state vem mínimo (hq_pending),
+      // sem teams/employees/vehicles/etc. Guarda o estado tal como está e
+      // salta todo o diffing de notificações (que rebentaria em undefined).
+      if (data.hq_pending) {
+        setState(data);
+        setStateError(null);
+        consecutiveFailuresRef.current = 0;
+        connectionLostWarnedRef.current = false;
+        return;
+      }
+
       // Team return notifications
       if (prevTeamsRef.current) {
         const returned = data.teams.filter((t) => {
@@ -455,6 +466,33 @@ export function GameProvider({ children }) {
     action("weapons/unassign", { employee_id: employeeId }, "Arma desatribuída");
   const autoAssignWeapon = (weaponId) =>
     action("weapons/auto_assign", { weapon_id: weaponId }, "Arma atribuída automaticamente");
+  const optimizeWeapons = () =>
+    action("weapons/optimize", {}, "Arsenal redistribuído pela melhor combinação");
+  // Otimizações SSS v6 — o backend devolve a mensagem certa para cada caso
+  // (redistribuído / já ótimo / reserva salarial), por isso o toast usa-a.
+  const optimizeVehicles = useCallback(async () => {
+    const res = await action("vehicles/optimize", {});
+    if (res.ok && res.data?.message) toast.success(res.data.message);
+    return res;
+  }, [action]);
+  const optimizeEmployees = useCallback(async () => {
+    const res = await action("employees/optimize", {});
+    if (res.ok && res.data?.message) toast.success(res.data.message);
+    return res;
+  }, [action]);
+  const optimizeProperties = useCallback(async () => {
+    const res = await action("properties/optimize", {});
+    if (res.ok && res.data?.message) toast.success(res.data.message);
+    return res;
+  }, [action]);
+  const claimAllQuests = useCallback(async () => {
+    const res = await action("quests/claim_all", {});
+    if (res.ok && res.data?.rewards?.length) {
+      const shown = res.data.rewards.slice(0, 3).join(" · ");
+      toast.success(`${res.data.claimed} contrato(s) — ${shown}${res.data.rewards.length > 3 ? " …" : ""}`);
+    }
+    return res;
+  }, [action]);
   const buyProperty = (typeKey, lat, lng) =>
     action("properties/buy", { type_key: typeKey, lat, lng }, "Propriedade comprada");
   const sellProperty = (propertyId) =>
@@ -545,6 +583,11 @@ export function GameProvider({ children }) {
         assignWeapon,
         unassignWeapon,
         autoAssignWeapon,
+        optimizeWeapons,
+        optimizeVehicles,
+        optimizeEmployees,
+        optimizeProperties,
+        claimAllQuests,
         buyProperty,
         sellProperty,
         upgradeProperty,
