@@ -205,7 +205,7 @@ export function DisclaimerModal() {
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 data-testid="disclaimer-decline"
-                variant="outline"
+                variant="destructive"
                 onClick={() => setStage("declined")}
                 className="sm:min-w-[140px]"
               >
