@@ -333,8 +333,8 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Button
             data-testid="logout-button"
             onClick={logout}
-            variant="outline"
-            className="w-full border-white/10 bg-transparent text-xs font-bold uppercase tracking-wider text-zinc-400 hover:bg-white/5 hover:text-white"
+            variant="destructive"
+            className="w-full text-xs font-bold uppercase tracking-wider"
           >
             <LogOut size={14} className="mr-1.5" /> Terminar sessão
           </Button>

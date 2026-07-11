@@ -59,6 +59,7 @@ export function DisclaimerModal() {
   const deadlineRef = useRef(Date.now() + READ_SECONDS * 1000);
   const [remaining, setRemaining] = useState(READ_SECONDS);
   const locked = remaining > 0;
+  const barRef = useRef(null);
 
   useEffect(() => {
     if (!visible || !locked) return;
@@ -67,6 +68,24 @@ export function DisclaimerModal() {
     }, 250);
     return () => clearInterval(id);
   }, [visible, locked]);
+
+  // Barra de progresso fluida — em vez de saltar a cada segundo (re-render),
+  // é o próprio CSS que interpola a largura linearmente até ao prazo: parte da
+  // fração já decorrida (importante ao voltar do ecrã de recusa a meio) e
+  // anima até 100% no tempo restante exato, a 60fps e sem re-renders.
+  useEffect(() => {
+    if (!visible || !locked || stage !== "notice") return;
+    const el = barRef.current;
+    if (!el) return;
+    const totalMs = READ_SECONDS * 1000;
+    const leftMs = Math.max(0, deadlineRef.current - Date.now());
+    const startPct = Math.min(100, ((totalMs - leftMs) / totalMs) * 100);
+    el.style.transition = "none";
+    el.style.width = `${startPct}%`;
+    void el.offsetWidth; // reflow: fixa o ponto de partida antes de animar
+    el.style.transition = `width ${leftMs}ms linear`;
+    el.style.width = "100%";
+  }, [visible, locked, stage]);
 
   // Foco no botão de compromisso assim que desbloqueia (acessibilidade em
   // alertdialog — enquanto está desativado não pode receber foco).
@@ -171,12 +190,13 @@ export function DisclaimerModal() {
                 <div className="mt-2.5" data-testid="disclaimer-read-progress">
                   <div className="h-1 overflow-hidden rounded-full bg-white/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-[width] duration-300 ease-linear"
-                      style={{ width: `${Math.round(((READ_SECONDS - remaining) / READ_SECONDS) * 100)}%` }}
+                      ref={barRef}
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400"
+                      style={{ width: "0%" }}
                     />
                   </div>
-                  <p aria-live="polite" className="mt-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-                    {`Tempo de leitura — podes aceitar em ${remaining}s`}
+                  <p className="mt-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                    Tempo de leitura em curso — lê com calma
                   </p>
                 </div>
               )}
