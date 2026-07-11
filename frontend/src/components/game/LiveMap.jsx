@@ -32,8 +32,7 @@ const oppIcon = (opp, selected, favorite, urgent) => {
   const initial = (SPEC_LABELS[opp.category] || "?").charAt(0);
   const taken = opp.status === "taken";
   const html = `
-    <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""}" style="--mk:${color}">
-      ${urgent && !taken ? '<span class="opp-pin-urgent"></span>' : ""}
+    <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""} ${urgent && !taken ? "opp-pin-urgent" : ""}" style="--mk:${color}">
       ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
       <span class="opp-pin-type" style="background:${color}">${initial}</span>
       ${favorite ? `<span style="position:absolute;top:-4px;right:-4px;color:#FBBF24;filter:drop-shadow(0 0 2px rgba(0,0,0,0.8))">${renderToStaticMarkup(<Star size={11} fill="#FBBF24" />)}</span>` : ""}
@@ -62,16 +61,6 @@ const hqIcon = () => {
   return makeDivIcon(html, 36);
 };
 
-// Radar tático não-interativo por baixo do QG — varrimento cónico contínuo
-// que dá vida ao centro de operações no mapa (puro CSS, sem lógica).
-const hqRadarIcon = () =>
-  L.divIcon({
-    html: '<div class="lus-radar-hq"></div>',
-    className: "lus-marker",
-    iconSize: [170, 170],
-    iconAnchor: [85, 85],
-  });
-
 // Veículo top-down — o corpo (<span data-car>) é rodado pelo loop rAF para o
 // rumo real da via: em movimento segue a estrada, estacionado fica orientado
 // no sentido em que chegou (encostado à berma, nunca sobre o alvo).
@@ -81,13 +70,8 @@ const unitIcon = (phase, chased) => {
   const classes = ["unit-car"];
   if (parked) classes.push("unit-car-parked");
   if (chased) classes.push("unit-car-chased");
-  // Só a equipa a caminho ou a regressar pulsa (em branco) — não a estacionada
-  // (que já tem o badge P) nem em perseguição (que já tem a sirene).
-  const traveling = (phase === "en_route" || phase === "returning") && !chased;
   const html = `
     <div class="${classes.join(" ")}" style="--mk:${color}">
-      ${chased ? '<span class="unit-siren"></span>' : ''}
-      ${traveling ? '<span class="unit-pulse"></span>' : ''}
       <span class="unit-car-body" data-car>
         <span class="unit-car-glass"></span>
         <span class="unit-car-door unit-car-door-l"></span>
@@ -117,26 +101,10 @@ const opIconCached = (kind) => {
   return icon;
 };
 
-const siteFxCache = new Map();
-const siteFxIconCached = (kind, stage = "execute") => {
-  const key = `${kind}|${stage}`;
-  let icon = siteFxCache.get(key);
-  if (!icon) {
-    icon = L.divIcon({
-      html: `<div class="lus-sitefx lus-sitefx-${kind} lus-sitefx-stage-${stage}"></div>`,
-      className: "lus-marker",
-      iconSize: [56, 56],
-      iconAnchor: [28, 28],
-    });
-    siteFxCache.set(key, icon);
-  }
-  return icon;
-};
-
 const TRANSFER_COLOR = "#A78BFA";
 
 // Alvo físico da missão — marcador vermelho persistente, visível do despacho
-// ao fim da operação. Variante "hot" (execução) pulsa mais depressa.
+// ao fim da operação. Variante "hot" (execução) acende o anel.
 const missionTargetIconCache = new Map();
 const missionTargetIconCached = (hot) => {
   const key = hot ? "hot" : "idle";
@@ -157,7 +125,6 @@ const missionTargetIconCached = (hot) => {
 const transferIcon = () => {
   const html = `
     <div class="unit-pin" style="--mk:${TRANSFER_COLOR}">
-      <span class="unit-pulse"></span>
       ${renderToStaticMarkup(<Warehouse size={12} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, 24);
@@ -546,13 +513,6 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   // clockTick, alimenta os tooltips do veículo e alvo.
   const mstate = missionStateAt(mission, choreo, nowMs);
 
-  // Grupo de fase para o halo do local — cada transição remonta o divIcon e
-  // dispara a animação de entrada própria dessa fase.
-  const fxStage = ["disembark", "recon", "approach"].includes(mstate.state)
-    ? "deploy"
-    : ["withdraw", "regroup", "board", "confirm"].includes(mstate.state)
-    ? "withdraw"
-    : "execute";
   const groundCount = choreo?.groundCount ?? memberCount;
 
   return (
@@ -620,16 +580,6 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             smoothFactor={1}
             pathOptions={{ color: "#E4E4E7", weight: 1.2, opacity: dim ? 0.08 : 0.28, dashArray: "2 5", lineCap: "round" }}
             interactive={false}
-          />
-          {/* Halo de atividade no local exato da missão — estilo por arquetipo,
-              com animação de transição própria por grupo de fase */}
-          <Marker
-            position={[mission.target.lat, mission.target.lng]}
-            icon={siteFxIconCached(choreo.kind, fxStage)}
-            interactive={false}
-            keyboard={false}
-            zIndexOffset={300}
-            opacity={dim ? 0.2 : 1}
           />
           {/* Linha de comunicações rádio entre operacionais (gerida no rAF) */}
           <Polyline
@@ -773,7 +723,6 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
   const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state?.player?.hq;
   const hqMarkerIcon = useMemo(() => hqIcon(), []);
-  const hqRadarMarkerIcon = useMemo(() => hqRadarIcon(), []);
   const level = state.player.level;
 
   // Roster real por operacional (especialização/patente) — alimenta a
@@ -829,14 +778,6 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       <FollowManager onCancel={() => setFollowId(null)} />
       {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
       {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
-      <Marker
-        position={[hq.lat, hq.lng]}
-        icon={hqRadarMarkerIcon}
-        interactive={false}
-        keyboard={false}
-        zIndexOffset={100}
-        opacity={baseFilter === "all" || baseFilter === "hq" ? 1 : 0.15}
-      />
       <Marker
         position={[hq.lat, hq.lng]}
         icon={hqMarkerIcon}
