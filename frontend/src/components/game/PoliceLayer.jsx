@@ -7,12 +7,12 @@
 // (patrulha entra/sai, agentes desembarcam/embarcam) e a 1 Hz para tooltips.
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Circle, Marker, Polyline, Tooltip as LTooltip } from "react-leaflet";
+import { Marker, Polyline, Tooltip as LTooltip } from "react-leaflet";
 import L from "leaflet";
 import { renderToStaticMarkup } from "react-dom/server";
 import { UserRound } from "lucide-react";
 import {
-  ensurePoliceSim, policeTick, getPatrols, getPatrolZones, getPoliceVersion,
+  ensurePoliceSim, policeTick, getPatrols, getPoliceVersion,
   officerStateAt, deployCommAt, patrolStateLabel, FORCES,
 } from "../../lib/police";
 
@@ -23,7 +23,6 @@ const policeCarIcon = (force) => {
   if (!carIconCache[key]) {
     const html = `
       <div class="police-car${key === "GNR" ? " police-force-gnr" : ""}" data-proot>
-        <span class="police-pulse"></span>
         <span class="police-car-body" data-car>
           <span class="police-lightbar"><i></i><i></i></span>
           <span class="unit-car-glass"></span>
@@ -213,31 +212,9 @@ export default function PoliceLayer({ state, serverNow }) {
   }, [serverNow]);
 
   const patrols = getPatrols();
-  const zones = getPatrolZones();
 
   return (
     <>
-      {/* Perímetros de patrulhamento — um por ativo do jogador (QG/imóveis).
-          Azul = PSP (urbano, compacto), verde = GNR (rural, área maior). */}
-      {zones.map((z, i) => {
-        const F = FORCES[z.force] || FORCES.PSP;
-        return (
-          <Circle
-            key={`pzone-${i}-${z.force}-${z.lat.toFixed(4)}`}
-            center={[z.lat, z.lng]}
-            radius={z.radius}
-            interactive={false}
-            pathOptions={{
-              color: F.color,
-              weight: 1,
-              opacity: 0.32,
-              dashArray: "4 7",
-              fillColor: F.color,
-              fillOpacity: 0.025,
-            }}
-          />
-        );
-      })}
       {patrols.map((p) => {
         const label = patrolStateLabel(p);
         const isGNR = p.force === "GNR";
