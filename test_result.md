@@ -168,6 +168,17 @@ backend:
         comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
+  - task: "Câmara do mapa centrada no QG do jogador — LiveMap.jsx MapContainer center passa de [38.7223,-9.1393] (Lisboa hardcoded) para [hq.lat, hq.lng]; vale para o mount logo após colocar o QG no onboarding e para cada login (o LiveMap monta de fresco em ambos os casos)"
+    implemented: true
+    working: NA
+    file: "frontend/src/components/game/LiveMap.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "12/07/2026 — Bug do utilizador: 'estabeleci o QG noutra localização e a câmara vai para Lisboa'. Causa raiz: center hardcoded no MapContainer. Fix de 1 linha. A verificar com agente de testes: conta nova → QG no Porto → câmara deve abrir no Porto após colocação E após re-login."
   - task: "DisclaimerModal ('é só um jogo') mostrado a cada login quando o mapa aparece — alertdialog z-[130] com compromisso explícito; 'Sim, compreendo — é só um jogo' → regista ack no backend + sessionStorage e liberta o jogo; 'Não concordo' → ecrã 'Compromisso necessário' com 'Reler o aviso' ou 'Terminar sessão' (logout + recusa registada); flag limpa em login/register/logout/expiração no AuthContextV2 (reaparece a cada login, não em refresh); testids: disclaimer-overlay, disclaimer-accept, disclaimer-decline, disclaimer-declined-view, disclaimer-reconsider, disclaimer-exit"
     implemented: true
     working: NA

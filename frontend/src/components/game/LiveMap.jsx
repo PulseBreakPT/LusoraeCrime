@@ -812,7 +812,10 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
 
   return (
     <MapContainer
-      center={[38.7223, -9.1393]}
+      // Câmara inicial centrada no Quartel-General do jogador (e não numa
+      // cidade fixa): vale para o primeiro mount logo após colocar o QG no
+      // onboarding e para cada início de sessão — o jogo abre sempre "em casa".
+      center={[hq.lat, hq.lng]}
       zoom={13}
       zoomControl={false}
       className="absolute inset-0 z-0 h-full w-full"
