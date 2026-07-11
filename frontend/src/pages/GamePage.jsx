@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useGame } from "../context/GameContextV2";
 import { useSettings } from "../context/SettingsContext";
 import LiveMap, { MapLegend, PlacementControls, MapBaseFilter } from "../components/game/LiveMap";
 import { ResourceBar } from "../components/game/ResourceBar";
 import { OpportunityCard } from "../components/game/OpportunityCard";
+import OperationView from "../components/game/OperationView";
 import { TeamsPanel } from "../components/game/TeamsPanel";
 import { EmpirePanel } from "../components/game/EmpirePanel";
 import { EmployeesPanel } from "../components/game/EmployeesPanel";
@@ -30,6 +32,45 @@ export default function GamePage() {
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
   const [baseFilter, setBaseFilter] = useState("all");
   const [stamp, setStamp] = useState(null);
+  // Câmara da Operação — id da missão cujo interior está a ser acompanhado.
+  // Aberta por CustomEvent (marcador-alvo no mapa, botão na Central da rede,
+  // cartão da oportunidade) para não acoplar esses componentes a esta página.
+  const [operationId, setOperationId] = useState(null);
+  const placementRef = useRef(placement);
+  const promptedOpsRef = useRef(new Set());
+  useEffect(() => { placementRef.current = placement; }, [placement]);
+  useEffect(() => {
+    const onOpen = (ev) => {
+      if (!placementRef.current && ev.detail?.id) setOperationId(ev.detail.id);
+    };
+    window.addEventListener("lus:open-operation", onOpen);
+    return () => window.removeEventListener("lus:open-operation", onOpen);
+  }, []);
+  // Missão terminou/desapareceu do estado → destruir a simulação interior.
+  useEffect(() => {
+    if (operationId && state && !state.missions.some((m) => m.id === operationId)) setOperationId(null);
+  }, [state, operationId]);
+  // Convite automático: quando uma equipa entra no alvo (janela de operação),
+  // um toast com ação permite abrir a câmara sem procurar o marcador no mapa.
+  useEffect(() => {
+    if (!state) return;
+    const nowMs = serverNow();
+    for (const m of state.missions || []) {
+      if (promptedOpsRef.current.has(m.id)) continue;
+      if (m.outcome || m.phase === "returning" || m.phase === "done") { promptedOpsRef.current.add(m.id); continue; }
+      if (nowMs >= Date.parse(m.arrive_at) && nowMs < Date.parse(m.finish_at)) {
+        promptedOpsRef.current.add(m.id);
+        toast(`${m.team_name} entrou no alvo`, {
+          id: `op-cam-${m.id}`,
+          description: `${m.opportunity?.name || "Operação"} — acompanha a equipa no interior.`,
+          action: {
+            label: "Abrir câmara",
+            onClick: () => window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: m.id } })),
+          },
+        });
+      }
+    }
+  }, [state, serverNow]);
 
   // Carimbo de confirmação de despacho — celebração breve (1.7s) no centro do
   // ecrã quando uma equipa é destacada. Disparado por CustomEvent para não
@@ -126,6 +167,20 @@ export default function GamePage() {
   const mapState = hideImpossibleMissions
     ? { ...state, opportunities: state.opportunities.filter((o) => opportunityReachable(state, o)) }
     : state;
+
+  // Missão com a câmara aberta + roster real (nome/especialização/patente) —
+  // alimenta a IA por papéis da simulação interior. Calculado apenas quando a
+  // câmara está aberta; o OperationView gera/destrói o interior ao montar/desmontar.
+  const operationMission = operationId ? state.missions.find((m) => m.id === operationId) : null;
+  let operationRoster = [];
+  if (operationMission) {
+    const byId = {};
+    for (const e of state.employees || []) byId[e.id] = e;
+    operationRoster = (operationMission.member_ids || [])
+      .map((id) => byId[id])
+      .filter(Boolean)
+      .map((e) => ({ name: e.name, role_key: e.role_key, spec: e.spec, rank: e.rank }));
+  }
 
   return (
     <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-background">
@@ -266,6 +321,17 @@ export default function GamePage() {
       <HQPanel open={openPanel === "hq"} onOpenChange={(o) => setOpenPanel(o ? "hq" : null)} onNavigate={navigateTo} />
       <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={navigateTo} />
       <SettingsPanel open={openPanel === "settings"} onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />
+
+      {/* Câmara da Operação — overlay tático do interior do alvo. O mapa
+          continua montado e sincronizado por baixo (mesmos timestamps). */}
+      {operationMission && (
+        <OperationView
+          mission={operationMission}
+          roster={operationRoster}
+          serverNow={serverNow}
+          onClose={() => setOperationId(null)}
+        />
+      )}
     </div>
   );
 }

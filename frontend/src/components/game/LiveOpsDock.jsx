@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtMoney, chanceColor, CATEGORY_COLORS } from "../../lib/game";
-import { Radio, Crosshair, Siren, X } from "lucide-react";
+import { Radio, Crosshair, Siren, X, Video } from "lucide-react";
 
 /*
  * Operação em Direto — painel embutível com a "transmissão" das operações.
@@ -188,15 +188,26 @@ export function LiveOpsPanel({ state, serverNow }) {
             <span className="ml-1.5 font-normal text-zinc-500">· {sel.opportunity?.district}</span>
           </p>
         </div>
-        <button
-          type="button"
-          data-testid="liveops-follow"
-          title="Seguir esta unidade no mapa"
-          onClick={() => window.dispatchEvent(new CustomEvent("lus:follow-mission", { detail: { id: sel.id } }))}
-          className="shrink-0 rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
-        >
-          <Crosshair size={11} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            data-testid="liveops-camera"
+            title="Abrir a câmara da operação — acompanhar a equipa no interior do alvo"
+            onClick={() => window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: sel.id } }))}
+            className="flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/60 hover:text-red-200"
+          >
+            <Video size={11} /> Câmara
+          </button>
+          <button
+            type="button"
+            data-testid="liveops-follow"
+            title="Seguir esta unidade no mapa"
+            onClick={() => window.dispatchEvent(new CustomEvent("lus:follow-mission", { detail: { id: sel.id } }))}
+            className="rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
+          >
+            <Crosshair size={11} />
+          </button>
+        </div>
       </div>
 
       {/* Tabs quando há várias operações em simultâneo */}

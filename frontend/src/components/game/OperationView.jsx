@@ -66,6 +66,18 @@ const fmtMMSS = (s) => {
   return `${String((v / 60) | 0).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
 };
 
+// Fase efetiva derivada dos timestamps reais — o campo mission.phase só é
+// atualizado pelo tick lazy do servidor (polling 4s), o que atrasaria a
+// entrada da equipa no interior. Returning/done/outcome vêm sempre do backend
+// (o desfecho só o servidor conhece).
+const effPhase = (mission, nowMs) => {
+  if (mission.phase === "done") return "done";
+  if (mission.phase === "returning" || mission.outcome) return "returning";
+  if (nowMs < Date.parse(mission.arrive_at)) return "en_route";
+  if (nowMs < Date.parse(mission.finish_at)) return "operating";
+  return "returning";
+};
+
 // Path2D em cache (coordenadas de célula) — construídos uma vez por edifício.
 function buildPaths(b) {
   const { grid, gw, gh } = b;
@@ -232,7 +244,7 @@ export function OperationView({ mission, roster, serverNow, onClose }) {
       }
       const nowMs = serverNow();
       const t = nowMs / 1000;
-      const phase = mission.phase;
+      const phase = effPhase(mission, nowMs);
       const operating = phase === "operating";
 
       // estados dos agentes (uma avaliação por frame)
@@ -464,9 +476,11 @@ export function OperationView({ mission, roster, serverNow, onClose }) {
   }, [b, sim, paths, mission.phase, serverNow]);
 
   // ----- HUD (2 Hz) -----
-  const now = serverNow() / 1000;
-  const operating = mission.phase === "operating";
-  const enRoute = mission.phase === "en_route";
+  const nowMs = serverNow();
+  const now = nowMs / 1000;
+  const phaseNow = effPhase(mission, nowMs);
+  const operating = phaseNow === "operating";
+  const enRoute = phaseNow === "en_route";
   const ended = !operating && !enRoute;
   const ph = sim && operating ? phaseAt(sim, now) : null;
   const chance = Math.round(((mission.success_chance || 0) + (mission.live_chance_delta || 0)) * 100);

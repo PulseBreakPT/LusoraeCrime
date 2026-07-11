@@ -12,7 +12,7 @@ import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown, Video } from "lucide-react";
 import { audio } from "../../lib/audio";
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
@@ -343,6 +343,17 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               ? "Um carro-patrulha segue a equipa. Se apanhados antes do QG, perdem toda a carga."
               : "A operação está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
           </p>
+          <Button
+            data-testid="opportunity-camera-button"
+            variant="outline"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: activeMission.id } }));
+              onClose();
+            }}
+            className="mt-2 w-full gap-1.5 border-red-500/30 font-bold uppercase tracking-wider text-red-300 hover:border-red-400/60 hover:text-red-200"
+          >
+            <Video size={13} /> Câmara da operação
+          </Button>
           {activeMission.phase === "en_route" && (
             <Button
               data-testid="recall-team-button"

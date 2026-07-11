@@ -105,6 +105,7 @@ function App() {
               <Route path="/rgpd" element={<LegalPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
               <Route path="/dev/loading" element={<DevLoadingPreview />} />
+              <Route path="/dev/operation" element={<DevOperationPreview />} />
               <Route
                 path="/"
                 element={
