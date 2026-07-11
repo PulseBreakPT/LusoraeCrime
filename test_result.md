@@ -179,6 +179,9 @@ frontend:
       - working: NA
         agent: "main"
         comment: "11/07/2026 — Implementado; ainda sem verificação visual. NOTA para testes E2E: o modal bloqueia toda a UI do jogo após login — clicar disclaimer-accept antes de interagir com o mapa/painéis."
+      - working: true
+        agent: "main"
+        comment: "11/07/2026 — Feedback do utilizador (2 bugs + 1 melhoria): (1) 'umacondição' sem espaço no ecrã de recusa → parágrafos reescritos com strings JSX explícitas (à prova de colapso de whitespace); (2) 'Terminar sessão' em loop infinito → CAUSA RAIZ em AuthContextV2.logout(): setUser(null) deixava o ProtectedRoute no estado 'a determinar' (spinner eterno); corrigido para setUser(false) → redireciona /auth. Afetava TODOS os logouts, incluindo o botão das Definições. (3) NOVO: bloqueio de leitura — tempo derivado da contagem de palavras do aviso (~200 ppm, clamp 8-20s → 20s), countdown no botão de aceitar ('Lê o aviso com atenção · Xs' + barra de progresso, testid disclaimer-read-progress), 'Não concordo' sempre clicável, prazo não recomeça ao voltar do ecrã de recusa. Verificado por E2E screenshots: countdown 18s→desbloqueio→aceitar→mapa; recusar→terminar sessão→/auth; re-login→disclaimer reaparece com 20s."
   - task: "Central da rede — fusão do 'Em direto' (LiveOpsDock) e 'Últimos registos' (ActivityFeed) num só painel com separadores EM DIRETO/REGISTOS (desktop canto inferior esquerdo, mobile barra única); auto-switch para EM DIRETO ao despachar equipa; LiveOpsDock.jsx refeito como LiveOpsPanel embutível (sem Shell/posicionamento próprio) com estado vazio tático"
     implemented: true
     working: true

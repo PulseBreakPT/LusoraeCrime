@@ -2,7 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth, DISCLAIMER_SESSION_KEY } from "../../context/AuthContextV2";
 import { api } from "../../lib/api";
 import { Button } from "../ui/button";
-import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2 } from "lucide-react";
+import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2, Hourglass } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Tempo de leitura obrigatório — o botão "aceitar" só desbloqueia depois de o
+// jogador ter tido tempo real para ler o aviso (prática de consentimento
+// informado). O tempo é DERIVADO do próprio texto: contagem de palavras a
+// ~200 ppm (leitura atenta em pt-PT), limitado a [8s, 20s] para nunca ser
+// absurdo se o texto mudar. O botão "Não concordo" fica sempre clicável.
+// ---------------------------------------------------------------------------
+const NOTICE_PLAIN_TEXT = [
+  "O Lusorae é uma obra de ficção. Todos os crimes, esquemas, personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual.",
+  "Nada do que acontece no jogo deve ser repetido, imitado ou servir de inspiração na vida real. Atividades criminosas reais causam danos a pessoas e comunidades e têm consequências legais graves.",
+  "Ao continuar, comprometes-te a tratar tudo isto como puro entretenimento e a nunca replicar na vida real o que vês ou fazes no jogo.",
+  "Assumes este compromisso?",
+].join(" ");
+const WORD_COUNT = NOTICE_PLAIN_TEXT.trim().split(/\s+/).length;
+const WORDS_PER_MINUTE = 200;
+export const READ_SECONDS = Math.min(20, Math.max(8, Math.ceil((WORD_COUNT / WORDS_PER_MINUTE) * 60)));
 
 /**
  * Disclaimer de ficção — mostrado UMA vez por sessão de login, no momento em
@@ -36,18 +53,34 @@ export function DisclaimerModal() {
   const [busy, setBusy] = useState(false);
   const acceptRef = useRef(null);
 
-  // Foco inicial no botão de compromisso (acessibilidade em alertdialog).
+  // Contagem decrescente de leitura — o prazo é fixado quando o modal monta e
+  // continua a correr mesmo que o jogador passe pelo ecrã de recusa e volte
+  // (o tempo de leitura já decorrido conta; não recomeça do zero).
+  const deadlineRef = useRef(Date.now() + READ_SECONDS * 1000);
+  const [remaining, setRemaining] = useState(READ_SECONDS);
+  const locked = remaining > 0;
+
   useEffect(() => {
-    if (visible && !leaving && stage === "notice") {
+    if (!visible || !locked) return;
+    const id = setInterval(() => {
+      setRemaining(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+    }, 250);
+    return () => clearInterval(id);
+  }, [visible, locked]);
+
+  // Foco no botão de compromisso assim que desbloqueia (acessibilidade em
+  // alertdialog — enquanto está desativado não pode receber foco).
+  useEffect(() => {
+    if (visible && !leaving && stage === "notice" && !locked) {
       const id = setTimeout(() => acceptRef.current?.focus(), 60);
       return () => clearTimeout(id);
     }
-  }, [visible, leaving, stage]);
+  }, [visible, leaving, stage, locked]);
 
   if (!visible) return null;
 
   const accept = () => {
-    if (leaving) return;
+    if (leaving || locked) return;
     try {
       sessionStorage.setItem(DISCLAIMER_SESSION_KEY, userId);
     } catch (_err) {
@@ -113,17 +146,20 @@ export function DisclaimerModal() {
 
             <div id="disclaimer-body" className="mt-5 space-y-3 text-sm leading-relaxed text-zinc-300">
               <p>
-                O <span className="font-semibold text-white">Lusorae é uma obra de ficção</span>. Todos os crimes, esquemas,
-                personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual.
+                {"O "}
+                <span className="font-semibold text-white">Lusorae é uma obra de ficção</span>
+                {". Todos os crimes, esquemas, personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual."}
               </p>
               <p>
-                <span className="font-semibold text-red-400">Nada do que acontece no jogo deve ser repetido, imitado ou servir de
-                inspiração na vida real.</span>{" "}
-                Atividades criminosas reais causam danos a pessoas e comunidades e têm consequências legais graves.
+                <span className="font-semibold text-red-400">
+                  {"Nada do que acontece no jogo deve ser repetido, imitado ou servir de inspiração na vida real."}
+                </span>
+                {" Atividades criminosas reais causam danos a pessoas e comunidades e têm consequências legais graves."}
               </p>
               <p>
-                Ao continuar, <span className="font-semibold text-white">comprometes-te</span> a tratar tudo isto como puro
-                entretenimento e a nunca replicar na vida real o que vês ou fazes no jogo.
+                {"Ao continuar, "}
+                <span className="font-semibold text-white">comprometes-te</span>
+                {" a tratar tudo isto como puro entretenimento e a nunca replicar na vida real o que vês ou fazes no jogo."}
               </p>
             </div>
 
@@ -131,6 +167,19 @@ export function DisclaimerModal() {
               <p className="text-center font-mono text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-200">
                 Assumes este compromisso?
               </p>
+              {locked && (
+                <div className="mt-2.5" data-testid="disclaimer-read-progress">
+                  <div className="h-1 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-[width] duration-300 ease-linear"
+                      style={{ width: `${Math.round(((READ_SECONDS - remaining) / READ_SECONDS) * 100)}%` }}
+                    />
+                  </div>
+                  <p aria-live="polite" className="mt-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                    {`Tempo de leitura — podes aceitar em ${remaining}s`}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -147,10 +196,21 @@ export function DisclaimerModal() {
                 data-testid="disclaimer-accept"
                 variant="success"
                 onClick={accept}
+                disabled={locked}
+                aria-disabled={locked}
                 className="sm:min-w-[240px]"
               >
-                <Check className="mr-1.5 h-4 w-4" strokeWidth={2.6} />
-                Sim, compreendo — é só um jogo
+                {locked ? (
+                  <>
+                    <Hourglass className="mr-1.5 h-4 w-4 animate-pulse" />
+                    {`Lê o aviso com atenção · ${remaining}s`}
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-1.5 h-4 w-4" strokeWidth={2.6} />
+                    Sim, compreendo — é só um jogo
+                  </>
+                )}
               </Button>
             </div>
 
@@ -180,12 +240,12 @@ export function DisclaimerModal() {
 
             <div className="mt-5 space-y-3 text-sm leading-relaxed text-zinc-300">
               <p>
-                O acesso à rede Lusorae depende deste compromisso — é uma{" "}
-                <span className="font-semibold text-white">condição de utilização</span>. Sem ele, não podemos deixar-te continuar.
+                {"O acesso à rede Lusorae depende deste compromisso — é uma "}
+                <span className="font-semibold text-white">condição de utilização</span>
+                {". Sem ele, não podemos deixar-te continuar."}
               </p>
               <p>
-                Se mudaste de ideias, podes reler o aviso e aceitar. Caso contrário, a tua sessão será terminada em segurança e
-                podes voltar quando estiveres pronto.
+                {"Se mudaste de ideias, podes reler o aviso e aceitar. Caso contrário, a tua sessão será terminada em segurança e podes voltar quando estiveres pronto."}
               </p>
             </div>
 

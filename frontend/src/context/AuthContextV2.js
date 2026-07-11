@@ -220,7 +220,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("lusorae_access_token");
     localStorage.removeItem("lusorae_refresh_token");
     clearDisclaimerFlag();
-    setUser(null);
+    // `false` = "sem sessão" → o ProtectedRoute redireciona para /auth.
+    // (`null` significa "ainda a determinar" e deixava a app presa num
+    // spinner infinito após terminar sessão.)
+    setUser(false);
     setGameState(null);
     setCatalog(null);
     resetBoot();
