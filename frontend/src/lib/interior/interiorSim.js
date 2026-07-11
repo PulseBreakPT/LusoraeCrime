@@ -20,10 +20,13 @@
 // pré-calculados com timestamps absolutos).
 
 import { hashStr, mulberry32 } from "../simCore";
-import { findPath, nearestWalkable, pathMetrics, pointAlong } from "./pathfind";
+import { nearestWalkable } from "./pathfind";
 import { OBJECTIVES } from "./buildingGen";
-
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+import { buildNpcs } from "./npc";
+import {
+  clamp, WALK, RUN, holdSeg, actionSeg, moveSeg, rawMoveSeg, spotNear,
+  injectAlerts, evalAgent, activeAlert,
+} from "./segments";
 
 export const INTERIOR_PHASES = [
   { key: "aproximacao", label: "Aproximação ao alvo" },
@@ -45,7 +48,6 @@ export const ROLE_META = {
 
 const DRIVER_KEYS = new Set(["motorista", "piloto"]);
 const RANK_ORDER = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"];
-
 // Preferência de especialização real → papel interior, por tipo de objetivo.
 const SPECIALIST_PREF = {
   safe: ["assaltante", "falsificador", "seguranca"],
@@ -58,9 +60,6 @@ const SPECIALIST_PREF = {
 };
 const SCOUT_PREF = ["espiao", "informador", "seguranca", "assaltante"];
 const CARRIER_PREF = ["contrabandista", "gestor", "lavador", "mecanico"];
-
-const WALK = 2.3;  // células/s
-const RUN = 4.4;
 
 // ---------------------------------------------------------------------------
 // Papéis
@@ -103,36 +102,6 @@ function assignRoles(members, objKind, n, rng) {
     if (c >= 0) { roles[c] = "carrier"; taken[c] = true; carrierIdx.push(c); }
   }
   return { roles, leaderIdx, specIdx, scoutIdx, carrierIdx };
-}
-
-// ---------------------------------------------------------------------------
-// Segmentos
-// ---------------------------------------------------------------------------
-const holdSeg = (t0, t1, x, y, face, label, extra = {}) =>
-  ({ t0, t1, kind: "hold", x, y, face, label, ...extra });
-const actionSeg = (t0, t1, x, y, face, label, extra = {}) =>
-  ({ t0, t1, kind: "action", x, y, face, label, ...extra });
-
-function moveSeg(b, t0, budget, from, to, speed, label, extra = {}) {
-  let pts = findPath(b.grid, b.gw, b.gh, from.x, from.y, to.x, to.y);
-  if (!pts || pts.length < 1) pts = [{ x: from.x, y: from.y }, { x: to.x, y: to.y }];
-  const metrics = pathMetrics(pts);
-  const natural = metrics.length / speed;
-  const dur = Math.max(0.4, Math.min(natural, Math.max(0.4, budget)));
-  const end = { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y };
-  return { seg: { t0, t1: t0 + dur, kind: "move", pts, metrics, label, ...extra }, end, dur };
-}
-
-// Caminho manual (atravessar a porta em linha) — sem A*, células conhecidas.
-function rawMoveSeg(t0, dur, pts, label, extra = {}) {
-  const metrics = pathMetrics(pts);
-  return { t0, t1: t0 + dur, kind: "move", pts, metrics, label, ...extra };
-}
-
-// Célula livre perto de (x,y), com desempate determinístico por agente.
-function spotNear(b, x, y, i, rng) {
-  const cand = nearestWalkable(b.grid, b.gw, b.gh, x + ((i % 3) - 1), y + (((i / 3) | 0) % 3) - 1, 5);
-  return cand || nearestWalkable(b.grid, b.gw, b.gh, x, y, 6) || { x, y };
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +164,25 @@ export function buildInteriorSim(mission, building, roster) {
   const corridor = b.rooms.find((r) => r.key === "corredor");
   const faceDoor = Math.PI / 2; // virado para a fachada (sul)
 
+  // ----- Alertas: complicações REAIS do live_log (timestamps do servidor) -----
+  // As janelas de alerta fazem vigias/batedor/líder reagir no instante exato
+  // em que a complicação acontece na transmissão — mesma verdade do backend.
+  const alerts = (mission.live_log || [])
+    .filter((e) => (e.kind === "comp_bad" || e.kind === "comp_good") && e.phase === "operating")
+    .map((e) => ({ t0: Date.parse(e.at) / 1000, good: e.kind === "comp_good", text: e.text || "" }))
+    .filter((a) => Number.isFinite(a.t0) && a.t0 > T0 && a.t0 < tEnd)
+    .sort((a, c) => a.t0 - c.t0);
+
+  // ----- Ocupantes do edifício (NPCs) -----
+  const rngNpc = mulberry32(hashStr(String(mission.id || "m") + ":npc"));
+  const { npcs, assembly, fled } = buildNpcs(
+    b, { arrive, tEnt0, tProg0, tExec0, tRet0, tExit0, tEnd }, rngNpc
+  );
+
+  // ----- Registo de saque (contador em tempo real + pilha junto à saída) -----
+  const lootTimes = [];
+  const lootDrops = [];
+
   // ----- Comms -----
   const comms = [];
   const nameOf = (i) => ground[i]?.name || `Operacional ${i + 1}`;
@@ -256,10 +244,14 @@ export function buildInteriorSim(mission, building, roster) {
       segs.push(mv.seg); cur = mv.end; t = mv.seg.t1;
       if (t < tExec0) { segs.push(holdSeg(t, tExec0, cur.x, cur.y, Math.atan2(obj.anchor.y - cur.y, obj.anchor.x - cur.x), "A preparar")); t = tExec0; }
       // ação principal — janela completa de execução
-      segs.push(actionSeg(tExec0, tDone0, obj.x, obj.y, Math.atan2(obj.anchor.y - obj.y, obj.anchor.x - obj.x), obj.act, { objective: true }));
+      segs.push(actionSeg(tExec0, tDone0, obj.x, obj.y, Math.atan2(obj.anchor.y - obj.y, obj.anchor.x - obj.x), obj.act, { objective: true, tool: obj.kind }));
+      lootTimes.push(tDone0);
       segs.push(holdSeg(tDone0, tRet0, obj.x, obj.y, faceDoor, "Objetivo garantido", { carry: objDef.carry }));
       t = tRet0;
     } else if (role === "scout") {
+      // CQB: verifica os cantos imediatamente após entrar
+      segs.push(holdSeg(t, t + 0.7, cur.x, cur.y, -faceDoor, "A verificar os cantos", { look: [Math.PI * 0.85, 0.15, -Math.PI / 2] }));
+      t += 0.7;
       // varre: sala frontal → divisão do objetivo → posto avançado
       const sweep1 = { x: Math.round(frontRoom.cx), y: Math.round(frontRoom.cy) };
       const mv1 = moveSeg(b, t, (tExec0 - t) * 0.3, cur, sweep1, WALK * 1.15, "A varrer a área");
@@ -277,7 +269,9 @@ export function buildInteriorSim(mission, building, roster) {
         const mv = moveSeg(b, pt, Math.min(6, tRet0 - pt), at, dst, WALK * 0.9, "A vigiar os corredores");
         segs.push(mv.seg); at = mv.end; pt = mv.seg.t1;
         const holdT = Math.min(tRet0, pt + 3.5 + rng() * 3);
-        segs.push(holdSeg(pt, holdT, at.x, at.y, flip ? -faceDoor : faceDoor, "A vigiar os corredores"));
+        segs.push(holdSeg(pt, holdT, at.x, at.y, flip ? -faceDoor : faceDoor, "A vigiar os corredores", {
+          look: [Math.atan2(pA.y - at.y, pA.x - at.x), Math.atan2(pB.y - at.y, pB.x - at.x)],
+        }));
         pt = holdT; flip = !flip;
       }
       if (pt < tRet0) segs.push(holdSeg(pt, tRet0, at.x, at.y, faceDoor, "A vigiar os corredores"));
@@ -296,11 +290,17 @@ export function buildInteriorSim(mission, building, roster) {
         const actT = Math.min(tRet0, pt + 2.5 + rng() * 2.5);
         segs.push(actionSeg(pt, actT, at.x, at.y, spot.face ?? 0, obj.kind === "carry" ? "A carregar mercadoria" : "A recolher valores"));
         pt = actT; looted = true;
+        lootTimes.push(actT);
         if (shuttle) {
           const back = moveSeg(b, pt, Math.min(7, tRet0 - pt), at, inside, WALK * 0.92, "A transportar a carga", { carry: "box" });
           segs.push(back.seg); at = back.end; pt = back.seg.t1;
           const dropT = Math.min(tRet0, pt + 1.2);
           segs.push(actionSeg(pt, dropT, at.x, at.y, faceDoor, "A empilhar junto à saída"));
+          lootDrops.push({
+            t: dropT,
+            x: at.x + ((lootDrops.length % 3) - 1) * 0.55,
+            y: at.y - 0.7 - Math.floor(lootDrops.length / 3) * 0.6,
+          });
           pt = dropT;
         }
         s++;
@@ -308,28 +308,58 @@ export function buildInteriorSim(mission, building, roster) {
       if (pt < tRet0) segs.push(holdSeg(pt, tRet0, at.x, at.y, faceDoor, "Pronto para retirar", looted ? { carry: carryKind } : {}));
       cur = at; t = tRet0;
     } else {
-      // vigia: 1.º protege a entrada; seguintes protegem corredor/porta do objetivo
-      const guardSlot = enterOrder.filter((k) => roles[k] === "guard").indexOf(i);
-      let post, face;
-      if (guardSlot <= 0) {
+      // vigia: postos com propósito — entrada, reféns, corredor/porta do objetivo
+      const guardsAll = enterOrder.filter((k) => roles[k] === "guard");
+      const guardSlot = guardsAll.indexOf(i);
+      const hostages = npcs.length > 0 && assembly;
+      let post, face, label;
+      const lookPts = [];
+      if (guardSlot === 0 && hostages && guardsAll.length === 1) {
+        // vigia único com reféns: cobre a entrada sem perder o canto de vista
+        post = spotNear(b, Math.round((inside.x + assembly.x) / 2), Math.round((inside.y + assembly.y) / 2), i, rng);
+        face = faceDoor;
+        label = "A vigiar entrada e reféns";
+        lookPts.push(entry, assembly);
+      } else if (guardSlot === 0) {
         post = spotNear(b, inside.x + (rng() < 0.5 ? -1 : 1), inside.y, i, rng);
         face = faceDoor; // de frente para a entrada
+        label = "A proteger a entrada";
+        lookPts.push(entry);
+      } else if (guardSlot === 1 && hostages) {
+        post = spotNear(
+          b,
+          assembly.x + Math.sign(frontRoom.cx - assembly.x) * 2,
+          assembly.y + Math.sign(frontRoom.cy - assembly.y) * 2,
+          i, rng
+        );
+        face = Math.atan2(assembly.y - post.y, assembly.x - post.x);
+        label = "A vigiar os reféns";
+        lookPts.push(assembly, entry);
       } else if (corridor) {
         post = spotNear(b, Math.round(corridor.cx), Math.round(corridor.cy), i, rng);
         face = 0;
+        label = "A vigiar o corredor";
+        if (objDoor) lookPts.push(objDoor);
+        lookPts.push(entry);
       } else if (objDoor) {
         post = spotNear(b, objDoor.x, objDoor.y + 1, i, rng);
         face = -faceDoor;
+        label = "A cobrir a porta do objetivo";
+        lookPts.push(objDoor, entry);
       } else {
         post = spotNear(b, Math.round(frontRoom.cx), Math.round(frontRoom.cy), i, rng);
         face = faceDoor;
+        label = "A cobrir a sala";
+        lookPts.push(entry);
       }
       const mv = moveSeg(b, t, (tExec0 - t) * 0.6, cur, post, WALK, "A tomar posição");
       segs.push(mv.seg); cur = mv.end; t = mv.seg.t1;
-      // segura o posto (com uma mudança de orientação a meio)
+      // olhar dirigido: alterna entre os pontos de interesse do posto
+      const look = lookPts.map((p) => Math.atan2(p.y - cur.y, p.x - cur.x));
+      if (look.length === 1) look.push(look[0] + 0.85);
       const mid = t + (tRet0 - t) * (0.4 + rng() * 0.25);
-      segs.push(holdSeg(t, mid, cur.x, cur.y, face, guardSlot <= 0 ? "A proteger a entrada" : "A vigiar o corredor"));
-      segs.push(holdSeg(mid, tRet0, cur.x, cur.y, face + (rng() - 0.5) * 1.6, guardSlot <= 0 ? "A proteger a entrada" : "A vigiar o corredor"));
+      segs.push(holdSeg(t, mid, cur.x, cur.y, face, label, { look }));
+      segs.push(holdSeg(mid, tRet0, cur.x, cur.y, face + (rng() - 0.5) * 1.2, label, { look: [...look].reverse() }));
       t = tRet0;
     }
 
@@ -345,9 +375,14 @@ export function buildInteriorSim(mission, building, roster) {
     segs.push({ t0: tOut + 1.4, t1: tOut + 2.6, kind: "hold", x: stack.x, y: stack.y, face: -Math.PI / 2, label: "A regressar ao veículo", fade: true, ...(carryOut ? { carry: carryOut } : {}) });
     segs.push({ t0: tOut + 2.6, t1: Infinity, kind: "gone" });
 
+    // reações a complicações reais: vigias/batedor/líder viram-se para a
+    // entrada no instante exato em que a transmissão relata o problema
+    const reactive = role === "guard" || role === "scout" || (role === "leader" && i !== specIdx);
     agents.push({
       name: nameOf(i), role, roleLabel: ROLE_META[role].label, color: ROLE_META[role].color,
-      roleKey: ground[i]?.role_key || null, segs, _lastIdx: 0,
+      roleKey: ground[i]?.role_key || null,
+      segs: reactive ? injectAlerts(segs, alerts, inside) : segs,
+      _lastIdx: 0,
     });
   }
 
@@ -363,7 +398,21 @@ export function buildInteriorSim(mission, building, roster) {
   say(tDone0 + 0.5, specIdx, "Feito! Objetivo garantido.");
   say(tRet0 + 0.4, leaderIdx, "Retirar! Todos para a saída.");
   say(tEnd - 1, leaderIdx, "Todos cá fora. Para o veículo!");
+  // controlo de ocupantes
+  if (npcs.length) {
+    const herder = guards.length ? guards[0] : leaderIdx;
+    say(tEnt0 + 1.2, herder, "No chão! Mãos onde as veja!");
+    say(tProg0 + 1.5, herder, `${npcs.length} ${npcs.length === 1 ? "ocupante controlado" : "ocupantes controlados"}. Canto seguro.`);
+  }
+  if (fled) say(fled.at + 0.5, leaderIdx, "Um civil fugiu pelas traseiras. Foco na missão!");
+  // reação falada às complicações reais da transmissão
+  for (const al of alerts) {
+    const reactor = guards.length ? guards[al.good ? 0 : guards.length - 1] : leaderIdx;
+    say(al.t0 + 1.1, reactor, al.good ? "Está resolvido. Continuamos." : "Atentos! Temos movimento.");
+  }
   comms.sort((a, c) => a.at - c.at);
+
+  lootTimes.sort((a, c) => a - c);
 
   return {
     building: b, arrive, finish, T0, T1,
@@ -371,6 +420,8 @@ export function buildInteriorSim(mission, building, roster) {
     objective: { ...obj, t0: tExec0, t1: tDone0 },
     driverOut: driverIdx >= 0,
     entry, inside,
+    npcs, assembly, fled, alerts,
+    lootTimes, lootDrops,
   };
 }
 

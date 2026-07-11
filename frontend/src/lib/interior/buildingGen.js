@@ -138,6 +138,7 @@ const ARCHDEFS = {
       { key: "quarto", name: "Quarto", furnish: [["block", "bed", { w: 2, h: 3 }], ["wall", "cabinet", { side: "right", frac: 0.35 }]] },
       { key: "escritorio", name: "Escritório", furnish: [["block", "desk", { w: 2, h: 1 }], ["block", "safe", { w: 1, h: 1, anchor: "corner" }], ["wall", "cabinet", { side: "left", frac: 0.4 }]] },
       { key: "quarto2", name: "Quarto", optional: 0.5, furnish: [["block", "bed", { w: 2, h: 3 }]] },
+      { key: "wc", name: "WC", optional: 0.5, furnish: [["block", "wc", { w: 1, h: 1, anchor: "corner" }], ["wall", "sink", { side: "left", frac: 0.25 }]] },
     ],
   },
   loja: {
@@ -157,6 +158,7 @@ const ARCHDEFS = {
       { key: "servidores", name: "Sala de servidores", furnish: [["rows", "server", { gap: 2, margin: 2 }]] },
       { key: "direcao", name: "Direção", furnish: [["block", "desk", { w: 2, h: 1 }], ["block", "safe", { w: 1, h: 1, anchor: "corner" }], ["wall", "cabinet", { side: "left", frac: 0.4 }]] },
       { key: "arquivo", name: "Arquivo", optional: 0.5, furnish: [["wall", "cabinet", { side: "top", frac: 0.8 }], ["wall", "cabinet", { side: "right", frac: 0.6 }]] },
+      { key: "copa", name: "Copa", optional: 0.55, furnish: [["wall", "kitchen", { side: "top", frac: 0.5 }], ["block", "table", { w: 2, h: 2, anchor: "center" }]] },
     ],
   },
   casino: {
@@ -345,8 +347,7 @@ function ensureConnectivity(b) {
 // ---------------------------------------------------------------------------
 // Célula transitável adjacente a um retângulo de mobiliário
 // ---------------------------------------------------------------------------
-function adjacentWalkable(b, f, rng) {
-  const opts = [];
+function adjacentWalkable(b, f, rng) {  const opts = [];
   for (let x = f.x; x < f.x + f.w; x++) {
     if (b.grid[(f.y - 1) * b.gw + x] === FLOOR) opts.push({ x, y: f.y - 1, face: Math.PI / 2 });
     if (b.grid[(f.y + f.h) * b.gw + x] === FLOOR) opts.push({ x, y: f.y + f.h, face: -Math.PI / 2 });
@@ -357,6 +358,151 @@ function adjacentWalkable(b, f, rng) {
   }
   if (!opts.length) return null;
   return opts[Math.floor(rng() * opts.length)];
+}
+
+// ---------------------------------------------------------------------------
+// Detalhe estrutural — janelas, saída de emergência, portas reforçadas,
+// câmaras de vigilância e painel de alarme (metadados; grelha só muda na
+// porta de emergência). Chamado depois do objetivo estar definido.
+// ---------------------------------------------------------------------------
+const HIGH_SEC = new Set(["joalharia", "banco", "casino", "museu"]);
+const VAULT_KEYS = new Set(["cofre", "cofres", "caixa"]);
+
+// nearestWalkable local (evita ciclo de imports com pathfind.js)
+function walkNear(b, x, y, maxR = 5) {
+  x = Math.round(x); y = Math.round(y);
+  const ok = (cx, cy) => {
+    if (cx < 0 || cy < 0 || cx >= b.gw || cy >= b.gh) return false;
+    const c = b.grid[cy * b.gw + cx];
+    return c === FLOOR || c === DOOR;
+  };
+  if (ok(x, y)) return { x, y };
+  for (let r = 1; r <= maxR; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (ok(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+      }
+    }
+  }
+  return null;
+}
+
+function addStructuralDetail(b, rng, risk = 3) {
+  const { grid, gw } = b;
+  b.windows = [];
+  b.cameras = [];
+  b.alarm = null;
+  b.highSec = HIGH_SEC.has(b.archKey) || risk >= 4;
+
+  const doorNear = (x, y, r = 2) => b.doors.some((d) => d.y === y && Math.abs(d.x - x) <= r) ||
+    b.doors.some((d) => d.x === x && Math.abs(d.y - y) <= r);
+
+  // janelas na fachada (grupos regulares, longe de portas)
+  for (let x = b.bx0 + 2; x <= b.bx1 - 2; x += 3 + Math.floor(rng() * 2)) {
+    if (grid[b.by1 * gw + x] !== WALL || doorNear(x, b.by1)) continue;
+    b.windows.push({ x, y: b.by1, horiz: true });
+  }
+  // traseiras (mais raras)
+  for (let x = b.bx0 + 2; x <= b.bx1 - 2; x += 5 + Math.floor(rng() * 3)) {
+    if (grid[b.by0 * gw + x] !== WALL || doorNear(x, b.by0)) continue;
+    b.windows.push({ x, y: b.by0, horiz: true });
+  }
+  // laterais
+  for (let y = b.by0 + 2; y <= b.by1 - 2; y += 4 + Math.floor(rng() * 2)) {
+    if (grid[y * gw + b.bx0] === WALL && !doorNear(b.bx0, y)) b.windows.push({ x: b.bx0, y, horiz: false });
+    if (grid[y * gw + b.bx1] === WALL && !doorNear(b.bx1, y)) b.windows.push({ x: b.bx1, y, horiz: false });
+  }
+
+  // saída de emergência: divisão encostada às traseiras que não seja casa-forte
+  const backRooms = b.rooms.filter((r) => r.y0 === b.by0 + 1 && !VAULT_KEYS.has(r.key) && r.x1 - r.x0 >= 3);
+  if (backRooms.length) {
+    const r = backRooms[Math.floor(rng() * backRooms.length)];
+    const ex = Math.round(r.x0 + 1 + rng() * Math.max(1, r.x1 - r.x0 - 2));
+    if (grid[b.by0 * gw + ex] === WALL) {
+      grid[b.by0 * gw + ex] = DOOR;
+      b.doors.push({ x: ex, y: b.by0, roomA: r.id, roomB: -1, emergency: true });
+      b.windows = b.windows.filter((wd) => !(wd.y === b.by0 && Math.abs(wd.x - ex) < 2));
+    }
+  }
+
+  // porta reforçada da casa-forte
+  for (const d of b.doors) {
+    const ra = d.roomA >= 0 ? b.rooms[d.roomA] : null;
+    const rb = d.roomB >= 0 ? b.rooms[d.roomB] : null;
+    if ((ra && VAULT_KEYS.has(ra.key)) || (rb && VAULT_KEYS.has(rb.key))) d.reinforced = true;
+  }
+
+  // câmaras + painel de alarme (só alvos de alta segurança)
+  if (!b.highSec) return;
+  const front = b.rooms[b.roomMap[(b.entry.y - 1) * gw + b.entry.x]] || b.rooms[0];
+  const objRoom = b.objective ? b.rooms[b.objective.roomId] : null;
+  const camRooms = [front];
+  if (objRoom && objRoom.id !== front.id) camRooms.push(objRoom);
+  for (const r of camRooms) {
+    const corners = [
+      { x: r.x0 + 0.18, y: r.y0 + 0.18 }, { x: r.x1 + 0.82, y: r.y0 + 0.18 },
+      { x: r.x0 + 0.18, y: r.y1 + 0.82 }, { x: r.x1 + 0.82, y: r.y1 + 0.82 },
+    ];
+    const pick = corners[Math.floor(rng() * corners.length)];
+    b.cameras.push({
+      x: pick.x, y: pick.y,
+      dir: Math.atan2(r.cy + 0.5 - pick.y, r.cx + 0.5 - pick.x),
+      roomId: r.id,
+    });
+  }
+  // painel de alarme junto à entrada (na fachada, do lado interior)
+  const ax = b.entry.x + 2 <= b.bx1 - 1 ? b.entry.x + 2 : b.entry.x - 2;
+  b.alarm = { x: ax + 0.5, y: b.by1 - 0.12 };
+}
+
+// ---------------------------------------------------------------------------
+// Ocupantes — pontos de spawn de NPCs sobre a grelha final
+// ---------------------------------------------------------------------------
+const CIV_COUNT = { casino: 2, museu: 2, banco: 2, loja: 1, joalharia: 1, moradia: 1 };
+
+function computeNpcSpawns(b, rng) {
+  b.npcSpawns = [];
+  const front = b.rooms[b.roomMap[(b.entry.y - 1) * b.gw + b.entry.x]];
+  if (!front) return;
+  const taken = [];
+  const farFromTaken = (c) => taken.every((t) => Math.hypot(t.x - c.x, t.y - c.y) >= 2);
+  const push = (kind, c, face, patrol) => {
+    if (!c || !farFromTaken(c)) return false;
+    taken.push(c);
+    b.npcSpawns.push({ kind, x: c.x, y: c.y, face, roomId: front.id, ...(patrol ? { patrol } : {}) });
+    return true;
+  };
+
+  // funcionários atrás de balcões/secretárias da sala frontal
+  const staffAnchors = b.furniture.filter((f) => (f.kind === "counter" || f.kind === "desk") && f.roomId === front.id);
+  const nStaff = staffAnchors.length ? (rng() < 0.55 ? 2 : 1) : 1;
+  for (let i = 0; i < nStaff; i++) {
+    const f = staffAnchors.length ? staffAnchors[Math.floor(rng() * staffAnchors.length)] : null;
+    const cell = f ? adjacentWalkable(b, f, rng) : null;
+    const c = cell ? { x: cell.x, y: cell.y } : walkNear(b, front.cx + (rng() * 4 - 2), front.cy, 4);
+    push("funcionario", c, cell?.face ?? Math.PI / 2);
+  }
+
+  // civis espalhados pela sala frontal
+  const civN = CIV_COUNT[b.archKey] ?? (rng() < 0.4 ? 1 : 0);
+  for (let i = 0; i < civN; i++) {
+    for (let t = 0; t < 5; t++) {
+      const x = front.x0 + 1 + rng() * Math.max(1, front.x1 - front.x0 - 2);
+      const y = front.y0 + 1 + rng() * Math.max(1, front.y1 - front.y0 - 2);
+      if (push("civil", walkNear(b, x, y, 3), rng() * Math.PI * 2 - Math.PI)) break;
+    }
+  }
+
+  // segurança em ronda (alvos de alta segurança)
+  if (b.highSec) {
+    const corridor = b.rooms.find((r) => r.key === "corredor");
+    const objRoom = b.objective ? b.rooms[b.objective.roomId] : null;
+    const pA = walkNear(b, front.cx, front.cy, 5);
+    const alt = corridor || (objRoom && objRoom.id !== front.id ? objRoom : null);
+    const pB = alt ? walkNear(b, alt.cx, alt.cy, 5) : walkNear(b, front.x0 + 2, front.cy, 5);
+    if (pA && pB) push("guarda", pA, Math.PI / 2, [pA, pB]);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -586,6 +732,8 @@ export function generateBuilding(mission) {
     b.lootSpots.push({ x: cell.x, y: cell.y, face: cell.face, kind: f.kind, roomId: f.roomId });
   }
 
+  addStructuralDetail(b, rng, mission.opportunity?.risk ?? 3);
   ensureConnectivity(b);
+  computeNpcSpawns(b, rng);
   return b;
 }
