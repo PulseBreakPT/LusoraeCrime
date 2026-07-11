@@ -32,13 +32,8 @@ import {
 // Configuração (tudo ajustável num sítio só)
 // ---------------------------------------------------------------------------
 export const POLICE_CONFIG = {
-  basePatrols: 6,
-  maxPatrols: 10,
+  maxPatrols: 12,
   heatPerExtraPatrol: 30,       // +1 patrulha por cada 30 de calor
-  cruise: 9.0,                  // m/s em patrulhamento (~32 km/h)
-  cruiseVar: 3.5,               // variação por patrulha
-  responseCruise: 17.5,         // m/s a responder (~63 km/h)
-  pursuitCruise: 22,            // m/s em perseguição
   accel: 2.4,                   // m/s²
   brake: 3.4,                   // m/s²
   curbEaseDur: 2.2,             // s — manobra de encosto à berma
@@ -57,27 +52,166 @@ export const POLICE_CONFIG = {
   routeThrottleMs: 650,         // 1 pedido OSRM de patrulha por 650ms (global)
 };
 
-// Zonas de patrulhamento — os 16 bairros do jogo (espelho de LISBON_SPOTS).
-export const PATROL_ZONES = [
-  { name: "Baixa", lat: 38.7118, lng: -9.1366, radius: 620 },
-  { name: "Alfama", lat: 38.7126, lng: -9.129, radius: 560 },
-  { name: "Bairro Alto", lat: 38.7139, lng: -9.1445, radius: 560 },
-  { name: "Cais do Sodré", lat: 38.706, lng: -9.1445, radius: 560 },
-  { name: "Belém", lat: 38.697, lng: -9.2065, radius: 800 },
-  { name: "Alcântara", lat: 38.704, lng: -9.175, radius: 700 },
-  { name: "Parque das Nações", lat: 38.768, lng: -9.097, radius: 850 },
-  { name: "Marvila", lat: 38.744, lng: -9.103, radius: 800 },
-  { name: "Areeiro", lat: 38.742, lng: -9.133, radius: 700 },
-  { name: "Campo de Ourique", lat: 38.718, lng: -9.165, radius: 620 },
-  { name: "Benfica", lat: 38.75, lng: -9.203, radius: 850 },
-  { name: "Lumiar", lat: 38.773, lng: -9.16, radius: 850 },
-  { name: "Mouraria", lat: 38.716, lng: -9.133, radius: 520 },
-  { name: "Estrela", lat: 38.713, lng: -9.16, radius: 620 },
-  { name: "Graça", lat: 38.718, lng: -9.124, radius: 560 },
-  { name: "Amoreiras", lat: 38.723, lng: -9.16, radius: 620 },
+// ---------------------------------------------------------------------------
+// Forças de segurança — divisão real portuguesa (simplificada):
+//   PSP  → zonas urbanas / centros das cidades: mais patrulhas, zonas
+//          compactas, resposta mais rápida. Faixa AZUL.
+//   GNR  → zonas rurais, vilas e estradas nacionais: menos patrulhas, áreas
+//          muito maiores, resposta ligeiramente mais lenta mas cruzeiro de
+//          estrada mais alto. Faixa VERDE.
+// ---------------------------------------------------------------------------
+export const FORCES = {
+  PSP: {
+    key: "PSP",
+    label: "Polícia de Segurança Pública",
+    color: "#3B82F6",
+    zoneRadius: 620,        // m — perímetro urbano compacto
+    patrolsPerZone: 2,      // presença reforçada no centro das cidades
+    cruise: 9.0,            // m/s em patrulhamento (~32 km/h)
+    cruiseVar: 3.5,
+    responseCruise: 17.5,   // m/s a responder (~63 km/h) — resposta rápida
+    pursuitCruise: 22,
+    officersMin: 2,
+    officersExtraChance: 0.4,
+  },
+  GNR: {
+    key: "GNR",
+    label: "Guarda Nacional Republicana",
+    color: "#22C55E",
+    zoneRadius: 1250,       // m — posto territorial cobre uma área muito maior
+    patrolsPerZone: 1,      // menos patrulhas, mais terreno por viatura
+    cruise: 10.5,           // m/s — cruzeiro de estrada nacional (~38 km/h)
+    cruiseVar: 3.0,
+    responseCruise: 15.0,   // m/s (~54 km/h) — resposta ligeiramente mais lenta
+    pursuitCruise: 20,
+    officersMin: 2,
+    officersExtraChance: 0.2,
+  },
+};
+
+const forceCfg = (p) => FORCES[p?.force] || FORCES.PSP;
+
+// Centros urbanos onde a PSP tem competência (grandes cidades e capitais de
+// distrito). Um ativo a menos de `r` metros do centro → zona PSP; caso
+// contrário → GNR (vilas, aldeias, campo, estradas, periferias).
+const PSP_CITIES = [
+  { name: "Lisboa", lat: 38.7223, lng: -9.1393, r: 9500 },
+  { name: "Amadora", lat: 38.7597, lng: -9.2399, r: 3500 },
+  { name: "Cascais", lat: 38.6979, lng: -9.4215, r: 3500 },
+  { name: "Almada", lat: 38.68, lng: -9.1587, r: 3500 },
+  { name: "Porto", lat: 41.1496, lng: -8.6109, r: 7500 },
+  { name: "Vila Nova de Gaia", lat: 41.124, lng: -8.6118, r: 4500 },
+  { name: "Braga", lat: 41.5454, lng: -8.4265, r: 5000 },
+  { name: "Guimarães", lat: 41.4425, lng: -8.2918, r: 3500 },
+  { name: "Coimbra", lat: 40.2033, lng: -8.4103, r: 5000 },
+  { name: "Faro", lat: 37.0194, lng: -7.9304, r: 4000 },
+  { name: "Setúbal", lat: 38.5244, lng: -8.8882, r: 4500 },
+  { name: "Aveiro", lat: 40.6405, lng: -8.6538, r: 4000 },
+  { name: "Viseu", lat: 40.6566, lng: -7.9124, r: 3500 },
+  { name: "Leiria", lat: 39.7443, lng: -8.807, r: 3500 },
+  { name: "Évora", lat: 38.5714, lng: -7.9135, r: 3500 },
+  { name: "Santarém", lat: 39.2362, lng: -8.6868, r: 3000 },
+  { name: "Viana do Castelo", lat: 41.6946, lng: -8.8302, r: 3000 },
+  { name: "Vila Real", lat: 41.3006, lng: -7.7441, r: 3000 },
+  { name: "Bragança", lat: 41.8061, lng: -6.7567, r: 3000 },
+  { name: "Castelo Branco", lat: 39.8222, lng: -7.4931, r: 3000 },
+  { name: "Guarda", lat: 40.5373, lng: -7.2675, r: 3000 },
+  { name: "Portalegre", lat: 39.2967, lng: -7.4286, r: 2500 },
+  { name: "Beja", lat: 38.0151, lng: -7.8632, r: 3000 },
+  { name: "Funchal", lat: 32.6669, lng: -16.9241, r: 4500 },
+  { name: "Ponta Delgada", lat: 37.7412, lng: -25.6756, r: 3500 },
 ];
 
-const BOUNDS = { latMin: 38.688, latMax: 38.792, lngMin: -9.235, lngMax: -9.09 };
+function forceFor(pt) {
+  let best = null;
+  let bd = Infinity;
+  for (const c of PSP_CITIES) {
+    const d = distMeters(pt, c);
+    if (d <= c.r && d < bd) { bd = d; best = c; }
+  }
+  return best ? { force: "PSP", city: best.name } : { force: "GNR", city: null };
+}
+
+// ---------------------------------------------------------------------------
+// Zonas de patrulhamento — DINÂMICAS: uma zona junto de cada ativo do jogador
+// (Quartel-General + cada imóvel), onde quer que ele esteja no país. Ativos
+// próximos partilham a mesma zona (merge). A força (PSP/GNR) e o raio vêm da
+// localização real do ativo.
+// ---------------------------------------------------------------------------
+let ZONES = [];
+let zonesSig = null;
+let BOUNDS = { latMin: 38.688, latMax: 38.792, lngMin: -9.235, lngMax: -9.09 };
+
+function assetsSignature(assets) {
+  return (assets || [])
+    .filter((a) => a && a.lat != null && a.lng != null)
+    .map((a) => `${a.kind}:${a.lat.toFixed(4)},${a.lng.toFixed(4)}`)
+    .sort()
+    .join("|");
+}
+
+function buildZonesFromAssets(assets) {
+  const zones = [];
+  for (const a of assets || []) {
+    if (!a || a.lat == null || a.lng == null) continue;
+    const cls = forceFor(a);
+    const F = FORCES[cls.force];
+    // Ativos encavalitados partilham a mesma zona (evita círculos duplicados).
+    const near = zones.find((z) => distMeters(z, a) < Math.max(z.radius, F.zoneRadius) * 0.85);
+    if (near) { near.weight += 1; continue; }
+    zones.push({
+      name: a.name || (a.kind === "hq" ? "Quartel-General" : "Imóvel"),
+      kind: a.kind,
+      lat: a.lat,
+      lng: a.lng,
+      radius: F.zoneRadius,
+      force: cls.force,
+      city: cls.city,
+      weight: 1,
+    });
+  }
+  return zones;
+}
+
+function computeBounds(zones) {
+  if (!zones.length) return { latMin: 38.688, latMax: 38.792, lngMin: -9.235, lngMax: -9.09 };
+  let latMin = Infinity, latMax = -Infinity, lngMin = Infinity, lngMax = -Infinity;
+  for (const z of zones) {
+    const dLat = (z.radius * 2.4) / 111320;
+    const dLng = (z.radius * 2.4) / (111320 * Math.cos((z.lat * Math.PI) / 180));
+    latMin = Math.min(latMin, z.lat - dLat);
+    latMax = Math.max(latMax, z.lat + dLat);
+    lngMin = Math.min(lngMin, z.lng - dLng);
+    lngMax = Math.max(lngMax, z.lng + dLng);
+  }
+  return { latMin, latMax, lngMin, lngMax };
+}
+
+// Reconstrói as zonas quando os ativos mudam (compra de imóvel, outra conta).
+// Patrulhas existentes são remapeadas para a zona mais próxima; as que ficam
+// órfãs (outra cidade / força errada) saem do mapa.
+function syncZones(ctx) {
+  const sig = assetsSignature(ctx?.assets);
+  if (sig === zonesSig) return false;
+  zonesSig = sig;
+  ZONES = buildZonesFromAssets(ctx?.assets || []);
+  BOUNDS = computeBounds(ZONES);
+  for (const p of sim.patrols) {
+    if (!ZONES.length) { p._remove = true; continue; }
+    let bi = 0;
+    let bd = Infinity;
+    ZONES.forEach((z, i) => {
+      const d = distMeters(p.pos, z);
+      if (d < bd) { bd = d; bi = i; }
+    });
+    if (bd > 5000 || p.force !== ZONES[bi].force) { p._remove = true; continue; }
+    p.zoneIdx = bi;
+    p.zone = ZONES[bi];
+  }
+  sim.patrols = sim.patrols.filter((p) => !p._remove);
+  bump();
+  return true;
+}
 
 export const PATROL_STATE_LABELS = {
   patrol: "Em patrulhamento",
@@ -106,7 +240,7 @@ const sim = {
   lastSaveAt: 0,
 };
 
-const SS_KEY = "lus:police:v1";
+const SS_KEY = "lus:police:v2";
 
 const bump = () => { sim.version++; };
 
@@ -123,7 +257,7 @@ function saveSnapshot(nowMs) {
     }));
     const handled = [];
     for (const [mid, h] of sim.handled) if (h.done) handled.push(mid);
-    sessionStorage.setItem(SS_KEY, JSON.stringify({ t: nowMs, patrols, handled }));
+    sessionStorage.setItem(SS_KEY, JSON.stringify({ t: nowMs, sig: zonesSig, patrols, handled }));
   } catch (e) { /* storage cheio/indisponível — ignorar */ }
 }
 
@@ -140,38 +274,42 @@ function loadSnapshot() {
 // ---------------------------------------------------------------------------
 // Criação de patrulhas
 // ---------------------------------------------------------------------------
-function shuffledZoneOrder() {
-  // Ordem fixa mas "espalhada" pela cidade (seed constante) — as primeiras 6
-  // patrulhas cobrem bairros afastados entre si.
-  const rng = mulberry32(hashStr("lusorae:zones"));
-  const idx = PATROL_ZONES.map((_, i) => i);
-  for (let i = idx.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
-  }
-  return idx;
-}
-const ZONE_ORDER = shuffledZoneOrder();
-
+// Zona com maior défice de cobertura (PSP quer 2 viaturas/zona, GNR 1).
+// Todas cobertas → reforços extra (calor) vão primeiro para zonas PSP,
+// onde há "mais operações policiais".
 function freeZoneIdx() {
-  const used = new Set(sim.patrols.map((p) => p.zoneIdx));
-  for (const z of ZONE_ORDER) if (!used.has(z)) return z;
-  return ZONE_ORDER[sim.patrols.length % ZONE_ORDER.length];
+  if (!ZONES.length) return 0;
+  const counts = new Array(ZONES.length).fill(0);
+  for (const p of sim.patrols) {
+    if (p.state !== "offduty" && p.zoneIdx >= 0 && p.zoneIdx < ZONES.length) counts[p.zoneIdx]++;
+  }
+  let best = 0;
+  let bestDef = -Infinity;
+  ZONES.forEach((z, i) => {
+    const def = FORCES[z.force].patrolsPerZone - counts[i];
+    if (def > bestDef) { bestDef = def; best = i; }
+  });
+  if (bestDef > 0) return best;
+  const psp = ZONES.map((z, i) => ({ z, i })).filter((x) => x.z.force === "PSP");
+  const pool = psp.length ? psp : ZONES.map((z, i) => ({ z, i }));
+  return pool[sim.patrols.length % pool.length].i;
 }
 
 function makePatrol({ zoneIdx, at, bearing, seed, officers, id, edgeSpawn }) {
-  const pid = id || `PSP-${String(sim.nextId++).padStart(2, "0")}`;
+  const zone = ZONES[zoneIdx] || ZONES[0] || { name: "—", lat: 38.7223, lng: -9.1393, radius: 620, force: "PSP" };
+  const F = FORCES[zone.force] || FORCES.PSP;
+  const pid = id || `${zone.force}-${String(sim.nextId++).padStart(2, "0")}`;
   const s = seed ?? hashStr(pid + ":" + zoneIdx);
   const rng = mulberry32(s);
-  const zone = PATROL_ZONES[zoneIdx];
-  const cruise = POLICE_CONFIG.cruise + (rng() - 0.35) * POLICE_CONFIG.cruiseVar;
+  const cruise = F.cruise + (rng() - 0.35) * F.cruiseVar;
   const p = {
     id: pid, seed: s, rng, zoneIdx, zone,
-    officers: officers ?? (2 + (rng() < 0.4 ? 1 : 0)),
+    force: zone.force,
+    officers: officers ?? (F.officersMin + (rng() < F.officersExtraChance ? 1 : 0)),
     pos: at || { lat: zone.lat, lng: zone.lng },
     bearing: bearing ?? rng() * 360,
     speed: 0,
-    cruiseBase: clamp(cruise, 5.5, 13.5),
+    cruiseBase: clamp(cruise, 5.5, 14.5),
     state: edgeSpawn ? "returning" : "patrol",
     stateSince: 0,
     route: null,          // { latlngs, cum, total, dist, stopAt }
@@ -239,15 +377,17 @@ function pickPatrolWaypoint(p) {
   if (distHome > p.zone.radius * 1.6) {
     // Afastou-se demasiado — regressa à sua área.
     radius = p.zone.radius * 0.5;
-  } else if (rng() < 0.16) {
-    // Desvio ocasional: bairro vizinho (o mais próximo de 3 amostras).
+  } else if (rng() < 0.16 && ZONES.length > 1) {
+    // Desvio ocasional: zona vizinha (a mais próxima de 3 amostras) — a GNR
+    // cobre as ligações entre zonas (estradas), a PSP raramente sai do centro.
     let best = null; let bd = Infinity;
     for (let k = 0; k < 3; k++) {
-      const z = PATROL_ZONES[Math.floor(rng() * PATROL_ZONES.length)];
+      const z = ZONES[Math.floor(rng() * ZONES.length)];
       const d = distMeters(p.zone, z);
       if (d > 1 && d < bd) { bd = d; best = z; }
     }
-    if (best) { center = best; radius = best.radius * 0.6; }
+    // Zonas noutra cidade (>12 km) não são desvio plausível de patrulhamento.
+    if (best && bd < 12000) { center = best; radius = best.radius * 0.6; }
   }
   const ang = rng() * Math.PI * 2;
   const dist = radius * (0.3 + 0.7 * rng());
@@ -663,7 +803,7 @@ function pursuitStep(p, m, nowMs, dt) {
         setRoute(p, info, 1);
       }).catch(() => { p.routePending = false; });
     }
-    driveStep(p, dt, POLICE_CONFIG.pursuitCruise);
+    driveStep(p, dt, forceCfg(p).pursuitCruise);
     return;
   }
 
@@ -682,7 +822,7 @@ function pursuitStep(p, m, nowMs, dt) {
     if (bt >= 1) p.pursuit.blend = null;
   }
   p.pos = target;
-  p.speed = POLICE_CONFIG.pursuitCruise;
+  p.speed = forceCfg(p).pursuitCruise;
   const b = routeBearingDeg(pk.latlngs, pk.cum, chaseFrac, -1);
   if (b != null) p.bearing = ((b % 360) + 360) % 360;
 }
@@ -722,7 +862,7 @@ function patrolStep(p, nowMs, dt, ctx) {
 
     case "responding": {
       if (!p.route) { p.speed = Math.max(0, p.speed - POLICE_CONFIG.brake * dt); return; }
-      const arrived = driveStep(p, dt, POLICE_CONFIG.responseCruise);
+      const arrived = driveStep(p, dt, forceCfg(p).responseCruise);
       if (arrived && p.respParking) {
         // Manobra de encosto à berma (reutiliza a geometria de buildParking).
         p.state = "arriving";
@@ -798,22 +938,22 @@ function patrolStep(p, nowMs, dt, ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// Frota — nº desejado escala com o calor; entradas pela periferia
+// Frota — nº desejado deriva das zonas (PSP 2/zona, GNR 1/zona) e escala com
+// o calor; entradas pela periferia
 // ---------------------------------------------------------------------------
 export function desiredPatrolCount(heat) {
-  return clamp(
-    POLICE_CONFIG.basePatrols + Math.floor((heat || 0) / POLICE_CONFIG.heatPerExtraPatrol),
-    POLICE_CONFIG.basePatrols,
-    POLICE_CONFIG.maxPatrols,
-  );
+  if (!ZONES.length) return 0;
+  const base = ZONES.reduce((n, z) => n + FORCES[z.force].patrolsPerZone, 0);
+  const cap = Math.min(POLICE_CONFIG.maxPatrols, base + 4);
+  return clamp(base + Math.floor((heat || 0) / POLICE_CONFIG.heatPerExtraPatrol), Math.min(base, cap), cap);
 }
 
 function reconcileFleet(nowMs, ctx) {
   const want = desiredPatrolCount(ctx.heat || 0);
   const active = sim.patrols.filter((p) => p.state !== "offduty");
-  if (active.length < want) {
+  if (active.length < want && ZONES.length) {
     const zoneIdx = freeZoneIdx();
-    const zone = PATROL_ZONES[zoneIdx];
+    const zone = ZONES[zoneIdx];
     const p = makePatrol({ zoneIdx, at: edgePointNear(zone), edgeSpawn: true });
     p.stateSince = nowMs / 1000;
     sim.patrols.push(p);
@@ -841,12 +981,15 @@ function reconcileFleet(nowMs, ctx) {
 export function ensurePoliceSim(ctx) {
   if (sim.inited) return;
   sim.inited = true;
+  syncZones(ctx);
   const snap = loadSnapshot();
   const want = desiredPatrolCount(ctx?.heat || 0);
-  if (snap?.patrols?.length) {
+  // Snapshot só é válido se as zonas forem as MESMAS (mesma conta/ativos) —
+  // caso contrário as patrulhas renasceriam na cidade errada.
+  if (snap?.patrols?.length && snap.sig === zonesSig && ZONES.length) {
     for (const s of snap.patrols.slice(0, POLICE_CONFIG.maxPatrols)) {
       const p = makePatrol({
-        id: s.id, seed: s.seed, zoneIdx: clamp(s.zoneIdx, 0, PATROL_ZONES.length - 1),
+        id: s.id, seed: s.seed, zoneIdx: clamp(s.zoneIdx, 0, ZONES.length - 1),
         at: { lat: s.lat, lng: s.lng }, bearing: s.bearing, officers: s.officers,
       });
       p.spawnFade = 1; // já existiam — sem fade
@@ -856,10 +999,10 @@ export function ensurePoliceSim(ctx) {
     }
     for (const mid of snap.handled || []) sim.handled.set(mid, { plan: null, done: true });
   }
-  while (sim.patrols.length < want) {
+  while (sim.patrols.length < want && ZONES.length) {
     const zoneIdx = freeZoneIdx();
-    const zone = PATROL_ZONES[zoneIdx];
-    const rng = mulberry32(hashStr("spawn:" + zoneIdx));
+    const zone = ZONES[zoneIdx];
+    const rng = mulberry32(hashStr("spawn:" + zoneIdx + ":" + sim.patrols.length));
     // Arranque inicial: nascem espalhadas dentro da sua zona (mapa a carregar),
     // com fade-in suave.
     const at = ringPoint(zone, rng() * Math.PI * 2, zone.radius * (0.2 + 0.6 * rng()));
@@ -872,6 +1015,7 @@ export function ensurePoliceSim(ctx) {
 export function policeTick(nowMs, dt, ctx) {
   if (!sim.inited) ensurePoliceSim(ctx);
   const v0 = sim.version;
+  syncZones(ctx);
   reconcileFleet(nowMs, ctx);
   director(nowMs, ctx);
   for (const p of sim.patrols) patrolStep(p, nowMs, dt, ctx);
@@ -882,6 +1026,11 @@ export function policeTick(nowMs, dt, ctx) {
 
 export function getPatrols() {
   return sim.patrols;
+}
+
+// Zonas de patrulhamento atuais (para desenhar os perímetros no mapa).
+export function getPatrolZones() {
+  return ZONES;
 }
 
 export function getPoliceVersion() {
