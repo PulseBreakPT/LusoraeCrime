@@ -185,6 +185,9 @@ frontend:
       - working: true
         agent: "main"
         comment: "11/07/2026 — Polimento pedido pelo utilizador: (a) barra de progresso agora é fluida — largura interpolada por transição CSS linear até ao prazo (60fps, sem re-renders; parte da fração já decorrida ao voltar do ecrã de recusa), em vez de saltar a cada segundo; (b) texto auxiliar estático 'Tempo de leitura em curso — lê com calma' (countdown só no botão); (c) botão Terminar sessão das Definições agora variant=destructive (vermelho). Verificado por E2E: larguras 34.8→42.8→51.9px em passos de ~350ms (crescimento sub-segundo), texto sem dígitos, retoma correta pós-recusa, screenshot das Definições com botão vermelho."
+      - working: true
+        agent: "main"
+        comment: "12/07/2026 — FIX de compilação + conclusão de refactor deixado a meio na sessão anterior: DisclaimerModal importava DISCLAIMER_SESSION_KEY que já não existia em AuthContextV2 (erro webpack) e AuthContextV2 chamava clearDisclaimerFlag() (função apagada) em login/register/logout/expiração (crash runtime latente). Refactor concluído: disclaimer agora é UMA ÚNICA VEZ POR CONTA — visibilidade derivada de user.disclaimer_accepted (servidor, via user_public de auth.py); sessionStorage totalmente removido; aceitar → POST /legal/disclaimer-ack + markDisclaimerAccepted() (novo callback no AuthContextV2) após animação de saída. Verificado E2E por screenshots: (A) modal aparece no 1.º login com countdown 20s; (B) aceitar fecha o modal; (C) refresh não repete; (D) re-login com tokens limpos NÃO repete (flag no servidor: last_disclaimer {accepted:true, version 1.0, ip} + disclaimer_log confirmados no Mongo). Ficheiros: DisclaimerModal.jsx, AuthContextV2.js, GamePage.jsx e HQOnboarding.jsx (comentários)."
   - task: "Central da rede — fusão do 'Em direto' (LiveOpsDock) e 'Últimos registos' (ActivityFeed) num só painel com separadores EM DIRETO/REGISTOS (desktop canto inferior esquerdo, mobile barra única); auto-switch para EM DIRETO ao despachar equipa; LiveOpsDock.jsx refeito como LiveOpsPanel embutível (sem Shell/posicionamento próprio) com estado vazio tático"
     implemented: true
     working: true
@@ -1072,6 +1075,22 @@ frontend:
         comment: "10/07/2026 — Verificado por screenshots: 360px mostra '75k €'/'5k €' sem reticências; desktop mantém '75 000 €'; painel Operacionais com KPIs 2×2 em mobile."
 
 agent_communication:
+  - agent: "main"
+    message: >
+      12/07/2026 — FIX de compilação (continuação): a sessão anterior deixou o refactor do
+      disclaimer a meio — DisclaimerModal.jsx importava DISCLAIMER_SESSION_KEY já removido
+      do AuthContextV2 (erro de compilação webpack) e AuthContextV2 chamava clearDisclaimerFlag()
+      inexistente em 4 sítios (crash runtime latente). Refactor concluído: disclaimer de ficção
+      agora aparece UMA única vez por conta (fonte de verdade user.disclaimer_accepted do
+      servidor; sessionStorage eliminado; novo markDisclaimerAccepted no AuthContextV2).
+      INFRA: .env backend+frontend recriados de novo (reset pós-fork; preview
+      d7399260-2a1a-48e8-8920-ae982efab0af); JWT_SECRET novo → sessões antigas inválidas;
+      admin seed OK (admin@lusorae.com / admin123; test_credentials.md atualizado; a BD
+      recomeçou vazia → o admin volta a ver o disclaimer 1 vez). Verificado E2E por
+      screenshots: modal no 1.º login → aceitar → não repete em refresh NEM em re-login;
+      last_disclaimer/disclaimer_log confirmados no Mongo. NOTA PARA TESTES E2E: contas
+      NOVAS têm de clicar data-testid="disclaimer-accept" (desbloqueia após ~20s) uma única
+      vez; depois disso o modal nunca mais aparece nessa conta.
   - agent: "main"
     message: >
       10/07/2026 — Melhorias de responsividade mobile (só frontend, backend intocado).

@@ -342,9 +342,10 @@ export default function GamePage() {
         />
       )}
 
-      {/* Disclaimer de ficção — mostrado uma vez por sessão de login, por cima
-          de toda a UI (z-[130]); "Sim" regista o compromisso e liberta o jogo,
-          "Não" leva a um ecrã de recusa com logout seguro. */}
+      {/* Disclaimer de ficção — mostrado uma única vez por conta (primeira
+          entrada; fonte de verdade: user.disclaimer_accepted no servidor),
+          por cima de toda a UI (z-[130]); "Sim" regista o compromisso e
+          liberta o jogo, "Não" leva a um ecrã de recusa com logout seguro. */}
       <DisclaimerModal />
     </div>
   );

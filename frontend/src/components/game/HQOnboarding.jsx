@@ -214,9 +214,9 @@ export default function HQOnboarding() {
       </div>
 
       {/* Disclaimer de ficção — para contas novas aparece AQUI, antes de o
-          jogador estabelecer o QG (primeiro ecrã real do jogo). Como é
-          mostrado uma vez por sessão de login (sessionStorage por user id),
-          aceitar aqui impede que repita ao entrar no mapa a seguir. */}
+          jogador estabelecer o QG (primeiro ecrã real do jogo). Aceite UMA
+          única vez por conta (user.disclaimer_accepted, registado no servidor
+          via POST /legal/disclaimer-ack) — depois nunca mais reaparece. */}
       <DisclaimerModal />
     </div>
   );

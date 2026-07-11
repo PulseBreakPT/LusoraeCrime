@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useAuth, DISCLAIMER_SESSION_KEY } from "../../context/AuthContextV2";
+import { useAuth } from "../../context/AuthContextV2";
 import { api } from "../../lib/api";
 import { Button } from "../ui/button";
 import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2, Hourglass } from "lucide-react";
@@ -22,36 +22,33 @@ const WORDS_PER_MINUTE = 200;
 export const READ_SECONDS = Math.min(20, Math.max(8, Math.ceil((WORD_COUNT / WORDS_PER_MINUTE) * 60)));
 
 /**
- * Disclaimer de ficção — mostrado UMA vez por sessão de login, no momento em
- * que o mapa aparece. Prática padrão da indústria (à imagem dos avisos de
- * ficção de jogos AAA): lembra o jogador de que tudo no Lusorae é fictício e
- * pede um compromisso explícito de nunca replicar nada na vida real.
+ * Disclaimer de ficção — mostrado UMA única vez por conta, na primeira
+ * entrada no jogo (registo/primeiro login). Prática padrão da indústria (à
+ * imagem dos avisos de ficção de jogos AAA): lembra o jogador de que tudo no
+ * Lusorae é fictício e pede um compromisso explícito de nunca replicar nada
+ * na vida real.
  *
  * Fluxo:
- *  - "Sim" → compromisso registado no servidor (data/hora/versão/IP) e o jogo
- *    continua; flag em sessionStorage impede repetição até ao próximo login.
+ *  - "Sim" → compromisso registado no servidor com data/hora/versão/IP
+ *    (POST /legal/disclaimer-ack) e o jogo continua; a fonte de verdade é
+ *    user.disclaimer_accepted (derivado desse registo de auditoria), pelo que
+ *    depois de aceite nunca mais reaparece — nem noutro login, nem noutro
+ *    dispositivo.
  *  - "Não" → segundo ecrã explica que o compromisso é condição de utilização;
  *    o jogador pode reler o aviso ou terminar a sessão em segurança (a recusa
  *    também fica registada para auditoria).
- *
- * A flag de sessionStorage é limpa em login/register/logout/sessão expirada
- * (AuthContextV2), garantindo que o aviso reaparece a CADA login — mas não em
- * cada refresh da página a meio da mesma sessão.
  */
 export function DisclaimerModal() {
-  const { user, logout } = useAuth();
-  const userId = user?.id ? String(user.id) : "";
-  const [visible, setVisible] = useState(() => {
-    try {
-      return sessionStorage.getItem(DISCLAIMER_SESSION_KEY) !== userId;
-    } catch (_err) {
-      return true;
-    }
-  });
+  const { user, logout, markDisclaimerAccepted } = useAuth();
   const [stage, setStage] = useState("notice"); // "notice" | "declined"
   const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const acceptRef = useRef(null);
+
+  // Visibilidade derivada do servidor: só aparece enquanto a conta ainda não
+  // assumiu o compromisso. `markDisclaimerAccepted` (chamado após a animação
+  // de saída) vira user.disclaimer_accepted a true e desmonta o modal.
+  const visible = !!user && !user.disclaimer_accepted;
 
   // Contagem decrescente de leitura — o prazo é fixado quando o modal monta e
   // continua a correr mesmo que o jogador passe pelo ecrã de recusa e volte
@@ -100,15 +97,16 @@ export function DisclaimerModal() {
 
   const accept = () => {
     if (leaving || locked) return;
-    try {
-      sessionStorage.setItem(DISCLAIMER_SESSION_KEY, userId);
-    } catch (_err) {
-      // sessionStorage indisponível → o aviso repete-se, nunca bloqueia o jogo
-    }
-    // Registo de auditoria no servidor — fire-and-forget, nunca bloqueia a UI.
+    // Registo de auditoria no servidor — fonte de verdade permanente (por
+    // conta). Fire-and-forget: nunca bloqueia a UI; se falhar, o campo
+    // user.disclaimer_accepted continua false e o aviso repete no próximo
+    // login, nunca deixando o compromisso por registar.
     api.post("/legal/disclaimer-ack", { accepted: true }, { timeout: 6000 }).catch(() => {});
     setLeaving(true);
-    setTimeout(() => setVisible(false), 340);
+    // Só depois da animação de saída é que o estado do utilizador é
+    // atualizado (disclaimer_accepted: true) — nesse momento `visible` passa
+    // a false e o modal desmonta-se.
+    setTimeout(() => markDisclaimerAccepted(), 340);
   };
 
   const declineFinal = async () => {

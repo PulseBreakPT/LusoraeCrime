@@ -154,9 +154,6 @@ export function AuthProvider({ children }) {
           localStorage.setItem("lusorae_access_token", res.data.access_token);
           localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
         }
-        // Novo login → o disclaimer de ficção volta a ser mostrado no mapa.
-        clearDisclaimerFlag();
-
         // Start boot sequence
         await startBoot(performBoot);
         return { ok: true };
@@ -180,8 +177,8 @@ export function AuthProvider({ children }) {
           localStorage.setItem("lusorae_access_token", res.data.access_token);
           localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
         }
-        // Conta nova → primeira entrada no mapa também mostra o disclaimer.
-        clearDisclaimerFlag();
+        // Conta nova → user.disclaimer_accepted vem false do servidor e o
+        // disclaimer de ficção aparece na primeira entrada no jogo.
 
         // Start boot sequence
         await startBoot(performBoot);
@@ -213,7 +210,6 @@ export function AuthProvider({ children }) {
     }
     localStorage.removeItem("lusorae_access_token");
     localStorage.removeItem("lusorae_refresh_token");
-    clearDisclaimerFlag();
     // `false` = "sem sessão" → o ProtectedRoute redireciona para /auth.
     // (`null` significa "ainda a determinar" e deixava a app presa num
     // spinner infinito após terminar sessão.)
@@ -256,7 +252,6 @@ export function AuthProvider({ children }) {
   // limpa o estado e devolve o utilizador ao ecrã de login com aviso.
   useEffect(() => {
     const onExpired = () => {
-      clearDisclaimerFlag();
       setUser(false);
       setGameState(null);
       setCatalog(null);
@@ -299,6 +294,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Disclaimer de ficção aceite — atualiza o estado local imediatamente para
+  // o modal não voltar a montar nesta sessão; a persistência real já foi
+  // gravada no servidor pelo próprio modal (POST /legal/disclaimer-ack), pelo
+  // que em qualquer login/dispositivo futuro /auth/me devolve o campo a true.
+  const markDisclaimerAccepted = useCallback(() => {
+    setUser((u) => (u ? { ...u, disclaimer_accepted: true } : u));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -312,6 +315,7 @@ export function AuthProvider({ children }) {
         changePassword,
         deleteAccount,
         claimAdmin,
+        markDisclaimerAccepted,
       }}
     >
       {children}
