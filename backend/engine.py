@@ -391,44 +391,16 @@ async def push_history(db, emp_id, text):
     }})
 
 
-# River Tejo shoreline approximation (west→east). A sampled point is on land when its
-# latitude is north of the interpolated shore at that longitude. Coarse but effective.
-_TEJO_SHORE = [
-    (-9.240, 38.690),  # west of Belém
-    (-9.200, 38.694),  # Belém
-    (-9.180, 38.700),  # Alcântara docks
-    (-9.150, 38.703),  # Cais do Sodré waterfront
-    (-9.130, 38.706),  # Terreiro do Paço
-    (-9.110, 38.711),  # Alfama waterfront
-    (-9.100, 38.720),  # Santa Apolónia bend
-    (-9.093, 38.750),  # Marvila / P. das Nações south
-    (-9.093, 38.780),  # P. das Nações north (river ends)
-]
-
-_LISBON_BOUNDS = {"lat_min": 38.685, "lat_max": 38.800, "lng_min": -9.240, "lng_max": -9.085}
+# Validação geográfica real: polígono oficial de Portugal (continente +
+# Madeira + Açores) + exclusão dos grandes corpos de água interiores com
+# geometria OSM (estuários do Tejo/Sado/Douro, rias de Aveiro/Formosa,
+# Alqueva, lagoas). Substitui a antiga aproximação da margem do Tejo.
+from geo import is_on_land_pt
 
 
 def is_on_land(lat, lng):
-    """Reject points that fall on the Tejo or outside Lisbon's coarse bounds."""
-    b = _LISBON_BOUNDS
-    if not (b["lat_min"] <= lat <= b["lat_max"] and b["lng_min"] <= lng <= b["lng_max"]):
-        return False
-    # Interpolate the shore latitude at this longitude.
-    pts = _TEJO_SHORE
-    if lng <= pts[0][0]:
-        shore = pts[0][1]
-    elif lng >= pts[-1][0]:
-        shore = pts[-1][1]
-    else:
-        for i in range(1, len(pts)):
-            if lng <= pts[i][0]:
-                x0, y0 = pts[i - 1]
-                x1, y1 = pts[i]
-                t = (lng - x0) / max(1e-9, (x1 - x0))
-                shore = y0 + t * (y1 - y0)
-                break
-    # Give the shore a ~110m buffer so pins don't visually sit at the water's edge.
-    return lat >= shore + 0.0010
+    """Terra firme portuguesa — fora do mar, dos estuários e do estrangeiro."""
+    return is_on_land_pt(lat, lng)
 
 
 def _sample_on_land(spot):
@@ -442,10 +414,14 @@ def _sample_on_land(spot):
     return spot["lat"], spot["lng"]
 
 
-def nearest_district(lat, lng):
-    """Rótulo de distrito mais próximo (só para exibição) para um ponto
-    escolhido manualmente pelo jogador — não é uma chave estrangeira."""
-    return min(LISBON_SPOTS, key=lambda s: haversine_m(lat, lng, s["lat"], s["lng"]))["name"]
+def nearest_district(lat, lng, spots=None):
+    """Rótulo de zona mais próxima (só para exibição/fallback) para um ponto
+    escolhido manualmente pelo jogador — não é uma chave estrangeira. Usa as
+    zonas geradas à volta do QG do jogador; cai nas de Lisboa se em falta."""
+    pool = [s for s in (spots or LISBON_SPOTS) if s.get("name")]
+    if not pool:
+        pool = LISBON_SPOTS
+    return min(pool, key=lambda s: haversine_m(lat, lng, s["lat"], s["lng"]))["name"]
 
 
 def _sample_around_property(center_lat, center_lng, radius_km):
@@ -604,10 +580,13 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             w *= 1 - min(SPAWN_ANTIFARM_PENALTY_MAX, SPAWN_ANTIFARM_PENALTY_PER * recent_counts[k])
         weights.append(max(0.05, w))
     hq = player["hq"]
-    # Centros candidatos: os 16 spots fixos de Lisboa (peso base) mais um
-    # centro sintético por propriedade possuída (peso maior, atenuado por
-    # densidade local). Zonas com atenção policial acumulada recebem menos
-    # oportunidades — o crime desloca-se para onde a polícia não está.
+    # Centros candidatos: as zonas de operação geradas à volta do QG do
+    # jogador (apenas as já batizadas com nomes reais — nunca mostramos nomes
+    # inventados) mais um centro sintético por propriedade possuída (peso
+    # maior, atenuado por densidade local). Zonas com atenção policial
+    # acumulada recebem menos oportunidades — o crime desloca-se para onde a
+    # polícia não está. Jogadores antigos (pré-migração) caem nas zonas de Lisboa.
+    district_spots = [d for d in (player.get("districts") or LISBON_SPOTS) if d.get("named", True) and d.get("name")]
     att_map = player.get("district_attention") or {}
 
     def _att_weight(name):
@@ -615,10 +594,14 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         return max(DISTRICT_ATTENTION_SPAWN_MIN_W,
                    1 - (att / DISTRICT_ATTENTION_MAX) * (1 - DISTRICT_ATTENTION_SPAWN_MIN_W))
 
-    centers = [(spot, LISBON_SPOT_WEIGHT * _att_weight(spot["name"]), None) for spot in LISBON_SPOTS]
+    centers = [(spot, LISBON_SPOT_WEIGHT * _att_weight(spot["name"]), None) for spot in district_spots]
     for p in props:
         centers.append(({"name": p["name"], "lat": p["lat"], "lng": p["lng"]},
                          _property_spawn_weight(p, props) * _att_weight(p["name"]), str(p["_id"])))
+    if not centers:
+        # QG acabado de colocar e nenhuma zona batizada ainda — o batismo em
+        # background termina em segundos; sem centros não há onde gerar missões.
+        return
     center_weights = [w for _, w, _ in centers]
     # Pity de raras (SSS v3): cada spawn sem uma oportunidade rara acumula um
     # pequeno bónus de probabilidade — a sorte nunca seca indefinidamente.

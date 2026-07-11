@@ -41,7 +41,9 @@ class Player(BaseDocument):
     quest_perf: dict = {}
     temp_bonus: Optional[dict] = None
     stats: dict = {}
-    hq: dict
+    hq: Optional[dict] = None
+    region: str = ""
+    districts: List[dict] = []
     last_tick: str
     created_at: str
     type_cooldowns: dict = {}

@@ -2,13 +2,16 @@ import asyncio
 import math
 import random
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import timedelta
 
 from db import db
 from auth import get_current_user
+from geo import is_valid_hq_location
+from geocode import reverse_geocode, street_label, locality_label
+from world_gen import generate_district_points, name_districts_task, ensure_naming_scheduled
 from engine import (advance, haversine_m, add_event, now_utc, next_threshold, parse_dt,
                     get_caps, get_org_bonuses, vehicle_doc, effective_speed, chance_breakdown,
                     team_effectiveness, district_attention_of, vehicle_mission_score,
@@ -102,10 +105,16 @@ REST_DURATION_S = 90
 WEAPON_SELL_FRACTION = 0.4
 
 
-async def get_player(user: dict) -> dict:
+async def get_player(user: dict, allow_pending: bool = False) -> dict:
     player = await db.players.find_one({"user_id": user["_id"]})
     if not player:
         raise HTTPException(status_code=404, detail="Organização não encontrada")
+    if not player.get("hq"):
+        # Conta nova: o jogo só arranca depois de o jogador escolher onde
+        # montar o Quartel-General (POST /game/hq/place).
+        if allow_pending:
+            return player
+        raise HTTPException(status_code=409, detail="Estabelece primeiro o teu Quartel-General")
     player["hq"].setdefault("level", 1)
     player["hq"].setdefault("upgrading_until", None)
     player["hq"].setdefault("upgrade_history", [])
@@ -398,7 +407,25 @@ async def catalog():
 
 @router.get("/state")
 async def get_state(user: dict = Depends(get_current_user), skip_advance: bool = False):
-    player = await get_player(user)
+    player = await get_player(user, allow_pending=True)
+    if not player.get("hq"):
+        # Onboarding: o jogador ainda não escolheu onde montar o QG — o
+        # frontend mostra o mapa de Portugal para a escolha do local.
+        return {
+            "hq_pending": True,
+            "server_time": now_utc().isoformat(),
+            "player": {
+                "id": str(player["_id"]),
+                "org_name": player.get("org_name", ""),
+                "clean_money": player.get("clean_money", 0),
+                "dirty_money": player.get("dirty_money", 0),
+                "level": player.get("level", 1),
+            },
+        }
+    # Retoma o batismo de zonas se alguma ficou sem nome (ex.: Nominatim
+    # indisponível na altura da colocação do QG) — operação barata (no-op
+    # quando está tudo batizado ou já há uma tarefa em curso).
+    ensure_naming_scheduled(db, player)
     if not skip_advance:
         player = await advance(db, player)
     pid = str(player["_id"])

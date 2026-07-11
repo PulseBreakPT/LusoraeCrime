@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
 from db import db
-from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
+from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY, LISBON_SPOTS
 from engine import now_utc, add_event, vehicle_doc, starting_employee
 from legal_data import current_version
 
@@ -190,19 +190,29 @@ def user_public(user: dict) -> dict:
             "role": user.get("role", "player")}
 
 
-async def create_player_for_user(user_id: str, org_name: str):
+async def create_player_for_user(user_id: str, org_name: str, with_default_hq: bool = False):
     # SAFEGUARD: never overwrite existing player data on restart/redeploy
     existing = await db.players.find_one({"user_id": user_id})
     if existing:
         return str(existing["_id"])
 
     now = now_utc().isoformat()
+    # Novos jogadores escolhem onde montar o 1º Quartel-General (em Portugal,
+    # nunca no mar) — o jogo só arranca depois do POST /game/hq/place.
+    # `with_default_hq` mantém o comportamento antigo para a conta admin seeded.
+    if with_default_hq:
+        hq = {**HQ_LOCATION, "level": 1, "upgrading_until": None, "upgrade_history": []}
+        districts = [{"key": f"d{i + 1}", "name": s["name"], "lat": s["lat"], "lng": s["lng"], "named": True}
+                     for i, s in enumerate(LISBON_SPOTS)]
+        region = "Lisboa"
+    else:
+        hq, districts, region = None, [], ""
     result = await db.players.insert_one({
         "user_id": user_id, "org_name": org_name,
         "clean_money": 75000, "dirty_money": 5000,
         "respect": 0, "level": 1, "heat": 0.0,
         "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0, "v2": True,
-        "hq": {**HQ_LOCATION, "level": 1, "upgrading_until": None, "upgrade_history": []},
+        "hq": hq, "districts": districts, "region": region,
         "priorities": {"active": HQ_DEFAULT_PRIORITY},
         "last_tick": now, "created_at": now,
     })
@@ -217,7 +227,7 @@ async def create_player_for_user(user_id: str, org_name: str):
     await db.teams.update_one({"_id": team_res.inserted_id}, {"$set": {"vehicle_id": str(veh_res.inserted_id)}})
     for role in ("assaltante", "motorista"):
         await db.employees.insert_one(starting_employee(pid, role, now, team_id=tid))
-    await add_event(db, pid, "system", f"{org_name} estabeleceu operações em Lisboa com 75.000 € limpos e 5.000 € sujos de capital inicial.")
+    await add_event(db, pid, "system", f"{org_name} foi fundada com 75.000 € limpos e 5.000 € sujos de capital inicial.")
     await add_event(db, pid, "team", "Crew Alfa está pronta: um assaltante, um motorista e um Sedan Usado na garagem.")
     return pid
 
@@ -414,6 +424,6 @@ async def seed_admin():
             "name": "Sindicato Lusorae", "role": "admin",
             "created_at": now_utc().isoformat(),
         })
-        await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae")
+        await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae", with_default_hq=True)
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
