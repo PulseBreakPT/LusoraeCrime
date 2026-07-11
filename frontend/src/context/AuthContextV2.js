@@ -5,17 +5,11 @@ import { useBoot } from "./BootContext";
 
 const AuthContext = createContext(null);
 
-// Disclaimer de ficção ("é apenas um jogo") — a flag vive em sessionStorage e
-// é limpa em cada login/registo/logout/expiração de sessão, para que o aviso
-// reapareça a CADA login (mas não em cada refresh a meio da mesma sessão).
-export const DISCLAIMER_SESSION_KEY = "lusorae_disclaimer_ack";
-const clearDisclaimerFlag = () => {
-  try {
-    sessionStorage.removeItem(DISCLAIMER_SESSION_KEY);
-  } catch (_err) {
-    // sessionStorage indisponível — sem consequências, o modal mostra-se sempre
-  }
-};
+// Disclaimer de ficção ("é apenas um jogo") — mostrado UMA única vez por
+// conta, no primeiro registo/entrada. A fonte de verdade é o servidor
+// (user.disclaimer_accepted, derivado do trilho de auditoria gravado por
+// POST /legal/disclaimer-ack); depois de aceite, nunca mais reaparece —
+// nem noutro login, nem noutro dispositivo.
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

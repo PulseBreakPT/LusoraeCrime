@@ -17,6 +17,7 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
+import HQOnboarding from "../components/game/HQOnboarding";
 import { DisclaimerModal } from "../components/game/DisclaimerModal";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
@@ -142,6 +143,13 @@ export default function GamePage() {
         </div>
       </div>
     );
+  }
+
+  // Onboarding: conta nova ainda sem QG — o jogo só arranca depois de o
+  // jogador escolher o local no mapa (POST /game/hq/place). Sem este guard,
+  // o LiveMap rebentava com player.hq undefined ("reading 'lat'").
+  if (state.hq_pending || !state.player?.hq) {
+    return <HQOnboarding />;
   }
 
   const alerts = orgAlerts(state);

@@ -771,7 +771,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
 
 export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, baseFilter = "all" }) {
   const { catalog, placement, updatePlacementPoint } = useGame();
-  const hq = state.player.hq;
+  const hq = state?.player?.hq;
   const hqMarkerIcon = useMemo(() => hqIcon(), []);
   const hqRadarMarkerIcon = useMemo(() => hqRadarIcon(), []);
   const level = state.player.level;
@@ -804,6 +804,11 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
     window.addEventListener("lus:follow-mission", onFollow);
     return () => window.removeEventListener("lus:follow-mission", onFollow);
   }, []);
+
+  // Guard defensivo (depois de todos os hooks): sem QG não há mapa do jogo —
+  // acontece no onboarding (hq_pending) ou em qualquer estado inesperado.
+  // Evita o crash "Cannot read properties of undefined (reading 'lat')".
+  if (!hq || hq.lat == null) return null;
 
   return (
     <MapContainer

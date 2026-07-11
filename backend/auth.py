@@ -187,7 +187,12 @@ class DeleteAccountInput(BaseModel):
 
 def user_public(user: dict) -> dict:
     return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", ""),
-            "role": user.get("role", "player")}
+            "role": user.get("role", "player"),
+            # Disclaimer de ficção: aceite UMA única vez por conta (no primeiro
+            # registo/entrada). O frontend usa este campo para nunca repetir o
+            # aviso — a fonte de verdade é o registo de auditoria gravado por
+            # POST /legal/disclaimer-ack (last_disclaimer).
+            "disclaimer_accepted": bool((user.get("last_disclaimer") or {}).get("accepted"))}
 
 
 async def create_player_for_user(user_id: str, org_name: str, with_default_hq: bool = False):

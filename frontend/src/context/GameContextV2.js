@@ -104,6 +104,17 @@ export function GameProvider({ children }) {
         offsetRef.current = Date.parse(data.server_time) - Date.now();
       }
 
+      // Onboarding: conta ainda sem QG — o /state vem mínimo (hq_pending),
+      // sem teams/employees/vehicles/etc. Guarda o estado tal como está e
+      // salta todo o diffing de notificações (que rebentaria em undefined).
+      if (data.hq_pending) {
+        setState(data);
+        setStateError(null);
+        consecutiveFailuresRef.current = 0;
+        connectionLostWarnedRef.current = false;
+        return;
+      }
+
       // Team return notifications
       if (prevTeamsRef.current) {
         const returned = data.teams.filter((t) => {
