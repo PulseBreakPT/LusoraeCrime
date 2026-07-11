@@ -14,6 +14,7 @@ import AdminPanel from "./pages/AdminPanel";
 import LegalPage from "./pages/LegalPage";
 import ChangelogPage from "./pages/ChangelogPage";
 import DevLoadingPreview from "./pages/DevLoadingPreview";
+import DevOperationPreview from "./pages/DevOperationPreview";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { Loader2, CheckCircle2, OctagonAlert, TriangleAlert, Info } from "lucide-react";
 
