@@ -90,6 +90,16 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 ## Credenciais
 Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
 
+### Patrulhas PSP/GNR à volta dos ativos do jogador (12/07/2026)
+- Zonas de patrulhamento 100% dinâmicas: uma zona junto de cada ativo (QG + imóveis), onde quer que o jogador se instale — fix principal: PoliceLayer.jsx passa ctx.assets ao police.js (a ligação que faltava da sessão anterior)
+- Divisão real portuguesa: PSP_CITIES (25 centros urbanos c/ raio) classifica cada ativo → PSP (urbano: azul, zona 620m, 2 viaturas, resposta 63 km/h, + agentes) vs GNR (rural/vilas: verde, zona 1250m, 1 viatura, resposta 54 km/h, cruzeiro de estrada + desvios entre zonas)
+- Perímetros de patrulhamento no mapa: Circles tracejados com a cor da força (interactive=false); reforços por calor vão primeiro a zonas PSP
+- Identidade visual: viatura GNR c/ faixa verde (police-force-gnr), agente verde (police-op-gnr), luzes de emergência azuis em ambas (realista); tooltips "PSP · urbana"/"GNR · rural" + copy própria; legenda do mapa atualizada
+- Robustez multi-cidade: edgePointNear entra pela periferia LOCAL da zona (2.5 raios) quando os BOUNDS globais esticam (Lisboa+Porto); nearestFreePatrol c/ raio máx 15 km (viatura do Porto não responde em Lisboa)
+- Validado: admin (Cais do Sodré) → 2 PSP; gnr.teste@lusorae.com (QG Mafra) → 1 GNR verde; snapshot sessionStorage invalidado por assinatura de ativos
+- Futuro (ideias do utilizador, não implementado): patrulhas a pé PSP, fiscalização rodoviária/postos territoriais GNR
+- NOTA infra: fork 12/07 — .env recriados (preview c3baec4c-7bfe-4277-937b-58977a0d3545), credenciais em /app/memory/test_credentials.md
+
 ### UI Uniformization Pass (07/07/2026)
 - Design system CSS: `.lus-panel` (shell vidro escuro de todos os Sheets + OpportunityCard), `.lus-card` (cartão interno standard, substituiu `border-white/10 bg-white/[0.03]` em 11 ficheiros), `.lus-topbar` (ResourceBar)
 - sheet.jsx: overlay c/ blur, header c/ barra vermelha de destaque + border-b, título uppercase display, close button circular — afeta os 10 painéis

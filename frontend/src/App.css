@@ -3734,6 +3734,42 @@ html:has(.lus-page-bg) {
     border-bottom-color: rgba(59, 130, 246, 0.95);
 }
 
+/* ---- Variante GNR (zonas rurais/vilas) — corpo branco com faixa VERDE.
+   As luzes de emergência mantêm-se azuis (realidade portuguesa): só a
+   identidade do corpo, o glow e os agentes mudam de cor. ---- */
+.police-force-gnr .police-car-body {
+    background: linear-gradient(
+        180deg,
+        #f1f5f9 0%,
+        #cbd5e1 32%,
+        #15803d 42%,
+        #14532d 58%,
+        #94a3b8 68%,
+        #64748b 100%
+    );
+    box-shadow: 0 0 7px rgba(34, 197, 94, 0.45);
+}
+
+.police-force-gnr .police-lightbar i {
+    background: #14532d;
+}
+
+.police-force-gnr.police-lights .police-car-body {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), 0 0 22px rgba(34, 197, 94, 0.5);
+}
+
+/* Militar da GNR — pin verde-claro */
+.police-op-gnr {
+    background: #bbf7d0;
+    border-color: rgba(9, 55, 30, 0.95);
+    color: #09371e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+}
+
+.police-op-gnr .op-face {
+    border-bottom-color: rgba(34, 197, 94, 0.95);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .police-lights .police-lightbar i:first-child,
     .police-lights .police-lightbar i:last-child,

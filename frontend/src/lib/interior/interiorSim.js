@@ -20,7 +20,7 @@
 // pré-calculados com timestamps absolutos).
 
 import { hashStr, mulberry32 } from "../simCore";
-import { nearestWalkable } from "./pathfind";
+import { nearestWalkable, pointAlong } from "./pathfind";
 import { OBJECTIVES } from "./buildingGen";
 import { buildNpcs } from "./npc";
 import {

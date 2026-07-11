@@ -327,8 +327,11 @@ function makePatrol({ zoneIdx, at, bearing, seed, officers, id, edgeSpawn }) {
   return p;
 }
 
-// Ponto na periferia do mapa mais próximo de uma zona — patrulhas novas
-// (subida de calor) entram a conduzir desde a periferia, nunca nascem no meio.
+// Ponto na periferia mais próximo de uma zona — patrulhas novas (subida de
+// calor) entram a conduzir desde a periferia, nunca nascem no meio.
+// Nota multi-cidade: com ativos em várias cidades os BOUNDS globais esticam
+// (Lisboa+Porto = centenas de km); nesse caso a entrada é pela periferia
+// LOCAL da zona (~2.5 raios do centro), nunca desde a outra ponta do país.
 function edgePointNear(zone) {
   const cands = [
     { lat: BOUNDS.latMin, lng: zone.lng }, { lat: BOUNDS.latMax, lng: zone.lng },
@@ -338,6 +341,9 @@ function edgePointNear(zone) {
   for (const c of cands) {
     const d = distMeters(c, zone);
     if (d < bd) { bd = d; best = c; }
+  }
+  if (bd > zone.radius * 3) {
+    return ringPoint(zone, bearingRad(zone, best), zone.radius * 2.5);
   }
   return best;
 }
@@ -457,12 +463,16 @@ function missionPlan(m, heat) {
   return null;
 }
 
-function nearestFreePatrol(target, excludeId) {
+// Patrulha livre mais próxima DENTRO do raio de resposta plausível — com
+// ativos em várias cidades, uma viatura do Porto nunca "responde" a uma
+// ocorrência em Lisboa (se ninguém está a alcance, não há resposta visível).
+function nearestFreePatrol(target, excludeId, maxDistM = 15000) {
   let best = null; let bd = Infinity;
   for (const p of sim.patrols) {
     if (p.id === excludeId) continue;
     if (p.state !== "patrol" && p.state !== "returning") continue;
     const d = distMeters(p.pos, target);
+    if (d > maxDistM) continue;
     if (d < bd) { bd = d; best = p; }
   }
   return best;

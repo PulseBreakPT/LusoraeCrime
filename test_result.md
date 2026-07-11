@@ -168,6 +168,28 @@ backend:
         comment: "08/07/2026 — 5 tentativas falhadas → 429 + Retry-After. Não testado ainda. IMPORTANTE: usar emails descartáveis nos testes de lockout para não bloquear admin@lusorae.com."
 
 frontend:
+  - task: "Fix crash 'pointAlong is not defined' no OperationView — interiorSim.js usava pointAlong (linha 458) sem o importar de ./pathfind (bug pré-existente do simulador de interiores); rebentava ao abrir a câmara da operação (ErrorBoundary 'Erro de renderização'). Import adicionado."
+    implemented: true
+    working: true
+    file: "frontend/src/lib/interior/interiorSim.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "12/07/2026 — Reportado pelo utilizador com stack trace (OperationView). Causa raiz: import em falta (lint no-undef confirmou, único no ficheiro). Verificado via /dev/operation (DevOperationPreview): interior renderiza, operacionais movem-se, rádio ativo, sem error boundary, 0 erros consola. INFRA: preview URL real é lusora-patrols.preview.emergentagent.com — REACT_APP_BACKEND_URL e CORS_ORIGINS atualizados."
+  - task: "Patrulhas PSP/GNR dinâmicas à volta dos ativos do jogador — PoliceLayer.jsx passa ctx.assets (QG {kind:'hq'} + imóveis {kind:'property'}) ao simulador police.js (a peça que faltava: as zonas nunca eram construídas); zonas nascem junto de cada ativo, classificadas PSP (centros urbanos, azul, 2 viaturas/zona, raio 620m) vs GNR (rural/vilas, verde, 1 viatura/zona, raio 1250m) via PSP_CITIES; perímetros de patrulhamento desenhados como Circles tracejados com a cor da força; ícones por força (police-force-gnr faixa verde, police-op-gnr agente verde — luzes de emergência mantêm-se azuis); tooltips com 'PSP · urbana'/'GNR · rural' + copy própria GNR; legenda do mapa atualizada (PSP/GNR/perímetros); robustez multi-cidade em police.js: edgePointNear entra pela periferia LOCAL da zona (2.5 raios) quando os BOUNDS globais esticam, nearestFreePatrol com raio máx de resposta 15 km"
+    implemented: true
+    working: NA
+    file: "frontend/src/components/game/PoliceLayer.jsx, frontend/src/lib/police.js, frontend/src/components/game/LiveMap.jsx, frontend/src/App.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "12/07/2026 — Verificado por screenshots Playwright: admin (QG Cais do Sodré, Lisboa) → 2 patrulhas PSP + 1 círculo de zona; conta nova gnr.teste@lusorae.com (QG colocado em Mafra via POST /game/hq/place) → 1 patrulha GNR verde + círculo 1250m. Zero erros de consola. INFRA: .env recriados 12/07 pós-fork (preview c3baec4c-7bfe-4277-937b-58977a0d3545), credenciais em /app/memory/test_credentials.md. Falta teste formal: tooltip da patrulha (força/zona), resposta a ocorrências com desfecho police, merge de zonas com imóveis encavalitados."
   - task: "Câmara do mapa centrada no QG do jogador — LiveMap.jsx MapContainer center passa de [38.7223,-9.1393] (Lisboa hardcoded) para [hq.lat, hq.lng]; vale para o mount logo após colocar o QG no onboarding e para cada login (o LiveMap monta de fresco em ambos os casos)"
     implemented: true
     working: NA
@@ -390,6 +412,17 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: >
+      12/07/2026 — Patrulhas PSP/GNR à volta dos ativos do jogador (continuação concluída).
+      (1) FIX principal: PoliceLayer.jsx agora passa ctx.assets (QG + imóveis) ao simulador
+      police.js — antes as zonas dinâmicas nunca eram construídas e as patrulhas não seguiam
+      o jogador. (2) Perímetros de zona (Circles tracejados azul PSP / verde GNR), ícones e
+      tooltips por força, legenda atualizada, robustez multi-cidade (spawn local + raio de
+      resposta 15 km). Sem alterações de código backend. (3) INFRA: .env recriados 12/07
+      pós-fork (preview c3baec4c-7bfe-4277-937b-58977a0d3545), JWT_SECRET novo; credenciais
+      em /app/memory/test_credentials.md (admin PSP Lisboa + gnr.teste@lusorae.com GNR Mafra).
+      Validação por screenshots: Lisboa→2 PSP azuis; Mafra→1 GNR verde; 0 erros consola.
   - agent: "main"
     message: >
       11/07/2026 — (1) INFRA: .env de backend+frontend recriados após reset de ambiente

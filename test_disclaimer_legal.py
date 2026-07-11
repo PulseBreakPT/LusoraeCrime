@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pymongo import MongoClient
 
 # Configuration
-BASE_URL = "https://context-mismatch.preview.emergentagent.com/api"
+BASE_URL = "https://lusora-patrols.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@lusorae.com"
 ADMIN_PASSWORD = "admin123"
 MONGO_URL = "mongodb://localhost:27017"

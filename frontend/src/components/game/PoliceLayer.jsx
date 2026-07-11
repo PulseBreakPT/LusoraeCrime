@@ -6,22 +6,23 @@
 // sem passar pelo React. O React só re-renderiza quando a composição muda
 // (patrulha entra/sai, agentes desembarcam/embarcam) e a 1 Hz para tooltips.
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Marker, Polyline, Tooltip as LTooltip } from "react-leaflet";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Circle, Marker, Polyline, Tooltip as LTooltip } from "react-leaflet";
 import L from "leaflet";
 import { renderToStaticMarkup } from "react-dom/server";
 import { UserRound } from "lucide-react";
 import {
-  ensurePoliceSim, policeTick, getPatrols, getPoliceVersion,
-  officerStateAt, deployCommAt, patrolStateLabel,
+  ensurePoliceSim, policeTick, getPatrols, getPatrolZones, getPoliceVersion,
+  officerStateAt, deployCommAt, patrolStateLabel, FORCES,
 } from "../../lib/police";
 
-// ---------- Ícones (cacheados — 1 instância por tipo) ----------
-let carIconCache = null;
-const policeCarIcon = () => {
-  if (!carIconCache) {
+// ---------- Ícones (cacheados — 1 instância por força PSP/GNR) ----------
+const carIconCache = {};
+const policeCarIcon = (force) => {
+  const key = force === "GNR" ? "GNR" : "PSP";
+  if (!carIconCache[key]) {
     const html = `
-      <div class="police-car" data-proot>
+      <div class="police-car${key === "GNR" ? " police-force-gnr" : ""}" data-proot>
         <span class="police-pulse"></span>
         <span class="police-car-body" data-car>
           <span class="police-lightbar"><i></i><i></i></span>
@@ -30,22 +31,23 @@ const policeCarIcon = () => {
           <span class="unit-car-door unit-car-door-r"></span>
         </span>
       </div>`;
-    carIconCache = L.divIcon({ html, className: "lus-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
+    carIconCache[key] = L.divIcon({ html, className: "lus-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
   }
-  return carIconCache;
+  return carIconCache[key];
 };
 
-let officerIconCache = null;
-const policeOfficerIcon = () => {
-  if (!officerIconCache) {
+const officerIconCache = {};
+const policeOfficerIcon = (force) => {
+  const key = force === "GNR" ? "GNR" : "PSP";
+  if (!officerIconCache[key]) {
     const html = `
-      <div class="op-pin police-op">
+      <div class="op-pin police-op${key === "GNR" ? " police-op-gnr" : ""}">
         <span class="op-face-wrap" data-face><span class="op-face"></span></span>
         ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
       </div>`;
-    officerIconCache = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
+    officerIconCache[key] = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
   }
-  return officerIconCache;
+  return officerIconCache[key];
 };
 
 const TipRow = ({ label, value, color = "#E4E4E7" }) => (
@@ -69,10 +71,22 @@ const STATE_COLORS = {
 
 export default function PoliceLayer({ state, serverNow }) {
   // Contexto mais recente para o loop rAF (sem re-subscrever o efeito).
-  const ctxRef = useRef({ missions: [], heat: 0 });
+  // `assets` = Quartel-General + imóveis do jogador — é à volta destes pontos
+  // que as zonas de patrulhamento são construídas (PSP em centros urbanos,
+  // GNR em zonas rurais/vilas), onde quer que o jogador se instale no país.
+  const ctxRef = useRef({ missions: [], heat: 0, assets: [] });
+  const hq = state?.player?.hq;
   ctxRef.current = {
     missions: state?.missions || [],
     heat: state?.player?.heat || 0,
+    assets: [
+      ...(hq && hq.lat != null && hq.lng != null
+        ? [{ kind: "hq", name: hq.name || "Quartel-General", lat: hq.lat, lng: hq.lng }]
+        : []),
+      ...(state?.properties || [])
+        .filter((p) => p && p.lat != null && p.lng != null)
+        .map((p) => ({ kind: "property", name: p.name, lat: p.lat, lng: p.lng })),
+    ],
   };
 
   const [, setVersion] = useState(0);
@@ -199,13 +213,36 @@ export default function PoliceLayer({ state, serverNow }) {
   }, [serverNow]);
 
   const patrols = getPatrols();
-  const carIcon = useMemo(() => policeCarIcon(), []);
-  const officerIcon = useMemo(() => policeOfficerIcon(), []);
+  const zones = getPatrolZones();
 
   return (
     <>
+      {/* Perímetros de patrulhamento — um por ativo do jogador (QG/imóveis).
+          Azul = PSP (urbano, compacto), verde = GNR (rural, área maior). */}
+      {zones.map((z, i) => {
+        const F = FORCES[z.force] || FORCES.PSP;
+        return (
+          <Circle
+            key={`pzone-${i}-${z.force}-${z.lat.toFixed(4)}`}
+            center={[z.lat, z.lng]}
+            radius={z.radius}
+            interactive={false}
+            pathOptions={{
+              color: F.color,
+              weight: 1,
+              opacity: 0.32,
+              dashArray: "4 7",
+              fillColor: F.color,
+              fillOpacity: 0.025,
+            }}
+          />
+        );
+      })}
       {patrols.map((p) => {
         const label = patrolStateLabel(p);
+        const isGNR = p.force === "GNR";
+        const F = FORCES[p.force] || FORCES.PSP;
+        const forceTint = isGNR ? "#86EFAC" : "#93C5FD";
         const color = STATE_COLORS[p.state] || "#60A5FA";
         const deployed = !!p.deploy;
         return (
@@ -216,15 +253,16 @@ export default function PoliceLayer({ state, serverNow }) {
                 else { delete carMarkersRef.current[p.id]; delete carElsRef.current[p.id]; }
               }}
               position={[p.pos.lat, p.pos.lng]}
-              icon={carIcon}
+              icon={policeCarIcon(p.force)}
               zIndexOffset={460}
             >
               <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
                 <div className="min-w-[150px]">
-                  <p className="text-[11px] font-bold text-blue-300">Patrulha {p.id}</p>
+                  <p className="text-[11px] font-bold" style={{ color: forceTint }}>Patrulha {p.id}</p>
                   <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color }}>{label}</p>
                   <div className="mt-1 space-y-0.5">
-                    <TipRow label="zona" value={p.zone.name} color="#93C5FD" />
+                    <TipRow label="força" value={isGNR ? "GNR · rural" : "PSP · urbana"} color={F.color} />
+                    <TipRow label="zona" value={p.zone.name} color={forceTint} />
                     <TipRow label="agentes" value={`${p.officers} a bordo`} color="#E4E4E7" />
                     {p.alert && (
                       <TipRow label="ocorrência" value={p.alert.missionName} color="#F59E0B" />
@@ -237,7 +275,11 @@ export default function PoliceLayer({ state, serverNow }) {
                     <p className="mt-1 text-[9px] text-red-400/80">Se apanhar a equipa antes do QG, a carga perde-se.</p>
                   )}
                   {p.state === "patrol" && (
-                    <p className="mt-1 text-[9px] text-zinc-500">Evita operar debaixo do olhar de uma patrulha…</p>
+                    <p className="mt-1 text-[9px] text-zinc-500">
+                      {isGNR
+                        ? "Posto territorial — menos viaturas, mais terreno e estradas vigiadas…"
+                        : "Evita operar debaixo do olhar de uma patrulha…"}
+                    </p>
                   )}
                 </div>
               </LTooltip>
@@ -251,7 +293,7 @@ export default function PoliceLayer({ state, serverNow }) {
                   else { arr[i] = null; if (ofElsRef.current[p.id]) ofElsRef.current[p.id][i] = null; }
                 }}
                 position={[p.parkPos?.lat ?? p.pos.lat, p.parkPos?.lng ?? p.pos.lng]}
-                icon={officerIcon}
+                icon={policeOfficerIcon(p.force)}
                 interactive={false}
                 keyboard={false}
                 zIndexOffset={515}

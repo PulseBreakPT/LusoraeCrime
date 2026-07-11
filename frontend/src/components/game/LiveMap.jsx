@@ -1044,13 +1044,23 @@ export const MapLegend = () => {
               <span className="flex h-3.5 w-3.5 items-center justify-center">
                 <span className="h-3 w-1.5 rounded-sm bg-blue-500" />
               </span>
-              Patrulha policial (azul fixo = a patrulhar)
+              Patrulha PSP — centros urbanos (mais viaturas)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="flex h-3.5 w-3.5 items-center justify-center">
+                <span className="h-3 w-1.5 rounded-sm bg-green-600" />
+              </span>
+              Patrulha GNR — zonas rurais e estradas
             </span>
             <span className="flex items-center gap-1.5">
               <span className="flex h-3.5 w-3.5 items-center justify-center">
                 <span className="h-3 w-1.5 animate-pulse rounded-sm bg-blue-400 shadow-[0_0_6px_#3b82f6]" />
               </span>
               Patrulha com luzes — a responder / em perseguição
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3.5 w-3.5 rounded-full border border-dashed border-blue-400/70" />
+              Perímetro de patrulha junto ao QG e imóveis
             </span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-blue-900 bg-blue-200" /> Agentes no terreno (perímetro)</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;2 min)</span>
