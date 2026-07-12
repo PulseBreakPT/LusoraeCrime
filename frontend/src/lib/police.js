@@ -81,10 +81,15 @@ export const FORCES = {
     patrolsPerZone: 2,      // presença reforçada no centro das cidades
     cruise: 9.0,            // m/s em patrulhamento (~32 km/h)
     cruiseVar: 3.5,
-    responseCruise: 17.5,   // m/s a responder (~63 km/h) — resposta rápida
-    pursuitCruise: 22,
+    responseCruise: 18.5,   // m/s a responder (~67 km/h) — resposta muito rápida
+    pursuitCruise: 23,      // fecha depressa (perseguições curtas e rápidas)
+    // Contraste de competência (o jogador tem de o SENTIR):
+    responseReachM: 5000,   // cobertura compacta — só acode a ocorrências perto
+    responseDelayS: 0,      // resposta imediata
+    backupCount: 1,         // 1 reforço, mas chega depressa
+    pursuitPersistent: false, // desiste se não fechar (curta e rápida)
     officersMin: 2,
-    officersExtraChance: 0.4,
+    officersExtraChance: 0.5, // mais agentes a pé no cerco urbano
     vehicles: [
       { type: "carro", w: 6 },
       { type: "mota", w: 2 },
@@ -99,17 +104,23 @@ export const FORCES = {
     tint: "#86EFAC",
     terrainLabel: "rural",
     zoneRadius: 1250,       // m — posto territorial cobre uma área muito maior
+    territorialRadius: 2600, // m — anel de estradas/periferia que a GNR ronda à
+                             //     volta de qualquer cidade (cobertura ampla)
     patrolsPerZone: 1,      // menos patrulhas, mais terreno por viatura
     cruise: 10.5,           // m/s — cruzeiro de estrada nacional (~38 km/h)
     cruiseVar: 3.0,
-    responseCruise: 15.0,   // m/s (~54 km/h) — resposta ligeiramente mais lenta
-    pursuitCruise: 20,
+    responseCruise: 14.5,   // m/s (~52 km/h) — resposta mais lenta a arrancar
+    pursuitCruise: 20,      // interceção persistente (perseguições longas)
+    responseReachM: 16000,  // cobertura vastíssima — acode a ocorrências longe
+    responseDelayS: 4.5,    // tempo de resposta inicial superior
+    backupCount: 2,         // chegam em maior número, mas mais tarde
+    pursuitPersistent: true, // não desiste — interceta o veículo em fuga
     officersMin: 2,
-    officersExtraChance: 0.2,
+    officersExtraChance: 0.2, // maioritariamente motorizada
     vehicles: [
-      { type: "carro", w: 5 },
+      { type: "tt", w: 4 },        // todo-o-terreno — domina estradas e campo
+      { type: "carro", w: 4 },
       { type: "mota", w: 2 },
-      { type: "tt", w: 2 },        // todo-o-terreno — cobertura rural/florestal
       { type: "carrinha", w: 1 },
     ],
   },
@@ -202,23 +213,41 @@ function assetsSignature(assets) {
 
 function buildZonesFromAssets(assets) {
   const zones = [];
+  // Adiciona (ou funde com a mais próxima da MESMA força) uma zona. Ativos
+  // encavalitados partilham a zona — as territoriais (GNR) fundem-se num raio
+  // maior, refletindo a cobertura ampla de um posto sobre várias localidades.
+  const pushZone = (a, force, radius, city, tag) => {
+    const near = zones.find((z) => z.force === force &&
+      distMeters(z, a) < Math.max(z.radius, radius) * 0.85);
+    if (near) { near.weight += 1; return; }
+    const coreName = a.name || (a.kind === "hq" ? "Quartel-General" : "Imóvel");
+    zones.push({
+      name: tag === "territorial" ? `Periferia${city ? " de " + city : ""}` : coreName,
+      kind: a.kind,
+      lat: a.lat,
+      lng: a.lng,
+      radius,
+      force,
+      city,
+      tag,          // "core" (competência da zona) | "territorial" (periferia)
+      weight: 1,
+    });
+  };
   for (const a of assets || []) {
     if (!a || a.lat == null || a.lng == null) continue;
     const cls = forceFor(a);
     const F = FORCES[cls.force];
-    // Ativos encavalitados partilham a mesma zona (evita círculos duplicados).
-    const near = zones.find((z) => distMeters(z, a) < Math.max(z.radius, F.zoneRadius) * 0.85);
-    if (near) { near.weight += 1; continue; }
-    zones.push({
-      name: a.name || (a.kind === "hq" ? "Quartel-General" : "Imóvel"),
-      kind: a.kind,
-      lat: a.lat,
-      lng: a.lng,
-      radius: F.zoneRadius,
-      force: cls.force,
-      city: cls.city,
-      weight: 1,
-    });
+    // Zona-núcleo: a força competente pela localização do ativo.
+    pushZone(a, cls.force, F.zoneRadius, cls.city, "core");
+    // Zona territorial: a força rural por omissão (GNR) patrulha SEMPRE o anel
+    // de estradas/periferia à volta de uma base urbana. Sem isto, um jogador só
+    // com bases na cidade nunca veria a GNR — mas ela ronda os acessos e a
+    // periferia de qualquer centro urbano. Genérico: usa DEFAULT_FORCE, sem
+    // hard-code a "GNR". Um ativo já em zona rural não precisa de companheira.
+    if (cls.force !== DEFAULT_FORCE) {
+      const G = FORCES[DEFAULT_FORCE];
+      pushZone(a, DEFAULT_FORCE, G.territorialRadius || G.zoneRadius, cls.city, "territorial");
+    }
   }
   return zones;
 }
@@ -248,13 +277,17 @@ function syncZones(ctx) {
   BOUNDS = computeBounds(ZONES);
   for (const p of sim.patrols) {
     if (!ZONES.length) { p._remove = true; continue; }
-    let bi = 0;
+    // Remapeia para a zona mais próxima DA MESMA FORÇA (uma cidade tem a zona
+    // PSP-núcleo e a GNR-territorial sobrepostas no centro; sem o filtro de
+    // força a patrulha GNR seria erradamente atribuída à zona PSP e removida).
+    let bi = -1;
     let bd = Infinity;
     ZONES.forEach((z, i) => {
+      if (z.force !== p.force) return;
       const d = distMeters(p.pos, z);
       if (d < bd) { bd = d; bi = i; }
     });
-    if (bd > 5000 || p.force !== ZONES[bi].force) { p._remove = true; continue; }
+    if (bi < 0 || bd > 5000) { p._remove = true; continue; }
     p.zoneIdx = bi;
     p.zone = ZONES[bi];
   }
@@ -282,7 +315,7 @@ const sim = {
   inited: false,
   patrols: [],
   version: 0,          // muda quando a composição visível muda (frota/agentes)
-  handled: new Map(),  // missionId -> { plan, patrolId, backupId, done }
+  handled: new Map(),  // missionId -> { plan, patrolId, backupIds, done }
   missionGeo: new Map(),// missionId -> { parking } (rota/estacionamento da equipa)
   nextRouteAt: 0,      // throttle global de pedidos OSRM de patrulha
   nextId: 1,
@@ -535,11 +568,12 @@ function missionForce(m) {
 // alcance é que a outra força apoia (escalada). Assim uma ocorrência urbana
 // chama a PSP e uma rural chama a GNR, como na realidade.
 function nearestFreePatrol(target, opts = {}) {
-  const { excludeId, maxDistM = 15000, preferForce = null } = opts;
+  const { excludeId, excludeIds, maxDistM = 15000, preferForce = null } = opts;
   const pick = (forceFilter) => {
     let best = null; let bd = Infinity;
     for (const p of sim.patrols) {
       if (p.id === excludeId) continue;
+      if (excludeIds && excludeIds.includes(p.id)) continue;
       if (p.state !== "patrol" && p.state !== "returning") continue;
       if (forceFilter && p.force !== forceFilter) continue;
       const d = distMeters(p.pos, target);
@@ -590,7 +624,7 @@ function director(nowMs, ctx) {
     if (!m?.target || !m?.arrive_at) continue;
     let h = sim.handled.get(m.id);
     if (!h) {
-      h = { plan: missionPlan(m, ctx.heat || 0), patrolId: null, backupId: null, pursuitId: null, done: false };
+      h = { plan: missionPlan(m, ctx.heat || 0), patrolId: null, backupIds: [], lastBackupAt: 0, pursuitId: null, done: false };
       sim.handled.set(m.id, h);
     }
     const vt = vehicleTimings(m);
@@ -607,7 +641,7 @@ function director(nowMs, ctx) {
         p.lights = true;
         p.deploy = null;
         p.parking = null;
-        p.pursuit = { missionId: m.id, missionName: m.opportunity?.name, locked: false, lagM: 0, lastRefetch: 0, blend: null };
+        p.pursuit = { missionId: m.id, missionName: m.opportunity?.name, locked: false, lagM: 0, lastRefetch: 0, blend: null, startSec: nowSec };
         p.route = null;
         p.routePending = false;
         bump();
@@ -616,25 +650,37 @@ function director(nowMs, ctx) {
 
     // ---- Resposta a suspeita/interceção ----
     const plan = h.plan;
-    if (plan && !h.done && !h.patrolId && nowSec >= plan.alertAt && nowSec < vt.finish - 4) {
+    const zoneCfg = FORCES[zoneForce] || FORCES[DEFAULT_FORCE];
+    // Competência sentida: a PSP responde de imediato mas só a curto alcance
+    // (cobertura compacta); a GNR demora mais a arrancar mas acode de muito
+    // mais longe (cobertura territorial vasta).
+    const respDelay = zoneCfg.responseDelayS || 0;
+    const respReach = zoneCfg.responseReachM ?? 15000;
+    if (plan && !h.done && !h.patrolId && nowSec >= plan.alertAt + respDelay && nowSec < vt.finish - 4) {
       // A força responsável pela zona responde primeiro (escala para a outra
       // se não houver ninguém dessa força a alcance).
-      const p = nearestFreePatrol(m.target, { preferForce: zoneForce });
+      const p = nearestFreePatrol(m.target, { preferForce: zoneForce, maxDistM: respReach });
       if (p) {
         h.patrolId = p.id;
         assignResponse(p, m, plan, false, nowMs);
       }
     }
-    // ---- Reforços: segunda patrulha, vinda da sua posição real ----
-    if (plan && plan.backup && h.patrolId && !h.backupId) {
+    // ---- Reforços: vindos da sua posição real. A PSP manda 1 reforço rápido;
+    // a GNR chega em maior número, mas escalonada (mais tarde) — cada patrulha
+    // adicional entra com um intervalo, refletindo "mais efetivo, mais lento".
+    if (plan && plan.backup && h.patrolId) {
       const primary = sim.patrols.find((x) => x.id === h.patrolId);
-      // só depois de o primário estar no local (pedido de reforços credível).
-      // Reforço da MESMA força primeiro; se a situação escalar e não houver,
-      // a outra força apoia.
-      if (primary && primary.state.startsWith("onscene") && nowSec < vt.finish) {
-        const p2 = nearestFreePatrol(m.target, { excludeId: h.patrolId, preferForce: primary.force });
+      const primCfg = FORCES[primary?.force] || FORCES[DEFAULT_FORCE];
+      const wantBackup = primCfg.backupCount ?? 1;
+      const backupGap = primCfg.responseDelayS ? 4.5 : 2.5; // GNR escalona mais
+      if (primary && primary.state.startsWith("onscene") && nowSec < vt.finish &&
+          h.backupIds.length < wantBackup && nowSec - h.lastBackupAt >= backupGap) {
+        const p2 = nearestFreePatrol(m.target, {
+          excludeIds: [h.patrolId, ...h.backupIds], preferForce: primary.force, maxDistM: respReach,
+        });
         if (p2) {
-          h.backupId = p2.id;
+          h.backupIds.push(p2.id);
+          h.lastBackupAt = nowSec;
           assignResponse(p2, m, plan, true, nowMs);
         }
       }
@@ -872,6 +918,14 @@ function pursuitStep(p, m, nowMs, dt) {
   const gap = distMeters(p.pos, teamPos);
 
   if (!p.pursuit.locked) {
+    // Contraste de força: a PSP faz perseguições curtas e rápidas — se não
+    // fechar a interceção em ~15s (fugitivo já longe), abandona. A GNR é
+    // persistente (pursuitPersistent) e nunca larga até intercetar.
+    if (!forceCfg(p).pursuitPersistent &&
+        nowSec - (p.pursuit.startSec || nowSec) > 15 && gap > POLICE_CONFIG.pursuitLockM * 1.4) {
+      breakOff(p, nowSec);
+      return;
+    }
     // Fase de interceção: conduz até à posição atual da equipa, re-planeando
     // a rota quando ela foge do destino anterior.
     if (gap < POLICE_CONFIG.pursuitLockM && geo.parking) {

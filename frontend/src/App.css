@@ -3258,6 +3258,31 @@ html:has(.lus-page-bg) {
     height: 30px;
 }
 
+/* Distintivo da força (P/G) — fixo no canto, cor da força via --pforce. Fica
+   fora de [data-car], por isso NÃO roda com a viatura. Leitura imediata de
+   quem está a rondar/responder sem passar o rato por cima. */
+.police-force-badge {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    min-width: 10px;
+    height: 10px;
+    padding: 0 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, monospace;
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1;
+    color: #05070a;
+    background: var(--pforce, #3B82F6);
+    border: 1px solid rgba(5, 5, 5, 0.85);
+    border-radius: 3px;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+}
+
 /* Corpo top-down — cor por força via --pbody (data-driven, sem hard-code
    PSP/GNR); rodado pelo loop rAF. Plano/escuro, sem gradiente. */
 .police-car-body {

@@ -981,17 +981,17 @@ export const MapLegend = () => {
               <span className="h-2.5 w-2.5 rounded-full border border-black bg-zinc-100" />
               Operacionais no terreno (papéis distintos)
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="flex h-3.5 w-3.5 items-center justify-center">
-                <span className="h-3 w-1.5 rounded-sm bg-blue-500" />
+            <span className="flex items-start gap-1.5">
+              <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-blue-500 text-[6px] font-black text-black">P</span>
               </span>
-              PSP (azul) — competência nos centros urbanos
+              <span><b className="text-blue-300">PSP</b> — centros urbanos: muitas patrulhas, resposta imediata mas curto alcance; cerco compacto, perseguições curtas.</span>
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="flex h-3.5 w-3.5 items-center justify-center">
-                <span className="h-3 w-1.5 rounded-sm bg-green-600" />
+            <span className="flex items-start gap-1.5">
+              <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-green-600 text-[6px] font-black text-black">G</span>
               </span>
-              GNR (verde) — rural, vilas e estradas nacionais
+              <span><b className="text-green-300">GNR</b> — periferia, estradas e campo: menos patrulhas mas alcance vasto, resposta mais lenta; reforços em maior número, perseguições longas e persistentes.</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="flex h-3.5 w-3.5 items-center justify-center">
