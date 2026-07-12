@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import {
   fmtMoney, fmtDuration, haversineM, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, effectiveSpeed,
-  chanceColor, chanceQualityLabel, pctSigned, MODIFIER_CATEGORY_LABELS,
+  chanceColor, chanceQualityLabel, pctSigned, MODIFIER_CATEGORY_LABELS, teamReadiness,
 } from "../../lib/game";
 import { Tip, Chip } from "./hud";
 import { Button } from "../ui/button";
@@ -38,6 +38,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [confirmLowChance, setConfirmLowChance] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [chances, setChances] = useState({}); // teamId -> chance de sucesso (preview)
   const previewRef = useRef(null);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
@@ -101,6 +102,24 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     audio.sfx.notify();
   }, [opp.id]);
 
+  // Veredicto de prontidão via helper unificado (mesma definição do TeamsPanel e
+  // de opportunityReachable) — memoizado para não recalcular O(equipas×funcionários)
+  // a cada segundo (o cartão re-renderiza no timer da contagem).
+  const readyMap = useMemo(() => {
+    const m = new Map();
+    for (const t of state?.teams || []) {
+      m.set(t.id, teamReadiness(state, catalog, t, { opp, now: serverNow() }));
+    }
+    return m;
+    // serverNow é estável (useCallback); recalcula quando o estado/opp/catálogo mudam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, catalog, opp]);
+
+  // Chave estável do conjunto de equipas prontas — só refaz os previews quando
+  // esse conjunto muda (evita martelar o servidor a cada poll).
+  const readyIdsKey = (state?.teams || [])
+    .filter((t) => readyMap.get(t.id)?.ok).map((t) => t.id).sort().join(",");
+
   useEffect(() => {
     setSelectedTeamId(null);
     setRecommendedTeamId(null);
@@ -108,13 +127,55 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     let cancelled = false;
     recommendTeamForOpportunity(opp.id).then((r) => {
       if (cancelled) return;
-      if (r.ok && r.data?.team_id) {
-        setRecommendedTeamId(r.data.team_id);
-        if (autoSelectBestTeam) setSelectedTeamId(r.data.team_id);
+      let best = r.ok && r.data?.team_id ? r.data.team_id : null;
+      // Fallback local quando o servidor não recomenda: melhor equipa pronta por
+      // ETA (proxy antes de as chances chegarem).
+      if (!best) {
+        const ready = (state?.teams || [])
+          .map((t) => ({ t, rr: readyMap.get(t.id) }))
+          .filter((x) => x.rr?.ok)
+          .sort((a, b) => (a.rr.eta || 0) - (b.rr.eta || 0));
+        best = ready[0]?.t.id || null;
+      }
+      if (best) {
+        setRecommendedTeamId(best);
+        if (autoSelectBestTeam) setSelectedTeamId(best);
       }
     });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opp.id, inProgress, recommendTeamForOpportunity, autoSelectBestTeam]);
+
+  // Chances de sucesso por equipa pronta (comparação lado-a-lado sem clicar cada
+  // uma). Limitado a ~6 previews em paralelo; refaz-se só quando muda o conjunto.
+  useEffect(() => {
+    if (inProgress) { setChances({}); return; }
+    const targets = (state?.teams || []).filter((t) => readyMap.get(t.id)?.ok).slice(0, 6);
+    if (!targets.length) { setChances({}); return; }
+    let cancelled = false;
+    Promise.all(targets.map((t) =>
+      previewDispatch(opp.id, t.id)
+        .then((r) => [t.id, r.ok ? r.data.chance : null])
+        .catch(() => [t.id, null])
+    )).then((pairs) => {
+      if (cancelled) return;
+      const map = {};
+      for (const [id, c] of pairs) if (c != null) map[id] = c;
+      setChances(map);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opp.id, inProgress, readyIdsKey, previewDispatch]);
+
+  // Oportunidade expirou com o cartão aberto → fecha automaticamente (o despacho
+  // já fica bloqueado abaixo; isto evita a janela entre polls em que se podia
+  // despachar para algo já expirado).
+  const expired = !inProgress && timeLeft <= 0;
+  useEffect(() => {
+    if (!expired) return;
+    const id = setTimeout(() => onClose(), 1500);
+    return () => clearTimeout(id);
+  }, [expired, onClose]);
 
   if (!state) return null;
   const hq = state.player.hq;
@@ -125,38 +186,14 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const distM = haversineM(hq.lat, hq.lng, opp.lat, opp.lng);
   const isFavorite = (state.player.favorite_types || []).includes(opp.type_key);
 
-  const readiness = (t) => {
-    if (t.status !== "idle") return { ok: false, reason: "Em operação" };
-    if (t.available_at && Date.parse(t.available_at) > serverNow()) return { ok: false, reason: "A reorganizar-se" };
-    const members = state.employees.filter((e) => e.team_id === t.id);
-    if (members.length === 0) return { ok: false, reason: "Sem membros" };
-    const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
-    if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
-    if (ready.length < opp.min_members) return { ok: false, reason: `Mín. ${opp.min_members} membros` };
-    const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
-    if (!vehicle) return { ok: false, reason: "Sem veículo" };
-    if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > serverNow()) {
-      return { ok: false, reason: "Veículo indisponível" };
-    }
-    if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
-    if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow()) {
-      return { ok: false, reason: "A abastecer" };
-    }
-    const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
-    if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
-    if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) {
-      return { ok: false, reason: "Veículo não adequado" };
-    }
-    const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
-    if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
-    return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle };
-  };
+  // Veredicto de prontidão via helper unificado (readyMap memoizado acima).
+  const readiness = (t) => readyMap.get(t.id) || teamReadiness(state, catalog, t, { opp, now: serverNow() });
 
   const lowChanceThreshold = catalog?.low_chance_confirm_threshold;
   const isLowChance = preview && lowChanceThreshold != null && preview.chance < lowChanceThreshold;
 
   const handleDispatch = async () => {
-    if (!selectedTeamId) return;
+    if (!selectedTeamId || expired) return;
     if (isLowChance && !confirmLowChance) {
       setConfirmLowChance(true);
       return;
@@ -188,7 +225,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       return { icon: Wrench, label: fmtMoney(cost), color: can ? "text-emerald-400" : "text-red-400", can, run: () => repairVehicle(vehicle.id) };
     }
     if (r.reason === "Sem veículo") {
-      const free = state.vehicles.filter((v) => !v.team_id && !v.transfer);
+      // Melhor veículo livre (maior condição) — não o primeiro arbitrário.
+      const free = state.vehicles
+        .filter((v) => !v.team_id && !v.transfer)
+        .sort((a, b) => (b.condition || 0) - (a.condition || 0));
       if (free.length) return { icon: Car, label: free[0].name, color: "text-cyan-400", can: true, run: () => assignVehicle(free[0].id, t.id) };
       return { icon: Car, label: "Frota", color: "text-cyan-400", can: true, run: () => { onClose(); onNavigate && onNavigate("fleet"); } };
     }
@@ -300,9 +340,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           tip={`Risco ${opp.risk}/5 — reduz a probabilidade de sucesso e aumenta a chance de ferimentos, detenções e interceção policial.`} />
         <Metric
           icon={Clock}
-          label={inProgress && activeMission ? (activeMission.phase === "en_route" ? "Chega em" : activeMission.phase === "operating" ? "Conclui" : "Regressa") : "Expira"}
-          value={fmtDuration(timeLeft)}
-          color="#F59E0B"
+          label={inProgress && activeMission ? (activeMission.phase === "en_route" ? "Chega em" : activeMission.phase === "operating" ? "Conclui" : "Regressa") : expired ? "Estado" : "Expira"}
+          value={inProgress ? fmtDuration(timeLeft) : expired ? "Expirada" : fmtDuration(Math.max(0, timeLeft))}
+          color={expired ? "#EF4444" : "#F59E0B"}
           tip={inProgress ? "Tempo até à próxima fase da operação em curso." : "Tempo até esta oportunidade desaparecer do mapa. Despacha uma equipa antes disso."}
         />
       </div>
@@ -399,8 +439,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 .sort((a, b) => {
                   if (a.id === recommendedTeamId) return -1;
                   if (b.id === recommendedTeamId) return 1;
-                  const rank = (t) => (readiness(t).ok ? 0 : 1);
-                  return rank(a) - rank(b);
+                  const ra = readiness(a), rb = readiness(b);
+                  if (ra.ok !== rb.ok) return ra.ok ? -1 : 1;   // prontas primeiro
+                  if (!ra.ok) return 0;
+                  // Entre prontas: maior probabilidade primeiro; ETA como desempate
+                  // (ou enquanto as chances ainda não chegaram).
+                  const ca = chances[a.id], cb = chances[b.id];
+                  if (ca != null && cb != null && ca !== cb) return cb - ca;
+                  if (ca != null && cb == null) return -1;
+                  if (cb != null && ca == null) return 1;
+                  return (ra.eta || 0) - (rb.eta || 0);
                 })
                 .map((t) => {
                 const r = readiness(t);
@@ -437,9 +485,18 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                         </p>
                       </div>
                       {r.ok ? (
-                        <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
-                          <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
-                        </Tip>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {chances[t.id] != null && (
+                            <Tip tip="Probabilidade de sucesso estimada para esta equipa nesta operação." align="end">
+                              <span className="font-mono text-[10px] font-bold" style={{ color: chanceColor(chances[t.id]) }}>
+                                {Math.round(chances[t.id] * 100)}%
+                              </span>
+                            </Tip>
+                          )}
+                          <Tip tip={`Tempo estimado de viagem até ao alvo com o ${r.vehicle.name}.`} align="end">
+                            <span className="font-mono text-[10px] text-cyan-400">ETA {fmtDuration(r.eta)}</span>
+                          </Tip>
+                        </div>
                       ) : (
                         <div className="flex shrink-0 items-center gap-1.5">
                           <span className="font-mono text-[10px] text-red-400">{r.reason}</span>
@@ -614,17 +671,17 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             <Button
               data-testid="dispatch-team-button"
               onClick={handleDispatch}
-              disabled={!selectedTeamId || busy}
-              variant={!selectedTeamId || busy || confirmLowChance ? "outline" : "success"}
+              disabled={!selectedTeamId || busy || expired}
+              variant={!selectedTeamId || busy || expired || confirmLowChance ? "outline" : "success"}
               className={`mt-3 w-full shrink-0 font-bold uppercase tracking-wider ${
-                !selectedTeamId || busy
+                !selectedTeamId || busy || expired
                   ? "border-red-500/30 bg-red-500/10 from-transparent to-transparent text-red-400 shadow-none hover:bg-red-500/20"
                   : confirmLowChance
                   ? "border-amber-500/50 bg-gradient-to-b from-amber-500/30 to-amber-600/20 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.25)] hover:border-amber-400/70 hover:from-amber-500/40 hover:to-amber-600/30 hover:text-amber-200"
                   : ""
               }`}
             >
-              {busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}
+              {expired ? "Operação expirada" : busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}
             </Button>
           </Tip>
       )}

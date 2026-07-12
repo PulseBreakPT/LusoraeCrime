@@ -55,9 +55,12 @@ export function GameProvider({ children }) {
 
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
+  const pendingRefreshRef = useRef(false);  // um refresh pedido durante um fetch em curso
+  const refreshRef = useRef(null);          // referência estável à última `refresh`
   const hasLoadedRef = useRef(!!initialGameState);
   const consecutiveFailuresRef = useRef(0);
   const connectionLostWarnedRef = useRef(false);
+  const [lastSyncAt, setLastSyncAt] = useState(0);  // ms da última sincronização com sucesso
 
   const prevTeamsRef = useRef(null);
   const prevEmployeesRef = useRef(null);
@@ -93,7 +96,11 @@ export function GameProvider({ children }) {
   const toggleFavoriteVehicle = toggleInList(setFavoriteVehicleIds);
 
   const refresh = useCallback(async () => {
-    if (fetchingRef.current || !user) return;
+    if (!user) return;
+    // Corrida action↔poll: se já há um fetch em curso, NÃO descartar o pedido —
+    // marca-o como pendente para correr logo a seguir (a mutação reflete-se sem
+    // esperar um ciclo inteiro de poll).
+    if (fetchingRef.current) { pendingRefreshRef.current = true; return; }
 
     fetchingRef.current = true;
     try {
@@ -110,6 +117,7 @@ export function GameProvider({ children }) {
       if (data.hq_pending) {
         setState(data);
         setStateError(null);
+        setLastSyncAt(Date.now());
         consecutiveFailuresRef.current = 0;
         connectionLostWarnedRef.current = false;
         return;
@@ -285,6 +293,7 @@ export function GameProvider({ children }) {
 
       setState(data);
       setStateError(null);
+      setLastSyncAt(Date.now());
       consecutiveFailuresRef.current = 0;
       connectionLostWarnedRef.current = false;
     } catch (e) {
@@ -301,8 +310,18 @@ export function GameProvider({ children }) {
       }
     } finally {
       fetchingRef.current = false;
+      // Se chegou um pedido de refresh enquanto este fetch corria, honra-o agora
+      // (sem recursão direta — via ref, no próximo tick).
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false;
+        setTimeout(() => refreshRef.current && refreshRef.current(), 0);
+      }
     }
   }, [user, notifications, autoOpenReport]);
+
+  // Referência estável à última `refresh` (usada pelo re-run pendente acima e
+  // pelo listener de visibilidade, sem re-subscrever efeitos).
+  refreshRef.current = refresh;
 
   // Polling — arranca sempre que há utilizador. Se o boot não entregou
   // estado inicial (fallback/timeout), o primeiro fetch é imediato para
@@ -314,19 +333,37 @@ export function GameProvider({ children }) {
     let isRunning = true;
 
     const schedulePoll = async () => {
-      if (!isRunning) return;
+      // Pausa total com o separador escondido — não martela o backend nem
+      // repete diffs/toasts/áudio em segundo plano. Retoma no `onVisible`.
+      if (!isRunning || document.visibilityState === "hidden") return;
       const startTime = Date.now();
       await refresh();
       const elapsed = Date.now() - startTime;
-      const delay = Math.max(2000, 4000 - elapsed);
-      pollTimeout = setTimeout(schedulePoll, delay);
+      const fails = consecutiveFailuresRef.current;
+      // Backoff exponencial quando o backend está em baixo (até 30s); cadência
+      // normal ~4s caso contrário.
+      const delay = fails > 0
+        ? Math.min(30000, 4000 * 2 ** fails)
+        : Math.max(2000, 4000 - elapsed);
+      if (isRunning && document.visibilityState === "visible") {
+        pollTimeout = setTimeout(schedulePoll, delay);
+      }
     };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && isRunning) {
+        if (pollTimeout) clearTimeout(pollTimeout);
+        schedulePoll(); // refresh imediato ao voltar a ficar visível
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     pollTimeout = setTimeout(schedulePoll, hasLoadedRef.current ? 4000 : 0);
 
     return () => {
       isRunning = false;
       if (pollTimeout) clearTimeout(pollTimeout);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user, refresh]);
 
@@ -539,6 +576,7 @@ export function GameProvider({ children }) {
       value={{
         state,
         stateError,
+        lastSyncAt,
         catalog,
         refresh,
         serverNow,

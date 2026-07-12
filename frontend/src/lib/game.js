@@ -219,6 +219,10 @@ export const CHAPTER_LABELS = {
   6: "Capítulo 6 — Legado",
 };
 
+// Limiar de "oportunidade a expirar" (pino urgente no mapa + rótulo da legenda
+// + lista de operações) — fonte única, antes hardcoded/duplicado em LiveMap.
+export const OPP_URGENT_SECONDS = 120;
+
 export function effectiveSpeed(v) {
   if (v.condition >= 50) return v.speed;
   return v.speed * (0.6 + (0.4 * v.condition) / 50);
@@ -812,39 +816,71 @@ export function passiveRates(state, catalog, now = Date.now()) {
   return { dirtyPerH, launderPerH, heatPerH };
 }
 
-export function teamsReadiness(state, now = Date.now()) {
+// Veredicto ÚNICO de prontidão de uma equipa — fonte de verdade partilhada por
+// OpportunityCard, TeamsPanel e opportunityReachable (antes eram três
+// implementações divergentes que se contradiziam).
+//   • opp = null → verificações operacionais genéricas ("a equipa consegue
+//     operar de todo?"): estado, reorganização, membros, veículo, condição,
+//     transferência, abastecimento, lugares e combustível mínimo.
+//   • opp definido → acrescenta o específico da operação: min_members,
+//     required_models, e combustível para a distância real (ida-e-volta).
+// `now` DEVE ser serverNow() do chamador (nunca Date.now() nas verificações de
+// tempo — evita a deriva do relógio). `catalog` é opcional (só a verificação de
+// lugares depende dele). Devolve { ok, reason, members, eta, vehicle, fuelNeeded }.
+export function teamReadiness(state, catalog, team, { opp = null, now = Date.now() } = {}) {
+  if (!team) return { ok: false, reason: "Sem equipa" };
+  if (team.status !== "idle") return { ok: false, reason: STATUS_LABELS[team.status] || "Em operação" };
+  if (team.available_at && Date.parse(team.available_at) > now) {
+    return { ok: false, reorg: true, reason: "A reorganizar-se" };
+  }
+  const members = (state?.employees || []).filter((e) => e.team_id === team.id);
+  if (members.length === 0) return { ok: false, reason: "Sem membros" };
+  const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
+  if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
+  if (opp && ready.length < (opp.min_members || 1)) {
+    return { ok: false, reason: `Mín. ${opp.min_members} membros` };
+  }
+  const vehicle = (state?.vehicles || []).find((v) => v.id === team.vehicle_id);
+  if (!vehicle) return { ok: false, reason: "Sem veículo" };
+  if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > now) {
+    return { ok: false, reason: "Veículo indisponível" };
+  }
+  if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
+  if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > now) {
+    return { ok: false, reason: "A abastecer" };
+  }
+  const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
+  if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
+  if (opp) {
+    if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) {
+      return { ok: false, reason: "Veículo não adequado" };
+    }
+    const hq = state?.player?.hq;
+    const distM = hq ? haversineM(hq.lat, hq.lng, opp.lat, opp.lng) : 0;
+    const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
+    if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
+    return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle, fuelNeeded, distM };
+  }
+  // Genérico (sem operação alvo): combustível mínimo operacional.
+  if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
+  return { ok: true, members: ready.length, vehicle };
+}
+
+export function teamsReadiness(state, now = Date.now(), catalog = null) {
   let ready = 0, busy = 0;
   const teams = state?.teams || [];
   teams.forEach((t) => {
     if (t.status !== "idle") { busy += 1; return; }
-    if (t.available_at && Date.parse(t.available_at) > now) return;
-    const members = (state.employees || []).filter((e) => e.team_id === t.id);
-    const active = members.filter((e) => e.status === "idle" && e.fatigue < 90);
-    const vehicle = (state.vehicles || []).find((v) => v.id === t.vehicle_id);
-    const ok = active.length > 0 && vehicle && vehicle.condition >= 30 && vehicle.fuel_l >= vehicle.tank_l * 0.12;
-    if (ok) ready += 1;
+    if (teamReadiness(state, catalog, t, { now }).ok) ready += 1;
   });
   return { ready, busy, total: teams.length };
 }
 
-// Existe pelo menos uma equipa capaz de despachar para esta oportunidade agora
-// (membros suficientes para o risco, veículo em condições, compatível se exigir
-// um modelo específico)? Usado por "Ocultar missões impossíveis" (Definições).
-export function opportunityReachable(state, opp) {
-  const teams = state?.teams || [];
-  const now = Date.now();
-  return teams.some((t) => {
-    if (t.status !== "idle") return false;
-    if (t.available_at && Date.parse(t.available_at) > now) return false;
-    const members = (state.employees || []).filter((e) => e.team_id === t.id);
-    const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
-    if (ready.length < (opp.min_members || 1)) return false;
-    const vehicle = (state.vehicles || []).find((v) => v.id === t.vehicle_id);
-    if (!vehicle || vehicle.condition < 20 || vehicle.fuel_l < vehicle.tank_l * 0.05) return false;
-    if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > now) return false;
-    if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) return false;
-    return true;
-  });
+// Existe pelo menos uma equipa capaz de despachar para esta oportunidade agora?
+// Usado por "Ocultar missões impossíveis" e pelo filtro "só alcançáveis".
+// Reutiliza o veredicto unificado (mesma definição do cartão de despacho).
+export function opportunityReachable(state, opp, now = Date.now(), catalog = null) {
+  return (state?.teams || []).some((t) => teamReadiness(state, catalog, t, { opp, now }).ok);
 }
 
 export function orgAlerts(state) {

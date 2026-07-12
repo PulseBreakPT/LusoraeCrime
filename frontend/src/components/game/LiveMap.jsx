@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X, Star, Check, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
-import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS } from "../../lib/game";
+import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS, OPP_URGENT_SECONDS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
 import PoliceLayer from "./PoliceLayer";
@@ -832,12 +832,16 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           missionPhaseLabel = STATUS_LABELS[activeMission.phase] || activeMission.phase;
         }
         const isFavorite = (state.player.favorite_types || []).includes(opp.type_key);
-        const urgent = !taken && !locked && expiresS > 0 && expiresS < 120;
+        const urgent = !taken && !locked && expiresS > 0 && expiresS < OPP_URGENT_SECONDS;
+        // Filtro por base: esbate as oportunidades geradas por outra base
+        // (mesma semântica das missões — generated_by_property_id ou "hq").
+        const dim = baseFilter !== "all" && (opp.generated_by_property_id || "hq") !== baseFilter;
         return (
           <Marker
             key={opp.id}
             position={[opp.lat, opp.lng]}
             icon={oppIconCached(opp, opp.id === selectedOppId, isFavorite, urgent)}
+            opacity={dim ? 0.25 : 1}
             zIndexOffset={isFavorite ? 400 : urgent ? 350 : 0}
             eventHandlers={{ click: () => { setFollowId(null); onSelectOpp(opp); } }}
           >
@@ -1004,7 +1008,7 @@ export const MapLegend = () => {
               Perímetro de patrulha junto ao QG e imóveis
             </span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-blue-900 bg-blue-200" /> Agentes no terreno (perímetro)</span>
-            <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;2 min)</span>
+            <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;{Math.round(OPP_URGENT_SECONDS / 60)} min)</span>
           </div>
           <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">

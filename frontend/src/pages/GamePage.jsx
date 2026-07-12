@@ -15,6 +15,7 @@ import { PropertiesPanel } from "../components/game/PropertiesPanel";
 import { HQPanel } from "../components/game/HQPanel";
 import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
+import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
@@ -24,7 +25,7 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, refresh, serverNow, autoOpenReportSignal, placement } = useGame();
@@ -265,6 +266,11 @@ export default function GamePage() {
       >
       <div className="lus-dock flex items-center gap-0.5 overflow-x-auto rounded-2xl border px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-1 md:overflow-visible md:px-1.5">
         <HudButton
+          testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400"
+          tip="Lista de todas as oportunidades no mapa — ordena por ETA, recompensa ou risco, filtra e despacha sem procurar pino a pino."
+          active={openPanel === "operations"} onClick={() => setOpenPanel("operations")}
+        />
+        <HudButton
           testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
           alert={alerts.claimable > 0}
           tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) por reclamar — história, diárias e semanais.` : "Missões de história, diárias, semanais e alertas dinâmicos."}
@@ -314,6 +320,11 @@ export default function GamePage() {
       </div>
       )}
 
+      <OpportunitiesPanel
+        open={openPanel === "operations"}
+        onOpenChange={(o) => setOpenPanel(o ? "operations" : null)}
+        onSelectOpp={(o) => { setSelectedOpp(o); setOpenPanel(null); }}
+      />
       <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} />
       <QuestsPanel
         open={openPanel === "quests"}
