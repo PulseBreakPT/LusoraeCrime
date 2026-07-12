@@ -13,17 +13,24 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { UserRound } from "lucide-react";
 import {
   ensurePoliceSim, policeTick, getPatrols, getPoliceVersion,
-  officerStateAt, deployCommAt, patrolStateLabel, FORCES,
+  officerStateAt, deployCommAt, patrolStateLabel, FORCES, DEFAULT_FORCE, VEHICLE_TYPE_LABELS,
 } from "../../lib/police";
 
-// ---------- Ícones (cacheados — 1 instância por força PSP/GNR) ----------
+// ---------- Ícones (data-driven por força — sem hard-code PSP/GNR) ----------
+// A cor da viatura/agente vem de FORCES[force] (bodyColor/tint) por CSS vars,
+// e o tipo de viatura de uma classe `.police-vehicle-<tipo>`. Acrescentar uma
+// força ou um tipo de viatura no futuro não exige tocar aqui.
+const cfgFor = (force) => FORCES[force] || FORCES[DEFAULT_FORCE];
+
 const carIconCache = {};
-const policeCarIcon = (force) => {
-  const key = force === "GNR" ? "GNR" : "PSP";
+const policeCarIcon = (force, vtype = "carro") => {
+  const key = `${force}|${vtype}`;
   if (!carIconCache[key]) {
+    const F = cfgFor(force);
     const html = `
-      <div class="police-car${key === "GNR" ? " police-force-gnr" : ""}" data-proot>
-        <span class="police-car-body" data-car>
+      <div class="police-car police-force-${(force || DEFAULT_FORCE).toLowerCase()}" data-proot
+           style="--pbody:${F.bodyColor};--ptint:${F.tint}">
+        <span class="police-car-body police-vehicle-${vtype}" data-car>
           <span class="police-lightbar"><i></i><i></i></span>
           <span class="unit-car-glass"></span>
           <span class="unit-car-door unit-car-door-l"></span>
@@ -37,10 +44,11 @@ const policeCarIcon = (force) => {
 
 const officerIconCache = {};
 const policeOfficerIcon = (force) => {
-  const key = force === "GNR" ? "GNR" : "PSP";
+  const key = force || DEFAULT_FORCE;
   if (!officerIconCache[key]) {
+    const F = cfgFor(force);
     const html = `
-      <div class="op-pin police-op${key === "GNR" ? " police-op-gnr" : ""}">
+      <div class="op-pin police-op police-op-${key.toLowerCase()}" style="--ptint:${F.tint}">
         <span class="op-face-wrap" data-face><span class="op-face"></span></span>
         ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
       </div>`;
@@ -217,9 +225,9 @@ export default function PoliceLayer({ state, serverNow }) {
     <>
       {patrols.map((p) => {
         const label = patrolStateLabel(p);
-        const isGNR = p.force === "GNR";
-        const F = FORCES[p.force] || FORCES.PSP;
-        const forceTint = isGNR ? "#86EFAC" : "#93C5FD";
+        const F = FORCES[p.force] || FORCES[DEFAULT_FORCE];
+        const forceTint = F.tint;
+        const vtypeLabel = VEHICLE_TYPE_LABELS[p.vehicleType] || VEHICLE_TYPE_LABELS.carro;
         const color = STATE_COLORS[p.state] || "#60A5FA";
         const deployed = !!p.deploy;
         return (
@@ -230,7 +238,7 @@ export default function PoliceLayer({ state, serverNow }) {
                 else { delete carMarkersRef.current[p.id]; delete carElsRef.current[p.id]; }
               }}
               position={[p.pos.lat, p.pos.lng]}
-              icon={policeCarIcon(p.force)}
+              icon={policeCarIcon(p.force, p.vehicleType)}
               zIndexOffset={460}
             >
               <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
@@ -238,7 +246,8 @@ export default function PoliceLayer({ state, serverNow }) {
                   <p className="text-[11px] font-bold" style={{ color: forceTint }}>Patrulha {p.id}</p>
                   <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color }}>{label}</p>
                   <div className="mt-1 space-y-0.5">
-                    <TipRow label="força" value={isGNR ? "GNR · rural" : "PSP · urbana"} color={F.color} />
+                    <TipRow label="força" value={`${p.force} · ${F.terrainLabel}`} color={F.color} />
+                    <TipRow label="viatura" value={vtypeLabel} color={forceTint} />
                     <TipRow label="zona" value={p.zone.name} color={forceTint} />
                     <TipRow label="agentes" value={`${p.officers} a bordo`} color="#E4E4E7" />
                     {p.alert && (
@@ -252,11 +261,7 @@ export default function PoliceLayer({ state, serverNow }) {
                     <p className="mt-1 text-[9px] text-red-400/80">Se apanhar a equipa antes do QG, a carga perde-se.</p>
                   )}
                   {p.state === "patrol" && (
-                    <p className="mt-1 text-[9px] text-zinc-500">
-                      {isGNR
-                        ? "Posto territorial — menos viaturas, mais terreno e estradas vigiadas…"
-                        : "Evita operar debaixo do olhar de uma patrulha…"}
-                    </p>
+                    <p className="mt-1 text-[9px] text-zinc-500">{F.label}.</p>
                   )}
                 </div>
               </LTooltip>

@@ -985,13 +985,13 @@ export const MapLegend = () => {
               <span className="flex h-3.5 w-3.5 items-center justify-center">
                 <span className="h-3 w-1.5 rounded-sm bg-blue-500" />
               </span>
-              Patrulha PSP — centros urbanos (mais viaturas)
+              PSP (azul) — competência nos centros urbanos
             </span>
             <span className="flex items-center gap-1.5">
               <span className="flex h-3.5 w-3.5 items-center justify-center">
                 <span className="h-3 w-1.5 rounded-sm bg-green-600" />
               </span>
-              Patrulha GNR — zonas rurais e estradas
+              GNR (verde) — rural, vilas e estradas nacionais
             </span>
             <span className="flex items-center gap-1.5">
               <span className="flex h-3.5 w-3.5 items-center justify-center">

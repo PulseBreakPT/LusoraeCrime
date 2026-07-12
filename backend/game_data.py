@@ -48,6 +48,9 @@ from economy_constants import (
     ESCAPE_HEAT_SPAN, ESCAPE_HEAT_EXP,
     POLICE_PROB_BASE, POLICE_PROB_SPAN, POLICE_PROB_EXP, POLICE_PROB_CAP,
     HEAT_DECAY_BASE_PER_MIN, HEAT_DECAY_SLOPE,
+    POLICE_URBAN_CHANCE_PENALTY, POLICE_RURAL_CHANCE_BONUS,
+    POLICE_URBAN_CHASE_BONUS, POLICE_RURAL_CHASE_RELIEF,
+    POLICE_URBAN_ESCAPE_PENALTY, POLICE_RURAL_ESCAPE_BONUS,
 )
 
 LISBON_SPOTS = [
@@ -70,6 +73,63 @@ LISBON_SPOTS = [
 ]
 
 HQ_LOCATION = {"name": "Armazém do Cais", "lat": 38.7062, "lng": -9.1480}
+
+# ---------------------------------------------------------------------------
+# Divisão territorial das forças de segurança (PSP urbano / GNR rural).
+# Espelho EXATO de PSP_CITIES em frontend/src/lib/police.js — o backend e a
+# simulação visual têm de classificar cada ponto da mesma forma. Um ponto a
+# menos de `r` metros do centro de uma região cai nessa força; caso contrário
+# cai na força por omissão (GNR — vilas, aldeias, campo, estradas, periferias).
+#
+# Estrutura genérica (N forças): para acrescentar a PJ/GOE/etc. no futuro basta
+# juntar entradas com outra `force` e um efeito em POLICE_FORCE_EFFECTS — sem
+# refatorações. `police_force_for()` (engine.py) resolve a força competente.
+POLICE_DEFAULT_FORCE = "GNR"
+POLICE_FORCE_REGIONS = [
+    {"force": "PSP", "name": "Lisboa", "lat": 38.7223, "lng": -9.1393, "r": 9500},
+    {"force": "PSP", "name": "Amadora", "lat": 38.7597, "lng": -9.2399, "r": 3500},
+    {"force": "PSP", "name": "Cascais", "lat": 38.6979, "lng": -9.4215, "r": 3500},
+    {"force": "PSP", "name": "Almada", "lat": 38.68, "lng": -9.1587, "r": 3500},
+    {"force": "PSP", "name": "Porto", "lat": 41.1496, "lng": -8.6109, "r": 7500},
+    {"force": "PSP", "name": "Vila Nova de Gaia", "lat": 41.124, "lng": -8.6118, "r": 4500},
+    {"force": "PSP", "name": "Braga", "lat": 41.5454, "lng": -8.4265, "r": 5000},
+    {"force": "PSP", "name": "Guimarães", "lat": 41.4425, "lng": -8.2918, "r": 3500},
+    {"force": "PSP", "name": "Coimbra", "lat": 40.2033, "lng": -8.4103, "r": 5000},
+    {"force": "PSP", "name": "Faro", "lat": 37.0194, "lng": -7.9304, "r": 4000},
+    {"force": "PSP", "name": "Setúbal", "lat": 38.5244, "lng": -8.8882, "r": 4500},
+    {"force": "PSP", "name": "Aveiro", "lat": 40.6405, "lng": -8.6538, "r": 4000},
+    {"force": "PSP", "name": "Viseu", "lat": 40.6566, "lng": -7.9124, "r": 3500},
+    {"force": "PSP", "name": "Leiria", "lat": 39.7443, "lng": -8.807, "r": 3500},
+    {"force": "PSP", "name": "Évora", "lat": 38.5714, "lng": -7.9135, "r": 3500},
+    {"force": "PSP", "name": "Santarém", "lat": 39.2362, "lng": -8.6868, "r": 3000},
+    {"force": "PSP", "name": "Viana do Castelo", "lat": 41.6946, "lng": -8.8302, "r": 3000},
+    {"force": "PSP", "name": "Vila Real", "lat": 41.3006, "lng": -7.7441, "r": 3000},
+    {"force": "PSP", "name": "Bragança", "lat": 41.8061, "lng": -6.7567, "r": 3000},
+    {"force": "PSP", "name": "Castelo Branco", "lat": 39.8222, "lng": -7.4931, "r": 3000},
+    {"force": "PSP", "name": "Guarda", "lat": 40.5373, "lng": -7.2675, "r": 3000},
+    {"force": "PSP", "name": "Portalegre", "lat": 39.2967, "lng": -7.4286, "r": 2500},
+    {"force": "PSP", "name": "Beja", "lat": 38.0151, "lng": -7.8632, "r": 3000},
+    {"force": "PSP", "name": "Funchal", "lat": 32.6669, "lng": -16.9241, "r": 4500},
+    {"force": "PSP", "name": "Ponta Delgada", "lat": 37.7412, "lng": -25.6756, "r": 3500},
+]
+
+# Efeito de cada força no risco REAL da operação (chance, perseguição, fuga).
+# `.get(force, {})` devolve efeito neutro para forças ainda sem regras — mais
+# uma força no futuro = mais uma entrada aqui, sem tocar na lógica.
+POLICE_FORCE_EFFECTS = {
+    "PSP": {
+        "terrain": "urbana", "chance": -POLICE_URBAN_CHANCE_PENALTY,
+        "chase": POLICE_URBAN_CHASE_BONUS, "escape": -POLICE_URBAN_ESCAPE_PENALTY,
+        "label": "Zona urbana — PSP",
+        "tip": "Centro urbano sob competência da PSP: malha policial densa e resposta rápida — mais arriscado e mais difícil de despistar.",
+    },
+    "GNR": {
+        "terrain": "rural", "chance": POLICE_RURAL_CHANCE_BONUS,
+        "chase": -POLICE_RURAL_CHASE_RELIEF, "escape": POLICE_RURAL_ESCAPE_BONUS,
+        "label": "Zona rural — GNR",
+        "tip": "Zona rural/estrada sob competência da GNR: patrulhas dispersas por muito terreno — menos vigilância e fuga mais fácil.",
+    },
+}
 
 TEAM_NAMES = ["Crew Alfa", "Crew Bravo", "Crew Cobra", "Crew Delta", "Crew Eco",
               "Crew Fénix", "Crew Gama", "Crew Hidra", "Crew Íbis", "Crew Jaguar",

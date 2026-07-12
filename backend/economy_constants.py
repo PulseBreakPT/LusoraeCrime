@@ -780,6 +780,21 @@ POLICE_PROB_SPAN = 0.49
 POLICE_PROB_EXP = 1.3
 POLICE_PROB_CAP = 0.65
 
+# --- Divisão territorial PSP (urbano) / GNR (rural) ---------------------------
+# A força competente pela zona da operação afeta o risco REAL, não só o visual:
+#   • Zona urbana (PSP): malha densa, resposta rápida — operar no centro é mais
+#     arriscado (menos chance) e a fuga é mais difícil, mas as patrulhas estão
+#     perto (mais perseguições).
+#   • Zona rural (GNR): patrulhas dispersas por muito terreno — menos olhos
+#     (mais chance), menos perseguições, e estradas abertas facilitam o despiste.
+# Efeitos modestos e transparentes (aparecem no breakdown do preview).
+POLICE_URBAN_CHANCE_PENALTY = 0.04   # zona PSP densa: centro urbano mais arriscado
+POLICE_RURAL_CHANCE_BONUS = 0.03     # zona GNR esparsa: menos vigilância
+POLICE_URBAN_CHASE_BONUS = 0.08      # resposta urbana rápida → mais perseguições
+POLICE_RURAL_CHASE_RELIEF = 0.05     # patrulhas rurais longe → menos perseguições
+POLICE_URBAN_ESCAPE_PENALTY = 0.06   # malha densa dificulta o despiste
+POLICE_RURAL_ESCAPE_BONUS = 0.10     # estradas nacionais abertas facilitam a fuga
+
 # --- Decaimento de calor não-linear --------------------------------------------
 # taxa/min = BASE − SLOPE*(heat/100) → calor 50: 1.2/min (igual à média antiga),
 # calor baixo dissipa mais depressa, calor alto "cola-se" — picos têm peso real.

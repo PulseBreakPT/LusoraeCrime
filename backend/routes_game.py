@@ -24,7 +24,8 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     weapon_combat_score, weapon_effective_score, weapon_jam_risk,
                     weapon_condition_factor,
                     _unlink_employee_weapon,
-                    is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage)
+                    is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage,
+                    police_force_for)
 from quests import (make_instance, enrich_quest, locked_principals, effective_quest_rewards,
                     LEVEL_MONEY_SLOPE, LEVEL_RESPECT_SLOPE, TIER_BONUS, STREAK_BONUS,
                     STREAK_BONUS_MAX, SPEED_BONUS, TOTAL_MULT_CAP, MOMENTUM_CLAIM)
@@ -608,6 +609,9 @@ async def _prepare_dispatch(player, opp, team):
     team_cat_missions = int((team.get("category_missions") or {}).get(opp["category"], 0) or 0)
     roster_missions = int(team.get("roster_missions", 0) or 0)
     vehicle_discreet = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("discretion", 50) >= STEALTH_VEHICLE_DISCRETION_MIN
+    # Força competente pela zona da operação — de opp.police_force (gravado no
+    # spawn) ou classificado agora para oportunidades anteriores à feature.
+    police_force = opp.get("police_force") or police_force_for(opp["lat"], opp["lng"])
     chance_ctx = {
         "heat": player["heat"], "risk": opp["risk"], "dist_km": opp.get("dist_km", 0.0),
         "category": opp["category"], "members": members, "min_members": opp.get("min_members", 1),
@@ -616,6 +620,7 @@ async def _prepare_dispatch(player, opp, team):
         # SSS v4: memória do mundo e da equipa, finalmente ligadas à chance.
         "district": opp.get("district"),
         "district_attention": district_attention_of(player, opp.get("district")),
+        "police_force": police_force,
         "team_streak": team_streak,
         "team_cat_missions": team_cat_missions,
         "roster_missions": roster_missions,
@@ -829,6 +834,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
             "risk": opp["risk"], "heat": opp["heat"], "pays": opp["pays"], "min_level": opp["min_level"],
+            "police_force": opp.get("police_force") or police_force_for(opp["lat"], opp["lng"]),
         },
         # Dados de recompensa dinâmica para cálculo consistente de XP/reputação
         "reward_xp": prep.get("reward_xp"),
