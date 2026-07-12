@@ -56,6 +56,7 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        VEHICLE_TRANSFER_COST_PER_KM, VEHICLE_TRANSFER_COST_MIN,
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S,
                        PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT,
+                       SPAWN_HQ_FALLOFF_KM,
                        CHANCE_FLOOR, CHANCE_CEILING, CHANCE_SOFT_KNEE, CHANCE_SOFT_SPAN,
                        RISK_PENALTY_LINEAR, RISK_PENALTY_QUADRATIC,
                        PRIMARY_ATTR_WEIGHT_MAIN, PRIMARY_ATTR_WEIGHT_SECONDARY,
@@ -626,7 +627,15 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         return max(DISTRICT_ATTENTION_SPAWN_MIN_W,
                    1 - (att / DISTRICT_ATTENTION_MAX) * (1 - DISTRICT_ATTENTION_SPAWN_MIN_W))
 
-    centers = [(spot, LISBON_SPOT_WEIGHT * _att_weight(spot["name"]), None) for spot in district_spots]
+    def _dist_weight(lat, lng):
+        # Enviesa a escolha de centro para perto do QG sem eliminar o longe:
+        # peso ∝ 1/(1 + d/D0). Um centro a SPAWN_HQ_FALLOFF_KM recebe metade do
+        # peso de um colado ao QG. Só afeta a probabilidade de escolha — o
+        # alcance espacial e o risco/recompensa por distância ficam intactos.
+        d_km = haversine_m(hq["lat"], hq["lng"], lat, lng) / 1000
+        return 1.0 / (1.0 + d_km / SPAWN_HQ_FALLOFF_KM)
+
+    centers = [(spot, LISBON_SPOT_WEIGHT * _att_weight(spot["name"]) * _dist_weight(spot["lat"], spot["lng"]), None) for spot in district_spots]
     for p in props:
         centers.append(({"name": p["name"], "lat": p["lat"], "lng": p["lng"]},
                          _property_spawn_weight(p, props) * _att_weight(p["name"]), str(p["_id"])))
