@@ -49,6 +49,8 @@ export const POLICE_CONFIG = {
   suspicionCap: 0.62,
   pursuitLockM: 240,            // distância para "colar" à rota da equipa
   pursuitLagMinM: 110,          // nunca fica em cima da equipa
+  interceptLeadM: 350,          // GNR: avança este tanto na rota para bloquear
+  interceptHoldM: 90,           // GNR: distância ao ponto de bloqueio p/ segurar
   routeThrottleMs: 650,         // 1 pedido OSRM de patrulha por 650ms (global)
 };
 
@@ -88,6 +90,12 @@ export const FORCES = {
     responseDelayS: 0,      // resposta imediata
     backupCount: 1,         // 1 reforço, mas chega depressa
     pursuitPersistent: false, // desiste se não fechar (curta e rápida)
+    // Personalidade da IA: agressiva — persegue por trás junto ao alvo, cerco
+    // compacto, vigia densamente o centro (investiga mais).
+    pursuitStyle: "tail",
+    watchFactor: 1.35,      // vigilância urbana densa → investiga mais vezes
+    perimeterScale: 0.85,   // cerco apertado junto ao alvo
+    edgeBias: false,        // mantém-se no centro da zona
     officersMin: 2,
     officersExtraChance: 0.5, // mais agentes a pé no cerco urbano
     vehicles: [
@@ -115,6 +123,12 @@ export const FORCES = {
     responseDelayS: 4.5,    // tempo de resposta inicial superior
     backupCount: 2,         // chegam em maior número, mas mais tarde
     pursuitPersistent: true, // não desiste — interceta o veículo em fuga
+    // Personalidade da IA: estratégica — corta a rota de fuga à frente, controla
+    // os acessos, perímetro amplo; vigia menos ao detalhe mas de muito longe.
+    pursuitStyle: "intercept",
+    watchFactor: 0.7,       // menos investigações de rotina (patrulhas dispersas)
+    perimeterScale: 1.35,   // perímetro de segurança amplo
+    edgeBias: true,         // vira-se para os acessos/estradas da periferia
     officersMin: 2,
     officersExtraChance: 0.2, // maioritariamente motorizada
     vehicles: [
@@ -466,13 +480,17 @@ function requestRoute(p, to, { urgent = false, endFrac = 1, nowMs = 0 } = {}) {
 // às vezes um desvio a um bairro vizinho, com regresso natural à zona.
 function pickPatrolWaypoint(p) {
   const rng = p.rng;
+  const edgeBias = !!(FORCES[p.force] || FORCES[DEFAULT_FORCE]).edgeBias;
   let center = p.zone;
   let radius = p.zone.radius;
   const distHome = distMeters(p.pos, p.zone);
+  // A GNR (edgeBias) controla os acessos: desvia-se mais para as ligações/
+  // estradas entre zonas; a PSP raramente sai do centro da sua zona.
+  const detourChance = edgeBias ? 0.30 : 0.16;
   if (distHome > p.zone.radius * 1.6) {
     // Afastou-se demasiado — regressa à sua área.
     radius = p.zone.radius * 0.5;
-  } else if (rng() < 0.16 && ZONES.length > 1) {
+  } else if (rng() < detourChance && ZONES.length > 1) {
     // Desvio ocasional: zona vizinha (a mais próxima de 3 amostras) — a GNR
     // cobre as ligações entre zonas (estradas), a PSP raramente sai do centro.
     let best = null; let bd = Infinity;
@@ -485,7 +503,8 @@ function pickPatrolWaypoint(p) {
     if (best && bd < 12000) { center = best; radius = best.radius * 0.6; }
   }
   const ang = rng() * Math.PI * 2;
-  const dist = radius * (0.3 + 0.7 * rng());
+  // GNR vira-se para o anel exterior (acessos/periferia); PSP fica mais central.
+  const dist = radius * (edgeBias ? (0.55 + 0.45 * rng()) : (0.3 + 0.7 * rng()));
   const pt = ringPoint(center, ang, dist);
   return {
     lat: clamp(pt.lat, BOUNDS.latMin, BOUNDS.latMax),
@@ -542,8 +561,12 @@ function missionPlan(m, heat) {
       backup: risk >= POLICE_CONFIG.backupRisk || heat >= POLICE_CONFIG.backupHeat,
     };
   }
+  // Deteção sensível à força: a PSP vigia densamente o centro urbano
+  // (investiga mais); a GNR, com patrulhas dispersas por muito terreno,
+  // investiga menos de rotina (mas o seu alcance de resposta é vastíssimo).
+  const watch = (FORCES[missionForce(m)] || FORCES[DEFAULT_FORCE]).watchFactor ?? 1;
   const prob = clamp(
-    POLICE_CONFIG.suspicionBase + risk * POLICE_CONFIG.suspicionPerRisk + heat * POLICE_CONFIG.suspicionPerHeat,
+    (POLICE_CONFIG.suspicionBase + risk * POLICE_CONFIG.suspicionPerRisk + heat * POLICE_CONFIG.suspicionPerHeat) * watch,
     0, POLICE_CONFIG.suspicionCap,
   );
   if (rng() < prob) {
@@ -641,7 +664,7 @@ function director(nowMs, ctx) {
         p.lights = true;
         p.deploy = null;
         p.parking = null;
-        p.pursuit = { missionId: m.id, missionName: m.opportunity?.name, locked: false, lagM: 0, lastRefetch: 0, blend: null, startSec: nowSec };
+        p.pursuit = { missionId: m.id, missionName: m.opportunity?.name, locked: false, lagM: 0, lastRefetch: 0, blend: null, startSec: nowSec, mode: (FORCES[p.force]?.pursuitStyle === "intercept" ? "block" : "tail") };
         p.route = null;
         p.routePending = false;
         bump();
@@ -732,7 +755,10 @@ function buildDeployment(p, nowSec) {
   const street = approach + Math.PI;
   const n = clamp(p.officers, 1, 4);
   const dPT = Math.max(6, distMeters(park, target));
-  const radScale = clamp(dPT / 26, 0.7, 1.4);
+  // Perímetro por força: a PSP fecha um cerco compacto junto ao alvo; a GNR
+  // monta um perímetro de segurança amplo (perimeterScale).
+  const perimeterScale = (FORCES[p.force] || FORCES[DEFAULT_FORCE]).perimeterScale ?? 1;
+  const radScale = clamp(dPT / 26, 0.7, 1.4) * perimeterScale;
   const intervene = kind === "intervene";
   const walkSpeed = (intervene ? POLICE_CONFIG.officerRun : POLICE_CONFIG.officerWalk);
 
@@ -926,8 +952,10 @@ function pursuitStep(p, m, nowMs, dt) {
       breakOff(p, nowSec);
       return;
     }
-    // Fase de interceção: conduz até à posição atual da equipa, re-planeando
-    // a rota quando ela foge do destino anterior.
+
+    // Assim que a equipa chega a alcance de "colar", ambas as forças caem na
+    // perseguição colada à rota (a diferença de personalidade está em COMO se
+    // chega aqui: a GNR corta à frente, a PSP persegue por trás).
     if (gap < POLICE_CONFIG.pursuitLockM && geo.parking) {
       p.pursuit.locked = true;
       p.pursuit.lagM = Math.max(POLICE_CONFIG.pursuitLagMinM, gap);
@@ -936,6 +964,45 @@ function pursuitStep(p, m, nowMs, dt) {
       p.routePending = false;
       return;
     }
+
+    // ---- GNR (estratégica): corta a rota de fuga À FRENTE e segura o acesso.
+    if ((forceCfg(p).pursuitStyle || "tail") === "intercept" && geo.parking) {
+      p.pursuit.mode = "block";
+      const pk = geo.parking;
+      const total = pk.total || 1;
+      // Ponto de bloqueio: um troço à frente da equipa, na própria rota de fuga.
+      const blockFrac = clamp((pose.frac ?? 0) + POLICE_CONFIG.interceptLeadM / total, 0, pk.parkFrac ?? 1);
+      const aim = pointOnRoute(pk.latlngs, pk.cum, blockFrac) || teamPos;
+      const distToBlock = distMeters(p.pos, aim);
+      // No ponto de bloqueio e a equipa ainda atrás → segura a posição (corta o
+      // acesso, luzes ligadas, virada para quem se aproxima).
+      if (distToBlock < POLICE_CONFIG.interceptHoldM) {
+        p.speed = Math.max(0, p.speed - POLICE_CONFIG.brake * dt);
+        p.lights = true;
+        const bb = toDeg(bearingRad(p.pos, teamPos));
+        if (bb != null) p.bearing = ((bb % 360) + 360) % 360;
+        return;
+      }
+      // Ainda a caminho do ponto de bloqueio — re-planeia quando ele avança
+      // (a equipa progride na fuga → o bloqueio desloca-se para a frente).
+      const needRouteI = !p.route && !p.routePending;
+      const staleI = p.route && (nowSec - (p.pursuit.lastRefetch || 0) > 6) &&
+        distMeters(aim, pointOnRoute(p.route.latlngs, p.route.cum, 1) || aim) > 150;
+      if (needRouteI || staleI) {
+        p.pursuit.lastRefetch = nowSec;
+        p.routePending = true;
+        fetchRoute({ ...p.pos }, aim).then((info) => {
+          if (p.state !== "pursuit" || !p.routePending) return;
+          setRoute(p, info, 1);
+        }).catch(() => { p.routePending = false; });
+      }
+      driveStep(p, dt, forceCfg(p).pursuitCruise);
+      return;
+    }
+
+    // ---- PSP (agressiva): persegue a posição ATUAL da equipa (por trás),
+    // re-planeando a rota quando ela foge do destino anterior.
+    p.pursuit.mode = "tail";
     const needRoute = !p.route && !p.routePending;
     const stale = p.route && (nowSec - (p.pursuit.lastRefetch || 0) > 9) &&
       distMeters(teamPos, pointOnRoute(p.route.latlngs, p.route.cum, 1) || teamPos) > 200;
@@ -1183,6 +1250,10 @@ export function getPoliceVersion() {
 }
 
 export function patrolStateLabel(p) {
+  if (p.state === "pursuit") {
+    // Rótulo por personalidade: GNR corta a rota à frente, PSP persegue/cerca.
+    return p.pursuit?.mode === "block" ? "A cortar a rota de fuga" : "Em perseguição (cerco)";
+  }
   if (p.state.startsWith("onscene")) return PATROL_STATE_LABELS[p.state];
   return PATROL_STATE_LABELS[p.state] || p.state;
 }
