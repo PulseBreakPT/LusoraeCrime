@@ -15,6 +15,16 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "..
 import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown, Video } from "lucide-react";
 import { audio } from "../../lib/audio";
 
+// Força de segurança competente pela zona (do backend, opp.police_force) — diz
+// ao jogador quem responde ali e como isso mexe no risco real. Escalável: mais
+// uma força = mais uma entrada.
+const POLICE_FORCE_INFO = {
+  PSP: { label: "PSP · urbana", color: "#3B82F6",
+    tip: "Zona urbana sob competência da PSP — malha policial densa e resposta rápida: operar aqui é mais arriscado e a fuga é mais difícil." },
+  GNR: { label: "GNR · rural", color: "#22C55E",
+    tip: "Zona rural/estrada sob competência da GNR — patrulhas dispersas por muito terreno: menos vigilância e fuga mais fácil." },
+};
+
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const {
     state, catalog, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
@@ -260,6 +270,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           tip="Respeito ganho em caso de sucesso — acumula para subir o nível da organização." />
         <Chip icon={Flame} value={`+${Math.round(opp.heat)}`} color="#EF4444"
           tip="Calor policial gerado por esta operação — sobe mesmo com sucesso." />
+        {opp.police_force && POLICE_FORCE_INFO[opp.police_force] && (
+          <Chip icon={Siren} value={POLICE_FORCE_INFO[opp.police_force].label}
+            color={POLICE_FORCE_INFO[opp.police_force].color}
+            tip={POLICE_FORCE_INFO[opp.police_force].tip} />
+        )}
         {opp.min_level > 1 && (
           <Chip icon={Lock} value={`N${opp.min_level}`} color={lockedByLevel ? "#EF4444" : "#71717A"}
             tip={`Nível mínimo da organização para esta operação: ${opp.min_level}.`} />

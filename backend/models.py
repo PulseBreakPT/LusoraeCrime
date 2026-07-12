@@ -200,6 +200,7 @@ class Opportunity(BaseDocument):
     expires_at: str
     created_at: str
     generated_by_property_id: Optional[str] = None
+    police_force: Optional[str] = None
 
 
 class Mission(BaseDocument):

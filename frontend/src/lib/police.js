@@ -60,11 +60,23 @@ export const POLICE_CONFIG = {
 //          muito maiores, resposta ligeiramente mais lenta mas cruzeiro de
 //          estrada mais alto. Faixa VERDE.
 // ---------------------------------------------------------------------------
+// Força por omissão (fallthrough geográfico e fallback de segurança). GNR
+// cobre tudo o que não é centro urbano — vilas, campo, estradas nacionais.
+export const DEFAULT_FORCE = "GNR";
+
+// Cada força é auto-descritiva: cor viva (color), cor do corpo da viatura
+// (bodyColor), tinta clara dos agentes/labels (tint), rótulo do terreno
+// (terrainLabel) e a frota (vehicles, com pesos). Acrescentar uma força nova
+// (PJ, GOE, drones…) = mais uma entrada aqui + uma região em FORCE_REGIONS —
+// nenhuma lógica hard-coded a "PSP"/"GNR" pelo meio.
 export const FORCES = {
   PSP: {
     key: "PSP",
     label: "Polícia de Segurança Pública",
     color: "#3B82F6",
+    bodyColor: "#1e3a8a",
+    tint: "#93C5FD",
+    terrainLabel: "urbana",
     zoneRadius: 620,        // m — perímetro urbano compacto
     patrolsPerZone: 2,      // presença reforçada no centro das cidades
     cruise: 9.0,            // m/s em patrulhamento (~32 km/h)
@@ -73,11 +85,19 @@ export const FORCES = {
     pursuitCruise: 22,
     officersMin: 2,
     officersExtraChance: 0.4,
+    vehicles: [
+      { type: "carro", w: 6 },
+      { type: "mota", w: 2 },
+      { type: "carrinha", w: 1 },
+    ],
   },
   GNR: {
     key: "GNR",
     label: "Guarda Nacional Republicana",
     color: "#22C55E",
+    bodyColor: "#14532d",
+    tint: "#86EFAC",
+    terrainLabel: "rural",
     zoneRadius: 1250,       // m — posto territorial cobre uma área muito maior
     patrolsPerZone: 1,      // menos patrulhas, mais terreno por viatura
     cruise: 10.5,           // m/s — cruzeiro de estrada nacional (~38 km/h)
@@ -86,50 +106,80 @@ export const FORCES = {
     pursuitCruise: 20,
     officersMin: 2,
     officersExtraChance: 0.2,
+    vehicles: [
+      { type: "carro", w: 5 },
+      { type: "mota", w: 2 },
+      { type: "tt", w: 2 },        // todo-o-terreno — cobertura rural/florestal
+      { type: "carrinha", w: 1 },
+    ],
   },
 };
 
-const forceCfg = (p) => FORCES[p?.force] || FORCES.PSP;
+// Rótulos pt-PT dos tipos de viatura (partilhados por todas as forças).
+export const VEHICLE_TYPE_LABELS = {
+  carro: "Carro-patrulha",
+  mota: "Mota",
+  carrinha: "Carrinha",
+  tt: "Todo-o-terreno",
+};
 
-// Centros urbanos onde a PSP tem competência (grandes cidades e capitais de
-// distrito). Um ativo a menos de `r` metros do centro → zona PSP; caso
-// contrário → GNR (vilas, aldeias, campo, estradas, periferias).
-const PSP_CITIES = [
-  { name: "Lisboa", lat: 38.7223, lng: -9.1393, r: 9500 },
-  { name: "Amadora", lat: 38.7597, lng: -9.2399, r: 3500 },
-  { name: "Cascais", lat: 38.6979, lng: -9.4215, r: 3500 },
-  { name: "Almada", lat: 38.68, lng: -9.1587, r: 3500 },
-  { name: "Porto", lat: 41.1496, lng: -8.6109, r: 7500 },
-  { name: "Vila Nova de Gaia", lat: 41.124, lng: -8.6118, r: 4500 },
-  { name: "Braga", lat: 41.5454, lng: -8.4265, r: 5000 },
-  { name: "Guimarães", lat: 41.4425, lng: -8.2918, r: 3500 },
-  { name: "Coimbra", lat: 40.2033, lng: -8.4103, r: 5000 },
-  { name: "Faro", lat: 37.0194, lng: -7.9304, r: 4000 },
-  { name: "Setúbal", lat: 38.5244, lng: -8.8882, r: 4500 },
-  { name: "Aveiro", lat: 40.6405, lng: -8.6538, r: 4000 },
-  { name: "Viseu", lat: 40.6566, lng: -7.9124, r: 3500 },
-  { name: "Leiria", lat: 39.7443, lng: -8.807, r: 3500 },
-  { name: "Évora", lat: 38.5714, lng: -7.9135, r: 3500 },
-  { name: "Santarém", lat: 39.2362, lng: -8.6868, r: 3000 },
-  { name: "Viana do Castelo", lat: 41.6946, lng: -8.8302, r: 3000 },
-  { name: "Vila Real", lat: 41.3006, lng: -7.7441, r: 3000 },
-  { name: "Bragança", lat: 41.8061, lng: -6.7567, r: 3000 },
-  { name: "Castelo Branco", lat: 39.8222, lng: -7.4931, r: 3000 },
-  { name: "Guarda", lat: 40.5373, lng: -7.2675, r: 3000 },
-  { name: "Portalegre", lat: 39.2967, lng: -7.4286, r: 2500 },
-  { name: "Beja", lat: 38.0151, lng: -7.8632, r: 3000 },
-  { name: "Funchal", lat: 32.6669, lng: -16.9241, r: 4500 },
-  { name: "Ponta Delgada", lat: 37.7412, lng: -25.6756, r: 3500 },
+const forceCfg = (p) => FORCES[p?.force] || FORCES[DEFAULT_FORCE];
+
+// Escolha ponderada de um tipo de viatura para uma força (determinística por rng).
+function pickVehicleType(F, rng) {
+  const opts = F.vehicles || [{ type: "carro", w: 1 }];
+  const total = opts.reduce((a, o) => a + o.w, 0);
+  let r = rng() * total;
+  for (const o of opts) {
+    r -= o.w;
+    if (r <= 0) return o.type;
+  }
+  return opts[0].type;
+}
+
+// Regiões de competência por força. Um ponto dentro do raio `r` de uma região
+// cai nessa força (a mais próxima ganha); fora de todas → DEFAULT_FORCE.
+// Estrutura genérica (N forças): hoje só há regiões PSP (centros urbanos e
+// capitais de distrito), com a GNR como omissão rural. Acrescentar regiões de
+// outra força no futuro não exige mudar forceFor(). Espelho EXATO de
+// POLICE_FORCE_REGIONS em backend/game_data.py — a classificação tem de ser
+// idêntica dos dois lados.
+const FORCE_REGIONS = [
+  { force: "PSP", name: "Lisboa", lat: 38.7223, lng: -9.1393, r: 9500 },
+  { force: "PSP", name: "Amadora", lat: 38.7597, lng: -9.2399, r: 3500 },
+  { force: "PSP", name: "Cascais", lat: 38.6979, lng: -9.4215, r: 3500 },
+  { force: "PSP", name: "Almada", lat: 38.68, lng: -9.1587, r: 3500 },
+  { force: "PSP", name: "Porto", lat: 41.1496, lng: -8.6109, r: 7500 },
+  { force: "PSP", name: "Vila Nova de Gaia", lat: 41.124, lng: -8.6118, r: 4500 },
+  { force: "PSP", name: "Braga", lat: 41.5454, lng: -8.4265, r: 5000 },
+  { force: "PSP", name: "Guimarães", lat: 41.4425, lng: -8.2918, r: 3500 },
+  { force: "PSP", name: "Coimbra", lat: 40.2033, lng: -8.4103, r: 5000 },
+  { force: "PSP", name: "Faro", lat: 37.0194, lng: -7.9304, r: 4000 },
+  { force: "PSP", name: "Setúbal", lat: 38.5244, lng: -8.8882, r: 4500 },
+  { force: "PSP", name: "Aveiro", lat: 40.6405, lng: -8.6538, r: 4000 },
+  { force: "PSP", name: "Viseu", lat: 40.6566, lng: -7.9124, r: 3500 },
+  { force: "PSP", name: "Leiria", lat: 39.7443, lng: -8.807, r: 3500 },
+  { force: "PSP", name: "Évora", lat: 38.5714, lng: -7.9135, r: 3500 },
+  { force: "PSP", name: "Santarém", lat: 39.2362, lng: -8.6868, r: 3000 },
+  { force: "PSP", name: "Viana do Castelo", lat: 41.6946, lng: -8.8302, r: 3000 },
+  { force: "PSP", name: "Vila Real", lat: 41.3006, lng: -7.7441, r: 3000 },
+  { force: "PSP", name: "Bragança", lat: 41.8061, lng: -6.7567, r: 3000 },
+  { force: "PSP", name: "Castelo Branco", lat: 39.8222, lng: -7.4931, r: 3000 },
+  { force: "PSP", name: "Guarda", lat: 40.5373, lng: -7.2675, r: 3000 },
+  { force: "PSP", name: "Portalegre", lat: 39.2967, lng: -7.4286, r: 2500 },
+  { force: "PSP", name: "Beja", lat: 38.0151, lng: -7.8632, r: 3000 },
+  { force: "PSP", name: "Funchal", lat: 32.6669, lng: -16.9241, r: 4500 },
+  { force: "PSP", name: "Ponta Delgada", lat: 37.7412, lng: -25.6756, r: 3500 },
 ];
 
 function forceFor(pt) {
   let best = null;
   let bd = Infinity;
-  for (const c of PSP_CITIES) {
+  for (const c of FORCE_REGIONS) {
     const d = distMeters(pt, c);
     if (d <= c.r && d < bd) { bd = d; best = c; }
   }
-  return best ? { force: "PSP", city: best.name } : { force: "GNR", city: null };
+  return best ? { force: best.force, city: best.name } : { force: DEFAULT_FORCE, city: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +303,7 @@ function saveSnapshot(nowMs) {
   try {
     const patrols = sim.patrols.map((p) => ({
       id: p.id, seed: p.seed, zoneIdx: p.zoneIdx, officers: p.officers,
-      lat: p.pos.lat, lng: p.pos.lng, bearing: p.bearing,
+      lat: p.pos.lat, lng: p.pos.lng, bearing: p.bearing, vehicleType: p.vehicleType,
     }));
     const handled = [];
     for (const [mid, h] of sim.handled) if (h.done) handled.push(mid);
@@ -290,14 +340,19 @@ function freeZoneIdx() {
     if (def > bestDef) { bestDef = def; best = i; }
   });
   if (bestDef > 0) return best;
-  const psp = ZONES.map((z, i) => ({ z, i })).filter((x) => x.z.force === "PSP");
-  const pool = psp.length ? psp : ZONES.map((z, i) => ({ z, i }));
+  // Excedente de patrulhas: prefere as zonas da força de maior densidade
+  // (mais presença onde a lei manda mais patrulhas por zona — hoje a PSP nos
+  // centros urbanos, mas genérico para qualquer força que venha a ter a maior
+  // patrolsPerZone).
+  const maxDensity = Math.max(...ZONES.map((z) => FORCES[z.force]?.patrolsPerZone || 0));
+  const dense = ZONES.map((z, i) => ({ z, i })).filter((x) => (FORCES[x.z.force]?.patrolsPerZone || 0) === maxDensity);
+  const pool = dense.length ? dense : ZONES.map((z, i) => ({ z, i }));
   return pool[sim.patrols.length % pool.length].i;
 }
 
 function makePatrol({ zoneIdx, at, bearing, seed, officers, id, edgeSpawn }) {
-  const zone = ZONES[zoneIdx] || ZONES[0] || { name: "—", lat: 38.7223, lng: -9.1393, radius: 620, force: "PSP" };
-  const F = FORCES[zone.force] || FORCES.PSP;
+  const zone = ZONES[zoneIdx] || ZONES[0] || { name: "—", lat: 38.7223, lng: -9.1393, radius: FORCES[DEFAULT_FORCE].zoneRadius, force: DEFAULT_FORCE };
+  const F = FORCES[zone.force] || FORCES[DEFAULT_FORCE];
   const pid = id || `${zone.force}-${String(sim.nextId++).padStart(2, "0")}`;
   const s = seed ?? hashStr(pid + ":" + zoneIdx);
   const rng = mulberry32(s);
@@ -305,6 +360,7 @@ function makePatrol({ zoneIdx, at, bearing, seed, officers, id, edgeSpawn }) {
   const p = {
     id: pid, seed: s, rng, zoneIdx, zone,
     force: zone.force,
+    vehicleType: pickVehicleType(F, rng),
     officers: officers ?? (F.officersMin + (rng() < F.officersExtraChance ? 1 : 0)),
     pos: at || { lat: zone.lat, lng: zone.lng },
     bearing: bearing ?? rng() * 360,
@@ -463,19 +519,37 @@ function missionPlan(m, heat) {
   return null;
 }
 
+// Força competente pela zona de uma missão: da etiqueta police_force gravada
+// pelo servidor (autoritativa), ou classificada pela posição do alvo para
+// missões anteriores à feature.
+function missionForce(m) {
+  return m?.opportunity?.police_force || forceFor(m.target).force;
+}
+
 // Patrulha livre mais próxima DENTRO do raio de resposta plausível — com
 // ativos em várias cidades, uma viatura do Porto nunca "responde" a uma
 // ocorrência em Lisboa (se ninguém está a alcance, não há resposta visível).
-function nearestFreePatrol(target, excludeId, maxDistM = 15000) {
-  let best = null; let bd = Infinity;
-  for (const p of sim.patrols) {
-    if (p.id === excludeId) continue;
-    if (p.state !== "patrol" && p.state !== "returning") continue;
-    const d = distMeters(p.pos, target);
-    if (d > maxDistM) continue;
-    if (d < bd) { bd = d; best = p; }
-  }
-  return best;
+//
+// Divisão de competências: quando `preferForce` é indicado, responde PRIMEIRO
+// a força responsável pela zona; só se nenhuma patrulha dessa força estiver a
+// alcance é que a outra força apoia (escalada). Assim uma ocorrência urbana
+// chama a PSP e uma rural chama a GNR, como na realidade.
+function nearestFreePatrol(target, opts = {}) {
+  const { excludeId, maxDistM = 15000, preferForce = null } = opts;
+  const pick = (forceFilter) => {
+    let best = null; let bd = Infinity;
+    for (const p of sim.patrols) {
+      if (p.id === excludeId) continue;
+      if (p.state !== "patrol" && p.state !== "returning") continue;
+      if (forceFilter && p.force !== forceFilter) continue;
+      const d = distMeters(p.pos, target);
+      if (d > maxDistM) continue;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  };
+  if (preferForce) return pick(preferForce) || pick(null);
+  return pick(null);
 }
 
 function assignResponse(p, m, plan, backupRole, nowMs) {
@@ -521,9 +595,11 @@ function director(nowMs, ctx) {
     }
     const vt = vehicleTimings(m);
 
+    const zoneForce = missionForce(m);
+
     // ---- Perseguição no regresso (chase_active vem do servidor) ----
     if (m.chase_active && nowSec >= vt.finish && nowSec < vt.ret && !h.pursuitId) {
-      const p = nearestFreePatrol(m.target);
+      const p = nearestFreePatrol(m.target, { preferForce: zoneForce });
       if (p) {
         h.pursuitId = p.id;
         p.state = "pursuit";
@@ -541,7 +617,9 @@ function director(nowMs, ctx) {
     // ---- Resposta a suspeita/interceção ----
     const plan = h.plan;
     if (plan && !h.done && !h.patrolId && nowSec >= plan.alertAt && nowSec < vt.finish - 4) {
-      const p = nearestFreePatrol(m.target);
+      // A força responsável pela zona responde primeiro (escala para a outra
+      // se não houver ninguém dessa força a alcance).
+      const p = nearestFreePatrol(m.target, { preferForce: zoneForce });
       if (p) {
         h.patrolId = p.id;
         assignResponse(p, m, plan, false, nowMs);
@@ -550,9 +628,11 @@ function director(nowMs, ctx) {
     // ---- Reforços: segunda patrulha, vinda da sua posição real ----
     if (plan && plan.backup && h.patrolId && !h.backupId) {
       const primary = sim.patrols.find((x) => x.id === h.patrolId);
-      // só depois de o primário estar no local (pedido de reforços credível)
+      // só depois de o primário estar no local (pedido de reforços credível).
+      // Reforço da MESMA força primeiro; se a situação escalar e não houver,
+      // a outra força apoia.
       if (primary && primary.state.startsWith("onscene") && nowSec < vt.finish) {
-        const p2 = nearestFreePatrol(m.target, h.patrolId);
+        const p2 = nearestFreePatrol(m.target, { excludeId: h.patrolId, preferForce: primary.force });
         if (p2) {
           h.backupId = p2.id;
           assignResponse(p2, m, plan, true, nowMs);
@@ -1002,6 +1082,7 @@ export function ensurePoliceSim(ctx) {
         id: s.id, seed: s.seed, zoneIdx: clamp(s.zoneIdx, 0, ZONES.length - 1),
         at: { lat: s.lat, lng: s.lng }, bearing: s.bearing, officers: s.officers,
       });
+      if (s.vehicleType) p.vehicleType = s.vehicleType;
       p.spawnFade = 1; // já existiam — sem fade
       sim.patrols.push(p);
       const num = parseInt(String(s.id).replace(/\D/g, ""), 10);

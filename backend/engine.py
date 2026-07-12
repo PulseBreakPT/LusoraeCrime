@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 
 from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LEVEL_XP,
+                       POLICE_FORCE_REGIONS, POLICE_DEFAULT_FORCE, POLICE_FORCE_EFFECTS,
                        TRAINING_COURSES, PROPERTY_TYPES, VEHICLE_MODELS, SPECIALIZATIONS,
                        BASE_EMPLOYEE_CAP, BASE_VEHICLE_CAP, CATEGORY_ATTRS, ATTR_KEYS,
                        RARITIES, RARITY_MIN_RESPECT, RANKS, TALENTS, RECRUIT_SOURCES,
@@ -424,6 +425,37 @@ def nearest_district(lat, lng, spots=None):
     return min(pool, key=lambda s: haversine_m(lat, lng, s["lat"], s["lng"]))["name"]
 
 
+# Metros por grau de latitude — MESMA constante do frontend (choreo.js M_LAT),
+# para a classificação equirectangular do backend bater exatamente com a da
+# simulação visual (police.js distMeters), sem discrepâncias na fronteira.
+_M_LAT = 111320.0
+
+
+def _equirect_m(lat1, lng1, lat2, lng2):
+    """Distância planar equirectangular em metros — réplica de distMeters em
+    frontend/src/lib/choreo.js (não haversine), para paridade exata na
+    classificação de força PSP/GNR entre backend e frontend."""
+    east = (lng2 - lng1) * _M_LAT * math.cos(math.radians((lat1 + lat2) / 2))
+    north = (lat2 - lat1) * _M_LAT
+    return math.hypot(east, north)
+
+
+def police_force_for(lat, lng):
+    """Força de segurança competente pela zona de um ponto (PSP urbana / GNR
+    rural). Um ponto dentro do raio de uma região PSP → essa força (a mais
+    próxima ganha); caso contrário → POLICE_DEFAULT_FORCE. Genérico para N
+    forças: acrescentar regiões a POLICE_FORCE_REGIONS chega. Espelha
+    forceFor() em frontend/src/lib/police.js."""
+    best = None
+    bd = float("inf")
+    for c in POLICE_FORCE_REGIONS:
+        d = _equirect_m(lat, lng, c["lat"], c["lng"])
+        if d <= c["r"] and d < bd:
+            bd = d
+            best = c
+    return best["force"] if best else POLICE_DEFAULT_FORCE
+
+
 def _sample_around_property(center_lat, center_lng, radius_km):
     """Amostragem uniforme num disco de raio configurável à volta de uma
     propriedade — distinta de _sample_on_land (caixa fixa em torno de um
@@ -643,6 +675,9 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             "expires_at": (now + timedelta(seconds=random.randint(*expires_range))).isoformat(),
             "created_at": now.isoformat(),
             "generated_by_property_id": origin_prop_id,
+            # Força competente pela zona (PSP urbana / GNR rural) — afeta risco,
+            # perseguição e fuga, e diz à simulação qual força deve responder.
+            "police_force": police_force_for(lat, lng),
         }
 
     docs = []
@@ -1347,6 +1382,21 @@ def mod_district_attention(ctx):
             "tip": f"Operações recentes em {ctx.get('district', 'esta zona')} deixaram a polícia local em alerta ({round(att)}%) — deixa a zona arrefecer ou opera noutro distrito."}
 
 
+def mod_police_zone(ctx):
+    """Divisão territorial PSP/GNR: a força competente pela zona da operação
+    afeta o risco real. Zona urbana (PSP) — malha densa, mais arriscado; zona
+    rural (GNR) — menos vigilância, ligeiramente mais fácil. Efeito modesto e
+    transparente. Genérico: lê o efeito de POLICE_FORCE_EFFECTS pela força."""
+    eff = POLICE_FORCE_EFFECTS.get(ctx.get("police_force"))
+    if not eff:
+        return None
+    pct = eff.get("chance", 0.0)
+    if abs(pct) < 0.0005:
+        return None
+    return {"key": "zona_policial", "category": "mundo", "label": eff["label"], "pct": pct,
+            "tip": eff["tip"]}
+
+
 def mod_team_momentum(ctx):
     """Momentum (SSS v3): séries de vitórias dão confiança operacional (bónus
     modesto e capado); séries de falhas minam-na. Uma vitória limpa repõe tudo."""
@@ -1363,7 +1413,7 @@ def mod_team_momentum(ctx):
 
 
 MODIFIERS = [
-    mod_risk_type, mod_risk_distance, mod_heat, mod_district_attention,
+    mod_risk_type, mod_risk_distance, mod_heat, mod_district_attention, mod_police_zone,
     mod_team_quality, mod_team_size, mod_team_fatigue, mod_team_morale, mod_team_loyalty,
     mod_team_leader, mod_team_uniform_spec, mod_team_coordination, mod_team_synergy,
     mod_team_momentum, mod_team_familiarity, mod_team_strategist,
@@ -1556,6 +1606,9 @@ def _compute_chase_chance(player, m):
     # Memória do mundo: zonas com atenção acumulada atraem perseguições.
     att = district_attention_of(player, t.get("district"))
     base += DISTRICT_ATTENTION_CHASE_MAX * min(1.0, att / DISTRICT_ATTENTION_MAX)
+    # Divisão territorial: no centro urbano (PSP) as patrulhas estão perto e
+    # respondem depressa (mais perseguições); no rural (GNR) estão dispersas.
+    base += POLICE_FORCE_EFFECTS.get(t.get("police_force"), {}).get("chase", 0.0)
     talents = m.get("talents", []) or []
     reduction = 0.0
     if "fantasma_digital" in talents:
@@ -1607,6 +1660,9 @@ def _compute_escape_chance(player, m):
         power_avg = float(m.get("weapon_power_avg", 0) or 0)
         if power_avg > 0:
             base += WEAPON_INTIMIDATION_ESCAPE_MAX * min(1.0, power_avg / 100.0)
+    # Divisão territorial: estradas nacionais e campo aberto (GNR) facilitam o
+    # despiste; a malha densa do centro urbano (PSP) dificulta-o.
+    base += POLICE_FORCE_EFFECTS.get(t.get("police_force"), {}).get("escape", 0.0)
     heat_frac = max(0.0, min(1.0, player.get("heat", 0) / 100))
     base -= ESCAPE_HEAT_SPAN * heat_frac ** ESCAPE_HEAT_EXP
     return max(0.10, min(0.95, base))
