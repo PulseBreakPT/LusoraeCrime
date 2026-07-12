@@ -27,15 +27,20 @@ const policeCarIcon = (force, vtype = "carro") => {
   const key = `${force}|${vtype}`;
   if (!carIconCache[key]) {
     const F = cfgFor(force);
+    const fkey = force || DEFAULT_FORCE;
+    // Distintivo da força (P/G) sempre visível — identifica quem enfrentas sem
+    // precisar de passar o rato por cima. Genérico: inicial da chave da força.
+    const badge = fkey.charAt(0).toUpperCase();
     const html = `
-      <div class="police-car police-force-${(force || DEFAULT_FORCE).toLowerCase()}" data-proot
-           style="--pbody:${F.bodyColor};--ptint:${F.tint}">
+      <div class="police-car police-force-${fkey.toLowerCase()}" data-proot
+           style="--pbody:${F.bodyColor};--ptint:${F.tint};--pforce:${F.color}">
         <span class="police-car-body police-vehicle-${vtype}" data-car>
           <span class="police-lightbar"><i></i><i></i></span>
           <span class="unit-car-glass"></span>
           <span class="unit-car-door unit-car-door-l"></span>
           <span class="unit-car-door unit-car-door-r"></span>
         </span>
+        <span class="police-force-badge">${badge}</span>
       </div>`;
     carIconCache[key] = L.divIcon({ html, className: "lus-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
   }

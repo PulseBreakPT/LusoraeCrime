@@ -793,12 +793,12 @@ POLICE_PROB_CAP = 0.65
 #   • Zona rural (GNR): patrulhas dispersas por muito terreno — menos olhos
 #     (mais chance), menos perseguições, e estradas abertas facilitam o despiste.
 # Efeitos modestos e transparentes (aparecem no breakdown do preview).
-POLICE_URBAN_CHANCE_PENALTY = 0.04   # zona PSP densa: centro urbano mais arriscado
-POLICE_RURAL_CHANCE_BONUS = 0.03     # zona GNR esparsa: menos vigilância
-POLICE_URBAN_CHASE_BONUS = 0.08      # resposta urbana rápida → mais perseguições
-POLICE_RURAL_CHASE_RELIEF = 0.05     # patrulhas rurais longe → menos perseguições
-POLICE_URBAN_ESCAPE_PENALTY = 0.06   # malha densa dificulta o despiste
-POLICE_RURAL_ESCAPE_BONUS = 0.10     # estradas nacionais abertas facilitam a fuga
+POLICE_URBAN_CHANCE_PENALTY = 0.06   # zona PSP densa: centro urbano mais arriscado
+POLICE_RURAL_CHANCE_BONUS = 0.05     # zona GNR esparsa: menos vigilância
+POLICE_URBAN_CHASE_BONUS = 0.11      # resposta urbana rápida → mais perseguições
+POLICE_RURAL_CHASE_RELIEF = 0.07     # patrulhas rurais longe → menos perseguições
+POLICE_URBAN_ESCAPE_PENALTY = 0.09   # malha densa dificulta o despiste
+POLICE_RURAL_ESCAPE_BONUS = 0.13     # estradas nacionais abertas facilitam a fuga
 
 # --- Decaimento de calor não-linear --------------------------------------------
 # taxa/min = BASE − SLOPE*(heat/100) → calor 50: 1.2/min (igual à média antiga),
