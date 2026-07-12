@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtMoneyShort, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
 import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
 import { Badge } from "../ui/badge";
-import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins } from "lucide-react";
+import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins, WifiOff } from "lucide-react";
 
 const useTick = () => {
   const [, setT] = useState(0);
@@ -40,6 +40,24 @@ const PayrollCountdown = ({ targetAt, serverNow }) => {
   useTick();
   const s = Math.max(0, (Date.parse(targetAt) - serverNow()) / 1000);
   return <>em {fmtDuration(s)}</>;
+};
+
+// Selo de desatualização — só aparece quando os dados ficam velhos (poll a
+// falhar / backend em baixo). Tem o seu próprio tick de 1 Hz para atualizar a
+// idade mesmo quando NÃO chegam dados novos (nenhum re-render da barra).
+const SyncBadge = () => {
+  const { lastSyncAt } = useGame();
+  useTick();
+  if (!lastSyncAt) return null;
+  const ageS = (Date.now() - lastSyncAt) / 1000;
+  if (ageS < 15) return null; // fresco → nada
+  return (
+    <Tip tip="Os dados podem estar desatualizados — a tentar restabelecer a ligação ao servidor.">
+      <span className="flex items-center gap-1 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-amber-500">
+        <WifiOff size={9} /> {ageS >= 60 ? "sem ligação" : "a reconectar…"}
+      </span>
+    </Tip>
+  );
 };
 
 export const ResourceBar = () => {
@@ -155,6 +173,7 @@ export const ResourceBar = () => {
               <p className="lus-clock font-mono text-xs font-bold text-zinc-200 sm:text-[13px]">
                 {new Date(serverNow()).toLocaleTimeString("pt-PT")}
               </p>
+              <SyncBadge />
               <p className="text-[8px] font-medium uppercase tracking-[0.22em] text-zinc-600">Lisboa · 38.72N 9.14W</p>
             </div>
           </Tip>
