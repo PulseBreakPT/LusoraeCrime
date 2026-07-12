@@ -679,6 +679,11 @@ VEHICLE_TRANSFER_DURATION_PER_KM_S = 25
 PROPERTY_INFLUENCE_RADIUS_KM = 2.5
 PROPERTY_SPOT_WEIGHT = 3.0
 LISBON_SPOT_WEIGHT = 1.0
+# Distância de meia-força do enviesamento de spawn para o QG: um centro de
+# distrito a esta distância recebe metade do peso de um centro colado ao QG.
+# Quanto maior, mais espalhadas ficam as missões (só afeta a probabilidade de
+# escolha do centro, não o alcance nem o risco/recompensa por distância).
+SPAWN_HQ_FALLOFF_KM = 3.0
 
 # ============================================================================
 # MISCELLANEOUS
