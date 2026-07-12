@@ -4,7 +4,7 @@ import { useSettings } from "../../context/SettingsContext";
 import { cn } from "../../lib/utils";
 import {
   fmtMoney, fmtDuration, SPEC_LABELS, STATUS_LABELS, STATUS_COLORS, RANK_LABELS, fatigueColor,
-  chanceColor, goodBarColor, teamsReadiness, vehicleRangeKm,
+  chanceColor, goodBarColor, teamsReadiness, teamReadiness, vehicleRangeKm,
   teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES,
 } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
@@ -276,27 +276,18 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     if (canOptVehicles) await optimizeVehicles();
   };
 
-  const readiness = (t, members, vehicle) => {
-    if (t.status !== "idle") return { ok: false, reason: STATUS_LABELS[t.status] || "Ocupada" };
-    if (t.available_at && Date.parse(t.available_at) > serverNow()) {
+  // Veredicto via helper unificado (mesma definição do OpportunityCard/
+  // opportunityReachable — antes divergiam). Preserva a forma { ok, ready,
+  // reorg, reason } que o resto do painel consome, incluindo a contagem de
+  // reorganização.
+  const readiness = (t) => {
+    const r = teamReadiness(state, catalog, t, { now: serverNow() });
+    if (r.ok) return { ok: true, ready: r.members };
+    if (r.reorg && t.available_at) {
       const remaining = Math.max(0, (Date.parse(t.available_at) - serverNow()) / 1000);
       return { ok: false, reorg: true, reason: `A reorganizar-se (${fmtDuration(remaining)})` };
     }
-    if (members.length === 0) return { ok: false, reason: "Sem membros" };
-    const ready = members.filter((e) => e.status === "idle" && e.fatigue < 90);
-    if (ready.length === 0) return { ok: false, reason: "Membros indisponíveis" };
-    if (!vehicle) return { ok: false, reason: "Sem veículo" };
-    if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
-    if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow()) {
-      return { ok: false, reason: "A abastecer" };
-    }
-    if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > serverNow()) {
-      return { ok: false, reason: "Veículo indisponível" };
-    }
-    if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
-    const seats = catalog?.vehicle_models?.[vehicle.model_key]?.seats;
-    if (seats != null && ready.length > seats) return { ok: false, reason: `Poucos lugares (${seats})` };
-    return { ok: true, ready: ready.length };
+    return { ok: false, reason: r.reason };
   };
 
   return (
