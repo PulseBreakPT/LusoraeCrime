@@ -28,7 +28,7 @@ import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair } from "lucide-react";
 
 export default function GamePage() {
-  const { state, stateError, refresh, serverNow, autoOpenReportSignal, placement } = useGame();
+  const { state, stateError, catalog, refresh, serverNow, autoOpenReportSignal, placement } = useGame();
   const { hideImpossibleMissions, showFps } = useSettings();
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(null);
@@ -175,7 +175,7 @@ export default function GamePage() {
   const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollShort ? 1 : alerts.payrollDueSoon ? 1 : 0);
   const fleetAlertCount = alerts.fleet + alerts.nearBreakdown;
   const mapState = hideImpossibleMissions
-    ? { ...state, opportunities: state.opportunities.filter((o) => opportunityReachable(state, o)) }
+    ? { ...state, opportunities: state.opportunities.filter((o) => opportunityReachable(state, o, serverNow(), catalog)) }
     : state;
 
   // Missão com a câmara aberta + roster real (nome/especialização/patente) —

@@ -70,6 +70,13 @@ export function GameProvider({ children }) {
   const payrollWarnedRef = useRef(false);
   const prevLevelRef = useRef(null);
   const prevChaseIdsRef = useRef(new Set());
+  const returnedTimersRef = useRef(new Set());  // timeouts pendentes de justReturnedTeamIds
+
+  // Cancela quaisquer timeouts pendentes ao desmontar (evita setState-após-unmount).
+  useEffect(() => () => {
+    for (const id of returnedTimersRef.current) clearTimeout(id);
+    returnedTimersRef.current.clear();
+  }, []);
 
   const [justReturnedTeamIds, setJustReturnedTeamIds] = useState([]);
   const [autoOpenReportSignal, setAutoOpenReportSignal] = useState(0);
@@ -171,10 +178,12 @@ export function GameProvider({ children }) {
           setJustReturnedTeamIds((prev) => [
             ...new Set([...prev, ...returned.map((t) => t.id)]),
           ]);
-          setTimeout(() => {
+          const clearId = setTimeout(() => {
+            returnedTimersRef.current.delete(clearId);
             const ids = returned.map((t) => t.id);
             setJustReturnedTeamIds((prev) => prev.filter((id) => !ids.includes(id)));
           }, 8000);
+          returnedTimersRef.current.add(clearId);
           if (autoOpenReport) setAutoOpenReportSignal((n) => n + 1);
         }
       }

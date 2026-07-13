@@ -827,6 +827,20 @@ export function passiveRates(state, catalog, now = Date.now()) {
 // `now` DEVE ser serverNow() do chamador (nunca Date.now() nas verificações de
 // tempo — evita a deriva do relógio). `catalog` é opcional (só a verificação de
 // lugares depende dele). Devolve { ok, reason, members, eta, vehicle, fuelNeeded }.
+// Base operacional atual de um veículo — espelho de resolve_mission_origin
+// (backend/engine.py): a origem para ETA/distância é a propriedade onde o
+// veículo está baseado (vehicle.property_id), caindo no QG quando não tem base.
+// Sem isto, o cliente calculava tudo a partir do QG e divergia do servidor.
+export function resolveVehicleOrigin(state, vehicle) {
+  const pid = vehicle?.property_id;
+  if (pid) {
+    const p = (state?.properties || []).find((x) => String(x.id) === String(pid));
+    if (p && p.lat != null && p.lng != null) return { lat: p.lat, lng: p.lng, property_id: pid };
+  }
+  const hq = state?.player?.hq;
+  return { lat: hq?.lat, lng: hq?.lng, property_id: null };
+}
+
 export function teamReadiness(state, catalog, team, { opp = null, now = Date.now() } = {}) {
   if (!team) return { ok: false, reason: "Sem equipa" };
   if (team.status !== "idle") return { ok: false, reason: STATUS_LABELS[team.status] || "Em operação" };
@@ -855,11 +869,13 @@ export function teamReadiness(state, catalog, team, { opp = null, now = Date.now
     if (opp.required_models?.length > 0 && !opp.required_models.includes(vehicle.model_key)) {
       return { ok: false, reason: "Veículo não adequado" };
     }
-    const hq = state?.player?.hq;
-    const distM = hq ? haversineM(hq.lat, hq.lng, opp.lat, opp.lng) : 0;
+    // Distância/ETA/combustível medidos a partir da BASE do veículo (como o
+    // servidor), não sempre do QG.
+    const origin = resolveVehicleOrigin(state, vehicle);
+    const distM = origin.lat != null ? haversineM(origin.lat, origin.lng, opp.lat, opp.lng) : 0;
     const fuelNeeded = ((2 * distM) / 1000) * (vehicle.cons / 100);
     if (vehicle.fuel_l < fuelNeeded) return { ok: false, reason: "Sem combustível" };
-    return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle, fuelNeeded, distM };
+    return { ok: true, members: ready.length, eta: Math.max(20, distM / effectiveSpeed(vehicle)), vehicle, fuelNeeded, distM, origin };
   }
   // Genérico (sem operação alvo): combustível mínimo operacional.
   if (vehicle.fuel_l < vehicle.tank_l * 0.12) return { ok: false, reason: "Combustível baixo" };
