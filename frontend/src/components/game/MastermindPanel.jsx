@@ -345,7 +345,7 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
         disabled={!target.unlocked || target.intel_active}
         onClick={onScout}
       >
-        <ScanLine size={11} /> {target.intel_active ? "Dossiê ativo" : "Obter dossiê"}
+        <ScanLine size={11} /> {target.intel_active ? "Dossiê ativo" : `Dossiê · ${fmtMoney(target.intel_cost)}`}
       </Button>
       <Button
         size="sm"
@@ -692,4 +692,3 @@ const ReadyLine = ({ ready, label }) => (
     {ready ? <Check size={10} /> : <X size={10} />} {label}
   </span>
 );
-
