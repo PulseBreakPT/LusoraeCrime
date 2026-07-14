@@ -310,6 +310,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
           tip="Respeito ganho em caso de sucesso — acumula para subir o nível da organização." />
         <Chip icon={Flame} value={`+${Math.round(opp.heat)}`} color="#EF4444"
           tip="Calor policial gerado por esta operação — sobe mesmo com sucesso." />
+        {opp.hot && (
+          <Chip icon={TrendingUp} value="Em alta +20%" color="#F59E0B"
+            tip="Mercado dinâmico: esta categoria está em alta neste momento e a recompensa mostrada já inclui +20%. A categoria em alta roda a cada 6 horas." />
+        )}
         {opp.police_force && POLICE_FORCE_INFO[opp.police_force] && (
           <Chip icon={Siren} value={POLICE_FORCE_INFO[opp.police_force].label}
             color={POLICE_FORCE_INFO[opp.police_force].color}

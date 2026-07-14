@@ -517,6 +517,18 @@ def min_members_for(risk):
     return max(1, risk - 1)
 
 
+HOT_CATEGORY_ROTATION = ["assalto", "logistica", "tecnica", "influencia", "especial"]
+HOT_CATEGORY_REWARD_MULT = 1.20
+
+
+def hot_category(now):
+    """Mercado dinâmico: a cada 6 horas há uma categoria "em alta" cujas
+    oportunidades nascem com +20% de recompensa. Rotação determinística
+    global (dia do ano + bloco de 6h), igual para todos os jogadores."""
+    idx = (now.timetuple().tm_yday * 4 + now.hour // 6) % len(HOT_CATEGORY_ROTATION)
+    return HOT_CATEGORY_ROTATION[idx]
+
+
 def achievement_bonus_pct(missions_success):
     """Conquistas permanentes: bónus de recompensa que nunca desaparece,
     concedido por cada marco de missões bem-sucedidas atingido."""
@@ -674,6 +686,10 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         dist_km = haversine_m(hq["lat"], hq["lng"], lat, lng) / 1000
         risk = min(5, t["risk"] + distance_risk_bump(dist_km))
         mult *= distance_reward_mult(dist_km)
+        # Mercado dinâmico: a categoria em alta nasce com +20% de recompensa.
+        is_hot = t["category"] == hot_category(now)
+        if is_hot:
+            mult *= HOT_CATEGORY_REWARD_MULT
         return {
             "player_id": pid, "type_key": key,
             "name": (f"Golpe de Oportunidade: {t['name']}" if special else t["name"]),
@@ -683,7 +699,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             "dist_km": round(dist_km, 2),
             "reward": int(t["base_reward"] * mult),
             "respect": int(t["respect"] * (1 + 0.15 * (level - 1)) * (1.5 if rare else 1.0)),
-            "risk": risk, "heat": t["heat"], "pays": t["pays"], "rare": rare,
+            "risk": risk, "heat": t["heat"], "pays": t["pays"], "rare": rare, "hot": is_hot,
             "special": special,
             "required_models": t.get("required_models", []),
             "duration_s": duration_s,

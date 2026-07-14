@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtMoneyShort, fmtDuration, heatStatus, passiveRates, teamsReadiness } from "../../lib/game";
+import { fmtMoney, fmtMoneyShort, fmtDuration, heatStatus, passiveRates, teamsReadiness, SPEC_LABELS, CATEGORY_COLORS } from "../../lib/game";
 import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
 import { Badge } from "../ui/badge";
-import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins, WifiOff } from "lucide-react";
+import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins, WifiOff, TrendingUp } from "lucide-react";
 
 const useTick = () => {
   const [, setT] = useState(0);
@@ -153,6 +153,13 @@ export const ResourceBar = () => {
         </Tip>
 
         <div className="hidden items-stretch gap-2 border-l border-border pl-2 md:flex">
+          {state.hot_category && (
+            <Stat
+              testId="stat-hot-category" icon={TrendingUp} color={CATEGORY_COLORS[state.hot_category] || "#F59E0B"} label="Em alta"
+              value={SPEC_LABELS[state.hot_category] || state.hot_category} sub="+20% recompensa" subColor="#F59E0B"
+              tip={`Mercado dinâmico: operações de ${SPEC_LABELS[state.hot_category] || state.hot_category} nascem com +20% de recompensa neste momento. A categoria em alta roda a cada 6 horas.`}
+            />
+          )}
           <Stat
             testId="stat-teams-ready" icon={Users} color={tr.ready === 0 && tr.total > 0 ? "#EF4444" : "#22D3EE"} label="Prontas" value={`${tr.ready}/${tr.total}`}
             tip={`Equipas prontas a operar: ${tr.ready} de ${tr.total}${tr.busy > 0 ? ` · ${tr.busy} em operação` : ""}. Uma equipa pronta tem membros disponíveis, veículo com combustível e em condições.`}

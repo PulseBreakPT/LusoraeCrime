@@ -199,6 +199,7 @@ class Opportunity(BaseDocument):
     heat: float
     pays: str
     rare: bool = False
+    hot: bool = False
     dist_km: float = 0.0
     min_members: int = 1
     required_models: List[str] = []
