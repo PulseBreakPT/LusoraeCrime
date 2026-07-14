@@ -3,7 +3,7 @@ import { parseActivityMessage } from "../lib/game";
 
 export const GAME_PANELS = [
   "operations", "quests", "empire", "teams", "employees",
-  "fleet", "properties", "weapons", "shop", "street", "hq", "intel", "settings",
+  "fleet", "properties", "weapons", "shop", "street", "mastermind", "hq", "intel", "settings",
 ];
 
 const PANEL_SET = new Set(GAME_PANELS);
