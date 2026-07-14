@@ -19,6 +19,7 @@ import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
 import { ShopPanel } from "../components/game/ShopPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { StreetPanel } from "../components/game/StreetPanel";
+import { MastermindPanel } from "../components/game/MastermindPanel";
 import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
@@ -29,7 +30,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star, Vault } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -379,6 +380,12 @@ export default function GamePage() {
           active={openPanel === "street"} onClick={() => setOpenPanel("street")}
         />
         <HudButton
+          testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-violet-300"
+          alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3}
+          tip="Mastermind — golpes por fases, preparações, mercado negro, caçadores rivais e caches de sinal."
+          active={openPanel === "mastermind"} onClick={() => setOpenPanel("mastermind")}
+        />
+        <HudButton
           testId="open-shop-button" shortcut="9" icon={ShoppingBag} label="Loja" color="text-amber-300"
           tip="Acelerar tempo, cosméticos, VIP e slots extra — tudo pago em dinheiro do jogo."
           active={openPanel === "shop"} onClick={() => setOpenPanel("shop")}
@@ -388,6 +395,7 @@ export default function GamePage() {
       )}
 
       <StreetPanel open={openPanel === "street"} onOpenChange={(o) => setOpenPanel(o ? "street" : null)} />
+      <MastermindPanel open={openPanel === "mastermind"} onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />
       <CommandCenter
         open={commandOpen}
         onOpenChange={setCommandOpen}
