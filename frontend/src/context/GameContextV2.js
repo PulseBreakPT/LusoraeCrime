@@ -70,6 +70,13 @@ export function GameProvider({ children }) {
   const payrollWarnedRef = useRef(false);
   const prevLevelRef = useRef(null);
   const prevChaseIdsRef = useRef(new Set());
+  const returnedTimersRef = useRef(new Set());  // timeouts pendentes de justReturnedTeamIds
+
+  // Cancela quaisquer timeouts pendentes ao desmontar (evita setState-após-unmount).
+  useEffect(() => () => {
+    for (const id of returnedTimersRef.current) clearTimeout(id);
+    returnedTimersRef.current.clear();
+  }, []);
 
   const [justReturnedTeamIds, setJustReturnedTeamIds] = useState([]);
   const [autoOpenReportSignal, setAutoOpenReportSignal] = useState(0);
@@ -171,10 +178,12 @@ export function GameProvider({ children }) {
           setJustReturnedTeamIds((prev) => [
             ...new Set([...prev, ...returned.map((t) => t.id)]),
           ]);
-          setTimeout(() => {
+          const clearId = setTimeout(() => {
+            returnedTimersRef.current.delete(clearId);
             const ids = returned.map((t) => t.id);
             setJustReturnedTeamIds((prev) => prev.filter((id) => !ids.includes(id)));
           }, 8000);
+          returnedTimersRef.current.add(clearId);
           if (autoOpenReport) setAutoOpenReportSignal((n) => n + 1);
         }
       }
@@ -537,6 +546,17 @@ export function GameProvider({ children }) {
   const transferVehicle = (vehicleId, toPropertyId) =>
     action("vehicles/transfer", { vehicle_id: vehicleId, to_property_id: toPropertyId }, "Veículo em trânsito");
 
+  // ---- Loja (dinheiro do jogo) ----
+  const speedup = (kind, id) => action("shop/speedup", { kind, id }, "Acelerado");
+  const buySlot = (kind) => action("shop/buy_slot", { kind }, "Slot extra adquirido");
+  const buyVip = (planKey) => action("shop/vip", { plan_key: planKey }, "VIP ativado");
+  const buyCosmetic = (category, key) => action("shop/cosmetic", { category, key }, "Cosmético adquirido");
+  const equipPaint = (vehicleId, paintKey) =>
+    action("vehicles/equip_paint", { vehicle_id: vehicleId, paint_key: paintKey });
+  const equipEmblem = (teamId, emblemKey) =>
+    action("teams/equip_emblem", { team_id: teamId, emblem_key: emblemKey });
+  const equipHqSkin = (skinKey) => action("hq/equip_skin", { skin_key: skinKey });
+
   // Modo de colocação manual — o dinheiro só é debitado em confirmPlacement,
   // que é o único momento em que /properties/buy é chamado; cancelar nunca
   // chega a fazer essa chamada, por isso não precisa de rollback.
@@ -637,6 +657,13 @@ export function GameProvider({ children }) {
         confirmPlacement,
         upgradeHQ,
         setOrgPriority,
+        speedup,
+        buySlot,
+        buyVip,
+        buyCosmetic,
+        equipPaint,
+        equipEmblem,
+        equipHqSkin,
         bribePolice,
         launder,
         claimQuest,

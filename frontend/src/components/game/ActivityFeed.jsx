@@ -34,7 +34,7 @@ const KIND_LABELS = {
 const PANEL_LABELS = {
   teams: "Equipas", fleet: "Frota", properties: "Imóveis", empire: "Império",
   employees: "Operacionais", quests: "Missões", intel: "Central de Inteligência",
-  weapons: "Arsenal", hq: "Quartel-General",
+  weapons: "Arsenal", hq: "Quartel-General", shop: "Loja",
 };
 
 // ---------- Categorias de filtro (derivadas de kind + destino do classifyEvent) ----------
@@ -113,7 +113,11 @@ const GROUP_LABELS = { now: "Agora", "10m": "Últimos 10 min", "1h": "Última ho
 // ---------- Dados do feed: enriquecer + contar + filtrar + colapsar repetidos ----------
 function useFeedData(events, filter, nowMs) {
   return useMemo(() => {
-    const enriched = (events || []).map((e) => {
+    // Ordena defensivamente do mais recente para o mais antigo — não assume a
+    // ordem do backend (o agrupamento por tempo, o colapso de repetidos e o
+    // "mais recente" dependem disto).
+    const ordered = [...(events || [])].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
+    const enriched = ordered.map((e) => {
       const dest = classifyEvent(e.kind, e.message);
       return { ...e, dest, cat: eventCategory(e, dest), sev: severityOf(dest.color) };
     });
@@ -134,7 +138,9 @@ function useFeedData(events, filter, nowMs) {
 // ---------- Não lidos: último ts visto guardado por jogador ----------
 function useUnread(events, playerId) {
   const key = `lus-feed-seen:${playerId || "anon"}`;
-  const firstTs = (events && events[0] && events[0].ts) || "";
+  // ts mais recente (não assume events[0]) — o "marcar como visto" tem de gravar
+  // o mais novo, senão eventos ficariam eternamente por ler.
+  const firstTs = (events || []).reduce((m, e) => (e?.ts && (!m || e.ts > m) ? e.ts : m), "");
   const [seenTs, setSeenTs] = useState(() => {
     try { return localStorage.getItem(key) || ""; } catch { return ""; }
   });

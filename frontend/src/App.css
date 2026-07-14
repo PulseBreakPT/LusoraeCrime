@@ -199,7 +199,8 @@
     border-radius: 10px;
     background: #eeeeee;
     color: #050505;
-    border: 2px solid #050505;
+    /* --skin (cosmético da loja) recolore a moldura; sem skin, preto por omissão. */
+    border: 2px solid var(--skin, #050505);
     box-shadow:
         0 0 0 1px rgba(212, 168, 83, 0.55),
         0 0 22px rgba(255, 255, 255, 0.35),
