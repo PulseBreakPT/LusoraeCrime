@@ -25,7 +25,7 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     weapon_condition_factor,
                     _unlink_employee_weapon,
                     is_on_land, nearest_district, resolve_mission_origin, get_property_vehicle_usage,
-                    police_force_for)
+                    police_force_for, hot_category)
 from quests import (make_instance, enrich_quest, locked_principals, effective_quest_rewards,
                     LEVEL_MONEY_SLOPE, LEVEL_RESPECT_SLOPE, TIER_BONUS, STREAK_BONUS,
                     STREAK_BONUS_MAX, SPEED_BONUS, TOTAL_MULT_CAP, MOMENTUM_CLAIM)
@@ -538,6 +538,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         "bonuses": bonuses,
         "salary_total": sum(e.get("salary", 0) for e in employees),
         "fuel_prices": FUEL_PRICES,
+        "hot_category": hot_category(now_utc()),
     }
 
 

@@ -19,6 +19,7 @@ import {
   AlertTriangle, Activity, Target, Clock, PartyPopper, Crown, Gauge, Stethoscope, Scale,
   Brain, Flame, TrendingDown, Link2, FlaskConical, Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 
 const MISSION_NEXT_LABEL = { en_route: "Chega em", operating: "Conclui em", returning: "Regressa em" };
 
@@ -186,7 +187,29 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
   const [repeatRecs, setRepeatRecs] = useState({});
+  const [autoBusy, setAutoBusy] = useState(false);
   useTick(open);
+
+  // Despacho automático: envia cada equipa livre para a melhor oportunidade
+  // que o servidor recomendar (a recomendação já valida todos os requisitos).
+  const autoDispatchAll = async () => {
+    setAutoBusy(true);
+    let sent = 0;
+    const idleIds = state ? state.teams.filter((t) => t.status === "idle").map((t) => t.id) : [];
+    for (const id of idleIds) {
+      let rec = recommendations[id];
+      if (!rec?.opportunity_id) {
+        const r = await recommendOpportunityForTeam(id);
+        rec = r.ok ? r.data : null;
+      }
+      if (rec?.opportunity_id) {
+        const res = await dispatchTeam(rec.opportunity_id, id);
+        if (res.ok) sent += 1;
+      }
+    }
+    setAutoBusy(false);
+    if (sent === 0) toast.info("Nenhuma equipa livre tem missão viável neste momento");
+  };
 
   // Equipas sem veículo recebem automaticamente o melhor disponível (o que
   // combina com a especialização, senão o de melhor condição) — só quando a
@@ -343,6 +366,26 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               )}
             >
               <Sparkles size={11} /> Otimizar equipas
+            </button>
+          </Tip>
+
+          <Tip
+            block
+            tip="Despacho automático: envia cada equipa livre para a melhor oportunidade que o servidor recomendar — só missões cujos requisitos (membros, veículo, combustível, nível) a equipa cumpre mesmo."
+          >
+            <button
+              data-testid="teams-auto-dispatch"
+              onClick={() => !autoBusy && readyIds.length > 0 && autoDispatchAll()}
+              disabled={autoBusy || readyIds.length === 0}
+              className={cn(
+                "mt-2 flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                !autoBusy && readyIds.length > 0
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-400 hover:border-amber-500/60 hover:bg-amber-500/20"
+                  : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+              )}
+            >
+              <Zap size={11} />
+              {autoBusy ? "A despachar…" : `Despacho automático${readyIds.length > 0 ? ` (${readyIds.length})` : ""}`}
             </button>
           </Tip>
         </div>
