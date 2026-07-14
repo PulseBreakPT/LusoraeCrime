@@ -216,7 +216,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
         group: "Resultados", keywords: `${item.model_key || ""} arsenal`, run: () => onNavigate("weapons"),
       })),
       ...(state.opportunities || []).map((item) => ({
-        id: `opp:${item.id}`, label: item.name, hint: `Operação · ${fmtMoney(item.reward_money)}`,
+        id: `opp:${item.id}`, label: item.name, hint: `Operação · ${fmtMoney(item.reward ?? 0)}`,
         Icon: Crosshair, group: "Resultados",
         keywords: `${item.type_key || ""} ${item.category || ""} ${item.district || ""} missão oportunidade`,
         run: () => onSelectOpp(item),
