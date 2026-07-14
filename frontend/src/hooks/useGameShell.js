@@ -125,7 +125,7 @@ export function useGameShell({
       }
       if (typing) return;
       const panel = PANEL_SHORTCUTS[event.key];
-      if (panel) {
+      if (panel && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         setOpenPanel(panel);
         return;
