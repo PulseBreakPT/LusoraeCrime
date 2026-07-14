@@ -31,6 +31,12 @@ const ACTION_SOUNDS = [
   ["employees/release", "notify"],
   ["quests/claim", "cash"],
   ["quests/choose", "notify"],
+  ["street/activities/start", "dispatch"],
+  ["street/activities/claim", "cash"],
+  ["street/contacts/call", "notify"],
+  ["street/garage", "repair"],
+  ["street/gear/buy", "cash"],
+  ["street/territory", "success"],
 ];
 
 function soundForAction(path) {
@@ -113,6 +119,24 @@ export function GameProvider({ children }) {
     try {
       const { data } = await api.get("/game/state", { timeout: 8000 });
       hasLoadedRef.current = true;
+
+      // Cidade Viva é um módulo separado para manter o tick principal pequeno.
+      // A leitura é sequencial: evita que o avanço urbano e o avanço normal
+      // concorram pela mesma carteira no servidor.
+      if (!data.hq_pending) {
+        try {
+          const { data: street } = await api.get("/game/street/state", { timeout: 8000 });
+          data.street = street;
+          if (street?.balances && data.player) {
+            data.player.clean_money = street.balances.clean_money;
+            data.player.dirty_money = street.balances.dirty_money;
+            data.player.heat = street.balances.heat;
+          }
+        } catch (streetError) {
+          // Uma falha no módulo urbano nunca deve esconder o resto do jogo.
+          console.error("Falha ao carregar /game/street/state:", streetError);
+        }
+      }
 
       if (data.server_time) {
         offsetRef.current = Date.parse(data.server_time) - Date.now();
@@ -659,6 +683,16 @@ export function GameProvider({ children }) {
     "Não existem recursos para otimizar."
   );
 
+  // Cidade Viva — todas as ações reutilizam o mesmo canal seguro, feedback e
+  // refresh do resto do jogo.
+  const saveStreetPlan = (payload) => action("street/plan", payload, "Plano de rua atualizado");
+  const buyStreetGear = (payload) => action("street/gear/buy", payload, "Equipamento adquirido");
+  const streetTerritoryAction = (payload) => action("street/territory", payload, "Situação territorial atualizada");
+  const callStreetContact = (payload) => action("street/contacts/call", payload, "Favor confirmado");
+  const startStreetActivity = (payload) => action("street/activities/start", payload, "Atividade iniciada");
+  const claimStreetActivity = (payload) => action("street/activities/claim", payload, "Resultado recolhido");
+  const streetGarageAction = (payload) => action("street/garage", payload, "Garagem atualizada");
+
   // Modo de colocação manual — o dinheiro só é debitado em confirmPlacement,
   // que é o único momento em que /properties/buy é chamado; cancelar nunca
   // chega a fazer essa chamada, por isso não precisa de rollback.
@@ -771,6 +805,13 @@ export function GameProvider({ children }) {
         repairFleetAll,
         repairWeaponsAll,
         optimizeOrganization,
+        saveStreetPlan,
+        buyStreetGear,
+        streetTerritoryAction,
+        callStreetContact,
+        startStreetActivity,
+        claimStreetActivity,
+        streetGarageAction,
         bribePolice,
         launder,
         claimQuest,
