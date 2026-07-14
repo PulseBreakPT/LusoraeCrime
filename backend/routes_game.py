@@ -4,6 +4,7 @@ import random
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
+from pymongo import ReturnDocument
 from typing import Optional
 from datetime import timedelta
 
@@ -2592,6 +2593,40 @@ def _speedup_cost(remaining_s: float) -> int:
     return max(SPEEDUP_COST_MIN, round(mins * SPEEDUP_COST_PER_MIN))
 
 
+async def _shop_debit(player_id, cost: int, guard=None, update=None):
+    """Debita saldo e altera o jogador numa única operação protegida."""
+    query = {"_id": player_id, "clean_money": {"$gte": cost}}
+    if guard:
+        query.update(guard)
+    operations = {"$inc": {"clean_money": -cost}}
+    for operator, values in (update or {}).items():
+        operations.setdefault(operator, {}).update(values)
+    return await db.players.find_one_and_update(
+        query,
+        operations,
+        return_document=ReturnDocument.AFTER,
+    )
+
+
+async def _shop_failure(player_id, cost: int, message: str):
+    fresh = await db.players.find_one({"_id": player_id}, {"clean_money": 1}) or {}
+    if (fresh.get("clean_money") or 0) < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    raise HTTPException(status_code=409, detail=message)
+
+
+async def _consume_shop_timer(player_id, cost: int, collection, query, update):
+    """Consome o temporizador por compare-and-set ou devolve o débito."""
+    result = await collection.update_one(query, update)
+    if result.modified_count == 1:
+        return
+    await db.players.update_one({"_id": player_id}, {"$inc": {"clean_money": cost}})
+    raise HTTPException(
+        status_code=409,
+        detail="Este temporizador já foi alterado. O dinheiro foi devolvido.",
+    )
+
+
 @router.post("/shop/speedup")
 async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_user)):
     """Acelera um temporizador já existente (nunca cria lógica de conclusão
@@ -2610,10 +2645,14 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
         if not until or parse_dt(until) <= now:
             raise HTTPException(status_code=400, detail="Não está a abastecer")
         cost = _speedup_cost((parse_dt(until) - now).total_seconds())
-        if player["clean_money"] < cost:
+        charged = await _shop_debit(player["_id"], cost)
+        if not charged:
             raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-        await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"refueling_until": now.isoformat()}})
+        await _consume_shop_timer(
+            player["_id"], cost, db.vehicles,
+            {"_id": vehicle["_id"], "player_id": pid, "refueling_until": until},
+            {"$set": {"refueling_until": now.isoformat()}},
+        )
         note = f"Abastecimento de {vehicle['name']}"
 
     elif body.kind == "vehicle_transfer":
@@ -2624,12 +2663,14 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
         if parse_dt(ends_at) <= now:
             raise HTTPException(status_code=400, detail="Transferência já concluída")
         cost = _speedup_cost((parse_dt(ends_at) - now).total_seconds())
-        if player["clean_money"] < cost:
+        charged = await _shop_debit(player["_id"], cost)
+        if not charged:
             raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-        new_transfer = dict(vehicle["transfer"])
-        new_transfer["ends_at"] = now.isoformat()
-        await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"transfer": new_transfer}})
+        await _consume_shop_timer(
+            player["_id"], cost, db.vehicles,
+            {"_id": vehicle["_id"], "player_id": pid, "transfer.ends_at": ends_at},
+            {"$set": {"transfer.ends_at": now.isoformat()}},
+        )
         note = f"Transferência de {vehicle['name']}"
 
     elif body.kind == "property_upgrade":
@@ -2640,10 +2681,14 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
         if not until or parse_dt(until) <= now:
             raise HTTPException(status_code=400, detail="Não está a subir de nível")
         cost = _speedup_cost((parse_dt(until) - now).total_seconds())
-        if player["clean_money"] < cost:
+        charged = await _shop_debit(player["_id"], cost)
+        if not charged:
             raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-        await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"upgrading_until": now.isoformat()}})
+        await _consume_shop_timer(
+            player["_id"], cost, db.properties,
+            {"_id": prop["_id"], "player_id": pid, "upgrading_until": until},
+            {"$set": {"upgrading_until": now.isoformat()}},
+        )
         note = f"Melhoria de {prop['name']}"
 
     elif body.kind == "hq_upgrade":
@@ -2652,12 +2697,18 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
         if not until or parse_dt(until) <= now:
             raise HTTPException(status_code=400, detail="O Quartel-General não está a subir de nível")
         cost = _speedup_cost((parse_dt(until) - now).total_seconds())
-        if player["clean_money"] < cost:
-            raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-        await db.players.update_one({"_id": player["_id"]}, {
-            "$inc": {"clean_money": -cost},
-            "$set": {"hq.upgrading_until": now.isoformat()},
-        })
+        charged = await _shop_debit(
+            player["_id"],
+            cost,
+            guard={"hq.upgrading_until": until},
+            update={"$set": {"hq.upgrading_until": now.isoformat()}},
+        )
+        if not charged:
+            await _shop_failure(
+                player["_id"],
+                cost,
+                "Esta melhoria já foi acelerada. Atualiza o jogo e tenta novamente.",
+            )
         note = "Melhoria do Quartel-General"
 
     elif body.kind == "team_reorg":
@@ -2668,17 +2719,21 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
         if not until or parse_dt(until) <= now:
             raise HTTPException(status_code=400, detail="A equipa já está pronta")
         cost = _speedup_cost((parse_dt(until) - now).total_seconds())
-        if player["clean_money"] < cost:
+        charged = await _shop_debit(player["_id"], cost)
+        if not charged:
             raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-        await db.teams.update_one({"_id": team["_id"]}, {"$set": {"available_at": None}})
+        await _consume_shop_timer(
+            player["_id"], cost, db.teams,
+            {"_id": team["_id"], "player_id": pid, "available_at": until},
+            {"$set": {"available_at": None}},
+        )
         note = f"Reorganização de {team['name']}"
 
     else:
         raise HTTPException(status_code=400, detail="Tipo de aceleração inválido")
 
     await add_event(db, pid, "shop", f"Aceleraste: {note} por {cost:,} €.")
-    await record_tx(db, pid, "shop_speedup", -cost, "clean", player["clean_money"] - cost, note)
+    await record_tx(db, pid, "shop_speedup", -cost, "clean", charged["clean_money"], note)
     return {"ok": True, "cost": cost}
 
 
@@ -2694,11 +2749,21 @@ async def shop_buy_slot(body: ShopBuySlotInput, user: dict = Depends(get_current
         raise HTTPException(status_code=400, detail="Tipo de slot inválido")
     n = player.get(field, 0) or 0
     cost = round(base * (1 + n * SLOT_COST_SCALE_PER_UNIT))
-    if player["clean_money"] < cost:
-        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, field: 1}})
+    guard = {field: n} if n else {"$or": [{field: 0}, {field: {"$exists": False}}]}
+    charged = await _shop_debit(
+        player["_id"],
+        cost,
+        guard=guard,
+        update={"$inc": {field: 1}},
+    )
+    if not charged:
+        await _shop_failure(
+            player["_id"],
+            cost,
+            "O preço do slot mudou porque outra compra terminou primeiro. Tenta novamente.",
+        )
     await add_event(db, pid, "shop", f"Compraste mais um slot de {label} por {cost:,} €.")
-    await record_tx(db, pid, "shop_slot", -cost, "clean", player["clean_money"] - cost, f"Slot extra de {label}")
+    await record_tx(db, pid, "shop_slot", -cost, "clean", charged["clean_money"], f"Slot extra de {label}")
     return {"ok": True, "cost": cost}
 
 
@@ -2709,18 +2774,25 @@ async def shop_buy_vip(body: ShopVipInput, user: dict = Depends(get_current_user
         raise HTTPException(status_code=400, detail="Plano inválido")
     player = await get_player(user)
     pid = str(player["_id"])
-    if player["clean_money"] < plan["cost"]:
-        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     now = now_utc()
-    current_until = parse_dt(player["vip_until"]) if player.get("vip_until") else None
+    current_raw = player.get("vip_until")
+    current_until = parse_dt(current_raw) if current_raw else None
     base = current_until if current_until and current_until > now else now
     new_until = (base + timedelta(days=plan["days"])).isoformat()
-    await db.players.update_one({"_id": player["_id"]}, {
-        "$inc": {"clean_money": -plan["cost"]},
-        "$set": {"vip_until": new_until},
-    })
+    charged = await _shop_debit(
+        player["_id"],
+        plan["cost"],
+        guard={"vip_until": current_raw},
+        update={"$set": {"vip_until": new_until}},
+    )
+    if not charged:
+        await _shop_failure(
+            player["_id"],
+            plan["cost"],
+            "O período VIP foi atualizado por outro pedido. Tenta novamente.",
+        )
     await add_event(db, pid, "shop", f"Ativaste o {plan['label']} por {plan['cost']:,} €.")
-    await record_tx(db, pid, "shop_vip", -plan["cost"], "clean", player["clean_money"] - plan["cost"], plan["label"])
+    await record_tx(db, pid, "shop_vip", -plan["cost"], "clean", charged["clean_money"], plan["label"])
     return {"ok": True, "vip_until": new_until}
 
 
@@ -2736,16 +2808,22 @@ async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_cu
     player = await get_player(user)
     pid = str(player["_id"])
     owned_key = f"{body.category}:{body.key}"
-    if owned_key in (player.get("owned_cosmetics") or []):
-        raise HTTPException(status_code=400, detail="Já possuis este cosmético")
-    if player["clean_money"] < item["cost"]:
+    charged = await _shop_debit(
+        player["_id"],
+        item["cost"],
+        guard={"owned_cosmetics": {"$ne": owned_key}},
+        update={"$addToSet": {"owned_cosmetics": owned_key}},
+    )
+    if not charged:
+        fresh = await db.players.find_one(
+            {"_id": player["_id"]},
+            {"clean_money": 1, "owned_cosmetics": 1},
+        ) or {}
+        if owned_key in (fresh.get("owned_cosmetics") or []):
+            raise HTTPException(status_code=409, detail="Já possuis este cosmético")
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {
-        "$inc": {"clean_money": -item["cost"]},
-        "$push": {"owned_cosmetics": owned_key},
-    })
     await add_event(db, pid, "shop", f"Compraste o cosmético \"{item['label']}\" por {item['cost']:,} €.")
-    await record_tx(db, pid, "shop_cosmetic", -item["cost"], "clean", player["clean_money"] - item["cost"], item["label"])
+    await record_tx(db, pid, "shop_cosmetic", -item["cost"], "clean", charged["clean_money"], item["label"])
     return {"ok": True}
 
 
@@ -2753,6 +2831,8 @@ async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_cu
 async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
+    if body.paint_key and body.paint_key not in VEHICLE_PAINTS:
+        raise HTTPException(status_code=400, detail="Pintura inválida")
     if body.paint_key and f"vehicle_paint:{body.paint_key}" not in (player.get("owned_cosmetics") or []):
         raise HTTPException(status_code=400, detail="Não possuis esta pintura")
     vehicle = await db.vehicles.find_one({"_id": _oid(body.vehicle_id, "Veículo inválido"), "player_id": pid})
@@ -2766,6 +2846,8 @@ async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends
 async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
+    if body.emblem_key and body.emblem_key not in TEAM_EMBLEMS:
+        raise HTTPException(status_code=400, detail="Emblema inválido")
     if body.emblem_key and f"team_emblem:{body.emblem_key}" not in (player.get("owned_cosmetics") or []):
         raise HTTPException(status_code=400, detail="Não possuis este emblema")
     team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
@@ -2779,6 +2861,8 @@ async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get
 async def equip_hq_skin(body: HqEquipSkinInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
+    if body.skin_key and body.skin_key not in HQ_SKINS:
+        raise HTTPException(status_code=400, detail="Skin inválida")
     if body.skin_key and f"hq_skin:{body.skin_key}" not in (player.get("owned_cosmetics") or []):
         raise HTTPException(status_code=400, detail="Não possuis esta skin")
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"hq_skin_key": body.skin_key}})
