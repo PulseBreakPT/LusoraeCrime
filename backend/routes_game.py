@@ -572,6 +572,9 @@ async def _prepare_dispatch(player, opp, team):
         raise HTTPException(status_code=400, detail="O veículo está a abastecer")
     if vehicle.get("transfer") and parse_dt(vehicle["transfer"]["ends_at"]) > now_utc():
         raise HTTPException(status_code=400, detail="O veículo está em trânsito para outra base")
+    if vehicle.get("impounded_until") and parse_dt(vehicle["impounded_until"]) > now:
+        remaining = max(1, int((parse_dt(vehicle["impounded_until"]) - now).total_seconds()))
+        raise HTTPException(status_code=400, detail=f"O veículo está apreendido durante mais {remaining}s")
     seats = VEHICLE_MODELS.get(vehicle["model_key"], {}).get("seats")
     if seats is not None and len(members) > seats:
         raise HTTPException(
@@ -869,6 +872,9 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "team_streak": prep.get("team_streak", 0),
         "vehicle_speed_effective": round(prep["speed"], 1),
         "vehicle_discreet": prep.get("vehicle_discreet", False),
+        # Cidade Viva: um carro reconhecido atrai patrulhas mesmo fora das
+        # atividades de rua. Matrículas frias repõem este valor a zero.
+        "vehicle_street_notoriety": round(float(vehicle.get("street_notoriety", 0) or 0), 1),
         "has_leader": prep.get("has_leader", False),
         "leader_cool": prep.get("leader_cool", 0),
         "has_medic": prep.get("has_medic", False),
