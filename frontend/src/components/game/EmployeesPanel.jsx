@@ -542,7 +542,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   });
 
   const restAllIds = state.employees.filter((e) => e.status === "idle" && e.fatigue >= 15).map((e) => e.id);
-  const restAll = () => restAllIds.forEach((id) => restEmployee(id));
+  const restAll = () => restAllEligible();
 
   // QI do efetivo — o Otimizar preenche vagas de equipas disponíveis com quem
   // está de fora, por aptidão à especialização (nunca move membros entre equipas).

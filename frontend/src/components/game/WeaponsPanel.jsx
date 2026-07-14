@@ -145,7 +145,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   const repairableIds = weapons.filter((w) => !weaponBusy(w) && w.condition < 99.5).map((w) => w.id);
   const repairAllCost = weapons.filter((w) => repairableIds.includes(w.id)).reduce((a, w) => a + repairCostOf(w), 0);
-  const repairAll = () => repairableIds.forEach((id) => repairWeapon(id));
+  const repairAll = () => repairWeaponsAll();
 
   const filteredWeapons = weapons.filter((w) =>
     matchesSearch(query, w.name, catalog?.weapon_models?.[w.model_key]?.name || w.model_key)

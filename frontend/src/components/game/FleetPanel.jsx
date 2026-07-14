@@ -73,7 +73,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
-    transferVehicle, renameVehicle, startPlacement, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles,
+    transferVehicle, renameVehicle, startPlacement, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles, repairFleetAll,
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
@@ -107,7 +107,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   const repairAllCost = state.vehicles
     .filter((v) => repairableIds.includes(v.id))
     .reduce((a, v) => a + Math.max(50, Math.round((100 - v.condition) * v.price * 0.002)), 0);
-  const repairAll = () => repairableIds.forEach((id) => repairVehicle(id));
+  const repairAll = () => repairFleetAll();
 
   const idleTeamsCount = state.teams.filter((t) => t.status === "idle").length;
   const canOptimize = state.vehicles.length > 0 && idleTeamsCount > 0;

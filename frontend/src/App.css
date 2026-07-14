@@ -3591,3 +3591,59 @@ html:has(.lus-page-bg) {
         background-position: 130% 0;
     }
 }
+
+
+/* ============================================================
+   General Improvements Pack — accessibility and HUD profiles
+   ============================================================ */
+html.lus-reduced-motion {
+    scroll-behavior: auto !important;
+}
+
+html.lus-reduced-motion *,
+html.lus-reduced-motion *::before,
+html.lus-reduced-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+}
+
+html.lus-high-contrast .lus-card,
+html.lus-high-contrast .lus-panel,
+html.lus-high-contrast .lus-dock,
+html.lus-high-contrast .lus-hud-btn {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+html.lus-high-contrast .text-zinc-500,
+html.lus-high-contrast .text-zinc-600 {
+    color: #a1a1aa !important;
+}
+
+html.lus-high-contrast button:focus-visible,
+html.lus-high-contrast input:focus-visible,
+html.lus-high-contrast [role="option"]:focus-visible {
+    outline: 2px solid #f87171 !important;
+    outline-offset: 2px;
+}
+
+html.lus-compact-hud .lus-dock {
+    gap: 0 !important;
+    padding: 0.18rem !important;
+}
+
+html.lus-compact-hud .lus-hud-btn {
+    gap: 0.2rem !important;
+    padding: 0.42rem 0.5rem !important;
+}
+
+html.lus-compact-hud .lus-hud-btn svg {
+    height: 0.8rem !important;
+    width: 0.8rem !important;
+}
+
+html.lus-focus-mode .lus-optional-hud {
+    display: none !important;
+}

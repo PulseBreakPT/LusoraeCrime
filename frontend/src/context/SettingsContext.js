@@ -10,6 +10,18 @@ import { audio } from "../lib/audio";
 // servidor mesmo sem o jogador ter a app aberta.
 const SettingsContext = createContext(null);
 
+const notificationPermission = () => (
+  typeof Notification === "undefined" ? "unsupported" : Notification.permission
+);
+
+const useStateNotificationPermission = () => {
+  const [permission, setPermission] = usePersistedState("set.desktopNotificationPermission", notificationPermission());
+  useEffect(() => {
+    setPermission(notificationPermission());
+  }, [setPermission]);
+  return [permission, setPermission];
+};
+
 export const NOTIFICATION_KEYS = [
   { key: "missionCompleted", label: "Operação concluída" },
   { key: "teamAvailable", label: "Equipa disponível" },
@@ -32,6 +44,12 @@ export function SettingsProvider({ children }) {
   const [rememberSort, setRememberSort] = usePersistedState("set.rememberSort", true);
   const [confirmIrreversible, setConfirmIrreversible] = usePersistedState("set.confirmIrreversible", true);
   const [showFps, setShowFps] = usePersistedState("set.showFps", false);
+  const [reducedMotion, setReducedMotion] = usePersistedState("set.reducedMotion", false);
+  const [highContrast, setHighContrast] = usePersistedState("set.highContrast", false);
+  const [compactHud, setCompactHud] = usePersistedState("set.compactHud", false);
+  const [focusMode, setFocusMode] = usePersistedState("set.focusMode", false);
+  const [desktopNotifications, setDesktopNotifications] = usePersistedState("set.desktopNotifications", false);
+  const [desktopNotificationPermission, setDesktopNotificationPermission] = useStateNotificationPermission();
 
   const [autoSelectBestTeam, setAutoSelectBestTeam] = usePersistedState("set.autoSelectBestTeam", true);
   const [autoSelectBestVehicle, setAutoSelectBestVehicle] = usePersistedState("set.autoSelectBestVehicle", true);
@@ -42,6 +60,19 @@ export function SettingsProvider({ children }) {
 
   const [notifications, setNotifications] = usePersistedState("set.notifications", DEFAULT_NOTIFICATIONS);
   const setNotification = (key, value) => setNotifications((prev) => ({ ...prev, [key]: value }));
+  const desktopNotificationsSupported = typeof Notification !== "undefined";
+  const requestDesktopNotifications = async (enabled) => {
+    if (!enabled) {
+      setDesktopNotifications(false);
+      return true;
+    }
+    if (!desktopNotificationsSupported) return false;
+    const permission = await Notification.requestPermission();
+    setDesktopNotificationPermission(permission);
+    const granted = permission === "granted";
+    setDesktopNotifications(granted);
+    return granted;
+  };
 
   const [soundEnabled, setSoundEnabled] = usePersistedState("set.soundEnabled", true);
   const [musicEnabled, setMusicEnabled] = usePersistedState("set.musicEnabled", true);
@@ -81,6 +112,10 @@ export function SettingsProvider({ children }) {
         rememberFilters, setRememberFilters, rememberSort, setRememberSort,
         confirmIrreversible, setConfirmIrreversible,
         showFps, setShowFps,
+        reducedMotion, setReducedMotion, highContrast, setHighContrast,
+        compactHud, setCompactHud, focusMode, setFocusMode,
+        desktopNotifications, requestDesktopNotifications,
+        desktopNotificationsSupported, desktopNotificationPermission,
         autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
         hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
         autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
