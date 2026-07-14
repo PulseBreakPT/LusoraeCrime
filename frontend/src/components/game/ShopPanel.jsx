@@ -194,29 +194,49 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 {state.player.hq_skin_key === key ? "Ativa" : "Equipar"}
                               </button>
                             ) : cat === "vehicle_paint" ? (
-                              <Select onValueChange={(vid) => equipPaint(vid, key)}>
+                              <Select onValueChange={(selection) => {
+                                const [mode, vehicleId] = selection.split(":");
+                                equipPaint(vehicleId, mode === "remove" ? null : key);
+                              }}>
                                 <SelectTrigger className="h-7 w-32 shrink-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {(state.vehicles || []).map((v) => (
-                                    <SelectItem key={v.id} value={v.id} className="font-mono text-xs">
-                                      {v.name}{v.paint_key === key ? " ✓" : ""}
-                                    </SelectItem>
-                                  ))}
+                                  {(state.vehicles || []).map((v) => {
+                                    const equipped = v.paint_key === key;
+                                    return (
+                                      <SelectItem
+                                        key={v.id}
+                                        value={`${equipped ? "remove" : "equip"}:${v.id}`}
+                                        className="font-mono text-xs"
+                                      >
+                                        {equipped ? `Remover de ${v.name}` : v.name}
+                                      </SelectItem>
+                                    );
+                                  })}
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <Select onValueChange={(tid) => equipEmblem(tid, key)}>
+                              <Select onValueChange={(selection) => {
+                                const [mode, teamId] = selection.split(":");
+                                equipEmblem(teamId, mode === "remove" ? null : key);
+                              }}>
                                 <SelectTrigger className="h-7 w-32 shrink-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {(state.teams || []).map((t) => (
-                                    <SelectItem key={t.id} value={t.id} className="font-mono text-xs">
-                                      {t.name}{t.emblem_key === key ? " ✓" : ""}
-                                    </SelectItem>
-                                  ))}
+                                  {(state.teams || []).map((t) => {
+                                    const equipped = t.emblem_key === key;
+                                    return (
+                                      <SelectItem
+                                        key={t.id}
+                                        value={`${equipped ? "remove" : "equip"}:${t.id}`}
+                                        className="font-mono text-xs"
+                                      >
+                                        {equipped ? `Remover de ${t.name}` : t.name}
+                                      </SelectItem>
+                                    );
+                                  })}
                                 </SelectContent>
                               </Select>
                             )

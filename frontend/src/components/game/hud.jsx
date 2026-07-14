@@ -3,7 +3,7 @@
 // a plataforma partilhe a mesma base visual, mantendo a estética escura/mono do Lusorae.
 
 import { useEffect, useRef, useState } from "react";
-import { Pencil, Check, X, Star } from "lucide-react";
+import { Pencil, Check, X, Star, Loader2 } from "lucide-react";
 import { getDisplayPrefs } from "../../lib/game";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
@@ -297,41 +297,60 @@ export const PurchaseButton = ({
   requireConfirm = false, onConfirm, className = "", layout = "row", children,
 }) => {
   const [armed, setArmed] = useState(false);
+  const [pending, setPending] = useState(false);
   const skipArm = getDisplayPrefs().confirmIrreversible === false;
   useEffect(() => {
     if (!armed) return;
     const id = setTimeout(() => setArmed(false), 3000);
     return () => clearTimeout(id);
   }, [armed]);
-  const tip = armed
+  const tip = pending
+    ? "A processar — aguarda a confirmação do servidor."
+    : armed
     ? "Clica outra vez para confirmar — ação irreversível."
     : !can
     ? (blockedReasons.length ? blockedReasons.join(" ") : null)
     : availableTip;
+  const runConfirm = async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      await onConfirm();
+    } finally {
+      setPending(false);
+    }
+  };
   const handleClick = () => {
-    if (!can) return;
-    if (!requireConfirm || skipArm) { onConfirm(); return; }
-    if (armed) { setArmed(false); onConfirm(); } else setArmed(true);
+    if (!can || pending) return;
+    if (!requireConfirm || skipArm) { runConfirm(); return; }
+    if (armed) { setArmed(false); runConfirm(); } else setArmed(true);
   };
   return (
     <Tip tip={tip} block className={className}>
       <button
         data-testid={testId}
         onClick={handleClick}
-        disabled={!can}
+        disabled={!can || pending}
+        aria-busy={pending}
         className={cn(
           layout === "card"
             ? "flex h-full w-full flex-col items-start gap-1 rounded-md border px-3 py-2 text-left font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px]"
             : "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase",
           "transition-colors disabled:cursor-not-allowed",
-          armed
+          pending
+            ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
+            : armed
             ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
             : can
             ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:border-emerald-500/60 hover:bg-emerald-500/20"
             : "border-red-500/30 bg-red-500/10 text-red-400"
         )}
       >
-        {children != null ? children : (<>{Icon && <Icon size={11} />} {armed ? confirmLabel : label}</>)}
+        {pending ? (
+          <><Loader2 size={11} className="animate-spin" /> A processar…</>
+        ) : children != null ? children : (
+          <>{Icon && <Icon size={11} />} {armed ? confirmLabel : label}</>
+        )}
       </button>
     </Tip>
   );
