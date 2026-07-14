@@ -9,7 +9,7 @@ from pymongo import ReturnDocument
 
 from auth import get_current_user
 from db import db
-from engine import add_event, now_utc, parse_dt, police_force_for, record_tx
+from engine import add_event, dirty_money_cap, now_utc, parse_dt, police_force_for, record_tx
 from street_data import (
     ACTIVITIES, APPROACHES, CITY_EVENTS, CONTACTS, ESCAPE_PLANS, GEAR, WAGERS,
     city_event, clamp_chance, street_rank, wanted_stars,
@@ -174,8 +174,9 @@ async def _owned_vehicle(player, vehicle_id):
 async def _process_street(player, now):
     """Avança apenas os sistemas urbanos. O tick principal continua responsável
     pelas missões, calor base, salários e propriedades existentes."""
+    was_missing = not bool(player.get("street"))
     street = _ensure_street(player, now)
-    changed = player.get("street") is None
+    changed = was_missing
 
     # Um veículo regressa automaticamente da apreensão quando o prazo termina.
     await db.vehicles.update_many(
@@ -220,6 +221,10 @@ async def _process_street(player, now):
                 lost_names.append(district["name"])
             else:
                 district["rival_pressure"] = round(pressure, 2)
+        # O rendimento territorial respeita o mesmo limite de dinheiro
+        # sujo usado pelas propriedades e recompensas do jogo principal.
+        dirty_room = max(0, dirty_money_cap(player.get("level", 1)) - int(player.get("dirty_money", 0)))
+        dirty_income = min(dirty_income, dirty_room)
         street["income_at"] = now.isoformat()
         changed = True
 
@@ -800,6 +805,7 @@ async def claim_activity(body: ActivityClaimInput, user: dict = Depends(get_curr
     new_heat = min(100.0, float(claimed.get("heat", 0)) + heat_gain)
     rep_gain = int(job["rep_reward"] if success else max(2, job["rep_reward"] * 0.15))
     street["rep"] = int(street.get("rep", 0) or 0) + rep_gain
+    paid_reward = 0
 
     if success:
         influence_gain = 18 + int(job["rep_reward"] / 4)
@@ -808,24 +814,29 @@ async def claim_activity(body: ActivityClaimInput, user: dict = Depends(get_curr
         if job["job_key"] == "race":
             street["race_streak"] = int(street.get("race_streak", 0) or 0) + 1
         balance_field = "clean_money" if job["pays"] == "clean" else "dirty_money"
+        paid_reward = int(job["reward"])
+        if balance_field == "dirty_money":
+            room = max(0, dirty_money_cap(claimed.get("level", 1)) - int(claimed.get("dirty_money", 0)))
+            paid_reward = min(paid_reward, room)
         await db.players.update_one(
             {"_id": player["_id"]},
             {
                 "$set": {"street": street, "heat": new_heat},
-                "$inc": {balance_field: int(job["reward"])},
+                "$inc": {balance_field: paid_reward},
             },
         )
-        balance_after = claimed.get(balance_field, 0) + int(job["reward"])
-        await record_tx(
-            db, str(player["_id"]), "street_activity_reward", int(job["reward"]), job["pays"],
-            balance_after, job["name"],
-        )
+        balance_after = claimed.get(balance_field, 0) + paid_reward
+        if paid_reward:
+            await record_tx(
+                db, str(player["_id"]), "street_activity_reward", paid_reward, job["pays"],
+                balance_after, job["name"],
+            )
         notoriety_gain = 4 + cfg["heat"] * 0.6
         await db.vehicles.update_one(
             {"_id": _oid(job["vehicle_id"])},
             {"$inc": {"street_notoriety": notoriety_gain}},
         )
-        message = f"{job['name']} concluída: +{job['reward']:,} € e +{rep_gain} reputação de rua."
+        message = f"{job['name']} concluída: +{paid_reward:,} € e +{rep_gain} reputação de rua."
         event_kind = "success"
     else:
         district["rival_pressure"] = min(100.0, float(district.get("rival_pressure", 0)) + 12)
@@ -861,7 +872,7 @@ async def claim_activity(body: ActivityClaimInput, user: dict = Depends(get_curr
         "vehicle_name": job["vehicle_name"],
         "outcome": job["outcome"],
         "caught": bool(job.get("caught")),
-        "reward": int(job["reward"]) if success else 0,
+        "reward": paid_reward,
         "rep": rep_gain,
     }
     street["history"] = [history, *list(street.get("history", []))][:20]
