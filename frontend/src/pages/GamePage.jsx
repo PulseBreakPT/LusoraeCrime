@@ -18,6 +18,7 @@ import { QuestsPanel } from "../components/game/QuestsPanel";
 import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
 import { ShopPanel } from "../components/game/ShopPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
+import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
 import { DisclaimerModal } from "../components/game/DisclaimerModal";
@@ -26,13 +27,30 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag } from "lucide-react";
+import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw } from "lucide-react";
 
 export default function GamePage() {
-  const { state, stateError, catalog, refresh, serverNow, autoOpenReportSignal, placement } = useGame();
-  const { hideImpossibleMissions, showFps } = useSettings();
+  const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
+  const settings = useSettings();
+  const { hideImpossibleMissions, showFps, focusMode } = settings;
   const [selectedOpp, setSelectedOpp] = useState(null);
-  const [openPanel, setOpenPanel] = useState(null);
+  const [openPanel, setOpenPanel] = useState(initialGamePanel);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const shellAlerts = state ? orgAlerts(state) : { total: 0 };
+  const { online, stale } = useGameShell({
+    state,
+    alerts: shellAlerts,
+    openPanel,
+    setOpenPanel,
+    selectedOpp,
+    setSelectedOpp,
+    refresh,
+    lastSyncAt,
+    commandOpen,
+    setCommandOpen,
+    settings,
+  });
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
   const [baseFilter, setBaseFilter] = useState("all");
   const [stamp, setStamp] = useState(null);
@@ -110,18 +128,6 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenReportSignal]);
 
-  // Escape fecha o último painel/modal aberto. Os Sheets (radix-ui/react-dialog)
-  // já se fecham sozinhos com Escape — falta apenas cobrir o cartão de
-  // oportunidade selecionada, que não é um Dialog.
-  useEffect(() => {
-    const onKeyDown = (ev) => {
-      if (ev.key !== "Escape") return;
-      if (selectedOpp) setSelectedOpp(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedOpp]);
-
   if (!state) {
     if (stateError) {
       return (
@@ -154,7 +160,7 @@ export default function GamePage() {
     return <HQOnboarding />;
   }
 
-  const alerts = orgAlerts(state);
+  const alerts = shellAlerts;
   const tr = teamsReadiness(state);
   const p = state.player;
   const empireAlert = p.heat >= 70 || p.dirty_money >= 15000;
@@ -217,13 +223,26 @@ export default function GamePage() {
         </div>
       )}
 
-      <ResourceBar />
-      {showFps && <FpsMeter />}
+      {!focusMode && <ResourceBar />}
+      {!focusMode && showFps && <FpsMeter />}
+      {(!online || stale) && (
+        <div
+          role="status"
+          data-testid="connection-banner"
+          className="pointer-events-auto absolute left-1/2 top-2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-500/30 bg-black/90 px-3 py-1.5 font-mono text-[10px] text-amber-300 shadow-xl backdrop-blur"
+        >
+          {online ? <RefreshCw size={12} /> : <WifiOff size={12} />}
+          <span>{online ? "Dados desatualizados" : "Sem ligação à internet"}</span>
+          <button type="button" onClick={refresh} className="font-bold text-white underline underline-offset-2">
+            Sincronizar
+          </button>
+        </div>
+      )}
       <Tip
         tip={alerts.total > 0 ? `Central de Inteligência — ${alerts.total} alerta(s) e ações recomendadas, estatísticas e registo de missões.` : "Central de Inteligência — estatísticas, ações recomendadas e registo de missões."}
         side="bottom"
         align="end"
-        className="pointer-events-auto absolute right-2 top-16 z-20"
+        className="lus-optional-hud pointer-events-auto absolute right-2 top-16 z-20"
       >
         <Button
           data-testid="open-intel-button"
@@ -238,7 +257,7 @@ export default function GamePage() {
           )}
         </Button>
       </Tip>
-      <Tip tip="Definições — conta, interface, automatizações e notificações." side="bottom" align="end" className="pointer-events-auto absolute right-2 top-32 z-20">
+      <Tip tip="Definições — conta, interface, automatizações e notificações." side="bottom" align="end" className="lus-optional-hud pointer-events-auto absolute right-2 top-32 z-20">
         <Button
           data-testid="open-settings-button"
           variant="outline"
@@ -249,64 +268,76 @@ export default function GamePage() {
           <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
         </Button>
       </Tip>
+      <Tip tip="Centro de Comandos — pesquisa global e ações rápidas (Ctrl K ou /)." side="bottom" align="end" className="pointer-events-auto absolute right-2 top-48 z-20">
+        <Button
+          data-testid="open-command-center"
+          variant="outline"
+          onClick={() => setCommandOpen(true)}
+          className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white hover:text-white md:px-3"
+        >
+          <Search size={16} className="h-[18px] w-[18px] text-sky-300 md:h-4 md:w-4" />
+          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Comandos</span>
+          <kbd className="hidden rounded border border-white/10 bg-black/40 px-1 font-mono text-[8px] text-zinc-500 lg:inline">Ctrl K</kbd>
+        </Button>
+      </Tip>
       {/* Modo de colocação = modo focado: só o mapa e os controlos de colocação
           ficam visíveis; central, cartões, legenda, filtro e dock saem do
           caminho para nada tapar o Confirmar/Cancelar. */}
-      {!placement && <ActivityFeed onNavigate={navigateTo} suppressed={!!selectedOpp} />}
-      {!placement && <ActivityFeedMobile onNavigate={navigateTo} suppressed={!!selectedOpp} />}
+      {!placement && !focusMode && <ActivityFeed onNavigate={navigateTo} suppressed={!!selectedOpp} />}
+      {!placement && !focusMode && <ActivityFeedMobile onNavigate={navigateTo} suppressed={!!selectedOpp} />}
       {selectedOpp && !placement && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
 
-      {!placement && <MapLegend />}
-      {!placement && <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />}
+      {!placement && !focusMode && <MapLegend />}
+      {!placement && !focusMode && <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />}
       <PlacementControls />
 
-      {!placement && (
+      {!placement && !focusMode && (
       <div
         className="pointer-events-auto absolute left-2 z-30 max-w-[calc(100vw-4rem)] md:left-1/2 md:max-w-none md:-translate-x-1/2"
         style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
       >
       <div className="lus-dock flex items-center gap-0.5 overflow-x-auto rounded-2xl border px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-1 md:overflow-visible md:px-1.5">
         <HudButton
-          testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400"
+          testId="open-operations-button" shortcut="1" icon={Crosshair} label="Operações" color="text-sky-400"
           tip="Lista de todas as oportunidades no mapa — ordena por ETA, recompensa ou risco, filtra e despacha sem procurar pino a pino."
           active={openPanel === "operations"} onClick={() => setOpenPanel("operations")}
         />
         <HudButton
-          testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400"
+          testId="open-quests-button" shortcut="2" icon={Target} label="Missões" color="text-rose-400"
           alert={alerts.claimable > 0}
           tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) por reclamar — história, diárias e semanais.` : "Missões de história, diárias, semanais e alertas dinâmicos."}
           active={openPanel === "quests"} onClick={() => setOpenPanel("quests")}
         />
         <HudButton
-          testId="open-empire-button" icon={Building2} label="Império" color="text-red-500"
+          testId="open-empire-button" shortcut="3" icon={Building2} label="Império" color="text-red-500"
           alert={empireAlert}
           tip={empireAlert ? `Atenção: ${p.heat >= 70 ? `calor a ${Math.round(p.heat)}%` : ""}${p.heat >= 70 && p.dirty_money >= 15000 ? " · " : ""}${p.dirty_money >= 15000 ? `${fmtMoney(p.dirty_money)} sujos por lavar` : ""} — abre o Império para agir.` : "Visão geral da organização, lavagem de dinheiro e suborno à polícia."}
           active={openPanel === "empire"} onClick={() => setOpenPanel("empire")}
         />
         <HudButton
-          testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400"
+          testId="open-teams-button" shortcut="4" icon={Users} label="Equipas" color="text-cyan-400"
           alert={alerts.teams > 0}
           tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Coordenação de membros, veículos e despacho rápido.`}
           active={openPanel === "teams"} onClick={() => setOpenPanel("teams")}
         />
         <HudButton
-          testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400"
+          testId="open-employees-button" shortcut="5" icon={IdCard} label="Operacionais" color="text-emerald-400"
           tip={hrAlertCount > 0 ? `Efetivo precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o efetivo leal."}
           active={openPanel === "employees"} onClick={() => setOpenPanel("employees")}
         />
         <HudButton
-          testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400"
+          testId="open-fleet-button" shortcut="6" icon={Car} label="Frota" color="text-amber-400"
           tip={fleetAlertCount > 0 ? `Frota precisa de atenção: ${fleetTipParts.join(" · ")}.` : "Abastecer, reparar, comprar e atribuir veículos às equipas."}
           active={openPanel === "fleet"} onClick={() => setOpenPanel("fleet")}
         />
         <HudButton
-          testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-purple-300"
+          testId="open-properties-button" shortcut="7" icon={Warehouse} label="Imóveis" color="text-purple-300"
           alert={alerts.raidRisk}
           tip={alerts.raidRisk ? "Risco de rusga policial aos laboratórios (calor ≥ 70%) — suborna a polícia ou aguenta o risco." : "Propriedades: capacidade, rendimento passivo e lavagem automática."}
           active={openPanel === "properties"} onClick={() => setOpenPanel("properties")}
         />
         <HudButton
-          testId="open-weapons-button" icon={Swords} label="Armamento" color="text-red-400"
+          testId="open-weapons-button" shortcut="8" icon={Swords} label="Armamento" color="text-red-400"
           alert={weaponsDamaged > 0}
           tip={
             weaponsDamaged > 0
@@ -318,7 +349,7 @@ export default function GamePage() {
           active={openPanel === "weapons"} onClick={() => setOpenPanel("weapons")}
         />
         <HudButton
-          testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300"
+          testId="open-shop-button" shortcut="9" icon={ShoppingBag} label="Loja" color="text-amber-300"
           tip="Acelerar tempo, cosméticos, VIP e slots extra — tudo pago em dinheiro do jogo."
           active={openPanel === "shop"} onClick={() => setOpenPanel("shop")}
         />
@@ -326,6 +357,12 @@ export default function GamePage() {
       </div>
       )}
 
+      <CommandCenter
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onNavigate={navigateTo}
+        onSelectOpp={(opp) => { setSelectedOpp(opp); setOpenPanel(null); }}
+      />
       <ShopPanel open={openPanel === "shop"} onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />
       <OpportunitiesPanel
         open={openPanel === "operations"}
@@ -369,7 +406,7 @@ export default function GamePage() {
   );
 }
 
-const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onClick }) => (
+const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, shortcut, onClick }) => (
   <Tip tip={tip} side="top">
     <Button
       data-testid={testId}
@@ -388,6 +425,11 @@ const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, onCli
           className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full"
           style={{ background: NOTIFY_COLOR, boxShadow: `0 0 6px ${NOTIFY_COLOR}` }}
         />
+      )}
+      {shortcut && (
+        <kbd className="hidden rounded border border-white/10 bg-black/40 px-1 font-mono text-[8px] text-zinc-600 lg:inline">
+          {shortcut}
+        </kbd>
       )}
     </Button>
   </Tip>
