@@ -16,6 +16,7 @@ import { HQPanel } from "../components/game/HQPanel";
 import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
+import { ShopPanel } from "../components/game/ShopPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
@@ -25,7 +26,7 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, autoOpenReportSignal, placement } = useGame();
@@ -316,10 +317,16 @@ export default function GamePage() {
           }
           active={openPanel === "weapons"} onClick={() => setOpenPanel("weapons")}
         />
+        <HudButton
+          testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300"
+          tip="Acelerar tempo, cosméticos, VIP e slots extra — tudo pago em dinheiro do jogo."
+          active={openPanel === "shop"} onClick={() => setOpenPanel("shop")}
+        />
       </div>
       </div>
       )}
 
+      <ShopPanel open={openPanel === "shop"} onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />
       <OpportunitiesPanel
         open={openPanel === "operations"}
         onOpenChange={(o) => setOpenPanel(o ? "operations" : null)}

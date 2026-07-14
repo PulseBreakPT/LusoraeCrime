@@ -251,7 +251,11 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 {/* Cabeçalho: placa com silhueta + identidade */}
                 <div className="relative z-[1] flex items-stretch gap-2.5">
                   <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                    <VehicleGlyph modelKey={v.model_key} accent={tier.color} className="h-[44px] w-[96px]" />
+                    <VehicleGlyph
+                      modelKey={v.model_key} accent={tier.color}
+                      paintColor={catalog?.shop?.vehicle_paints?.[v.paint_key]?.color}
+                      className="h-[44px] w-[96px]"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-1.5">

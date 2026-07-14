@@ -34,7 +34,7 @@ const KIND_LABELS = {
 const PANEL_LABELS = {
   teams: "Equipas", fleet: "Frota", properties: "Imóveis", empire: "Império",
   employees: "Operacionais", quests: "Missões", intel: "Central de Inteligência",
-  weapons: "Arsenal", hq: "Quartel-General",
+  weapons: "Arsenal", hq: "Quartel-General", shop: "Loja",
 };
 
 // ---------- Categorias de filtro (derivadas de kind + destino do classifyEvent) ----------

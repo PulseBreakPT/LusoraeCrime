@@ -59,7 +59,9 @@ const EMBLEMS = {
   ),
 };
 
-export const TeamGlyph = ({ spec, accent = "#A1A1AA", className = "" }) => {
+// `emblemColor` (da loja — Team.emblem_key) tinge o emblema mantendo a sombra
+// inferior fixa; sem emblema comprado, cai no metálico cinzento por omissão.
+export const TeamGlyph = ({ spec, accent = "#A1A1AA", emblemColor, className = "" }) => {
   const uid = useId().replace(/[:]/g, "");
   const draw = EMBLEMS[spec] || EMBLEMS.assalto;
   const grad = `url(#tg-${uid})`;
@@ -67,8 +69,8 @@ export const TeamGlyph = ({ spec, accent = "#A1A1AA", className = "" }) => {
     <svg viewBox="0 0 96 44" className={`lus-team-glyph ${className}`} aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id={`tg-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#E4E4E7" stopOpacity="0.95" />
-          <stop offset="0.42" stopColor="#A1A1AA" stopOpacity="0.88" />
+          <stop offset="0" stopColor={emblemColor || "#E4E4E7"} stopOpacity="0.95" />
+          <stop offset="0.42" stopColor={emblemColor || "#A1A1AA"} stopOpacity="0.88" />
           <stop offset="0.58" stopColor="#52525B" stopOpacity="0.92" />
           <stop offset="1" stopColor="#27272A" stopOpacity="0.96" />
         </linearGradient>

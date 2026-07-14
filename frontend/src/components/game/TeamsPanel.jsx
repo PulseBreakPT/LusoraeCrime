@@ -407,7 +407,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 {/* Cabeçalho dossier: placa com emblema + identidade da unidade */}
                 <div className="relative z-[1] flex items-stretch gap-2.5">
                   <div className="lus-team-plate relative flex h-[54px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                    <TeamGlyph spec={t.spec} accent={tier.color} className="h-[44px] w-[82px]" />
+                    <TeamGlyph
+                      spec={t.spec} accent={tier.color}
+                      emblemColor={catalog?.shop?.team_emblems?.[t.emblem_key]?.color}
+                      className="h-[44px] w-[82px]"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-1.5">

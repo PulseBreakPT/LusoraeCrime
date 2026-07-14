@@ -53,9 +53,12 @@ const oppIconCached = (opp, selected, favorite, urgent) => {
   return icon;
 };
 
-const hqIcon = () => {
+// `skinColor` (da loja — Player.hq_skin_key) recolore a moldura do marcador;
+// sem skin comprada/equipada, cai no contorno preto por omissão.
+const hqIcon = (skinColor) => {
+  const style = skinColor ? ` style="--skin:${skinColor}"` : "";
   const html = `
-    <div class="hq-pin">
+    <div class="hq-pin"${style}>
       ${renderToStaticMarkup(<Home size={16} strokeWidth={2.5} />)}
     </div>`;
   return makeDivIcon(html, 36);
@@ -722,7 +725,8 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
 export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, baseFilter = "all" }) {
   const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state?.player?.hq;
-  const hqMarkerIcon = useMemo(() => hqIcon(), []);
+  const hqSkinColor = catalog?.shop?.hq_skins?.[state?.player?.hq_skin_key]?.color;
+  const hqMarkerIcon = useMemo(() => hqIcon(hqSkinColor), [hqSkinColor]);
   const level = state.player.level;
 
   // Roster real por operacional (especialização/patente) — alimenta a

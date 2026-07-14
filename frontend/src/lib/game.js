@@ -1102,6 +1102,8 @@ export function classifyEvent(kind, message) {
     }
     case "weapon":
       return { panel: "weapons", color: "#34D399" };
+    case "shop":
+      return { panel: "shop", color: "#38BDF8" };
     case "property":
       return { panel: "properties", color: "#A78BFA" };
     case "launder":

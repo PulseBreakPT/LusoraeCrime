@@ -128,7 +128,9 @@ const GLYPHS = {
 };
 GLYPHS.moto_rapida = GLYPHS.moto;
 
-export const VehicleGlyph = ({ modelKey, accent = "#A1A1AA", className = "" }) => {
+// `paintColor` (da loja — Vehicle.paint_key) tinge o corpo mantendo a sombra
+// inferior fixa; sem pintura, cai no metálico cinzento por omissão.
+export const VehicleGlyph = ({ modelKey, accent = "#A1A1AA", paintColor, className = "" }) => {
   const uid = useId().replace(/[:]/g, "");
   const draw = GLYPHS[modelKey] || GLYPHS.usado;
   const grad = `url(#vg-${uid})`;
@@ -136,8 +138,8 @@ export const VehicleGlyph = ({ modelKey, accent = "#A1A1AA", className = "" }) =
     <svg viewBox="0 0 120 44" className={`lus-doss-glyph ${className}`} aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id={`vg-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#E4E4E7" stopOpacity="0.95" />
-          <stop offset="0.42" stopColor="#A1A1AA" stopOpacity="0.88" />
+          <stop offset="0" stopColor={paintColor || "#E4E4E7"} stopOpacity="0.95" />
+          <stop offset="0.42" stopColor={paintColor || "#A1A1AA"} stopOpacity="0.88" />
           <stop offset="0.58" stopColor="#52525B" stopOpacity="0.92" />
           <stop offset="1" stopColor="#27272A" stopOpacity="0.96" />
         </linearGradient>
