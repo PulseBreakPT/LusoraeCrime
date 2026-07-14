@@ -19,9 +19,10 @@ import {
 import { audio } from "../../lib/audio";
 import { toast } from "sonner";
 
-const GAME_VERSION = "1.1.0";
+const GAME_VERSION = "1.2.0";
 
 const CHANGELOG = [
+  { v: "1.2.0", text: "Centro de Comandos global, pesquisa de ativos e operações, atalhos, ações em lote seguras, exportação CSV, navegação persistente e novos perfis de acessibilidade." },
   { v: "1.1.0", text: "Banda sonora original e efeitos sonoros temáticos — sirenes de perseguição, dinheiro, subida de nível e mais." },
   { v: "1.0.0", text: "Módulo de Definições: conta, interface, jogabilidade, automatizações e notificações." },
   { v: "0.9.0", text: "Interligação total do jogo: novos veículos exigidos por operações, novas especialidades com talentos e bónus próprios." },
