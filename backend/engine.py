@@ -1642,6 +1642,11 @@ def _compute_chase_chance(player, m):
     # Divisão territorial: no centro urbano (PSP) as patrulhas estão perto e
     # respondem depressa (mais perseguições); no rural (GNR) estão dispersas.
     base += POLICE_FORCE_EFFECTS.get(t.get("police_force"), {}).get("chase", 0.0)
+    # Cidade Viva: patrulhas reconhecem veículos usados repetidamente. O efeito
+    # é limitado para nunca tornar uma fuga impossível e pode ser limpo na
+    # garagem através de matrículas frias.
+    notoriety = max(0.0, float(m.get("vehicle_street_notoriety", 0) or 0))
+    base += min(0.18, notoriety * 0.002)
     talents = m.get("talents", []) or []
     reduction = 0.0
     if "fantasma_digital" in talents:
@@ -1720,6 +1725,20 @@ async def _resolve_chase(db, player, m):
     stats = player.setdefault("stats", default_stats())
     stats["fines_paid"] = stats.get("fines_paid", 0) + lost
     stats["missions_police"] = stats.get("missions_police", 0) + 1
+    # A interceção também apreende o carro de fuga. Seguro clandestino reduz
+    # o tempo de retenção para metade; a garagem Cidade Viva permite recuperá-lo.
+    if m.get("vehicle_id"):
+        try:
+            caught_vehicle = await db.vehicles.find_one({"_id": ObjectId(m["vehicle_id"])})
+        except Exception:
+            caught_vehicle = None
+        if caught_vehicle:
+            hold_s = 300 if caught_vehicle.get("insured") else 600
+            await db.vehicles.update_one(
+                {"_id": caught_vehicle["_id"]},
+                {"$set": {"impounded_until": (now_utc() + timedelta(seconds=hold_s)).isoformat()},
+                 "$inc": {"street_notoriety": 18}},
+            )
     # 40% chance a random member gets arrested.
     if m.get("member_ids") and random.random() < 0.4:
         victim_id = random.choice(m["member_ids"])
@@ -1987,7 +2006,16 @@ async def _crew_returns(db, player, m, outcome):
                 wear += UNEXPECTED_REPAIR_CONDITION_HIT
                 await add_event(db, pid, "vehicle", f"{veh['name']} sofreu uma avaria inesperada durante {t['name']}.")
             new_condition = max(0.0, veh["condition"] - wear)
-            inc = {"missions_done": 1, "missions_since_repair": 1}
+            inc = {
+                "missions_done": 1,
+                "missions_since_repair": 1,
+                # Cada operação torna a viatura mais reconhecível. Missões
+                # bem-sucedidas e parciais deixam mais testemunhas e imagens.
+                "street_notoriety": max(
+                    1.0,
+                    float(t.get("risk", 1)) * (1.8 if outcome in ("success", "partial") else 1.0),
+                ),
+            }
             if outcome == "success":
                 inc["missions_success"] = 1
             await db.vehicles.update_one({"_id": veh["_id"]}, {
