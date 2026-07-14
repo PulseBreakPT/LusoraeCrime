@@ -18,6 +18,7 @@ import { QuestsPanel } from "../components/game/QuestsPanel";
 import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
 import { ShopPanel } from "../components/game/ShopPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
+import { StreetPanel } from "../components/game/StreetPanel";
 import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
@@ -28,7 +29,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -163,6 +164,7 @@ export default function GamePage() {
   const alerts = shellAlerts;
   const tr = teamsReadiness(state);
   const p = state.player;
+  const wantedStars = state.street?.wanted?.stars || 0;
   const empireAlert = p.heat >= 70 || p.dirty_money >= 15000;
 
   const hrTipParts = [];
@@ -225,6 +227,28 @@ export default function GamePage() {
 
       {!focusMode && <ResourceBar />}
       {!focusMode && showFps && <FpsMeter />}
+      {!focusMode && wantedStars > 0 && (
+        <button
+          type="button"
+          data-testid="wanted-stars-hud"
+          onClick={() => setOpenPanel("street")}
+          className="lus-optional-hud pointer-events-auto absolute left-2 top-16 z-20 rounded-xl border border-amber-500/25 bg-black/85 px-3 py-2 shadow-xl backdrop-blur"
+          aria-label={`Nível de procurado: ${wantedStars} de 5 estrelas`}
+        >
+          <span className="flex gap-0.5">
+            {[0, 1, 2, 3, 4].map((index) => (
+              <Star
+                key={index}
+                size={13}
+                className={index < wantedStars ? "fill-amber-400 text-amber-300" : "text-zinc-700"}
+              />
+            ))}
+          </span>
+          <span className="mt-1 block font-mono text-[8px] font-bold uppercase tracking-wider text-red-300">
+            Polícia em alerta
+          </span>
+        </button>
+      )}
       {(!online || stale) && (
         <div
           role="status"
@@ -349,6 +373,12 @@ export default function GamePage() {
           active={openPanel === "weapons"} onClick={() => setOpenPanel("weapons")}
         />
         <HudButton
+          testId="open-street-button" icon={Radar} label="Cidade" color="text-cyan-300"
+          alert={wantedStars >= 3 || (state.street?.districts || []).some((district) => district.rival_pressure >= 70)}
+          tip="Cidade Viva — nível de procurado, territórios, contactos, corridas, entregas e garagem clandestina."
+          active={openPanel === "street"} onClick={() => setOpenPanel("street")}
+        />
+        <HudButton
           testId="open-shop-button" shortcut="9" icon={ShoppingBag} label="Loja" color="text-amber-300"
           tip="Acelerar tempo, cosméticos, VIP e slots extra — tudo pago em dinheiro do jogo."
           active={openPanel === "shop"} onClick={() => setOpenPanel("shop")}
@@ -357,6 +387,7 @@ export default function GamePage() {
       </div>
       )}
 
+      <StreetPanel open={openPanel === "street"} onOpenChange={(o) => setOpenPanel(o ? "street" : null)} />
       <CommandCenter
         open={commandOpen}
         onOpenChange={setCommandOpen}
