@@ -200,7 +200,7 @@ def _vehicle_score(vehicle):
     speed = float(vehicle.get("speed", model.get("speed", 10)))
     condition = float(vehicle.get("condition", 0))
     discretion = float(model.get("discretion", 5))
-    return max(0.1, min(1.0, speed / 30 * 0.55 + condition / 100 * 0.3 + discretion / 10 * 0.15))
+    return max(0.1, min(1.0, speed / 30 * 0.55 + condition / 100 * 0.3 + discretion / 100 * 0.15))
 
 
 def _portfolio_usage(mastermind):
@@ -359,6 +359,7 @@ async def _snapshot(player, now):
             **cfg,
             "preps": [{**prep} for prep in cfg["preps"]],
             "unlocked": rank["level"] >= cfg["unlock_rank"],
+            "intel_cost": 1500 * cfg["unlock_rank"],
             "cooldown_remaining_s": _remaining((state.get("target_cooldowns") or {}).get(key), now),
             "intel": intel if intel_active else None,
             "intel_active": intel_active,
