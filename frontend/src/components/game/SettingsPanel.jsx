@@ -303,6 +303,10 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
     showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
     rememberFilters, setRememberFilters, rememberSort, setRememberSort,
     confirmIrreversible, setConfirmIrreversible, showFps, setShowFps,
+    reducedMotion, setReducedMotion, highContrast, setHighContrast,
+    compactHud, setCompactHud, focusMode, setFocusMode,
+    desktopNotifications, requestDesktopNotifications,
+    desktopNotificationsSupported, desktopNotificationPermission,
     autoSelectBestTeam, setAutoSelectBestTeam, autoSelectBestVehicle, setAutoSelectBestVehicle,
     hideImpossibleMissions, setHideImpossibleMissions, repeatLastConfig, setRepeatLastConfig,
     autoOpenReport, setAutoOpenReport, lowSuccessThreshold, setLowSuccessThreshold,
@@ -372,6 +376,18 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           </Row>
           <Row label="Mostrar contador de FPS" hint="Indicador de fluidez no canto do ecrã" testId="settings-row-show-fps">
             <ToggleSwitch testId="settings-toggle-show-fps" checked={showFps} onChange={setShowFps} />
+          </Row>
+          <Row label="Modo focado" hint="Mantém apenas o mapa e os controlos essenciais" testId="settings-row-focus-mode">
+            <ToggleSwitch testId="settings-toggle-focus-mode" checked={focusMode} onChange={setFocusMode} />
+          </Row>
+          <Row label="HUD compacto" hint="Reduz botões e espaçamento para ganhar área de mapa" testId="settings-row-compact-hud">
+            <ToggleSwitch testId="settings-toggle-compact-hud" checked={compactHud} onChange={setCompactHud} />
+          </Row>
+          <Row label="Contraste elevado" hint="Reforça contornos, texto e estados interativos" testId="settings-row-high-contrast">
+            <ToggleSwitch testId="settings-toggle-high-contrast" checked={highContrast} onChange={setHighContrast} />
+          </Row>
+          <Row label="Reduzir animações" hint="Desativa movimento decorativo e transições longas" testId="settings-row-reduced-motion">
+            <ToggleSwitch testId="settings-toggle-reduced-motion" checked={reducedMotion} onChange={setReducedMotion} />
           </Row>
         </Section>
 
@@ -504,6 +520,27 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
         </Section>
 
         <Section icon={Bell} title="Notificações" testId="settings-section-notifications">
+          <Row
+            label="Notificações do sistema"
+            hint={
+              !desktopNotificationsSupported
+                ? "Não suportadas neste browser"
+                : desktopNotificationPermission === "denied"
+                ? "Bloqueadas nas permissões do browser"
+                : "Avisa quando surge um evento com o jogo em segundo plano"
+            }
+            testId="settings-row-desktop-notifications"
+          >
+            <ToggleSwitch
+              testId="settings-toggle-desktop-notifications"
+              checked={desktopNotifications}
+              disabled={!desktopNotificationsSupported || desktopNotificationPermission === "denied"}
+              onChange={async (enabled) => {
+                const ok = await requestDesktopNotifications(enabled);
+                if (enabled && !ok) toast.error("Autoriza as notificações nas definições do browser.");
+              }}
+            />
+          </Row>
           {NOTIFICATION_KEYS.map((n) => (
             <Row key={n.key} label={n.label} testId={`settings-row-notify-${n.key}`}>
               <ToggleSwitch
