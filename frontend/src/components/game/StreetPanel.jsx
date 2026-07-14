@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity, BadgeEuro, BriefcaseBusiness, Car, Check, ChevronRight,
+  Activity, BriefcaseBusiness, Car, Check, ChevronRight,
   Clock3, Contact, Gauge, Gavel, MapPinned, RadioTower, Radar,
   ShieldCheck, ShoppingBag, Siren, Sparkles, Star, Target, Trophy,
   Wrench, Zap,
 } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtDuration, fmtMoney } from "../../lib/game";
-import { MiniBar, PanelKicker, PanelWatermark, SectionHeader, Tip } from "./hud";
+import { MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
