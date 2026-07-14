@@ -403,6 +403,41 @@ export function GameProvider({ children }) {
     [refresh]
   );
 
+  // Fila comum para ações em lote. Executa em sequência para cada pedido ler o
+  // saldo/estado mais recente, mostra um único progresso e faz um só refresh.
+  const runBatchActions = useCallback(async (label, requests, emptyMessage) => {
+    if (!requests.length) {
+      toast.info(emptyMessage || "Nada elegível para esta ação.");
+      return { ok: true, completed: 0, failed: 0 };
+    }
+    const toastId = toast.loading(`${label} · 0/${requests.length}`);
+    let completed = 0;
+    const errors = [];
+    for (const request of requests) {
+      try {
+        await api.post(`/game/${request.path}`, request.payload || {});
+        completed += 1;
+      } catch (error) {
+        errors.push(formatApiErrorDetail(error.response?.data?.detail) || error.message);
+      }
+      toast.loading(`${label} · ${completed}/${requests.length}`, { id: toastId });
+    }
+    await refresh();
+    if (completed > 0) {
+      toast.success(
+        errors.length
+          ? `${completed} concluída(s) · ${errors.length} ignorada(s)`
+          : `${completed} ação(ões) concluída(s)`,
+        { id: toastId }
+      );
+      haptics.success();
+    } else {
+      toast.error(errors[0] || "Não foi possível concluir a ação em lote.", { id: toastId });
+      haptics.error();
+    }
+    return { ok: errors.length === 0, completed, failed: errors.length, errors };
+  }, [refresh]);
+
   // All game actions
   const dispatchTeam = (opportunityId, teamId) =>
     action("dispatch", { opportunity_id: opportunityId, team_id: teamId }, "Equipa destacada");
@@ -557,6 +592,73 @@ export function GameProvider({ children }) {
     action("teams/equip_emblem", { team_id: teamId, emblem_key: emblemKey });
   const equipHqSkin = (skinKey) => action("hq/equip_skin", { skin_key: skinKey });
 
+  const restAllEligible = () => runBatchActions(
+    "A enviar operacionais para descanso",
+    (state?.employees || [])
+      .filter((employee) => employee.status === "idle" && employee.fatigue >= 15)
+      .map((employee) => ({
+        path: "employees/rest",
+        payload: { employee_id: employee.id },
+      })),
+    "Nenhum operacional disponível precisa de descansar."
+  );
+
+  const vehicleIsFree = (vehicle) => {
+    if (vehicle.transfer || (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > serverNow())) return false;
+    if (!vehicle.team_id) return true;
+    const team = (state?.teams || []).find((item) => item.id === vehicle.team_id);
+    return !team || team.status === "idle";
+  };
+
+  const refuelAllEligible = () => runBatchActions(
+    "A abastecer a frota",
+    (state?.vehicles || [])
+      .filter((vehicle) => vehicleIsFree(vehicle) && vehicle.tank_l - vehicle.fuel_l > 0.1)
+      .map((vehicle) => ({
+        path: "vehicles/refuel",
+        payload: { vehicle_id: vehicle.id },
+      })),
+    "Todos os veículos elegíveis já têm o depósito cheio."
+  );
+
+  const repairFleetAll = () => runBatchActions(
+    "A reparar a frota",
+    (state?.vehicles || [])
+      .filter((vehicle) => vehicleIsFree(vehicle) && vehicle.condition < 99)
+      .map((vehicle) => ({
+        path: "vehicles/repair",
+        payload: { vehicle_id: vehicle.id },
+      })),
+    "Nenhum veículo elegível precisa de reparação."
+  );
+
+  const repairWeaponsAll = () => runBatchActions(
+    "A reparar o armamento",
+    (state?.weapons || [])
+      .filter((weapon) => {
+        if (weapon.condition >= 99) return false;
+        if (!weapon.employee_id) return true;
+        const employee = (state?.employees || []).find((item) => item.id === weapon.employee_id);
+        return !employee || employee.status === "idle";
+      })
+      .map((weapon) => ({
+        path: "weapons/repair",
+        payload: { weapon_id: weapon.id },
+      })),
+    "Nenhuma arma elegível precisa de reparação."
+  );
+
+  const optimizeOrganization = () => runBatchActions(
+    "A otimizar a organização",
+    [
+      { path: "employees/optimize", payload: {} },
+      { path: "vehicles/optimize", payload: {} },
+      { path: "properties/optimize", payload: {} },
+      { path: "weapons/optimize", payload: {} },
+    ],
+    "Não existem recursos para otimizar."
+  );
+
   // Modo de colocação manual — o dinheiro só é debitado em confirmPlacement,
   // que é o único momento em que /properties/buy é chamado; cancelar nunca
   // chega a fazer essa chamada, por isso não precisa de rollback.
@@ -664,6 +766,11 @@ export function GameProvider({ children }) {
         equipPaint,
         equipEmblem,
         equipHqSkin,
+        restAllEligible,
+        refuelAllEligible,
+        repairFleetAll,
+        repairWeaponsAll,
+        optimizeOrganization,
         bribePolice,
         launder,
         claimQuest,
