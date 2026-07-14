@@ -180,11 +180,23 @@ async def _team_members(player, team, *, require_ready=False):
     return members
 
 
-def _team_score(members):
+APPROACH_ATTRS = {
+    "silent": ("discricao", "hack", "sangue_frio"),
+    "social": ("negociacao", "inteligencia", "discricao"),
+    "assault": ("tiro", "forca", "resistencia"),
+}
+
+
+def _team_score(members, approach_key=None):
     values = []
     for member in members:
-        attrs = sorted((float(v) for v in (member.get("attrs") or {}).values()), reverse=True)
-        skill = sum(attrs[:3]) / max(1, min(3, len(attrs))) if attrs else 2
+        attrs = member.get("attrs") or {}
+        preferred = APPROACH_ATTRS.get(approach_key)
+        if preferred:
+            skill = sum(float(attrs.get(key, 2)) for key in preferred) / len(preferred)
+        else:
+            strongest = sorted((float(v) for v in attrs.values()), reverse=True)
+            skill = sum(strongest[:3]) / max(1, min(3, len(strongest))) if strongest else 2
         morale = float(member.get("morale", 70))
         loyalty = float(member.get("loyalty", 70))
         fatigue = float(member.get("fatigue", 0))
@@ -525,6 +537,11 @@ async def create_heist(body: HeistCreateInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail="Recetor indisponível")
     team = await _owned_team(player, body.team_id)
     vehicle = await _owned_vehicle(player, body.vehicle_id)
+    if vehicle.get("team_id") and vehicle.get("team_id") != str(team["_id"]):
+        raise HTTPException(
+            status_code=400,
+            detail="O veículo de fuga está atribuído a outra equipa",
+        )
     await _team_members(player, team)
     heist = {
         "id": uuid4().hex,
@@ -746,7 +763,7 @@ async def launch_heist(body: HeistIdInput, user: dict = Depends(get_current_user
     complication_key = complication_keys[min(len(complication_keys) - 1, comp_index)]
     complication = COMPLICATIONS[complication_key]
     rank = mastermind_rank(state.get("xp", 0))
-    team_score = _team_score(members)
+    team_score = _team_score(members, heist["approach_key"])
     vehicle_score = _vehicle_score(vehicle)
     completed = [
         cfg for cfg in target["preps"]
