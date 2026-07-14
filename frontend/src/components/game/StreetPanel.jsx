@@ -164,7 +164,6 @@ export const StreetPanel = ({ open, onOpenChange }) => {
               <ActivitiesTab
                 street={street}
                 activeJob={activeJob}
-                now={now}
                 vehicles={vehicles}
                 vehicleMeta={vehicleMeta}
                 vehicleId={vehicleId}
@@ -401,7 +400,7 @@ const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
 );
 
 const ActivitiesTab = ({
-  street, activeJob, now, vehicles, vehicleMeta, vehicleId, setVehicleId,
+  street, activeJob, vehicles, vehicleMeta, vehicleId, setVehicleId,
   districts, districtKey, setDistrictKey, wagerKey, setWagerKey, onStart, onClaim,
 }) => {
   if (activeJob) {
