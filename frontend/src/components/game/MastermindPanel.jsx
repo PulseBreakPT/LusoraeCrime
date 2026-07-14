@@ -58,23 +58,13 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
   }, [draft.team_id, hunterTeamId, teams]);
 
   useEffect(() => {
-    if (!draft.vehicle_id && vehicles[0]) {
-      setDraft((current) => ({ ...current, vehicle_id: vehicles[0].id }));
+    const compatible = vehicles.filter((vehicle) => (
+      !vehicle.team_id || vehicle.team_id === draft.team_id
+    ));
+    if (!compatible.some((vehicle) => vehicle.id === draft.vehicle_id)) {
+      setDraft((current) => ({ ...current, vehicle_id: compatible[0]?.id || "" }));
     }
-  }, [draft.vehicle_id, vehicles]);
-
-  useEffect(() => {
-    if (!mastermind) return;
-    const approach = mastermind.approaches?.find((item) => item.unlocked);
-    const fence = mastermind.fences?.find((item) => item.unlocked);
-    setDraft((current) => ({
-      ...current,
-      approach_key: mastermind.approaches?.some((item) => item.key === current.approach_key && item.unlocked)
-        ? current.approach_key : approach?.key || "silent",
-      fence_key: mastermind.fences?.some((item) => item.key === current.fence_key && item.unlocked)
-        ? current.fence_key : fence?.key || "quick",
-    }));
-  }, [mastermind?.rank?.level]);
+  }, [draft.team_id, draft.vehicle_id, vehicles]);
 
   if (!state) return null;
 
@@ -234,7 +224,7 @@ const BoardTab = ({
                   value={draft.vehicle_id}
                   onChange={(event) => setDraft((current) => ({ ...current, vehicle_id: event.target.value }))}
                 >
-                  {vehicles.map((vehicle) => (
+                  {vehicles.filter((vehicle) => !vehicle.team_id || vehicle.team_id === draft.team_id).map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
                       {vehicle.name} · {Math.round(vehicle.condition)}%
                     </option>
