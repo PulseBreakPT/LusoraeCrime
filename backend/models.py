@@ -51,6 +51,12 @@ class Player(BaseDocument):
     favorite_types: List[str] = []
     settings: dict = {}
     priorities: dict = {}
+    # ---- Loja ----
+    extra_vehicle_slots: int = 0
+    extra_employee_slots: int = 0
+    vip_until: Optional[str] = None
+    owned_cosmetics: List[str] = []
+    hq_skin_key: Optional[str] = None
 
 
 class Team(BaseDocument):
@@ -69,6 +75,7 @@ class Team(BaseDocument):
     streak: int = 0
     roster_missions: int = 0
     category_missions: dict = {}
+    emblem_key: Optional[str] = None
 
 
 class Employee(BaseDocument):
@@ -138,6 +145,7 @@ class Vehicle(BaseDocument):
     bought_at: str
     property_id: Optional[str] = None
     transfer: Optional[dict] = None
+    paint_key: Optional[str] = None
 
 
 class Weapon(BaseDocument):

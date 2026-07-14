@@ -65,7 +65,11 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VEHICLE_CATEGORY_WEIGHTS, VEHICLE_MISMATCH_PENALTY,
                        VEHICLE_CONDITION_PENALTY_THRESHOLD, VEHICLE_SPEED_FLOOR,
                        VEHICLE_SPEED_CURVE_EXP, PRIMARY_ATTR_WEIGHT_MAIN,
-                       PRIMARY_ATTR_WEIGHT_SECONDARY)
+                       PRIMARY_ATTR_WEIGHT_SECONDARY,
+                       # ---- Loja ----
+                       SPEEDUP_COST_PER_MIN, SPEEDUP_COST_MIN,
+                       SLOT_COST_VEHICLE_BASE, SLOT_COST_EMPLOYEE_BASE, SLOT_COST_SCALE_PER_UNIT,
+                       VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
@@ -244,6 +248,38 @@ class QuestChooseInput(BaseModel):
     option: str
 
 
+class ShopSpeedupInput(BaseModel):
+    kind: str  # vehicle_refuel | vehicle_transfer | property_upgrade | hq_upgrade | team_reorg
+    id: Optional[str] = None  # não usado para hq_upgrade
+
+
+class ShopBuySlotInput(BaseModel):
+    kind: str  # vehicle | employee
+
+
+class ShopVipInput(BaseModel):
+    plan_key: str
+
+
+class ShopCosmeticInput(BaseModel):
+    category: str  # vehicle_paint | team_emblem | hq_skin
+    key: str
+
+
+class VehicleEquipPaintInput(BaseModel):
+    vehicle_id: str
+    paint_key: Optional[str] = None
+
+
+class TeamEquipEmblemInput(BaseModel):
+    team_id: str
+    emblem_key: Optional[str] = None
+
+
+class HqEquipSkinInput(BaseModel):
+    skin_key: Optional[str] = None
+
+
 def _oid(v, msg):
     try:
         return ObjectId(v)
@@ -403,6 +439,19 @@ async def catalog():
             "total_mult_cap": TOTAL_MULT_CAP,
             "difficulty_mults": DIFFICULTY_MULT,
             "momentum_claim": MOMENTUM_CLAIM,
+        },
+        # Loja — tudo pago em dinheiro do jogo (clean_money), sem moeda
+        # premium/pagamentos reais.
+        "shop": {
+            "speedup_cost_per_min": SPEEDUP_COST_PER_MIN,
+            "speedup_cost_min": SPEEDUP_COST_MIN,
+            "slot_cost_vehicle_base": SLOT_COST_VEHICLE_BASE,
+            "slot_cost_employee_base": SLOT_COST_EMPLOYEE_BASE,
+            "slot_cost_scale_per_unit": SLOT_COST_SCALE_PER_UNIT,
+            "vip_plans": VIP_PLANS,
+            "vehicle_paints": VEHICLE_PAINTS,
+            "team_emblems": TEAM_EMBLEMS,
+            "hq_skins": HQ_SKINS,
         },
     }
 
@@ -1528,6 +1577,9 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     duration_s = REFUEL_DURATION_BASE_S + REFUEL_DURATION_PER_L_S * missing
+    vip_active = bool(player.get("vip_until")) and parse_dt(player["vip_until"]) > now_utc()
+    if vip_active:
+        duration_s *= VIP_REFUEL_SPEED_MULT
     until = (now_utc() + timedelta(seconds=duration_s)).isoformat()
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_refueled": 1}})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"refueling_until": until}, "$inc": {"fuel_spent_total": cost}})
@@ -2528,3 +2580,206 @@ async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_
     }})
     await add_event(db, pid, "intel", f"{d['name']}: {res['outcome']}")
     return {"ok": True, "outcome": res["outcome"]}
+
+
+# ============================================================================
+# LOJA — acelerar tempo, slots extra, VIP e cosméticos. Tudo pago em
+# clean_money (dinheiro do jogo); sem moeda premium nem pagamentos reais.
+# ============================================================================
+
+def _speedup_cost(remaining_s: float) -> int:
+    mins = max(0.0, remaining_s) / 60
+    return max(SPEEDUP_COST_MIN, round(mins * SPEEDUP_COST_PER_MIN))
+
+
+@router.post("/shop/speedup")
+async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_user)):
+    """Acelera um temporizador já existente (nunca cria lógica de conclusão
+    nova) — só antecipa o timestamp relevante para agora. O próximo advance()
+    conclui-o pelo caminho normal (_complete_refuels, _complete_hq_upgrade,
+    etc.), exatamente como aconteceria sem a compra."""
+    player = await get_player(user)
+    pid = str(player["_id"])
+    now = now_utc()
+
+    if body.kind == "vehicle_refuel":
+        vehicle = await db.vehicles.find_one({"_id": _oid(body.id, "Veículo inválido"), "player_id": pid})
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Veículo não encontrado")
+        until = vehicle.get("refueling_until")
+        if not until or parse_dt(until) <= now:
+            raise HTTPException(status_code=400, detail="Não está a abastecer")
+        cost = _speedup_cost((parse_dt(until) - now).total_seconds())
+        if player["clean_money"] < cost:
+            raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+        await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"refueling_until": now.isoformat()}})
+        note = f"Abastecimento de {vehicle['name']}"
+
+    elif body.kind == "vehicle_transfer":
+        vehicle = await db.vehicles.find_one({"_id": _oid(body.id, "Veículo inválido"), "player_id": pid})
+        if not vehicle or not vehicle.get("transfer"):
+            raise HTTPException(status_code=400, detail="Veículo não está em trânsito")
+        ends_at = vehicle["transfer"]["ends_at"]
+        if parse_dt(ends_at) <= now:
+            raise HTTPException(status_code=400, detail="Transferência já concluída")
+        cost = _speedup_cost((parse_dt(ends_at) - now).total_seconds())
+        if player["clean_money"] < cost:
+            raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+        new_transfer = dict(vehicle["transfer"])
+        new_transfer["ends_at"] = now.isoformat()
+        await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"transfer": new_transfer}})
+        note = f"Transferência de {vehicle['name']}"
+
+    elif body.kind == "property_upgrade":
+        prop = await db.properties.find_one({"_id": _oid(body.id, "Propriedade inválida"), "player_id": pid})
+        if not prop:
+            raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+        until = prop.get("upgrading_until")
+        if not until or parse_dt(until) <= now:
+            raise HTTPException(status_code=400, detail="Não está a subir de nível")
+        cost = _speedup_cost((parse_dt(until) - now).total_seconds())
+        if player["clean_money"] < cost:
+            raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+        await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"upgrading_until": now.isoformat()}})
+        note = f"Melhoria de {prop['name']}"
+
+    elif body.kind == "hq_upgrade":
+        hq = player.get("hq") or {}
+        until = hq.get("upgrading_until")
+        if not until or parse_dt(until) <= now:
+            raise HTTPException(status_code=400, detail="O Quartel-General não está a subir de nível")
+        cost = _speedup_cost((parse_dt(until) - now).total_seconds())
+        if player["clean_money"] < cost:
+            raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+        await db.players.update_one({"_id": player["_id"]}, {
+            "$inc": {"clean_money": -cost},
+            "$set": {"hq.upgrading_until": now.isoformat()},
+        })
+        note = "Melhoria do Quartel-General"
+
+    elif body.kind == "team_reorg":
+        team = await db.teams.find_one({"_id": _oid(body.id, "Equipa inválida"), "player_id": pid})
+        if not team:
+            raise HTTPException(status_code=404, detail="Equipa não encontrada")
+        until = team.get("available_at")
+        if not until or parse_dt(until) <= now:
+            raise HTTPException(status_code=400, detail="A equipa já está pronta")
+        cost = _speedup_cost((parse_dt(until) - now).total_seconds())
+        if player["clean_money"] < cost:
+            raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
+        await db.teams.update_one({"_id": team["_id"]}, {"$set": {"available_at": None}})
+        note = f"Reorganização de {team['name']}"
+
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de aceleração inválido")
+
+    await add_event(db, pid, "shop", f"Aceleraste: {note} por {cost:,} €.")
+    await record_tx(db, pid, "shop_speedup", -cost, "clean", player["clean_money"] - cost, note)
+    return {"ok": True, "cost": cost}
+
+
+@router.post("/shop/buy_slot")
+async def shop_buy_slot(body: ShopBuySlotInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    if body.kind == "vehicle":
+        field, base, label = "extra_vehicle_slots", SLOT_COST_VEHICLE_BASE, "veículo"
+    elif body.kind == "employee":
+        field, base, label = "extra_employee_slots", SLOT_COST_EMPLOYEE_BASE, "funcionário"
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de slot inválido")
+    n = player.get(field, 0) or 0
+    cost = round(base * (1 + n * SLOT_COST_SCALE_PER_UNIT))
+    if player["clean_money"] < cost:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, field: 1}})
+    await add_event(db, pid, "shop", f"Compraste mais um slot de {label} por {cost:,} €.")
+    await record_tx(db, pid, "shop_slot", -cost, "clean", player["clean_money"] - cost, f"Slot extra de {label}")
+    return {"ok": True, "cost": cost}
+
+
+@router.post("/shop/vip")
+async def shop_buy_vip(body: ShopVipInput, user: dict = Depends(get_current_user)):
+    plan = VIP_PLANS.get(body.plan_key)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Plano inválido")
+    player = await get_player(user)
+    pid = str(player["_id"])
+    if player["clean_money"] < plan["cost"]:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    now = now_utc()
+    current_until = parse_dt(player["vip_until"]) if player.get("vip_until") else None
+    base = current_until if current_until and current_until > now else now
+    new_until = (base + timedelta(days=plan["days"])).isoformat()
+    await db.players.update_one({"_id": player["_id"]}, {
+        "$inc": {"clean_money": -plan["cost"]},
+        "$set": {"vip_until": new_until},
+    })
+    await add_event(db, pid, "shop", f"Ativaste o {plan['label']} por {plan['cost']:,} €.")
+    await record_tx(db, pid, "shop_vip", -plan["cost"], "clean", player["clean_money"] - plan["cost"], plan["label"])
+    return {"ok": True, "vip_until": new_until}
+
+
+_COSMETIC_CATALOGS = {"vehicle_paint": VEHICLE_PAINTS, "team_emblem": TEAM_EMBLEMS, "hq_skin": HQ_SKINS}
+
+
+@router.post("/shop/cosmetic")
+async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_current_user)):
+    catalog_map = _COSMETIC_CATALOGS.get(body.category)
+    if not catalog_map or body.key not in catalog_map:
+        raise HTTPException(status_code=400, detail="Cosmético inválido")
+    item = catalog_map[body.key]
+    player = await get_player(user)
+    pid = str(player["_id"])
+    owned_key = f"{body.category}:{body.key}"
+    if owned_key in (player.get("owned_cosmetics") or []):
+        raise HTTPException(status_code=400, detail="Já possuis este cosmético")
+    if player["clean_money"] < item["cost"]:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    await db.players.update_one({"_id": player["_id"]}, {
+        "$inc": {"clean_money": -item["cost"]},
+        "$push": {"owned_cosmetics": owned_key},
+    })
+    await add_event(db, pid, "shop", f"Compraste o cosmético \"{item['label']}\" por {item['cost']:,} €.")
+    await record_tx(db, pid, "shop_cosmetic", -item["cost"], "clean", player["clean_money"] - item["cost"], item["label"])
+    return {"ok": True}
+
+
+@router.post("/vehicles/equip_paint")
+async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    if body.paint_key and f"vehicle_paint:{body.paint_key}" not in (player.get("owned_cosmetics") or []):
+        raise HTTPException(status_code=400, detail="Não possuis esta pintura")
+    vehicle = await db.vehicles.find_one({"_id": _oid(body.vehicle_id, "Veículo inválido"), "player_id": pid})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"paint_key": body.paint_key}})
+    return {"ok": True}
+
+
+@router.post("/teams/equip_emblem")
+async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    if body.emblem_key and f"team_emblem:{body.emblem_key}" not in (player.get("owned_cosmetics") or []):
+        raise HTTPException(status_code=400, detail="Não possuis este emblema")
+    team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
+    if not team:
+        raise HTTPException(status_code=404, detail="Equipa não encontrada")
+    await db.teams.update_one({"_id": team["_id"]}, {"$set": {"emblem_key": body.emblem_key}})
+    return {"ok": True}
+
+
+@router.post("/hq/equip_skin")
+async def equip_hq_skin(body: HqEquipSkinInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    if body.skin_key and f"hq_skin:{body.skin_key}" not in (player.get("owned_cosmetics") or []):
+        raise HTTPException(status_code=400, detail="Não possuis esta skin")
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"hq_skin_key": body.skin_key}})
+    return {"ok": True}

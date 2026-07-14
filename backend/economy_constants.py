@@ -920,6 +920,51 @@ QUEST_MONEY_TARGET_PCT_PER_LEVEL = 0.30  # alvos monetários escalam com o níve
 QUEST_OFFER_REPEAT_PENALTY_H = 48        # oferecer a mesma missão em <48h é penalizado
 
 # ============================================================================
+# LOJA — acelerar tempo, slots extra, VIP e cosméticos (tudo pago em
+# clean_money; sem moeda premium/pagamentos reais). Nenhum destes afeta as
+# fórmulas de risco/recompensa — são conveniência e sumidouros de dinheiro.
+# ============================================================================
+
+# --- Acelerar tempo: encurta um temporizador já existente (refuel/
+# transferência/upgrade/reorganização) por dinheiro, sem duplicar a lógica de
+# conclusão — o próximo advance() conclui pelo caminho normal.
+SPEEDUP_COST_PER_MIN = 40     # € por minuto restante
+SPEEDUP_COST_MIN = 100        # mínimo por acelerar (mesmo 10s restantes)
+
+# --- Slots extra: aumenta o teto de veículos/funcionários de get_caps().
+# Preço cresce a cada compra (evita infinitas compras baratas).
+SLOT_COST_VEHICLE_BASE = 8000
+SLOT_COST_EMPLOYEE_BASE = 6000
+SLOT_COST_SCALE_PER_UNIT = 0.35   # +35% de preço por slot já comprado
+
+# --- VIP: multiplicadores modestos, ativos enquanto player.vip_until > agora.
+VIP_PLANS = {
+    "7d": {"days": 7, "cost": 15000, "label": "VIP · 7 dias"},
+    "30d": {"days": 30, "cost": 45000, "label": "VIP · 30 dias"},
+}
+VIP_INCOME_MULT = 1.15         # +15% rendimento passivo
+VIP_HEAT_RELIEF_MULT = 0.90    # -10% acumulação de calor
+VIP_REFUEL_SPEED_MULT = 0.80   # -20% duração de abastecimento
+
+# --- Cosméticos: zero efeito nas fórmulas, só cor/ícone (data-driven, mesmo
+# princípio de FORCES[force].bodyColor em lib/police.js).
+VEHICLE_PAINTS = {
+    "grafite": {"label": "Grafite Fosco", "cost": 2500, "color": "#3F3F46"},
+    "vermelho": {"label": "Vermelho Sangue", "cost": 3500, "color": "#B91C1C"},
+    "azul_real": {"label": "Azul Real", "cost": 3500, "color": "#1D4ED8"},
+    "dourado": {"label": "Dourado", "cost": 6000, "color": "#CA8A04"},
+}
+TEAM_EMBLEMS = {
+    "caveira": {"label": "Caveira", "cost": 2000, "color": "#E4E4E7"},
+    "coroa": {"label": "Coroa", "cost": 4000, "color": "#CA8A04"},
+    "serpente": {"label": "Serpente", "cost": 3000, "color": "#16A34A"},
+}
+HQ_SKINS = {
+    "industrial": {"label": "Industrial", "cost": 5000, "color": "#71717A"},
+    "fortim": {"label": "Fortim", "cost": 8000, "color": "#7C2D12"},
+}
+
+# ============================================================================
 # SUMMARY OF REDESIGNED VALUES
 # ============================================================================
 #

@@ -57,6 +57,7 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        VEHICLE_TRANSFER_DURATION_BASE_S, VEHICLE_TRANSFER_DURATION_PER_KM_S,
                        PROPERTY_INFLUENCE_RADIUS_KM, PROPERTY_SPOT_WEIGHT, LISBON_SPOT_WEIGHT,
                        SPAWN_HQ_FALLOFF_KM,
+                       VIP_INCOME_MULT, VIP_HEAT_RELIEF_MULT, VIP_REFUEL_SPEED_MULT,
                        CHANCE_FLOOR, CHANCE_CEILING, CHANCE_SOFT_KNEE, CHANCE_SOFT_SPAN,
                        RISK_PENALTY_LINEAR, RISK_PENALTY_QUADRATIC,
                        PRIMARY_ATTR_WEIGHT_MAIN, PRIMARY_ATTR_WEIGHT_SECONDARY,
@@ -291,6 +292,13 @@ async def get_caps(db, pid, hq_level=1):
                + sum(PROPERTY_TYPES[p["type_key"]].get("cap_employees", 0) * p["level"] for p in props))
     veh_cap = (BASE_VEHICLE_CAP + hq_tier["cap_vehicles"]
                + sum(PROPERTY_TYPES[p["type_key"]].get("cap_vehicles", 0) * p["level"] for p in props))
+    # Slots extra da loja (comprados com dinheiro do jogo) — teto fixo somado,
+    # sem tocar na assinatura nem nos pontos de chamada existentes.
+    slots = await db.players.find_one(
+        {"_id": ObjectId(pid)}, {"extra_vehicle_slots": 1, "extra_employee_slots": 1}
+    ) or {}
+    emp_cap += slots.get("extra_employee_slots", 0) or 0
+    veh_cap += slots.get("extra_vehicle_slots", 0) or 0
     return {"employees": emp_cap, "vehicles": veh_cap}, props
 
 
@@ -2526,8 +2534,11 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
     # O Quartel-General melhora a eficiência de todas as propriedades: mais
     # produção/lavagem passiva e menos calor gerado pelas ilegais.
     hq_tier = HQ_LEVEL_BENEFITS[min(player["hq"]["level"], HQ_MAX_LEVEL) - 1]
-    hq_income_mult = 1 + hq_tier["passive_income_pct"]
-    hq_heat_mult = 1 - hq_tier["heat_reduction_pct"]
+    # VIP da loja (comprado com dinheiro do jogo): bónus modesto, mesmo gate
+    # dos benefícios por nível de QG — não é um sistema de bónus novo.
+    vip_active = bool(player.get("vip_until")) and parse_dt(player["vip_until"]) > now
+    hq_income_mult = (1 + hq_tier["passive_income_pct"]) * (VIP_INCOME_MULT if vip_active else 1.0)
+    hq_heat_mult = (1 - hq_tier["heat_reduction_pct"]) * (VIP_HEAT_RELIEF_MULT if vip_active else 1.0)
     for p in props:
         if not property_active(p, now):
             continue
