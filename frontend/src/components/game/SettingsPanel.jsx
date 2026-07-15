@@ -19,9 +19,10 @@ import {
 import { audio } from "../../lib/audio";
 import { toast } from "sonner";
 
-const GAME_VERSION = "1.3.0";
+const GAME_VERSION = "1.4.0";
 
 const CHANGELOG = [
+  { v: "1.4.0", text: "Mastermind: grandes golpes por fases, dossiês e preparações, abordagens e recetores, mercado negro dinâmico, caçadores rivais, recompensas e caches de sinal." },
   { v: "1.3.0", text: "Cidade Viva: procurado por estrelas, scanner policial, eventos urbanos, territórios, contactos, atividades de rua, planeamento tático e garagem clandestina." },
   { v: "1.2.0", text: "Centro de Comandos global, pesquisa de ativos e operações, atalhos, ações em lote seguras, exportação CSV, navegação persistente e novos perfis de acessibilidade." },
   { v: "1.1.0", text: "Banda sonora original e efeitos sonoros temáticos — sirenes de perseguição, dinheiro, subida de nível e mais." },

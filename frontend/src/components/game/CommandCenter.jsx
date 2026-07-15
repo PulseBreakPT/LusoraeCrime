@@ -4,7 +4,7 @@ import {
   Search, Crosshair, Target, Building2, Users, IdCard, Car, Warehouse,
   Swords, ShoppingBag, Landmark, BrainCircuit, Radar, Settings, RefreshCw,
   ClipboardCopy, Download, BedDouble, Fuel, Wrench, Sparkles, Focus,
-  Clock3, CornerDownLeft,
+  Clock3, CornerDownLeft, Vault,
 } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
@@ -50,6 +50,7 @@ const PANEL_COMMANDS = [
   ["weapons", "Armamento", "Inventário, atribuição e manutenção", Swords, "8"],
   ["shop", "Loja", "Acelerações, cosméticos, VIP e slots", ShoppingBag, "9"],
   ["street", "Cidade Viva", "Procurado, territórios, contactos e atividades de rua", Radar, null],
+  ["mastermind", "Mastermind", "Grandes golpes, mercado negro, caçadores e sinais", Vault, null],
   ["hq", "Quartel-General", "Estratégia, melhorias e desempenho", Landmark, null],
   ["intel", "Central de Inteligência", "Alertas, relatórios e histórico", BrainCircuit, null],
   ["settings", "Definições", "Interface, jogabilidade e notificações", Settings, null],

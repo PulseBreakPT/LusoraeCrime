@@ -37,6 +37,13 @@ const ACTION_SOUNDS = [
   ["street/garage", "repair"],
   ["street/gear/buy", "cash"],
   ["street/territory", "success"],
+  ["mastermind/heists/launch", "dispatch"],
+  ["mastermind/heists/claim", "cash"],
+  ["mastermind/heists/prep", "notify"],
+  ["mastermind/heists/intel", "notify"],
+  ["mastermind/market/trade", "cash"],
+  ["mastermind/bounty", "notify"],
+  ["mastermind/cache/scan", "success"],
 ];
 
 function soundForAction(path) {
@@ -135,6 +142,19 @@ export function GameProvider({ children }) {
         } catch (streetError) {
           // Uma falha no módulo urbano nunca deve esconder o resto do jogo.
           console.error("Falha ao carregar /game/street/state:", streetError);
+        }
+        try {
+          const { data: mastermind } = await api.get("/game/mastermind/state", { timeout: 8000 });
+          data.mastermind = mastermind;
+          if (mastermind?.balances && data.player) {
+            data.player.clean_money = mastermind.balances.clean_money;
+            data.player.dirty_money = mastermind.balances.dirty_money;
+            data.player.heat = mastermind.balances.heat;
+          }
+        } catch (mastermindError) {
+          // O quadro de grandes golpes é independente: o jogo base e a cidade
+          // continuam utilizáveis mesmo que esta leitura falhe.
+          console.error("Falha ao carregar /game/mastermind/state:", mastermindError);
         }
       }
 
@@ -693,6 +713,18 @@ export function GameProvider({ children }) {
   const claimStreetActivity = (payload) => action("street/activities/claim", payload, "Resultado recolhido");
   const streetGarageAction = (payload) => action("street/garage", payload, "Garagem atualizada");
 
+  // Mastermind — grandes golpes, mercado negro, caçadores rivais e caches.
+  const scoutMastermindTarget = (payload) => action("mastermind/heists/intel", payload, "Dossiê atualizado");
+  const createMastermindHeist = (payload) => action("mastermind/heists/create", payload, "Plano criado");
+  const startHeistPrep = (payload) => action("mastermind/heists/prep/start", payload, "Preparação iniciada");
+  const claimHeistPrep = (payload) => action("mastermind/heists/prep/claim", payload, "Relatório recolhido");
+  const launchMastermindHeist = (payload) => action("mastermind/heists/launch", payload, "Grande golpe lançado");
+  const claimMastermindHeist = (payload) => action("mastermind/heists/claim", payload, "Resultado recolhido");
+  const abortMastermindHeist = (payload) => action("mastermind/heists/abort", payload, "Plano cancelado");
+  const tradeBlackMarket = (payload) => action("mastermind/market/trade", payload, "Ordem executada");
+  const resolveBounty = (payload) => action("mastermind/bounty", payload, "Resposta aos caçadores concluída");
+  const scanSignalCache = (payload) => action("mastermind/cache/scan", payload, "Varredura concluída");
+
   // Modo de colocação manual — o dinheiro só é debitado em confirmPlacement,
   // que é o único momento em que /properties/buy é chamado; cancelar nunca
   // chega a fazer essa chamada, por isso não precisa de rollback.
@@ -812,6 +844,16 @@ export function GameProvider({ children }) {
         startStreetActivity,
         claimStreetActivity,
         streetGarageAction,
+        scoutMastermindTarget,
+        createMastermindHeist,
+        startHeistPrep,
+        claimHeistPrep,
+        launchMastermindHeist,
+        claimMastermindHeist,
+        abortMastermindHeist,
+        tradeBlackMarket,
+        resolveBounty,
+        scanSignalCache,
         bribePolice,
         launder,
         claimQuest,
