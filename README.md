@@ -1154,6 +1154,22 @@ Por isso, o número mostrado no changelog público e as versões dos pacotes de 
 
 ---
 
+## Android / Google Play
+
+O projeto está preparado para distribuição Android através de **Capacitor 8**, com package ID `pt.lusorae.crime`, **target/compile SDK 36**, minSdk 24 e pipeline GitHub Actions que gera um Android App Bundle de validação.
+
+- Google Sign-In via Credential Manager / Social Login.
+- Google ID token validado no backend antes da criação da sessão.
+- Política de Privacidade pública: https://pulsebreakpt.github.io/LusoraeCrime/privacy.html
+- Eliminação de conta fora da app: https://pulsebreakpt.github.io/LusoraeCrime/delete-account.html
+- Eliminação dentro da app em Definições → Conta.
+- Guia completo de release: [docs/GOOGLE_PLAY_RELEASE.md](docs/GOOGLE_PLAY_RELEASE.md)
+- Workflow Android: [Android / Google Play readiness](.github/workflows/android.yml)
+
+A ativação efetiva do Google Sign-In requer configurar o Web OAuth Client ID e o Android OAuth Client no mesmo projeto Google Cloud, incluindo o SHA-1 do certificado de assinatura da Play Store.
+
+---
+
 ## Direção futura
 
 Itens ainda documentados como evolução possível:
