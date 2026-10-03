@@ -100,25 +100,90 @@
     font-family: "Inter", sans-serif;
 }
 
-/* Base OpenStreetMap sem API key. O OSM standard é claro; o color grade
-   abaixo transforma-o no mapa tático escuro do Lusorae sem depender de
-   providers pagos (CARTO/MapTiler/etc.). */
-.leaflet-tile {
-    filter: none;
+/* -------------------------------------------------------------------------
+   Cartografia "noite operacional" — alinhada com o visual do 112i.
+   O 112i pinta a cartografia vetorial com uma paleta própria:
+   bg #09090a · terra #151517 · edifícios #232428 · vias #303238–#55585e.
+   Aqui mantemos Leaflet + OpenStreetMap sem API key e aproximamos a mesma
+   leitura através de color grading do raster, sem o aspeto azul/negativo.
+   ------------------------------------------------------------------------- */
+.lus-dark-map.leaflet-container {
+    background: #09090a;
+    isolation: isolate;
 }
 
-.leaflet-tile.lus-osm-base-tile {
-    filter: brightness(0.62) invert(1) contrast(1.16) hue-rotate(180deg) saturate(0.58);
+/* O pane inteiro recebe o tratamento para que tiles novos durante pan/zoom
+   não "pisquem" claros antes de o filtro ser aplicado. */
+.lus-dark-map .leaflet-tile-pane {
+    background: #09090a;
+    filter:
+        grayscale(1)
+        invert(0.90)
+        brightness(0.46)
+        contrast(1.32)
+        saturate(0.12);
+}
+
+/* O tile não leva filtros próprios: evita dupla transformação e seams. */
+.lus-dark-map .leaflet-tile {
+    filter: none !important;
+    opacity: 0.96;
+}
+
+/* Véu muito subtil: baixa POIs/cores residuais e deixa pins/rotas dominar,
+   tal como o "calm cartography" do 112i. */
+.lus-dark-map::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 250;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 44%, transparent 42%, rgba(0, 0, 0, 0.16) 100%),
+        linear-gradient(180deg, rgba(9, 9, 10, 0.08), rgba(9, 9, 10, 0.18));
+    mix-blend-mode: multiply;
+}
+
+/* Leaflet panes operacionais ficam acima do véu. */
+.lus-dark-map .leaflet-overlay-pane,
+.lus-dark-map .leaflet-shadow-pane,
+.lus-dark-map .leaflet-marker-pane,
+.lus-dark-map .leaflet-tooltip-pane,
+.lus-dark-map .leaflet-popup-pane {
+    z-index: 400;
+}
+
+.lus-dark-map .leaflet-control-container {
+    position: relative;
+    z-index: 800;
 }
 
 .leaflet-control-attribution {
-    background: rgba(5, 5, 5, 0.78) !important;
-    color: #52525b !important;
-    font-size: 9px !important;
+    margin: 0 8px 8px 0 !important;
+    padding: 3px 6px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
+    background: rgba(12, 13, 15, 0.92) !important;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.35);
+    color: #81838a !important;
+    font-family: "Inter", sans-serif;
+    font-size: 8px !important;
 }
 
 .leaflet-control-attribution a {
-    color: #8e8e93 !important;
+    color: #b8babf !important;
+}
+
+/* Zoom/pan no mapa deve sentir-se tão limpo quanto no 112i. */
+.lus-dark-map .leaflet-zoom-animated,
+.lus-dark-map .leaflet-tile-container {
+    will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-dark-map .leaflet-tile-pane {
+        transition: none;
+    }
 }
 
 .lus-marker {
