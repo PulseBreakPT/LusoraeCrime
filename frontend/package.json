@@ -72,7 +72,7 @@
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "android:prepare": "yarn build && cap sync android",
+    "android:prepare": "PUBLIC_URL=/ yarn build && cap sync android",
     "android:bundle": "cd android && ./gradlew bundleRelease"
   },
   "browserslist": {
