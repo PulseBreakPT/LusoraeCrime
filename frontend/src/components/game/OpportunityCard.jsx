@@ -12,7 +12,7 @@ import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
 import { audio } from "../../lib/audio";
 
 // Força de segurança competente pela zona (do backend, opp.police_force) — diz
@@ -33,7 +33,7 @@ const POLICE_FORCE_INFO = {
 
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const {
-    state, catalog, dispatchTeam, previewDispatch, serverNow, refuelVehicle, repairVehicle, assignVehicle, recallTeam,
+    state, catalog, dispatchTeam, previewDispatch, serverNow, assignVehicle, recallTeam,
     recommendTeamForOpportunity, toggleFavoriteType,
   } = useGame();
   const { autoSelectBestTeam, lowSuccessThreshold } = useSettings();
@@ -222,17 +222,17 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const selectedTeamReadiness = selectedTeam ? readiness(selectedTeam) : null;
 
   const fixFor = (t, r) => {
-    const money = state.player.clean_money;
     const vehicle = state.vehicles.find((v) => v.id === t.vehicle_id);
-    if (r.reason === "Sem combustível" && vehicle) {
-      const cost = Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]);
-      const can = money >= cost;
-      return { icon: Fuel, label: fmtMoney(cost), color: can ? "text-amber-400" : "text-red-400", can, run: () => refuelVehicle(vehicle.id) };
-    }
-    if (r.reason === "Veículo avariado" && vehicle) {
-      const cost = Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002));
-      const can = money >= cost;
-      return { icon: Wrench, label: fmtMoney(cost), color: can ? "text-emerald-400" : "text-red-400", can, run: () => repairVehicle(vehicle.id) };
+    if ((r.reason === "Sem combustível" || r.reason === "Veículo avariado") && vehicle) {
+      // Manutenção é canónica na Frota. O cartão da operação explica o
+      // bloqueio e leva ao local certo, mas não duplica reparação/abastecimento.
+      return {
+        icon: Car,
+        label: "Frota",
+        color: "text-amber-400",
+        can: true,
+        run: () => { onClose(); onNavigate && onNavigate("fleet"); },
+      };
     }
     if (r.reason === "Sem veículo") {
       // Melhor veículo livre (maior condição) — não o primeiro arbitrário.
