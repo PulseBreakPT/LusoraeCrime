@@ -219,4 +219,24 @@ describe("offline guest engine", () => {
     expect(state.events[0].message).toBe("Evento antigo do modo convidado.");
   });
 
+  test("migrates legacy economy values to the Portugal 2026 profile", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
+    raw.version = 2;
+    raw.employees[0].salary = 260;
+    raw.vehicles[0].price = 6000;
+    localStorage.setItem("lusorae_guest_save_v2", JSON.stringify(raw));
+
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.employees[0].salary).toBeGreaterThan(260);
+    expect(state.vehicles[0].price).toBe(12500);
+    expect(state.fuel_prices.gasolina).toBe(2.12);
+    expect(state.fuel_prices.gasoleo).toBe(2.22);
+  });
+
 });
