@@ -664,7 +664,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                         Manutenção necessária — gere combustível e reparações na Frota.
                       </p>
                     )}
-                    </div>
                   </div>
                 )}
 
