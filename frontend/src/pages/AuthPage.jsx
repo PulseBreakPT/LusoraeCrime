@@ -69,7 +69,13 @@ export default function AuthPage() {
     setBusy("google");
     const result = await loginWithGoogle();
     setBusy(null);
-    if (!result.ok) setError(result.error || "Não foi possível entrar com Google.");
+    if (!result.ok) {
+      if (result.status === 404 || result.isNetwork) {
+        setError("O servidor do jogo não está disponível neste momento. O acesso Google volta a funcionar assim que o backend estiver online.");
+      } else {
+        setError(result.error || "Não foi possível entrar com Google.");
+      }
+    }
   };
 
   const handleGuest = async () => {
@@ -103,6 +109,8 @@ export default function AuthPage() {
 
     if (result.ok) {
       localStorage.setItem(GUEST_READY_KEY, "1");
+    } else if (result.status === 404 || result.isNetwork) {
+      setError("O servidor do jogo está offline ou sem a API publicada. O modo convidado está pronto, mas precisa do backend para carregar o jogo completo.");
     } else {
       setError(result.error || "Não foi possível iniciar o modo convidado.");
     }
