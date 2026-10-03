@@ -154,7 +154,7 @@ def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
 
 
-MISSION_STATS_VERSION = 3
+MISSION_STATS_VERSION = 4
 
 
 def default_stats():
@@ -203,16 +203,16 @@ async def reconcile_mission_stats(db, player):
         raw_outcome = mission.get("outcome")
         if raw_outcome not in ("success", "partial", "failure", "police"):
             continue
+        # Success/partial ainda em regresso não têm resultado terminal: podem
+        # chegar ao QG ou acabar apanhados numa perseguição. Só entram nas
+        # estatísticas quando o regresso terminar.
+        if mission.get("phase") == "returning" and raw_outcome in ("success", "partial"):
+            continue
+
         total += 1
         category = (mission.get("opportunity") or {}).get("category")
         if category:
             by_category[category] = by_category.get(category, 0) + 1
-
-        # Success/partial ainda em regresso não têm resultado terminal: podem
-        # chegar ao QG ou acabar apanhados numa perseguição. Contam já para o
-        # total, mas só entram numa categoria quando regressarem.
-        if mission.get("phase") == "returning" and raw_outcome in ("success", "partial"):
-            continue
 
         outcome = "police" if mission.get("chase_outcome") == "caught" else raw_outcome
         if outcome == "success":
@@ -1660,9 +1660,12 @@ def _roll_outcome(player, m):
 def _record_terminal_mission_stats(player, m, outcome):
     """Regista exatamente um resultado terminal por operação."""
     stats = ensure_stats(player)
+    stats["missions_total"] = stats.get("missions_total", 0) + 1
+    cat = m["opportunity"].get("category")
+    if cat:
+        stats["by_category"][cat] = stats["by_category"].get(cat, 0) + 1
     if outcome == "success":
         stats["missions_success"] = stats.get("missions_success", 0) + 1
-        cat = m["opportunity"].get("category")
         if cat:
             stats["success_by_category"][cat] = stats["success_by_category"].get(cat, 0) + 1
         if int(m.get("pending_reward", 0) or 0) >= 8000:
@@ -1686,8 +1689,6 @@ def _record_terminal_mission_stats(player, m, outcome):
 def _apply_outcome(player, m, outcome):
     t = m["opportunity"]
     stats = ensure_stats(player)
-    stats["missions_total"] += 1
-    stats["by_category"][t["category"]] = stats["by_category"].get(t["category"], 0) + 1
     # Memória do mundo (SSS v3): a zona onde a operação aconteceu aquece —
     # quanto pior o desfecho e maior o risco, mais atenção policial acumula.
     att = player.setdefault("district_attention", {})
