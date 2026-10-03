@@ -144,15 +144,6 @@
     mix-blend-mode: multiply;
 }
 
-/* Leaflet panes operacionais ficam acima do véu. */
-.lus-dark-map .leaflet-overlay-pane,
-.lus-dark-map .leaflet-shadow-pane,
-.lus-dark-map .leaflet-marker-pane,
-.lus-dark-map .leaflet-tooltip-pane,
-.lus-dark-map .leaflet-popup-pane {
-    z-index: 400;
-}
-
 .lus-dark-map .leaflet-control-container {
     position: relative;
     z-index: 800;
