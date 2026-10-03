@@ -139,7 +139,7 @@ const Feature = ({ icon: Icon, index, title, text }) => (
 // Página
 // ---------------------------------------------------------------------------
 export default function AuthPage() {
-  const { user, login, register, checkAvailability } = useAuth();
+  const { user, login, register, loginWithGoogle, googleSignInEnabled, checkAvailability } = useAuth();
   const [mode, setMode] = useState("login");
   const [values, setValues] = useState({ orgName: "", email: "", password: "", confirm: "" });
   const [touched, setTouched] = useState({});
@@ -154,6 +154,8 @@ export default function AuthPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [availability, setAvailability] = useState({ email: null, orgName: null });
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState("");
 
   const submittingRef = useRef(false);
   const orgRef = useRef(null);
@@ -339,20 +341,48 @@ export default function AuthPage() {
     doSubmit();
   };
 
+  const handleGoogleLogin = async () => {
+    if (googleBusy || !googleSignInEnabled) return;
+    setGoogleError("");
+    setGoogleBusy(true);
+    const res = await loginWithGoogle();
+    setGoogleBusy(false);
+    if (!res.ok) setGoogleError(res.error || "Não foi possível iniciar sessão com a Google.");
+  };
+
   if (user) return <Navigate to="/" replace />;
 
-  // No GitHub Pages, o acesso fica oculto sem remover a implementação.
+  // Em builds onde email/password fica oculto, o acesso Google continua
+  // disponível. Assim a versão pública nunca fica presa num ecrã reservado.
   if (!AUTH_UI_ENABLED) {
     return (
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050506] px-4">
-        <img src={BG} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050506] via-[#050506]/90 to-[#050506]/70" />
-        <div className="relative z-10 w-full max-w-xl rounded-xl border border-white/10 bg-black/60 p-8 text-center shadow-2xl backdrop-blur-md">
+        <img src={BG} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050506] via-[#050506]/90 to-[#050506]/65" />
+        <div className="relative z-10 w-full max-w-md rounded-xl border border-white/10 bg-black/70 p-7 text-center shadow-2xl backdrop-blur-md">
           <ShieldCheck className="mx-auto h-8 w-8 text-red-500" aria-hidden="true" />
           <h1 className="mt-4 font-display text-4xl font-bold uppercase tracking-tight text-white">Lusorae</h1>
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.3em] text-red-400">Acesso reservado</p>
-          <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-zinc-400">
-            O sistema de acesso está temporariamente oculto nesta versão pública.
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.3em] text-red-400">Entrar na rede</p>
+          <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-zinc-400">
+            Entra com a tua Conta Google para criar ou retomar o teu império.
+          </p>
+          <Button
+            type="button"
+            data-testid="google-sign-in-button"
+            onClick={handleGoogleLogin}
+            disabled={googleBusy || !googleSignInEnabled}
+            className="mt-6 h-12 w-full bg-white font-semibold text-zinc-950 hover:bg-zinc-100"
+          >
+            {googleBusy ? <Loader2 size={18} className="mr-2 animate-spin" /> : <span className="mr-2 text-lg font-bold">G</span>}
+            Continuar com Google
+          </Button>
+          {!googleSignInEnabled && (
+            <p className="mt-3 text-xs text-amber-400">Google Sign-In ainda não está configurado nesta build.</p>
+          )}
+          {googleError && <p className="mt-3 text-xs text-red-400" role="alert">{googleError}</p>}
+          <p className="mt-5 text-[11px] leading-relaxed text-zinc-500">
+            Ao continuar, aceitas os <Link to="/termos" className="text-zinc-300 underline">Termos de Serviço</Link> e a{" "}
+            <Link to="/privacidade" className="text-zinc-300 underline">Política de Privacidade</Link>.
           </p>
         </div>
       </div>
@@ -473,6 +503,28 @@ export default function AuthPage() {
                 </span>
               </div>
 
+              <div className="px-5 pt-5 sm:px-6">
+                <Button
+                  type="button"
+                  data-testid="google-sign-in-button-full"
+                  onClick={handleGoogleLogin}
+                  disabled={googleBusy || !googleSignInEnabled}
+                  className="h-11 w-full bg-white font-semibold text-zinc-950 hover:bg-zinc-100"
+                >
+                  {googleBusy ? <Loader2 size={17} className="mr-2 animate-spin" /> : <span className="mr-2 text-base font-bold">G</span>}
+                  Continuar com Google
+                </Button>
+                {!googleSignInEnabled && (
+                  <p className="mt-2 text-center text-[10px] text-amber-400">Google Sign-In ainda não está configurado nesta build.</p>
+                )}
+                {googleError && <p className="mt-2 text-center text-xs text-red-400" role="alert">{googleError}</p>}
+                <div className="my-4 flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1 bg-white/10" />
+                  <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-600">ou</span>
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
+              </div>
+
               {/* ------------------------------------------------------- Tabs */}
               <div className="lus-auth-tabs" data-mode={mode} role="tablist" aria-label="Modo de acesso">
                 <span className="lus-auth-glider" aria-hidden="true" />
@@ -499,6 +551,10 @@ export default function AuthPage() {
                   <Crown size={13} aria-hidden="true" /> Criar Império
                 </button>
               </div>
+              <p data-testid="google-terms-copy" className="mt-3 px-5 text-center text-[10px] leading-relaxed text-zinc-600 sm:px-6">
+                Ao continuar com Google, aceitas os <Link to="/termos" className="text-zinc-400 underline">Termos de Serviço</Link> e a{" "}
+                <Link to="/privacidade" className="text-zinc-400 underline">Política de Privacidade</Link>.
+              </p>
 
               {/* ------------------------------------------- Cabeçalho do modo */}
               <div key={`head-${mode}`} className="lus-auth-swap mt-5">
