@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Polyline, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,6 +9,7 @@ import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fm
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
 import PoliceLayer from "./PoliceLayer";
+import MapBaseLayer from "./MapBaseLayer";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -774,10 +775,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       className="absolute inset-0 z-0 h-full w-full"
       attributionControl={true}
     >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-      />
+      <MapBaseLayer />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
       <FollowManager onCancel={() => setFollowId(null)} />
       {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
