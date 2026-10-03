@@ -41,7 +41,7 @@ jobs:
       - name: Build frontend
         env:
           CI: "false"
-          REACT_APP_BACKEND_URL: "https://lusora-patrols.preview.emergentagent.com"
+          REACT_APP_BACKEND_URL: ${{ vars.PUBLIC_BACKEND_URL || 'https://lusora-patrols.preview.emergentagent.com' }}
           REACT_APP_AUTH_UI_ENABLED: "true"
           REACT_APP_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: yarn build
