@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -10,6 +10,7 @@ import { useGame } from "../../context/GameContextV2";
 import { formatApiErrorDetail, fmtMoney } from "../../lib/game";
 import { Button } from "../ui/button";
 import { DisclaimerModal } from "./DisclaimerModal";
+import MapBaseLayer from "./MapBaseLayer";
 
 // -----------------------------------------------------------------------------
 // Onboarding de conta nova: o backend cria a organização com hq=null e o
@@ -113,10 +114,7 @@ export default function HQOnboarding() {
         attributionControl={true}
         className="absolute inset-0 z-0 h-full w-full"
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-        />
+        <MapBaseLayer />
         <ClickPicker onPick={pick} />
         {point && (
           <Marker
