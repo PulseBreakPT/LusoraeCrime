@@ -38,6 +38,7 @@ jobs:
       - name: Install dependencies
         run: yarn install --non-interactive
 
+      # Regression gate: frontend, routing and backend syntax are checked together.
       - name: Test Portugal economy
         run: |
           python -m py_compile ../backend/engine.py ../backend/routes_game.py ../backend/road_routing.py ../backend/auth.py ../backend/reward_engine.py
