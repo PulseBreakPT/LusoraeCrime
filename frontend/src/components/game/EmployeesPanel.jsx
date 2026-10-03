@@ -135,9 +135,9 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
   return (
     <Card data-testid={`employee-card-${e.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2 sm:p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
-      <div className="relative z-[1] flex items-start justify-between gap-2">
+      <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
             <InlineRename
               testId={`emp-rename-${e.id}`} value={e.name} onSave={(name) => renameEmployee(e.id, name)}
@@ -173,7 +173,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
             {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
           <RarityBadge rarity={e.rarity} rar={rar} />
           <Tip
             tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · conclui em ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
@@ -260,7 +260,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
         </div>
       )}
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
         <Select
           value={e.team_id || "__none__"}
           disabled={!idle}
@@ -465,7 +465,7 @@ const CandidateCard = ({ c }) => {
 
   return (
     <Card data-testid={`candidate-card-${c.id}`} className="h-full min-w-0 lus-card p-2.5 sm:p-3 shadow-none">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">
             {c.name} <span className="font-mono text-[10px] font-normal text-zinc-500">{c.age} anos</span>
