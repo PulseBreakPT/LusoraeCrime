@@ -1,4 +1,5 @@
 import axios from "axios";
+import { isLocalGuestMode, localGuestRequest } from "../game/localGuestEngine";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TOKEN_KEY = "lusorae_access_token";
@@ -8,6 +9,21 @@ const REFRESH_KEY = "lusorae_refresh_token";
 // bloqueado) deixe o ecrã em "a carregar" para sempre — ao fim de 15s
 // rejeita e cai no catch de quem chamou.
 export const api = axios.create({ baseURL: API, timeout: 15000 });
+
+const remoteGet = api.get.bind(api);
+const remotePost = api.post.bind(api);
+
+api.get = (url, config = {}) => (
+  isLocalGuestMode()
+    ? localGuestRequest("get", url, null, config)
+    : remoteGet(url, config)
+);
+
+api.post = (url, data = {}, config = {}) => (
+  isLocalGuestMode()
+    ? localGuestRequest("post", url, data, config)
+    : remotePost(url, data, config)
+);
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY);
