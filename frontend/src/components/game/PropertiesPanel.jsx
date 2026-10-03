@@ -187,7 +187,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
               <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 {/* Cabeçalho: placa com emblema + identidade */}
                 <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                  <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <PropertyGlyph typeKey={p.type_key} accent={tier.color} className="h-[44px] w-[96px]" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -323,7 +323,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                 return (
                   <Card key={key} data-testid={`market-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
                     <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                      <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <PropertyGlyph typeKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
                       </div>
@@ -376,7 +376,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       )}
                     </div>
 
-                    <div className="relative z-[1] mt-2 flex items-center justify-between gap-2">
+                    <div className="relative z-[1] mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       {ownedOfType > 0 ? (
                         <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">no património: <span className="text-zinc-300">{ownedOfType}</span></span>
                       ) : <span />}
@@ -391,7 +391,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                         ].filter(Boolean)}
                         availableTip={buyTip}
                         onConfirm={() => { startPlacement(key); onOpenChange(false); }}
-                        className="w-auto shrink-0"
+                        className="w-full shrink-0 sm:w-auto"
                       />
                     </div>
                   </Card>
