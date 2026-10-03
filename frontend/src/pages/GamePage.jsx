@@ -195,7 +195,7 @@ export default function GamePage() {
       {stamp && (
         <div key={stamp.key} className="lus-stamp" aria-hidden="true" data-testid="dispatch-stamp">
           <div className="lus-stamp-box">
-            <p className="font-display text-2xl font-bold uppercase tracking-[0.25em] text-emerald-400">Equipa destacada</p>
+            <p className="font-display text-2xl font-bold uppercase tracking-[0.25em] text-emerald-400">Equipa despachada</p>
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-emerald-200/70">{stamp.team} · em rota para o alvo</p>
           </div>
         </div>
@@ -256,15 +256,20 @@ export default function GamePage() {
               {navGroup === "operations" && (
                 <div className="grid grid-cols-3 gap-1">
                   <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
-                  <NavAction testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
+                  <NavAction testId="open-quests-button" icon={Target} label="Objetivos" color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
                   <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-violet-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
                 </div>
               )}
 
-              {navGroup === "organization" && (
-                <div className="grid grid-cols-4 gap-1">
+              {navGroup === "crew" && (
+                <div className="grid grid-cols-2 gap-1">
                   <NavAction testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400" alert={alerts.teams > 0} onClick={() => openFromNav("teams")} />
                   <NavAction testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400" alert={hrAlertCount > 0} onClick={() => openFromNav("employees")} />
+                </div>
+              )}
+
+              {navGroup === "equipment" && (
+                <div className="grid grid-cols-2 gap-1">
                   <NavAction testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400" alert={fleetAlertCount > 0} onClick={() => openFromNav("fleet")} />
                   <NavAction testId="open-weapons-button" icon={Swords} label="Armamento" color="text-red-400" alert={weaponsDamaged > 0 || weaponsUnequipped > 0} onClick={() => openFromNav("weapons")} />
                 </div>
@@ -282,7 +287,7 @@ export default function GamePage() {
                 <>
                   <div className="grid grid-cols-3 gap-1">
                     <NavAction testId="open-street-button" icon={Radar} label="Cidade" color="text-cyan-300" alert={wantedStars >= 3 || (state.street?.districts || []).some((district) => district.rival_pressure >= 70)} onClick={() => openFromNav("street")} />
-                    <NavAction testId="open-intel-button" icon={BrainCircuit} label="Intel" color="text-red-400" alert={alerts.total > 0} onClick={() => openFromNav("intel")} />
+                    <NavAction testId="open-intel-button" icon={BrainCircuit} label="Relatórios" color="text-red-400" alert={alerts.total > 0} onClick={() => openFromNav("intel")} />
                     <NavAction testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300" onClick={() => openFromNav("shop")} />
                     <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
                     <NavAction testId="map-legend-toggle" icon={MapIcon} label="Legenda" color="text-zinc-300" active={mapLegendOpen} onClick={() => { setNavGroup(null); setMapLegendOpen((value) => !value); }} />
@@ -314,7 +319,7 @@ export default function GamePage() {
             </div>
           )}
 
-          <div className="lus-dock flex items-center gap-3 px-1 py-1">
+          <div className="lus-dock flex items-center gap-2 px-1 py-1">
             <GroupButton
               testId="nav-group-operations"
               icon={Crosshair}
@@ -325,13 +330,22 @@ export default function GamePage() {
               onClick={() => toggleNavGroup("operations")}
             />
             <GroupButton
-              testId="nav-group-organization"
+              testId="nav-group-crew"
               icon={Users}
-              label="Organização"
+              label="Crew"
               color="text-cyan-400"
-              alert={alerts.teams > 0 || hrAlertCount > 0 || fleetAlertCount > 0 || weaponsDamaged > 0}
-              active={navGroup === "organization" || ["teams", "employees", "fleet", "weapons"].includes(openPanel)}
-              onClick={() => toggleNavGroup("organization")}
+              alert={alerts.teams > 0 || hrAlertCount > 0}
+              active={navGroup === "crew" || ["teams", "employees"].includes(openPanel)}
+              onClick={() => toggleNavGroup("crew")}
+            />
+            <GroupButton
+              testId="nav-group-equipment"
+              icon={Swords}
+              label="Equipamento"
+              color="text-amber-300"
+              alert={fleetAlertCount > 0 || weaponsDamaged > 0 || weaponsUnequipped > 0}
+              active={navGroup === "equipment" || ["fleet", "weapons"].includes(openPanel)}
+              onClick={() => toggleNavGroup("equipment")}
             />
             <GroupButton
               testId="nav-group-empire"
