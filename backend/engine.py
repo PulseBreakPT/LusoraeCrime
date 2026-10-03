@@ -154,15 +154,86 @@ def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
 
 
+MISSION_STATS_VERSION = 2
+
+
 def default_stats():
-    return {"missions_total": 0, "missions_success": 0, "missions_failure": 0, "missions_police": 0,
+    return {"missions_total": 0, "missions_success": 0, "missions_partial": 0,
+            "missions_failure": 0, "missions_police": 0,
             "earned_dirty": 0, "earned_clean": 0, "fines_paid": 0, "laundered_total": 0,
             "by_category": {}, "success_by_category": {}, "high_value_ops": 0, "ops_dispatched": 0,
             "recruits_hired": 0, "recruits_informador": 0, "trainings_completed": 0,
             "employees_promoted": 0, "employees_rested": 0, "bonuses_paid": 0,
             "vehicles_bought": 0, "vehicles_repaired": 0, "vehicles_refueled": 0,
             "properties_bought": 0, "properties_upgraded": 0, "teams_created": 0,
-            "bribes_paid": 0, "raids_survived": 0}
+            "bribes_paid": 0, "raids_survived": 0, "_mission_outcome_version": 0}
+
+
+def ensure_stats(player):
+    """Completa saves antigos sem apagar métricas já acumuladas."""
+    current = player.get("stats")
+    if not isinstance(current, dict):
+        current = {}
+    for key, value in default_stats().items():
+        if key not in current or current[key] is None:
+            current[key] = value.copy() if isinstance(value, dict) else value
+        elif isinstance(value, dict) and not isinstance(current[key], dict):
+            current[key] = {}
+    player["stats"] = current
+    return current
+
+
+async def reconcile_mission_stats(db, player):
+    """Repara uma vez os contadores de resultados a partir do histórico real."""
+    stats = ensure_stats(player)
+    if int(stats.get("_mission_outcome_version", 0) or 0) >= MISSION_STATS_VERSION:
+        return stats
+
+    pid = str(player["_id"])
+    missions = await db.missions.find({
+        "player_id": pid,
+        "phase": "done",
+        "outcome": {"$in": ["success", "partial", "failure", "police"]},
+    }).to_list(10000)
+
+    total = success = partial = failure = police = high_value = 0
+    by_category = {}
+    success_by_category = {}
+    for mission in missions:
+        outcome = "police" if mission.get("chase_outcome") == "caught" else mission.get("outcome")
+        if outcome not in ("success", "partial", "failure", "police"):
+            continue
+        total += 1
+        category = (mission.get("opportunity") or {}).get("category")
+        if category:
+            by_category[category] = by_category.get(category, 0) + 1
+        if outcome == "success":
+            success += 1
+            if category:
+                success_by_category[category] = success_by_category.get(category, 0) + 1
+            if int(mission.get("pending_reward", 0) or 0) >= 8000:
+                high_value += 1
+        elif outcome == "partial":
+            partial += 1
+        elif outcome == "failure":
+            failure += 1
+        else:
+            police += 1
+
+    stats.update({
+        "missions_total": total,
+        "missions_success": success,
+        "missions_partial": partial,
+        "missions_failure": failure,
+        "missions_police": police,
+        "by_category": by_category,
+        "success_by_category": success_by_category,
+        "high_value_ops": high_value,
+        "_mission_outcome_version": MISSION_STATS_VERSION,
+    })
+    player["stats"] = stats
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"stats": stats}})
+    return stats
 
 
 def betrayal_risk_of(e):
@@ -1578,9 +1649,35 @@ def _roll_outcome(player, m):
     return "failure"
 
 
+def _record_terminal_mission_stats(player, m, outcome):
+    """Regista exatamente um resultado terminal por operação."""
+    stats = ensure_stats(player)
+    if outcome == "success":
+        stats["missions_success"] = stats.get("missions_success", 0) + 1
+        cat = m["opportunity"].get("category")
+        if cat:
+            stats["success_by_category"][cat] = stats["success_by_category"].get(cat, 0) + 1
+        if int(m.get("pending_reward", 0) or 0) >= 8000:
+            stats["high_value_ops"] = stats.get("high_value_ops", 0) + 1
+        player["achievement_bonus_pct"] = achievement_bonus_pct(stats["missions_success"])
+        stats["current_success_streak"] = stats.get("current_success_streak", 0) + 1
+        if stats["current_success_streak"] == STREAK_SPECIAL_THRESHOLD and not player.get("streak_op_pending"):
+            player["streak_op_pending"] = True
+            return True
+    elif outcome == "partial":
+        stats["missions_partial"] = stats.get("missions_partial", 0) + 1
+    elif outcome == "failure":
+        stats["missions_failure"] = stats.get("missions_failure", 0) + 1
+        stats["current_success_streak"] = 0
+    elif outcome == "police":
+        stats["missions_police"] = stats.get("missions_police", 0) + 1
+        stats["current_success_streak"] = 0
+    return False
+
+
 def _apply_outcome(player, m, outcome):
     t = m["opportunity"]
-    stats = player.setdefault("stats", default_stats())
+    stats = ensure_stats(player)
     stats["missions_total"] += 1
     stats["by_category"][t["category"]] = stats["by_category"].get(t["category"], 0) + 1
     # Memória do mundo (SSS v3): a zona onde a operação aconteceu aquece —
@@ -1619,7 +1716,6 @@ def _apply_outcome(player, m, outcome):
     elif outcome == "partial":
         # Sucesso parcial (SSS v3): a equipa abortou a meio mas salvou parte do
         # saque — paga menos, faz mais barulho e a polícia fica mais desconfiada.
-        stats["missions_partial"] = stats.get("missions_partial", 0) + 1
         frac = random.uniform(PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX)
         m["pending_reward"] = int(t["reward"] * frac)
         m["pending_pays"] = t["pays"]
@@ -1634,7 +1730,7 @@ def _apply_outcome(player, m, outcome):
             m["escape_chance"] = _compute_escape_chance(player, m)
         m["chase_chance"] = round(chase_chance, 3)
     elif outcome == "failure":
-        stats["missions_failure"] += 1
+        _record_terminal_mission_stats(player, m, "failure")
         # Reputação por falha: 25% do valor de sucesso (usando novo cálculo se disponível)
         base_rep = m.get("reward_reputation", t["respect"])
         player["respect"] += max(1, int(base_rep * 0.25))
@@ -1643,7 +1739,7 @@ def _apply_outcome(player, m, outcome):
         cooldowns = player.setdefault("type_cooldowns", {})
         cooldowns[t["type_key"]] = (now_utc() + timedelta(minutes=FAILED_TYPE_COOLDOWN_MIN)).isoformat()
     else:
-        stats["missions_police"] += 1
+        _record_terminal_mission_stats(player, m, "police")
         fine = int(player["dirty_money"] * 0.10)
         stats["fines_paid"] += fine
         player["dirty_money"] -= fine
@@ -1748,9 +1844,8 @@ async def _resolve_chase(db, player, m):
     lost = int(m.get("pending_reward", 0))
     m["pending_reward"] = 0
     player["heat"] = min(100, player.get("heat", 0) + 20)
-    stats = player.setdefault("stats", default_stats())
+    stats = ensure_stats(player)
     stats["fines_paid"] = stats.get("fines_paid", 0) + lost
-    stats["missions_police"] = stats.get("missions_police", 0) + 1
     # A interceção também apreende o carro de fuga. Seguro clandestino reduz
     # o tempo de retenção para metade; a garagem Cidade Viva permite recuperá-lo.
     if m.get("vehicle_id"):
@@ -2092,30 +2187,6 @@ async def _progress_mission(db, player, m, now):
                 player["phrase_memory"] = update_memory(player.get("phrase_memory"), ret_used)
         except Exception:
             logger.exception("Falha a gerar o guião de regresso da missão %s", m.get("_id"))
-        # Track success now (before pay-out): the operation succeeded, delivery is separate.
-        stats = player.setdefault("stats", default_stats())
-        if outcome == "success":
-            stats["missions_success"] = stats.get("missions_success", 0) + 1
-            # Métricas usadas pelas missões (quests) de categoria e alto valor —
-            # sem estes incrementos, 19 quests ficavam impossíveis de completar.
-            cat = m["opportunity"].get("category")
-            if cat:
-                stats.setdefault("success_by_category", {})
-                stats["success_by_category"][cat] = stats["success_by_category"].get(cat, 0) + 1
-            if int(m.get("pending_reward", 0) or 0) >= 8000:
-                stats["high_value_ops"] = stats.get("high_value_ops", 0) + 1
-            # Conquistas permanentes: cada marco de missões bem-sucedidas concede
-            # um pequeno bónus passivo de recompensa, para sempre.
-            player["achievement_bonus_pct"] = achievement_bonus_pct(stats["missions_success"])
-            # Série de vitórias da organização (SSS v3): ao atingir o marco, o
-            # mundo reage — o próximo tick gera um Golpe de Oportunidade especial.
-            stats["current_success_streak"] = stats.get("current_success_streak", 0) + 1
-            if stats["current_success_streak"] == STREAK_SPECIAL_THRESHOLD and not player.get("streak_op_pending"):
-                player["streak_op_pending"] = True
-                await add_event(db, m["player_id"], "intel",
-                                f"As ruas falam da tua série de {STREAK_SPECIAL_THRESHOLD} vitórias — um Golpe de Oportunidade vai aparecer no mapa.")
-        elif outcome in ("failure", "police"):
-            stats["current_success_streak"] = 0
         # Momentum da equipa (SSS v3): vitórias somam, falhas invertem o sinal,
         # sucesso parcial não mexe — nem herói nem culpado.
         team_doc = await db.teams.find_one({"_id": team_oid})
@@ -2136,13 +2207,25 @@ async def _progress_mission(db, player, m, now):
         kind = "success" if outcome in ("success", "partial") else ("police" if outcome == "police" else "failure")
         await add_event(db, m["player_id"], kind, _outcome_message(m, outcome))
     if phase == "returning" and now >= parse_dt(m["return_at"]):
-        # Resolve chase (if any) and pay pending reward on arrival at HQ.
+        # Só agora existe um resultado terminal: uma operação que correu bem
+        # no alvo mas foi apanhada no regresso conta como interceção, não como
+        # sucesso + interceção em simultâneo.
         if m.get("outcome") in ("success", "partial"):
-            await _resolve_chase(db, player, m)
+            chase_result = await _resolve_chase(db, player, m)
             for k in ("pending_reward", "chase_outcome"):
                 if k in m:
                     updates[k] = m[k]
-            if int(m.get("pending_reward", 0) or 0) > 0:
+            final_outcome = "police" if chase_result == "caught" else m.get("outcome")
+            streak_special = _record_terminal_mission_stats(player, m, final_outcome)
+            if streak_special:
+                await add_event(
+                    db, m["player_id"], "intel",
+                    f"As ruas falam da tua série de {STREAK_SPECIAL_THRESHOLD} vitórias — um Golpe de Oportunidade vai aparecer no mapa.",
+                )
+            if final_outcome == "police":
+                m["outcome"] = "police"
+                updates["outcome"] = "police"
+            elif int(m.get("pending_reward", 0) or 0) > 0:
                 await _pay_pending_reward(db, player, m)
         phase = "done"
         updates["phase"] = phase
@@ -2829,7 +2912,8 @@ async def _maybe_raid(db, player, props, minutes, now):
 async def advance(db, player):
     now = now_utc()
     pid = str(player["_id"])
-    player.setdefault("stats", default_stats())
+    ensure_stats(player)
+    await reconcile_mission_stats(db, player)
 
     await db.opportunities.update_many(
         {"player_id": pid, "status": "active", "expires_at": {"$lte": now.isoformat()}},
