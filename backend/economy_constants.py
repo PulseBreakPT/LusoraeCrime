@@ -290,10 +290,11 @@ HQ_DEPARTMENTS = {
     'comunicacoes': {'name': 'Comunicações', 'desc': 'Coordenação e automação avançada de operações.'},
 }
 
-# VEHICLE REPAIR COSTS (REDESIGNED - 6x INCREASE)
-# Old multiplier: 0.002 (0.2% of vehicle price)
-# New multiplier: 0.012 (1.2% of vehicle price)
-VEHICLE_REPAIR_BASE_MULTIPLIER = 0.012  # was 0.002, 6x increase
+# VEHICLE REPAIR COSTS
+# Cada ponto de condição em falta custa 0,3% do valor do veículo antes de
+# descontos. Ex.: 20% de dano = ~6% do valor, coerente com reparações relevantes
+# sem transformar qualquer acidente numa reconstrução integral.
+VEHICLE_REPAIR_BASE_MULTIPLIER = 0.003
 VEHICLE_REPAIR_MIN = 50
 
 # Repair discounts stack up to 50% max
