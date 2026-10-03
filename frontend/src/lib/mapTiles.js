@@ -10,3 +10,16 @@ export const MAP_TILE_ATTRIBUTION =
 
 export const MAP_TILE_MAX_ZOOM = 19;
 export const MAP_TILE_CLASS = "lus-osm-base-tile";
+
+
+export const MAP_DETAIL_BREAKPOINTS = Object.freeze({
+  overviewMax: 8,
+  operationalMax: 13,
+});
+
+export function mapDetailForZoom(zoom) {
+  const z = Number(zoom) || 0;
+  if (z <= MAP_DETAIL_BREAKPOINTS.overviewMax) return "overview";
+  if (z <= MAP_DETAIL_BREAKPOINTS.operationalMax) return "operational";
+  return "street";
+}
