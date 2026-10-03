@@ -518,7 +518,7 @@ const publicState=(save)=>{
     candidates:clone(save.candidates),vehicles:clone(save.vehicles),weapons:clone(save.weapons),
     properties:clone(save.properties),opportunities:clone(save.opportunities),missions:clone(save.missions),
     history:clone(save.history),events:clone(save.events),quests:clone(save.quests),caps,
-    bonuses:{heal:0,legal:0,bribe_discount:0,repair_discount:save.properties.some(p=>p.type_key==="oficina")?.15:0},
+    bonuses:{heal:0,legal:0,bribe_discount:0,repair_discount:save.properties.some(p=>p.type_key==="oficina") ? 0.15 : 0},
     salary_total:save.employees.reduce((s,e)=>s+(e.salary||0),0),fuel_prices:clone(LOCAL_CATALOG.fuel_prices),
     hot_category:"assalto",
   };
