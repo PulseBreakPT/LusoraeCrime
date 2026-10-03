@@ -278,8 +278,8 @@ const EmployeeCard = ({ e, onNavigate }) => {
             })}
           </SelectContent>
         </Select>
-        <Tip tip={`Salário: ${fmtMoney(e.salary)} a cada ciclo de ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)}, em dinheiro limpo. Promoções aumentam o salário em 10%.`} align="end">
-          <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/ciclo</span>
+        <Tip tip={`Salário bruto semanal: ${fmtMoney(e.salary)}. No fecho de segunda-feira às 20:00 a organização suporta ainda 23,75% de TSU patronal. Promoções aumentam o salário em 10%.`} align="end">
+          <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/semana</span>
         </Tip>
       </div>
       {vehicle && (
@@ -454,7 +454,10 @@ const CandidateCard = ({ c }) => {
   const lackMoney = state.player.clean_money < c.cost;
   const full = caps.used >= caps.max;
   const topAttrs = Object.entries(c.attrs || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
-  const newPayroll = (state.salary_total || 0) + c.salary;
+  const ssRate = catalog?.economy_meta?.employer_social_security_rate ?? 0.2375;
+  const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
+  const candidateWeeklyCost = Math.round(c.salary * (1 + ssRate));
+  const newWeeklyFixed = weeklyFixed + candidateWeeklyCost;
   const blockers = [];
   if (full) blockers.push("esconderijos cheios");
   if (lackRespect) blockers.push(`faltam ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} de respeito`);
@@ -469,8 +472,8 @@ const CandidateCard = ({ c }) => {
           </p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec} ·{" "}
-            <Tip tip={`Impacto no ciclo salarial: ${fmtMoney(state.salary_total || 0)} → ${fmtMoney(newPayroll)} por ciclo de ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)}.`}>
-              <span>{fmtMoney(c.salary)}/ciclo</span>
+            <Tip tip={`Salário bruto ${fmtMoney(c.salary)}/semana + TSU patronal ${fmtMoney(candidateWeeklyCost - c.salary)}. O fecho fixo passa de ${fmtMoney(weeklyFixed)} para cerca de ${fmtMoney(newWeeklyFixed)}.`}>
+              <span>{fmtMoney(c.salary)}/semana</span>
             </Tip>
           </p>
         </div>
@@ -511,7 +514,7 @@ const CandidateCard = ({ c }) => {
             lackRespect ? `Requer ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} de respeito adicional.` : null,
             lackMoney ? "Dinheiro insuficiente." : null,
           ].filter(Boolean)}
-          availableTip={`Recrutar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/ciclo de salário.`}
+          availableTip={`Recrutar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/semana de salário bruto + TSU patronal.`}
           onConfirm={() => recruitEmployee(c.id)}
           className="w-auto shrink-0"
         />
@@ -534,6 +537,8 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const canBuyHideout = hideout && state.player.level >= hideout.min_level && state.player.clean_money >= hideout.price;
   const capFull = caps.used >= caps.max;
   const payrollMs = state.player.next_payroll_at ? Date.parse(state.player.next_payroll_at) - serverNow() : null;
+  const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
+  const weeklyBreakdown = state.weekly_cost_breakdown || {};
   const poolMs = state.player.pool_refresh_at ? Date.parse(state.player.pool_refresh_at) - serverNow() : null;
 
   const grouped = {};
@@ -585,22 +590,24 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
           </SheetDescription>
         </SheetHeader>
 
-        {state.player.clean_money < state.salary_total && state.salary_total > 0 && (
+        {state.player.clean_money < weeklyFixed && weeklyFixed > 0 && (
           <Alert variant="destructive" data-testid="payroll-warning" className="mt-3 border-red-600/40 bg-red-600/10 py-2">
             <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
-              <AlertTriangle size={12} /> Fundos insuficientes para o próximo ciclo salarial (faltam {fmtMoney(state.salary_total - state.player.clean_money)}) —
-              o efetivo vai perder moral e lealdade, e quem estiver disponível pode abandonar a organização.
+              <AlertTriangle size={12} /> Fundos insuficientes para o fecho semanal (faltam {fmtMoney(weeklyFixed - state.player.clean_money)}).
+              Segunda-feira às 20:00 são liquidados salários, TSU, frota e imóveis.
             </AlertDescription>
           </Alert>
         )}
 
         <Card className="mt-3 flex items-center justify-between lus-card px-3 py-2 shadow-none">
           <div>
-            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Ciclo salarial</p>
-            <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(state.salary_total)}/ciclo</p>
+            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Fecho semanal</p>
+            <Tip tip={`Salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)} + TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)} + frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} + imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}.`}>
+              <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(weeklyFixed)}</p>
+            </Tip>
           </div>
           <div className="text-right">
-            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Próximo pagamento</p>
+            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Segunda · 20:00</p>
             <p className="font-mono text-xs font-bold text-amber-400" data-testid="payroll-countdown">
               {payrollMs !== null ? fmtDuration(payrollMs / 1000) : "—"}
             </p>
