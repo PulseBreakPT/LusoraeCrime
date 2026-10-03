@@ -604,6 +604,7 @@ export function teamSynergy(members, category, meta) {
 
 export function parseActivityMessage(message) {
   const React = require('react');
+  const safeMessage = typeof message === 'string' ? message : String(message ?? '');
   const parts = [];
   let lastIdx = 0;
 
@@ -621,7 +622,7 @@ export function parseActivityMessage(message) {
 
   const execAll = (regex, onMatch) => {
     let m;
-    while ((m = regex.exec(message)) !== null) {
+    while ((m = regex.exec(safeMessage)) !== null) {
       onMatch(m);
       // Guarda contra matches vazios (e regexes sem /g): avança sempre
       if (m.index === regex.lastIndex) regex.lastIndex++;
@@ -654,7 +655,7 @@ export function parseActivityMessage(message) {
 
   matches.forEach((match) => {
     if (match.start > lastIdx) {
-      parts.push(message.substring(lastIdx, match.start));
+      parts.push(safeMessage.substring(lastIdx, match.start));
     }
 
     if (match.type === 'dirty') {
@@ -674,11 +675,11 @@ export function parseActivityMessage(message) {
     lastIdx = match.end;
   });
 
-  if (lastIdx < message.length) {
-    parts.push(message.substring(lastIdx));
+  if (lastIdx < safeMessage.length) {
+    parts.push(safeMessage.substring(lastIdx));
   }
 
-  return parts.length > 0 ? parts : message;
+  return parts.length > 0 ? parts : safeMessage;
 }
 
 
