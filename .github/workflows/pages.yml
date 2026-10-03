@@ -39,7 +39,9 @@ jobs:
         run: yarn install --non-interactive
 
       - name: Test Portugal economy
-        run: python backend/tests/test_economy_portugal_2026.py
+        run: |
+          python -m py_compile ../backend/engine.py ../backend/routes_game.py ../backend/auth.py ../backend/reward_engine.py
+          python ../backend/tests/test_economy_portugal_2026.py
 
       - name: Test offline guest engine
         env:
