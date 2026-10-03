@@ -624,6 +624,12 @@ const mutateGame=(save,path,payload)=>{
     if(caps.teams.used>=caps.teams.max)fail(400,"Limite de equipas atingido");chargeClean(save,LOCAL_CATALOG.team_create_cost,"Formação de equipa");
     const t=makeTeam();t.name=`Crew ${String.fromCharCode(65+save.teams.length)}`;t.spec=p.spec||"assalto";t.vehicle_id=null;save.teams.push(t);return {ok:true,team_id:t.id};
   }
+  if(path==="teams/equip_emblem"){
+    const team=save.teams.find((t)=>t.id===p.team_id);
+    if(!team)fail(404,"Equipa não encontrada");
+    team.emblem_key=p.emblem_key||null;
+    return {ok:true};
+  }
   if(path==="employees/recruit"){
     const c=save.candidates.find(x=>x.id===p.candidate_id);if(!c)fail(404,"Candidato não encontrado");
     if(caps.employees.used>=caps.employees.max)fail(400,"Capacidade de operacionais atingida");chargeClean(save,c.cost,"Recrutamento");
@@ -697,7 +703,41 @@ const mutateGame=(save,path,payload)=>{
   if(path==="shop/buy_slot"){const key=p.kind==="vehicle"?"extra_vehicle_slots":"extra_employee_slots";const base=p.kind==="vehicle"?LOCAL_CATALOG.shop.slot_cost_vehicle_base:LOCAL_CATALOG.shop.slot_cost_employee_base;const n=save.player[key]||0;const cost=Math.round(base*(1+n*LOCAL_CATALOG.shop.slot_cost_scale_per_unit));chargeClean(save,cost,"Slot extra");save.player[key]=n+1;return {ok:true,cost};}
   if(path==="shop/vip"){const plan=LOCAL_CATALOG.shop.vip_plans[p.plan_key];if(!plan)fail(400,"Plano inválido");chargeClean(save,plan.price,"VIP");save.player.vip_until=new Date(Date.now()+plan.days*86400000).toISOString();return {ok:true};}
   if(path==="shop/cosmetic"){const item=LOCAL_CATALOG.shop[p.category==="vehicle_paint"?"vehicle_paints":p.category==="team_emblem"?"team_emblems":"hq_skins"]?.[p.key];if(!item)fail(400,"Cosmético inválido");chargeClean(save,item.price,"Cosmético");const token=`${p.category}:${p.key}`;if(!save.player.owned_cosmetics.includes(token))save.player.owned_cosmetics.push(token);return {ok:true};}
-  if(path==="shop/speedup")return {ok:true};
+  if(path==="shop/speedup"){
+    const targetKind=p.kind;
+    let remainingS=0;
+    if(targetKind==="vehicle_refuel"){
+      const v=save.vehicles.find(x=>x.id===p.id);if(!v)fail(404,"Veículo não encontrado");
+      remainingS=Math.max(0,(Date.parse(v.refueling_until||0)-Date.now())/1000);
+      const cost=Math.max(LOCAL_CATALOG.shop.speedup_cost_min,Math.round((remainingS/60)*LOCAL_CATALOG.shop.speedup_cost_per_min));
+      chargeClean(save,cost,"Aceleração de abastecimento");v.fuel_l=v.tank_l;v.refueling_until=null;return {ok:true,cost};
+    }
+    if(targetKind==="vehicle_transfer"){
+      const v=save.vehicles.find(x=>x.id===p.id);if(!v)fail(404,"Veículo não encontrado");
+      remainingS=Math.max(0,(Date.parse(v.transfer?.ends_at||0)-Date.now())/1000);
+      const cost=Math.max(LOCAL_CATALOG.shop.speedup_cost_min,Math.round((remainingS/60)*LOCAL_CATALOG.shop.speedup_cost_per_min));
+      chargeClean(save,cost,"Aceleração de transferência");if(v.transfer){v.property_id=v.transfer.to_property_id||null;v.transfer=null;}return {ok:true,cost};
+    }
+    if(targetKind==="property_upgrade"){
+      const pr=save.properties.find(x=>x.id===p.id);if(!pr)fail(404,"Propriedade não encontrada");
+      remainingS=Math.max(0,(Date.parse(pr.upgrading_until||0)-Date.now())/1000);
+      const cost=Math.max(LOCAL_CATALOG.shop.speedup_cost_min,Math.round((remainingS/60)*LOCAL_CATALOG.shop.speedup_cost_per_min));
+      chargeClean(save,cost,"Aceleração de obra");if(pr.upgrading_until){pr.level=Math.min(LOCAL_CATALOG.property_max_level,pr.level+1);pr.upgrading_until=null;}return {ok:true,cost};
+    }
+    if(targetKind==="hq_upgrade"){
+      const hq=save.player.hq;if(!hq)fail(400,"Quartel-General não estabelecido");
+      remainingS=Math.max(0,(Date.parse(hq.upgrading_until||0)-Date.now())/1000);
+      const cost=Math.max(LOCAL_CATALOG.shop.speedup_cost_min,Math.round((remainingS/60)*LOCAL_CATALOG.shop.speedup_cost_per_min));
+      chargeClean(save,cost,"Aceleração do QG");if(hq.upgrading_until){hq.level=Math.min(LOCAL_CATALOG.hq_max_level,hq.level+1);hq.upgrading_until=null;}return {ok:true,cost};
+    }
+    if(targetKind==="team_reorg"){
+      const team=save.teams.find(x=>x.id===p.id);if(!team)fail(404,"Equipa não encontrada");
+      remainingS=Math.max(0,(Date.parse(team.available_at||0)-Date.now())/1000);
+      const cost=Math.max(LOCAL_CATALOG.shop.speedup_cost_min,Math.round((remainingS/60)*LOCAL_CATALOG.shop.speedup_cost_per_min));
+      chargeClean(save,cost,"Aceleração de reorganização");team.available_at=null;return {ok:true,cost};
+    }
+    return {ok:true,cost:0};
+  }
 
   if(path==="street/plan"){save.street.plan={...save.street.plan,...p};return {ok:true};}
   if(path==="street/gear/buy"){const prices={vest:2200,jammer:3200,papers:2800,tires:2600};const cost=(prices[p.gear_key]||2500)*(p.quantity||1);chargeClean(save,cost,"Equipamento de rua");save.street.gear[p.gear_key]=(save.street.gear[p.gear_key]||0)+(p.quantity||1);return {ok:true};}
