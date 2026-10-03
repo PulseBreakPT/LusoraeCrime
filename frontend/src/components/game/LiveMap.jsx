@@ -752,7 +752,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
   );
 };
 
-export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, baseFilter = "all" }) {
+export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, onSelectProperty, baseFilter = "all" }) {
   const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state?.player?.hq;
   const hqSkinColor = catalog?.shop?.hq_skins?.[state?.player?.hq_skin_key]?.color;
@@ -833,6 +833,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             icon={propIcon(p.type_key)}
             zIndexOffset={300}
             opacity={baseFilter === "all" || baseFilter === p.id ? 1 : 0.25}
+            eventHandlers={{ click: () => onSelectProperty && onSelectProperty(p) }}
           >
             <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
               <div className="min-w-[140px]">
@@ -947,8 +948,10 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
   );
 }
 
-export const MapLegend = () => {
-  const [open, setOpen] = useState(false);
+export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = false }) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const containerRef = useRef(null);
 
   // Popover: clicar fora ou Escape fecha, tal como qualquer dropdown/menu.
@@ -970,7 +973,7 @@ export const MapLegend = () => {
     <div
       ref={containerRef}
       className="pointer-events-auto absolute right-2 z-30"
-      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+      style={{ bottom: hideTrigger ? "calc(4.7rem + env(safe-area-inset-bottom, 0px))" : "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {open && (
         <Card
@@ -1053,15 +1056,17 @@ export const MapLegend = () => {
           </div>
         </Card>
       )}
-      <Button
-        data-testid="map-legend-toggle"
-        variant="outline" size="icon"
-        onClick={() => setOpen(!open)}
-        title="Legenda do mapa"
-        className="rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-400 shadow-2xl hover:bg-black hover:text-white"
-      >
-        {open ? <X size={15} /> : <MapIcon size={15} />}
-      </Button>
+      {!hideTrigger && (
+        <Button
+          data-testid="map-legend-toggle"
+          variant="outline" size="icon"
+          onClick={() => setOpen(!open)}
+          title="Legenda do mapa"
+          className="rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-400 shadow-2xl hover:bg-black hover:text-white"
+        >
+          {open ? <X size={15} /> : <MapIcon size={15} />}
+        </Button>
+      )}
     </div>
   );
 };
