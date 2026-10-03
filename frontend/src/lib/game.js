@@ -1,4 +1,4 @@
-import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMask, Terminal, Crown, Star, Zap, Eye, Target, Landmark, Globe, CreditCard } from "lucide-react";
+import { Crosshair, Car, Package, Truck, Banknote, HandCoins, Swords, VenetianMask, Terminal, Crown, Star, Zap, Eye, Target, Landmark, Globe, CreditCard, Skull, Gem } from "lucide-react";
 
 // Cor única para "precisa da tua atenção" (badges/dots de notificação) — o
 // mesmo laranja já usado no resto do site (heatStatus "Alerta", feridos, etc.).
@@ -60,16 +60,16 @@ export const TYPE_ICONS = {
   ciberataque_bancario: CreditCard,
 
   // Assalto
-  roubo_joalharia: Crosshair,
-  assalto_licorista: Car,
-  roubo_carga: Swords,
+  roubo_joalharia: Gem,
+  assalto_licorista: Crosshair,
+  roubo_carga: Truck,
   assalto_penhores: Target,
   assalto_blindado: Crosshair,
-  emboscada_rival: Car,
-  assalto_casino: Swords,
-  sequestro_relampago: Target,
+  emboscada_rival: Target,
+  assalto_casino: Crosshair,
+  sequestro_relampago: VenetianMask,
   assalto_museu: Crosshair,
-  guerra_territorio: Car,
+  guerra_territorio: Swords,
 
   // Logística
   entrega_local: Package,
@@ -108,13 +108,13 @@ export const TYPE_ICONS = {
   golpe_estado_local: HandCoins,
 
   // Especial
-  roubo_obra_arte: Star,
+  roubo_obra_arte: Gem,
   operacao_encoberta: Crown,
   resgate_refem: VenetianMask,
   leilao_clandestino: Star,
   venda_armamento: Crown,
   fuga_prisao: VenetianMask,
-  assassinato_contrato: Star,
+  assassinato_contrato: Skull,
   golpe_banco_central: Crown,
   trafico_influencia_internacional: VenetianMask,
   operacao_fantasma: Star,
