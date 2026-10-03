@@ -296,7 +296,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   // v3: usa o roster real (especializações/patentes) para papéis, líder,
   // batedor, retaguarda e motorista ao volante.
   const memberCount = Math.max(1, Math.min(6, (mission.member_ids || []).length || 2));
-  const rosterKey = (roster || []).map((r) => `${r.role_key}:${r.spec}:${r.rank}`).join(",");
+  const rosterKey = (roster || []).map((r) => `${r.id || ""}:${r.name || ""}:${r.role_key}:${r.spec}:${r.rank}`).join(",");
   const choreo = useMemo(() => {
     if (!route?.parking) return null;
     return buildChoreography(mission, route.parking, memberCount, roster);
@@ -660,7 +660,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             )}
             {phase === "operating" && choreo && (
               <p className="mt-0.5 text-[9px] text-zinc-400">
-                {choreo.driverInside ? "Motorista ao volante" : "Veículo estacionado"} · {CHOREO_LABELS[choreo.kind]}
+                {choreo.driverInside ? `${choreo.driverMember?.name || "Motorista"} · ao volante` : "Veículo estacionado"} · {CHOREO_LABELS[choreo.kind]}
               </p>
             )}
             {mission.success_chance != null && pos.phase === "en_route" && (
