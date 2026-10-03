@@ -197,7 +197,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               blockedReasons={["Dinheiro insuficiente."]}
               availableTip={`Repara todos os veículos disponíveis abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}
               onConfirm={repairAll}
-              className="w-auto shrink-0"
+              className="w-full shrink-0 sm:w-auto"
             />
           )}
         </div>
@@ -249,7 +249,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 {/* Cabeçalho: placa com silhueta + identidade */}
                 <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                  <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <VehicleGlyph
                       modelKey={v.model_key} accent={tier.color}
                       paintColor={catalog?.shop?.vehicle_paints?.[v.paint_key]?.color}
@@ -514,7 +514,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 return (
                   <Card key={key} data-testid={`stand-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
                     <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                      <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <VehicleGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
                       </div>
@@ -561,7 +561,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       <AdequacyRow model={m} catalog={catalog} testId={`stand-adequacy-${key}`} />
                     </div>
 
-                    <div className="relative z-[1] mt-2 flex items-center justify-between gap-2">
+                    <div className="relative z-[1] mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       {owned > 0 ? (
                         <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">na frota: <span className="text-zinc-300">{owned}</span></span>
                       ) : <span />}
@@ -577,7 +577,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         ].filter(Boolean)}
                         availableTip={`Comprar por ${fmtMoney(m.price)} limpos. Velocidade ${m.speed} m/s, depósito ${m.tank_l}L, consumo ${m.cons}L/100km.`}
                         onConfirm={() => buyVehicle(key)}
-                        className="w-auto shrink-0"
+                        className="w-full shrink-0 sm:w-auto"
                       />
                     </div>
                   </Card>
