@@ -237,6 +237,10 @@ class Mission(BaseDocument):
     origin: dict
     origin_property_id: Optional[str] = None
     target: dict
+    # Percursos rodoviários persistidos no despacho. Guardá-los na missão evita
+    # recalcular no browser e garante que o veículo nasce logo sobre a estrada.
+    road_outward: Optional[dict] = None
+    road_inward: Optional[dict] = None
     phase: str
     outcome: Optional[str] = None
     success_chance: Optional[float] = None
