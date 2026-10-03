@@ -12,7 +12,7 @@ import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown, Video } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Fuel, Wrench, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
 import { audio } from "../../lib/audio";
 
 // Força de segurança competente pela zona (do backend, opp.police_force) — diz
@@ -44,6 +44,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [confirmLowChance, setConfirmLowChance] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showAdvancedSetup, setShowAdvancedSetup] = useState(false);
   const [chances, setChances] = useState({}); // teamId -> chance de sucesso (preview)
   const previewRef = useRef(null);
   const inProgress = opp.status === "taken";
@@ -76,6 +77,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     setPreview(null);
     setConfirmLowChance(false);
     setShowDetails(false);
+    setShowAdvancedSetup(false);
     if (!selectedTeamId || inProgress) return;
     let cancelled = false;
     previewDispatch(opp.id, selectedTeamId).then((r) => {
@@ -216,6 +218,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   };
 
   const anyReady = state.teams.some((t) => readiness(t).ok);
+  const selectedTeam = state.teams.find((t) => t.id === selectedTeamId) || null;
+  const selectedTeamReadiness = selectedTeam ? readiness(selectedTeam) : null;
 
   const fixFor = (t, r) => {
     const money = state.player.clean_money;
@@ -408,17 +412,6 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               ? "Um carro-patrulha segue a equipa. Se apanhados antes do QG, perdem toda a carga."
               : "A operação está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
           </p>
-          <Button
-            data-testid="opportunity-camera-button"
-            variant="outline"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: activeMission.id } }));
-              onClose();
-            }}
-            className="mt-2 w-full gap-1.5 border-red-500/30 font-bold uppercase tracking-wider text-red-300 hover:border-red-400/60 hover:text-red-200"
-          >
-            <Video size={13} /> Câmara da operação
-          </Button>
           {activeMission.phase === "en_route" && (
             <Button
               data-testid="recall-team-button"
@@ -441,7 +434,46 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         <p className="mt-3 text-center font-mono text-xs text-red-500">Requer nível {opp.min_level}</p>
       ) : (
         <>
-          <div className="mt-3 max-h-36 overflow-y-auto overscroll-contain">
+          <Card data-testid="dispatch-quick-setup" className="mt-3 border-white/10 bg-black/20 p-2.5 shadow-none">
+            {selectedTeam && selectedTeamReadiness?.ok ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 truncate text-xs font-semibold text-white">
+                    {selectedTeam.name}
+                    {selectedTeam.id === recommendedTeamId && (
+                      <Badge variant="outline" className="gap-0.5 border-emerald-500/20 bg-emerald-500/10 px-1 py-0 font-mono text-[8px] font-normal uppercase text-emerald-300">
+                        <Sparkles size={8} /> automático
+                      </Badge>
+                    )}
+                  </p>
+                  <p className="mt-0.5 truncate font-mono text-[9px] text-zinc-500">
+                    {selectedTeamReadiness.members} membros · {selectedTeamReadiness.vehicle?.name || "sem veículo"}
+                    {chances[selectedTeam.id] != null ? ` · ${Math.round(chances[selectedTeam.id] * 100)}% sucesso` : ""}
+                  </p>
+                </div>
+                <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-400">Pronta</span>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-semibold text-white">{anyReady ? "Escolhe uma equipa" : "Nenhuma equipa pronta"}</p>
+                <p className="mt-0.5 font-mono text-[9px] text-zinc-500">
+                  {anyReady ? "A recomendação automática está disponível na configuração avançada." : "Corrige membros, veículo, combustível ou condição para poder despachar."}
+                </p>
+              </div>
+            )}
+            <Button
+              data-testid="dispatch-advanced-toggle"
+              type="button"
+              variant="ghost"
+              onClick={() => setShowAdvancedSetup((value) => !value)}
+              className="mt-2 h-7 w-full justify-center gap-1 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
+            >
+              {showAdvancedSetup ? "Ocultar configuração" : "Configuração avançada"}
+              <ChevronDown size={11} className={`transition-transform ${showAdvancedSetup ? "rotate-180" : ""}`} />
+            </Button>
+          </Card>
+
+          <div className={`mt-2 max-h-36 overflow-y-auto overscroll-contain ${showAdvancedSetup ? "" : "hidden"}`}>
             <div className="space-y-1 pr-1.5">
               {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
                   jogador não precisa de percorrer bloqueadas para achar a boa. */}
@@ -691,7 +723,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   : ""
               }`}
             >
-              {expired ? "Operação expirada" : busy ? "A destacar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Destacar equipa"}
+              {expired ? "Operação expirada" : busy ? "A despachar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Despachar"}
             </Button>
           </Tip>
       )}
