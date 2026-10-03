@@ -6,8 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X, Star, Check, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { propertyMarketPrice } from "../../lib/propertyMarket";
-import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS, OPP_URGENT_SECONDS } from "../../lib/game";
-import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
+import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS, OPP_URGENT_SECONDS } from "../../lib/game";
+import { fetchRoute, pointOnTimedRoute, sliceTimedRoute, timeAtDistanceFraction } from "../../lib/routing";
 import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
 import PoliceLayer from "./PoliceLayer";
 import MapBaseLayer from "./MapBaseLayer";
@@ -41,6 +41,19 @@ const safeRiskLevel = (value) => Math.max(0, Math.min(5, Math.round(Number(value
 const safeRiskDots = (value) => {
   const risk = safeRiskLevel(value);
   return "●".repeat(risk) + "○".repeat(5 - risk);
+};
+
+const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+const smooth01 = (value) => {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+};
+const blendMapPoint = (a, b, t) => {
+  const f = smooth01(t);
+  return {
+    lat: Number(a.lat) + (Number(b.lat) - Number(a.lat)) * f,
+    lng: Number(a.lng) + (Number(b.lng) - Number(a.lng)) * f,
+  };
 };
 
 const PROP_ICONS = {
@@ -279,9 +292,6 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
 const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, roster, showOperatorNames = true }) => {
   const map = useMap();
   const [route, setRoute] = useState(null);
-  const cumRef = useRef(null);
-  const glowRef = useRef(null);
-  const lineRef = useRef(null);
   const markerRef = useRef(null);
   const svgRef = useRef(null);
   const carRootRef = useRef(null);
@@ -291,14 +301,34 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
 
   useEffect(() => {
     let cancelled = false;
-    fetchRoute(mission.origin, mission.target).then((info) => {
+
+    const loadRoadPlans = async () => {
+      // Mesmo princípio do 112i: ida e regresso são percursos OSRM
+      // independentes. Nunca invertemos a ida por ruas de sentido único.
+      const outward = await fetchRoute(mission.origin, mission.target);
       if (cancelled) return;
-      // Estacionamento credível (buildParking): recuo 25–50m seeded por
-      // missão, encosto lateral à berma e rumo da via — nunca sobre o alvo.
-      const parking = buildParking(mission, info);
-      cumRef.current = parking.cum;
-      setRoute({ ...info, parking, parkFrac: parking.parkFrac, park: parking.park });
-    });
+
+      if (outward.unavailable || !outward.latlngs?.length) {
+        setRoute({ outward, inward: null, parking: null, parkTime: 0, unavailable: true });
+        return;
+      }
+
+      const parking = buildParking(mission, outward);
+      const returnOrigin = parking.repark ? parking.park2 : parking.park;
+      const parkTime = timeAtDistanceFraction(outward, parking.cum, parking.parkFrac);
+
+      let inward = await fetchRoute(returnOrigin, mission.origin);
+      if (!cancelled && inward.unavailable) {
+        // O ponto lateral de estacionamento pode não fazer snap. O alvo é o
+        // segundo ponto rodoviário conhecido para obter um regresso válido.
+        inward = await fetchRoute(mission.target, mission.origin);
+      }
+      if (cancelled) return;
+
+      setRoute({ outward, inward, parking, parkTime, unavailable: false });
+    };
+
+    loadRoadPlans();
     return () => { cancelled = true; };
   }, [mission.id, mission.origin.lat, mission.origin.lng, mission.target.lat, mission.target.lng]);
 
@@ -323,11 +353,90 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
 
   const computePos = () => {
     const now = serverNow();
-    // Rota ainda não carregada — fallback em linha reta (sem rumo).
-    if (!route?.parking) return { ...missionPosition(mission, now), progress: 0, frac: 0, bearing: null, state: null };
-    // Pose completa do motor de estados: posição com aceleração/travagem
-    // reais, encosto à berma, rumo da via e estado nomeado.
-    return vehiclePoseAt(mission, route.parking, now);
+    const depart = Date.parse(mission.depart_at);
+    const arrive = Date.parse(mission.arrive_at);
+    const finish = Date.parse(mission.finish_at);
+    const ret = Date.parse(mission.return_at);
+
+    if (now >= ret) {
+      return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "done", state: "done", progress: 1, bearing: null, moving: false };
+    }
+
+    // Nunca inventa uma diagonal por cima de edifícios enquanto o OSRM
+    // responde. O veículo aguarda num ponto real conhecido.
+    if (!route?.parking) {
+      if (now < arrive) {
+        return { lat: mission.origin.lat, lng: mission.origin.lng, phase: "en_route", state: "routing", progress: 0, bearing: null, moving: false };
+      }
+      if (now < finish) {
+        return { lat: mission.target.lat, lng: mission.target.lng, phase: "operating", state: "execute", progress: 1, bearing: null, moving: false };
+      }
+      return { lat: mission.target.lat, lng: mission.target.lng, phase: "returning", state: "routing", progress: 0, bearing: null, moving: false };
+    }
+
+    if (now < arrive) {
+      const phaseT = clamp01((now - depart) / Math.max(1, arrive - depart));
+      // 94% da janela segue os tempos de cada troço OSRM; o final apenas
+      // encosta o carro da estrada ao ponto de estacionamento.
+      const roadT = clamp01(phaseT / 0.94);
+      const travelSeconds = roadT * Math.max(0, route.parkTime || route.outward.duration || 0);
+      const roadPose = pointOnTimedRoute(route.outward, travelSeconds);
+      const anchor = roadPose || route.parking.anchor || mission.origin;
+      const parkBlend = phaseT <= 0.94 ? 0 : (phaseT - 0.94) / 0.06;
+      const parked = blendMapPoint(anchor, route.parking.park, parkBlend);
+      return {
+        ...parked,
+        phase: "en_route",
+        state: parkBlend > 0 ? "parking" : "travel",
+        progress: phaseT,
+        travelSeconds,
+        bearing: roadPose?.bearing ?? null,
+        moving: true,
+      };
+    }
+
+    if (now < finish) {
+      // A coreografia local continua a tratar estacionamento/repark; a viagem
+      // em estrada deixou de depender da interpolação por distância.
+      return vehiclePoseAt(mission, route.parking, now);
+    }
+
+    const returnStart = route.parking.repark ? route.parking.park2 : route.parking.park;
+    const phaseT = clamp01((now - finish) / Math.max(1, ret - finish));
+    if (!route.inward || route.inward.unavailable || !route.inward.latlngs?.length) {
+      return { ...returnStart, phase: "returning", state: "routing", progress: phaseT, bearing: null, moving: false };
+    }
+
+    // Regresso OSRM independente. Pequena janela inicial apenas para sair da
+    // berma e fazer snap ao primeiro ponto da rota.
+    const leaveWindow = Math.min(0.08, 2500 / Math.max(1, ret - finish));
+    const routeStart = pointOnTimedRoute(route.inward, 0) || returnStart;
+    if (phaseT < leaveWindow) {
+      const position = blendMapPoint(returnStart, routeStart, phaseT / Math.max(0.001, leaveWindow));
+      return {
+        ...position,
+        phase: "returning",
+        state: "depart",
+        progress: phaseT,
+        travelSeconds: 0,
+        bearing: routeStart.bearing ?? null,
+        moving: true,
+      };
+    }
+
+    const roadT = clamp01((phaseT - leaveWindow) / Math.max(0.001, 1 - leaveWindow));
+    const travelSeconds = roadT * Math.max(0, route.inward.duration || 0);
+    const roadPose = pointOnTimedRoute(route.inward, travelSeconds) || routeStart;
+    return {
+      lat: roadPose.lat,
+      lng: roadPose.lng,
+      phase: "returning",
+      state: "return",
+      progress: phaseT,
+      travelSeconds,
+      bearing: roadPose.bearing ?? null,
+      moving: true,
+    };
   };
 
   // PERF: o movimento é 100% imperativo num loop requestAnimationFrame —
@@ -369,21 +478,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         }
       }
 
-      // 3) Trajeto restante — o <path> SVG é mais caro; 3x/s chega.
-      if (now - lastLine > 320) {
-        lastLine = now;
-        if (route?.latlngs && cumRef.current) {
-          let latlngs = null;
-          if (p.phase === "en_route") {
-            latlngs = sliceRoute(route.latlngs, cumRef.current, p.frac ?? p.progress, route.parkFrac ?? 1);
-          } else if (p.phase === "returning") {
-            latlngs = sliceRoute(route.latlngs, cumRef.current, p.frac ?? (1 - p.progress), 0);
-          }
-          const arr = latlngs && latlngs.length > 1 ? latlngs : [];
-          if (glowRef.current) glowRef.current.setLatLngs(arr);
-          if (lineRef.current) lineRef.current.setLatLngs(arr);
-        }
-      }
+      // 3) A linha do percurso permanece estável, como no 112i. O veículo
+      //    é que avança sobre a geometria OSRM; não reconstruímos o SVG.
 
       // 4) (o carro-patrulha da perseguição vive agora na PoliceLayer)
 
@@ -508,11 +604,6 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, mission, followed, map, dim]);
 
-  // Dash do trajeto de regresso — só quando a fase realmente muda.
-  useEffect(() => {
-    if (lineRef.current) lineRef.current.setStyle({ dashArray: phase === "returning" ? "6 6" : null });
-  }, [phase]);
-
   // Saída da fase de operação → os marcadores dos operacionais desmontam;
   // limpa as caches de elementos/flags para a próxima missão no mesmo slot.
   useEffect(() => {
@@ -596,26 +687,33 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
           </div>
         </LTooltip>
       </Marker>
-      {route?.latlngs && route.latlngs.length > 1 && (
-        <>
-          {/* Glow underlay */}
-          <Polyline
-            ref={glowRef}
-            positions={[]}
-            smoothFactor={2}
-            pathOptions={{ color: "#FFFFFF", weight: 6, opacity: 0.18, lineCap: "round", lineJoin: "round" }}
-            interactive={false}
-          />
-          {/* Main line */}
-          <Polyline
-            ref={lineRef}
-            positions={[]}
-            smoothFactor={2}
-            pathOptions={{ color: "#FFFFFF", weight: 2.4, opacity: 0.9, lineCap: "round", lineJoin: "round" }}
-            interactive={false}
-          />
-        </>
-      )}
+      {(() => {
+        const positions =
+          phase === "returning" && route?.inward?.latlngs?.length > 1
+            ? route.inward.latlngs
+            : phase === "en_route" && route?.outward?.latlngs?.length > 1
+            ? sliceTimedRoute(route.outward, 0, route.parkTime || route.outward.duration)
+            : [];
+        if (positions.length < 2) return null;
+        const returning = phase === "returning";
+        return (
+          <>
+            {/* Percurso rodoviário completo e estável — padrão 112i. */}
+            <Polyline
+              positions={positions}
+              smoothFactor={1}
+              pathOptions={{ color: "#071016", weight: 6, opacity: dim ? 0.12 : 0.68, lineCap: "round", lineJoin: "round" }}
+              interactive={false}
+            />
+            <Polyline
+              positions={positions}
+              smoothFactor={1}
+              pathOptions={{ color: "#FFFFFF", weight: 2.6, opacity: dim ? 0.25 : 0.92, dashArray: returning ? "6 6" : null, lineCap: "round", lineJoin: "round" }}
+              interactive={false}
+            />
+          </>
+        );
+      })()}
       {deployed && (
         <>
           {/* Trilho a pé veículo -> alvo (subtil, não interativo) */}
@@ -687,8 +785,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             {chased && (
               <TipRow label="escape" value={`${Math.round((mission.escape_chance || 0.5) * 100)}%`} color="#EF4444" />
             )}
-            {route && !route.fallback && (
-              <TipRow label="rota" value={`${(route.distance / 1000).toFixed(1)} km`} color="#22D3EE" />
+            {route?.outward && !route.outward.unavailable && (
+              <TipRow label="rota" value={(route.outward.distance / 1000).toFixed(1) + " km"} color="#22D3EE" />
             )}
             <p className="mt-1 text-[9px] text-cyan-500/80">
               {followed ? "O mapa está a seguir esta unidade — clica para largar" : "Clica para seguir esta unidade no mapa"}
@@ -707,13 +805,11 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
   const origin = tr.from;
   const target = tr.to;
   const [route, setRoute] = useState(null);
-  const cumRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     fetchRoute(origin, target).then((info) => {
       if (cancelled) return;
-      cumRef.current = buildCumulative(info.latlngs);
       setRoute(info);
     });
     return () => { cancelled = true; };
@@ -724,10 +820,11 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
     const started = Date.parse(tr.started_at);
     const ends = Date.parse(tr.ends_at);
     const t = Math.min(1, Math.max(0, (now - started) / Math.max(1, ends - started)));
-    if (!route || !cumRef.current) {
-      return { lat: origin.lat + (target.lat - origin.lat) * t, lng: origin.lng + (target.lng - origin.lng) * t };
+    if (!route || route.unavailable || !route.latlngs?.length) {
+      return t >= 1 ? { lat: target.lat, lng: target.lng } : { lat: origin.lat, lng: origin.lng };
     }
-    return pointOnRoute(route.latlngs, cumRef.current, t) || { lat: target.lat, lng: target.lng };
+    const pose = pointOnTimedRoute(route, t * Math.max(0, route.duration || 0));
+    return pose ? { lat: pose.lat, lng: pose.lng } : { lat: origin.lat, lng: origin.lng };
   };
 
   const [pos, setPos] = useState(() => computePos());
@@ -742,7 +839,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
 
   return (
     <>
-      {route?.latlngs && route.latlngs.length > 1 && (
+      {route?.latlngs && !route.unavailable && route.latlngs.length > 1 && (
         <Polyline
           positions={route.latlngs}
           smoothFactor={2}
