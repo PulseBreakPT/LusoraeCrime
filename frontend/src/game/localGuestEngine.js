@@ -13,6 +13,42 @@ const uid = (prefix = "id") =>
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const money = (n) => Math.max(0, Math.round(Number(n) || 0));
 
+const lisbonFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone:"Europe/Lisbon", year:"numeric", month:"2-digit", day:"2-digit",
+  hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23",
+});
+const lisbonParts = (date) => Object.fromEntries(
+  lisbonFormatter.formatToParts(date)
+    .filter((p)=>p.type!=="literal")
+    .map((p)=>[p.type,Number(p.value)])
+);
+const lisbonOffsetMs = (date) => {
+  const p=lisbonParts(date);
+  return Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-date.getTime();
+};
+const lisbonWallToUtc = (wallMs) => {
+  let utc=wallMs-lisbonOffsetMs(new Date(wallMs));
+  utc=wallMs-lisbonOffsetMs(new Date(utc));
+  return new Date(utc);
+};
+const nextWeeklySettlementIso = (from=Date.now()) => {
+  const current=new Date(from);
+  const p=lisbonParts(current);
+  const localDay=new Date(Date.UTC(p.year,p.month-1,p.day)).getUTCDay();
+  let days=(1-localDay+7)%7; // Monday
+  if(days===0 && (p.hour>20 || (p.hour===20 && (p.minute>0 || p.second>0)))) days=7;
+  if(days===0 && p.hour===20 && p.minute===0 && p.second===0) days=7;
+  const wall=Date.UTC(p.year,p.month-1,p.day+days,20,0,0);
+  return lisbonWallToUtc(wall).toISOString();
+};
+const isMonday20Lisbon = (value) => {
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime())) return false;
+  const p=lisbonParts(d);
+  const day=new Date(Date.UTC(p.year,p.month-1,p.day)).getUTCDay();
+  return day===1 && p.hour===20 && p.minute===0;
+};
+
 const normalizeRisk = (value) => {
   const n = Number(value) || 1;
   // v1 do modo convidado gravava uma pseudo-percentagem (29/40/51/62)
@@ -187,7 +223,7 @@ const createInitialSave = () => {
       respect:0, level:1, heat:0, hq:null, districts:[], region:"",
       priorities:{active:"equilibrio"}, favorite_types:[], owned_cosmetics:[],
       extra_vehicle_slots:0, extra_employee_slots:0, vip_until:null, hq_skin_key:null,
-      next_payroll_at:new Date(now + 120 * 60000).toISOString(), pool_refresh_at:null,
+      next_payroll_at:nextWeeklySettlementIso(now), pool_refresh_at:null,
       stats:{missions_success:0,missions_failed:0,total_earned:0},
     },
     teams:[team], employees, candidates:[
@@ -294,6 +330,12 @@ const normalizeSavedEconomy = (save) => {
   ) {
     save.player.clean_money = 100000;
     addEvent(save, "system", "Capital de transição atualizado para a economia Portugal 2026: 100 000 € limpos.");
+  }
+  if (previousEconomyVersion < 5 || !isMonday20Lisbon(save.player?.next_payroll_at)) {
+    save.player.next_payroll_at = nextWeeklySettlementIso(Date.now());
+    if (previousEconomyVersion < 5) {
+      addEvent(save, "system", "Fecho de custos fixos migrado para segunda-feira às 20:00 (hora de Portugal).");
+    }
   }
   return save;
 };
@@ -453,38 +495,48 @@ const tick = (save) => {
       clean += (cfg.passive_clean||0)*p.level*passiveHours;
       dirty += (cfg.passive_dirty||0)*p.level*passiveHours;
     });
-    const maintenancePct=LOCAL_CATALOG.property_meta?.maintenance_pct_per_day||0.00008;
-    const propertyOperating=save.properties.reduce((sum,p)=>{
-      const cfg=LOCAL_CATALOG.property_types[p.type_key]||{};
-      const basis=Number(p.purchase_price||cfg.price||0);
-      return sum+(basis*Number(p.level||1)*maintenancePct/24*passiveHours);
-    },0);
-    if(propertyOperating>0){
-      save.player.clean_money=Math.max(0,save.player.clean_money-propertyOperating);
-    }
     if(clean){save.player.clean_money += clean;}
     if(dirty){save.player.dirty_money += dirty;}
     save.player.heat=clamp(save.player.heat-elapsed/900,0,100);
   }
 
-  const payrollAt=Date.parse(save.player.next_payroll_at||0);
-  if(payrollAt && now>=payrollAt){
+  let payrollAt=Date.parse(save.player.next_payroll_at||0);
+  if(!payrollAt || !isMonday20Lisbon(save.player.next_payroll_at)){
+    save.player.next_payroll_at=nextWeeklySettlementIso(now);
+    payrollAt=Date.parse(save.player.next_payroll_at);
+  }
+  let settlements=0;
+  while(payrollAt && now>=payrollAt && settlements<4){
+    settlements+=1;
     const economy=LOCAL_CATALOG.economy_meta||{};
+    const propMeta=LOCAL_CATALOG.property_meta||{};
     const gross=save.employees.reduce((s,e)=>s+(e.salary||0),0);
     const employerSs=Math.round(gross*(economy.employer_social_security_rate||0.2375));
     const fleetWeekly=Math.round(save.vehicles.reduce(
       (sum,v)=>sum+((economy.vehicle_annual_fixed_costs?.[v.model_key]||0)/52),0
     ));
-    const total=gross+employerSs+fleetWeekly;
+    const propertyWeekly=Math.round(save.properties.reduce((sum,p)=>{
+      const cfg=LOCAL_CATALOG.property_types[p.type_key]||{};
+      const basis=Number(p.purchase_price||cfg.price||0);
+      return sum+basis*Math.max(1,Number(p.level||1))*(propMeta.maintenance_pct_per_week||0.00056);
+    },0));
+    const total=gross+employerSs+fleetWeekly+propertyWeekly;
     if(save.player.clean_money>=total){
       save.player.clean_money-=total;
-      tx(save,"weekly_costs",-total,"clean","Salários + TSU + custos fixos da frota");
-      addEvent(save,"system",`Custos semanais pagos: ${total.toLocaleString("pt-PT")} € (salários ${gross.toLocaleString("pt-PT")} € + TSU ${employerSs.toLocaleString("pt-PT")} € + frota ${fleetWeekly.toLocaleString("pt-PT")} €).`);
+      save.properties.forEach((p)=>{
+        p.condition=clamp((p.condition??100)+(propMeta.condition_recovery_per_week||3),0,100);
+      });
+      tx(save,"weekly_costs",-total,"clean","Fecho semanal — salários + TSU + frota + imóveis");
+      addEvent(save,"system",`Fecho semanal pago: ${total.toLocaleString("pt-PT")} € (salários ${gross.toLocaleString("pt-PT")} € + TSU ${employerSs.toLocaleString("pt-PT")} € + frota ${fleetWeekly.toLocaleString("pt-PT")} € + imóveis ${propertyWeekly.toLocaleString("pt-PT")} €).`);
     } else {
-      save.employees.forEach((e)=>{e.morale=clamp((e.morale||70)-12,0,100);e.loyalty=clamp((e.loyalty||70)-5,0,100);});
-      addEvent(save,"warning",`Sem fundos para os custos semanais de ${total.toLocaleString("pt-PT")} €.`);
+      save.employees.forEach((e)=>{e.morale=clamp((e.morale||70)-10,0,100);e.loyalty=clamp((e.loyalty||70)-8,0,100);});
+      save.properties.forEach((p)=>{
+        p.condition=clamp((p.condition??100)-(propMeta.condition_decay_missed_week||8),0,100);
+      });
+      addEvent(save,"warning",`Sem fundos para o fecho semanal de ${total.toLocaleString("pt-PT")} €; moral e condição dos imóveis baixaram.`);
     }
-    save.player.next_payroll_at=new Date(now+(economy.economic_week_minutes||120)*60000).toISOString();
+    save.player.next_payroll_at=nextWeeklySettlementIso(payrollAt+1000);
+    payrollAt=Date.parse(save.player.next_payroll_at);
   }
   save.last_tick=now;
   return save;
@@ -673,10 +725,19 @@ const publicState=(save)=>{
       const fleetWeekly=Math.round(save.vehicles.reduce(
         (sum,v)=>sum+((economy.vehicle_annual_fixed_costs?.[v.model_key]||0)/52),0
       ));
+      const propMeta=LOCAL_CATALOG.property_meta||{};
+      const propertyWeekly=Math.round(save.properties.reduce((sum,p)=>{
+        const cfg=LOCAL_CATALOG.property_types[p.type_key]||{};
+        const basis=Number(p.purchase_price||cfg.price||0);
+        return sum+basis*Math.max(1,Number(p.level||1))*(propMeta.maintenance_pct_per_week||0.00056);
+      },0));
       return {
         salary_total:gross,
-        weekly_fixed_total:gross+employerSs+fleetWeekly,
-        weekly_cost_breakdown:{gross_salaries:gross,employer_social_security:employerSs,fleet_fixed:fleetWeekly},
+        weekly_fixed_total:gross+employerSs+fleetWeekly+propertyWeekly,
+        weekly_cost_breakdown:{
+          gross_salaries:gross,employer_social_security:employerSs,
+          fleet_fixed:fleetWeekly,property_fixed:propertyWeekly,
+        },
       };
     })(),
     fuel_prices:clone(LOCAL_CATALOG.fuel_prices),
@@ -923,9 +984,9 @@ const mutateGame=(save,path,payload)=>{
   if(path==="street/activities/start"){
     if(save.street.active_job)fail(409,"Já existe uma atividade em curso");
     const defs={
-      race:{name:"Corrida Clandestina",reward:5200,duration:20,chance:.68},
-      chop_shop:{name:"Entrega à Desmontagem",reward:10500,duration:22,chance:.72},
-      smuggling:{name:"Rota Clandestina",reward:17000,duration:26,chance:.64},
+      race:{name:"Corrida Clandestina",rewardMin:4000,rewardMax:7500,duration:20,chance:.68,pays:"clean",baseCost:0,fuel:7,wear:5,heat:5,rep:20},
+      chop_shop:{name:"Entrega à Desmontagem",rewardMin:7500,rewardMax:13500,duration:22,chance:.72,pays:"dirty",baseCost:1200,fuel:9,wear:8,heat:9,rep:32},
+      smuggling:{name:"Rota Clandestina",rewardMin:12000,rewardMax:22000,duration:26,chance:.64,pays:"dirty",baseCost:2500,fuel:13,wear:10,heat:12,rep:46},
     };
     const d=defs[p.job_key];if(!d)fail(400,"Atividade inválida");
     const rank=streetRank(save.street.rep||0);
@@ -933,16 +994,30 @@ const mutateGame=(save,path,payload)=>{
     if(p.job_key==="smuggling"&&rank.level<3)fail(400,"Esta atividade requer nível de rua 3");
     const vehicle=save.vehicles.find(v=>v.id===p.vehicle_id);if(!vehicle)fail(400,"Seleciona um veículo");
     const district=save.street.districts.find(x=>x.key===p.district_key);if(!district)fail(400,"Seleciona uma zona");
-    const stake=p.job_key==="race"?({cautious:500,standard:1500,high:3500}[p.wager_key]||1500):0;
-    if(stake)chargeClean(save,stake,"Aposta virtual");
-    const mult=p.wager_key==="high"?1.7:p.wager_key==="cautious"?.9:1.2;
+    if((vehicle.fuel_l||0)<d.fuel)fail(400,"Combustível insuficiente");
+    const wagerCfg={
+      cautious:{cost:500,rewardMult:.9,success:.05},
+      standard:{cost:1500,rewardMult:1.2,success:0},
+      high:{cost:3500,rewardMult:1.7,success:-.08},
+    };
+    const wager=p.job_key==="race"?(wagerCfg[p.wager_key]||wagerCfg.standard):null;
+    const totalCost=d.baseCost+(wager?.cost||0);
+    if(totalCost)chargeClean(save,totalCost,p.job_key==="race"?"Aposta virtual":"Preparação de atividade");
     const approach=save.street.plan?.approach_key||"balanced";
-    const chance=clamp(d.chance+(approach==="ghost"?.06:approach==="impact"?-.06:0)-save.player.heat*.001,0.2,.95);
+    const approachReward=approach==="ghost"?.88:approach==="impact"?1.18:1;
+    const approachChance=approach==="ghost"?.06:approach==="impact"?-.06:0;
+    const chance=clamp(d.chance+approachChance+(wager?.success||0)-save.player.heat*.001,0.2,.95);
+    const jobId=uid("street");
+    const roll=rollFrom(jobId+":reward");
+    const baseReward=Math.round(d.rewardMin+(d.rewardMax-d.rewardMin)*roll);
+    const reward=Math.round(baseReward*approachReward*(wager?.rewardMult||1));
+    vehicle.fuel_l=clamp((vehicle.fuel_l||0)-d.fuel,0,vehicle.tank_l||100);
+    vehicle.condition=clamp((vehicle.condition??100)-d.wear,0,100);
     save.street.active_job={
-      id:uid("street"),job_key:p.job_key,name:d.name,district_key:p.district_key,district_name:district.name,
+      id:jobId,job_key:p.job_key,name:d.name,district_key:p.district_key,district_name:district.name,
       vehicle_id:p.vehicle_id,vehicle_name:vehicle.name,status:"running",started_at:nowIso(),
       finish_at:new Date(Date.now()+d.duration*1000).toISOString(),
-      reward:Math.round((d.reward+stake)*mult),chance,approach_key:approach,wager_key:p.wager_key||null,
+      reward,chance,approach_key:approach,wager_key:p.wager_key||null,pays:d.pays,heat_gain:d.heat,rep_reward:d.rep,
     };
     return {ok:true};
   }
@@ -951,13 +1026,22 @@ const mutateGame=(save,path,payload)=>{
     if(job.status!=="ready")fail(400,"Atividade ainda em curso");
     const success=rollFrom(job.id)<=job.chance;
     const d=save.street.districts.find(x=>x.key===job.district_key);
+    const heat=success?(job.heat_gain||6):Math.max(2,Math.round((job.heat_gain||6)*1.35));
+    const rep=success?(job.rep_reward||20):Math.max(2,Math.round((job.rep_reward||20)*.15));
     if(success){
-      save.player.dirty_money+=job.reward;save.street.rep+=35;
-      if(d)d.influence=Math.min(150,d.influence+28);
-      save.player.heat=clamp(save.player.heat+6,0,100);
+      if(job.pays==="clean"){
+        save.player.clean_money+=job.reward;
+        tx(save,"street_activity_reward",job.reward,"clean",job.name);
+      }else{
+        save.player.dirty_money+=job.reward;
+        tx(save,"street_activity_reward",job.reward,"dirty",job.name);
+      }
+      save.street.rep+=rep;
+      if(d)d.influence=Math.min(150,d.influence+18+Math.round(rep/4));
+      save.player.heat=clamp(save.player.heat+heat,0,100);
     }else{
-      save.street.rep+=8;save.player.heat=clamp(save.player.heat+12,0,100);
-      if(d)d.rival_pressure=clamp((d.rival_pressure||0)+10,0,100);
+      save.street.rep+=rep;save.player.heat=clamp(save.player.heat+heat,0,100);
+      if(d)d.rival_pressure=clamp((d.rival_pressure||0)+12,0,100);
     }
     save.street.active_job=null;
     return {ok:true,success,reward:success?job.reward:0};
