@@ -309,6 +309,48 @@ Nunca commitar o `.jks`, passwords ou secrets.
 
 Ativar **Play App Signing** no primeiro release. A Google passa a proteger a app signing key; a tua upload key é usada para autenticar futuros uploads.
 
+## GitHub Secrets para AAB release assinado
+
+Depois de criares a upload key, adiciona estes valores em **Settings → Secrets and variables → Actions → Secrets**:
+
+- `ANDROID_UPLOAD_KEYSTORE_BASE64` — conteúdo base64 do ficheiro `.jks`.
+- `ANDROID_UPLOAD_KEYSTORE_PASSWORD` — password do keystore.
+- `ANDROID_UPLOAD_KEY_ALIAS` — alias da chave.
+- `ANDROID_UPLOAD_KEY_PASSWORD` — password da chave.
+
+Exemplo para obter o base64 localmente:
+
+```bash
+base64 -w 0 lusorae-upload.jks
+```
+
+Em macOS:
+
+```bash
+base64 < lusorae-upload.jks | tr -d '\n'
+```
+
+O workflow nunca grava a upload key no repositório: reconstrói-a temporariamente no runner, gera o AAB e remove o ficheiro no final.
+
+### Versionamento Android
+
+Em **Actions → Variables** podes definir:
+
+- `ANDROID_VERSION_CODE` — inteiro crescente obrigatório em cada upload Play.
+- `ANDROID_VERSION_NAME` — versão visível, por exemplo `1.0.0`.
+
+Se não existirem, a pipeline usa `1` e `1.0.0`.
+
+Com os quatro secrets de assinatura configurados, o artifact final chama-se:
+
+`lusorae-google-play-aab`
+
+Sem esses secrets, a pipeline continua a validar tudo e gera apenas:
+
+`lusorae-android-debug-aab`
+
+---
+
 ## Testes antes da submissão
 
 - Instalação numa build Android real.
