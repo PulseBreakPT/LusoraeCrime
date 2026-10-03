@@ -52,7 +52,7 @@ const RecommendedActions = ({ onNavigate }) => {
   const teamsNoMembers = state.teams.filter((t) => state.employees.every((e) => e.team_id !== t.id)).length;
   if (teamsNoMembers) recs.push({ id: "nomembers", text: `${teamsNoMembers} equipa(s) sem membros`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
   const claimable = (state.quests || []).filter((q) => q.status === "completed").length;
-  if (claimable) recs.push({ id: "quests", text: `${claimable} recompensa(s) de missão por reclamar`, action: "Abrir Missões", run: () => onNavigate && onNavigate("quests"), can: true });
+  if (claimable) recs.push({ id: "quests", text: `${claimable} recompensa(s) de missão por reclamar`, action: "Abrir Objetivos", run: () => onNavigate && onNavigate("quests"), can: true });
   if (state.salary_total > 0 && p.clean_money < state.salary_total) {
     recs.push({
       id: "payroll", text: `Fundos insuficientes para o ciclo salarial (${fmtMoney(state.salary_total)})`,
@@ -100,18 +100,10 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
   const total = s.missions_total || 0;
   const successRate = total ? Math.round(((s.missions_success || 0) / total) * 100) : null;
 
-  const emps = state.employees;
-  const avgLevel = emps.length ? (emps.reduce((a, e) => a + e.level, 0) / emps.length).toFixed(1) : "—";
-  const avgFatigue = emps.length ? Math.round(emps.reduce((a, e) => a + e.fatigue, 0) / emps.length) : 0;
 
   const vehs = state.vehicles;
-  const avgCond = vehs.length ? Math.round(vehs.reduce((a, v) => a + v.condition, 0) / vehs.length) : 0;
-  const totalKm = Math.round(vehs.reduce((a, v) => a + v.km_total, 0));
-  const fleetCosts = vehs.reduce((a, v) => a + (v.fuel_spent_total || 0) + (v.repair_spent_total || 0), 0);
 
   const pt = catalog?.property_types || {};
-  const dirtyPerH = state.properties.reduce((a, p) => a + (pt[p.type_key]?.dirty_per_h || 0) * p.level, 0);
-  const launderPerH = state.properties.reduce((a, p) => a + (pt[p.type_key]?.launder_per_h || 0) * p.level, 0);
   const fleetValue = vehs.reduce((a, v) => a + sellValueOf(v), 0);
   const propValue = state.properties.reduce((a, p) => a + (pt[p.type_key] ? Math.round(pt[p.type_key].price * 0.7 * p.level) : 0), 0);
   const netWorth = state.player.clean_money + state.player.dirty_money + fleetValue + propValue;
@@ -121,16 +113,16 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="overflow-y-auto lus-panel">
         <SheetHeader>
           <PanelWatermark icon={BrainCircuit} />
-          <PanelKicker>Informação · Análise</PanelKicker>
+          <PanelKicker>Rede · Relatórios</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <BrainCircuit size={18} className="text-primary" /> Central de Inteligência
+            <BrainCircuit size={18} className="text-primary" /> Relatórios
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Quem sabe primeiro, age primeiro — números, alertas e histórico da rede.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Alertas acionáveis, resumo essencial e histórico da organização.</SheetDescription>
         </SheetHeader>
 
         <RecommendedActions onNavigate={onNavigate} />
 
-        <Section title="Operações" testId="intel-operations">
+        <Section title="Resumo de operações" testId="intel-operations">
           <Grid>
             <Cell label="Operações" value={total} tip="Total de operações concluídas (com qualquer resultado)." />
             <Cell label="Taxa de sucesso" value={successRate === null ? "—" : `${successRate}%`}
@@ -176,7 +168,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
         </Section>
 
-        <Section title="Economia" testId="intel-economy">
+        <Section title="Resumo financeiro" testId="intel-economy">
           <Grid>
             <Cell label="Ganho sujo" value={fmtMoney(s.earned_dirty || 0)} color="#F59E0B" tip="Total de dinheiro sujo ganho em operações desde o início." />
             <Cell label="Ganho limpo" value={fmtMoney(s.earned_clean || 0)} color="#10B981" tip="Total de dinheiro limpo ganho diretamente em operações." />
@@ -187,35 +179,13 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           </Grid>
         </Section>
 
-        <Section title="Operacionais" testId="intel-hr">
-          <Grid>
-            <Cell label="Efetivo" value={`${emps.length}/${state.caps.employees.max}`} tip="Operacionais ativos vs. capacidade (compra esconderijos para expandir)." />
-            <Cell label="Nível médio" value={avgLevel} tip="Nível médio dos operacionais — sobe com experiência de operações e formações." />
-            <Cell label="Fadiga média" value={`${avgFatigue}%`} color={avgFatigue >= 60 ? "#EF4444" : undefined} tip="Fadiga média — aos 90% um operacional fica indisponível." />
-            <Cell label="Em formação" value={emps.filter((e) => e.status === "training").length} color="#22D3EE" tip="Operacionais em cursos de formação neste momento." />
-          </Grid>
-        </Section>
+        
 
-        <Section title="Frota" testId="intel-fleet">
-          <Grid>
-            <Cell label="Veículos" value={`${vehs.length}/${state.caps.vehicles.max}`} tip="Veículos na garagem vs. capacidade total (compra garagens para expandir)." />
-            <Cell label="Condição média" value={`${avgCond}%`} color={avgCond < 50 ? "#EF4444" : undefined} tip="Abaixo de 50% os veículos perdem velocidade; abaixo de 30% não operam." />
-            <Cell label="Km totais" value={totalKm} tip="Quilómetros percorridos por toda a frota." />
-            <Cell label="Custos frota" value={fmtMoney(fleetCosts)} color="#F59E0B" tip="Total gasto em combustível e reparações." />
-            <Cell label="Valor frota" value={fmtMoney(fleetValue)} tip="Valor de revenda atual de todos os veículos (40% do preço × condição)." />
-          </Grid>
-        </Section>
+        
 
-        <Section title="Património" testId="intel-properties">
-          <Grid>
-            <Cell label="Propriedades" value={state.properties.length} tip="Número de propriedades do império." />
-            <Cell label="Produção passiva" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B" tip="Dinheiro sujo gerado automaticamente pelos laboratórios." />
-            <Cell label="Lavagem passiva" value={`${fmtMoney(launderPerH)}/h`} color="#34D399" tip="Lavagem automática das empresas de fachada (sem taxa)." />
-            <Cell label="Calor" value={`${Math.round(state.player.heat)}%`} color="#EF4444" tip="Aos 70% há risco de rusgas; aos 90% as operações ficam bloqueadas." />
-          </Grid>
-        </Section>
+        
 
-        <Section title="Registo de operações" testId="intel-history">
+        <Section title="Histórico" testId="intel-history">
           {state.history.length === 0 && (
             <EmptyState
               title="Historial em branco"
