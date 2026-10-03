@@ -778,7 +778,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       center={[hq.lat, hq.lng]}
       zoom={13}
       zoomControl={false}
-      className="absolute inset-0 z-0 h-full w-full"
+      className="lus-dark-map absolute inset-0 z-0 h-full w-full"
       attributionControl={true}
     >
       <MapBaseLayer />
