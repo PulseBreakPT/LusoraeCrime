@@ -145,7 +145,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           </Tip>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3" data-testid="properties-list">
+        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="properties-list">
           {state.player.heat >= 70 && props.some((p) => p.type_key === "laboratorio") && (
             <Alert variant="destructive" data-testid="raid-warning" className="border-red-600/40 bg-red-600/10 py-2">
               <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
@@ -186,7 +186,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             return (
               <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 {/* Cabeçalho: placa com emblema + identidade */}
-                <div className="relative z-[1] flex items-stretch gap-2.5">
+                <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
                   <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <PropertyGlyph typeKey={p.type_key} accent={tier.color} className="h-[44px] w-[96px]" />
                   </div>
@@ -305,7 +305,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Landmark} title="Mercado imobiliário" meta={catalog ? `${Object.keys(catalog.property_types || {}).length} tipos` : undefined} />
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.property_types).map(([key, pt]) => {
                 const tier = propertyTier(pt);
@@ -322,7 +322,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     }`;
                 return (
                   <Card key={key} data-testid={`market-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
-                    <div className="relative z-[1] flex items-stretch gap-2.5">
+                    <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
                       <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <PropertyGlyph typeKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
