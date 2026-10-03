@@ -16,45 +16,11 @@ import {
 const BG =
   "https://images.unsplash.com/photo-1731234361187-4702894e725a?crop=entropy&cs=srgb&fm=jpg&q=85&w=1920";
 
-const GUEST_KEY = "lusorae_guest_credentials_v1";
-const GUEST_READY_KEY = "lusorae_guest_initialized";
-
-const randomHex = (bytes = 12) => {
-  const values = new Uint8Array(bytes);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(values);
-  } else {
-    for (let i = 0; i < values.length; i += 1) {
-      values[i] = Math.floor(Math.random() * 256);
-    }
-  }
-  return Array.from(values, (v) => v.toString(16).padStart(2, "0")).join("");
-};
-
-const getGuestCredentials = () => {
-  try {
-    const existing = JSON.parse(localStorage.getItem(GUEST_KEY) || "null");
-    if (existing?.email && existing?.password && existing?.orgName) return existing;
-  } catch (_err) {
-    // Gera novas credenciais técnicas abaixo.
-  }
-
-  const id = randomHex(12);
-  const credentials = {
-    email: `guest-${id}@lusorae.pt`,
-    password: `Guest!${randomHex(18)}Aa1`,
-    orgName: `Convidado ${id.slice(0, 6).toUpperCase()}`,
-  };
-  localStorage.setItem(GUEST_KEY, JSON.stringify(credentials));
-  return credentials;
-};
-
 export default function AuthPage() {
   const {
     user,
-    login,
-    register,
     loginWithGoogle,
+    playAsGuest,
     googleSignInEnabled,
   } = useAuth();
 
@@ -82,40 +48,11 @@ export default function AuthPage() {
     if (busy) return;
     setError("");
     setBusy("guest");
-
-    const credentials = getGuestCredentials();
-    const wasInitialized = localStorage.getItem(GUEST_READY_KEY) === "1";
-
-    let result;
-
-    if (wasInitialized) {
-      result = await login(credentials.email, credentials.password);
-      if (result.ok) {
-        setBusy(null);
-        return;
-      }
-    }
-
-    result = await register(
-      credentials.orgName,
-      credentials.email,
-      credentials.password,
-      true
-    );
-
-    if (!result.ok && [400, 409].includes(result.status)) {
-      result = await login(credentials.email, credentials.password);
-    }
-
-    if (result.ok) {
-      localStorage.setItem(GUEST_READY_KEY, "1");
-    } else if (result.status === 404 || result.isNetwork) {
-      setError("O servidor do jogo está offline ou sem a API publicada. O modo convidado está pronto, mas precisa do backend para carregar o jogo completo.");
-    } else {
-      setError(result.error || "Não foi possível iniciar o modo convidado.");
-    }
-
+    const result = await playAsGuest();
     setBusy(null);
+    if (!result.ok) {
+      setError(result.error || "Não foi possível iniciar o modo convidado local.");
+    }
   };
 
   return (
@@ -213,7 +150,7 @@ export default function AuthPage() {
               {!googleSignInEnabled && (
                 <p className="mt-3 text-center text-[11px] text-zinc-500">
                   Google Login fica disponível assim que o OAuth da app for
-                  configurado. O modo convidado já pode ser utilizado.
+                  configurado. O modo convidado funciona sem servidor.
                 </p>
               )}
 
@@ -228,8 +165,8 @@ export default function AuthPage() {
 
               <div className="mt-6 border-t border-white/8 pt-5 text-center text-[11px] leading-relaxed text-zinc-500">
                 <p>
-                  O progresso de convidado fica associado a este dispositivo.
-                  Para sincronizar entre dispositivos, usa a Conta Google.
+                  O modo convidado funciona totalmente neste dispositivo, mesmo sem backend.
+                  Para cloud save e sincronização entre dispositivos, usa a Conta Google.
                 </p>
                 <p className="mt-3">
                   Ao continuar, aceitas os{" "}
