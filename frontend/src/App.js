@@ -96,7 +96,7 @@ function App() {
     <BootProvider>
       <AuthProvider>
         <LoadingProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={process.env.PUBLIC_URL}>
             <BootScreen />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
