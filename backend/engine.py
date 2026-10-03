@@ -2680,7 +2680,8 @@ async def _process_property_maintenance(db, player, props, minutes, now):
         return
     hours = minutes / 60
     total_cost = sum(
-        PROPERTY_TYPES[p["type_key"]]["price"] * p["level"] * PROPERTY_MAINTENANCE_PCT_PER_DAY / 24 * hours
+        (p.get("purchase_price") or PROPERTY_TYPES[p["type_key"]]["price"])
+        * p["level"] * PROPERTY_MAINTENANCE_PCT_PER_DAY / 24 * hours
         for p in props
     )
     can_pay = player["clean_money"] >= total_cost
