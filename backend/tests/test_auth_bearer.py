@@ -106,7 +106,7 @@ class TestGameStateBearer:
         assert r.status_code == 200, r.text
         d = r.json()
         # populated payload sanity
-        assert "player" in d and d["player"].get("clean_money") == 75000
+        assert "player" in d and d["player"].get("clean_money") == 100000
         assert "teams" in d and len(d["teams"]) == 1
         assert "employees" in d and len(d["employees"]) >= 2
         assert "opportunities" in d
