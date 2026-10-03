@@ -1,5 +1,5 @@
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtDuration, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
+import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip, PanelKicker, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -8,8 +8,8 @@ import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { BrainCircuit, Lightbulb, ArrowRight } from "lucide-react";
 
-const OUTCOME_LABELS = { success: "Sucesso", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
-const OUTCOME_COLORS = { success: "#34D399", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
+const OUTCOME_LABELS = { success: "Sucesso", partial: "Parcial", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
+const OUTCOME_COLORS = { success: "#34D399", partial: "#38BDF8", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
 
 const RecommendedActions = ({ onNavigate }) => {
   const { state, bribePolice, launder } = useGame();
@@ -98,7 +98,9 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
   if (!state) return null;
   const s = state.player.stats || {};
   const total = s.missions_total || 0;
-  const successRate = total ? Math.round(((s.missions_success || 0) / total) * 100) : null;
+  const successes = s.missions_success || 0;
+  const partials = s.missions_partial || 0;
+  const successRate = total ? Math.round(((successes + partials) / total) * 100) : null;
 
 
   const vehs = state.vehicles;
@@ -124,12 +126,14 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Section title="Resumo de operações" testId="intel-operations">
           <Grid>
-            <Cell label="Operações" value={total} tip="Total de operações concluídas (com qualquer resultado)." />
-            <Cell label="Taxa de sucesso" value={successRate === null ? "—" : `${successRate}%`}
+            <Cell label="Operações" value={total} tip="Total de operações concluídas. Sucessos, parciais, falhas e interceções passam a formar categorias exclusivas." />
+            <Cell label="Taxa de êxito" value={successRate === null ? "—" : `${successRate}%`}
                   color={successRate === null ? undefined : chanceColor(successRate / 100)}
-                  tip="Percentagem de operações bem-sucedidas. Melhora com equipas compatíveis, membros treinados e calor baixo." />
+                  tip="Percentagem de operações que terminaram com sucesso total ou parcial." />
+            <Cell label="Sucessos" value={successes} color="#34D399" tip="Operações concluídas com sucesso e com regresso seguro ao QG." />
+            <Cell label="Parciais" value={partials} color="#38BDF8" tip="Operações em que a equipa salvou parte do objetivo e regressou ao QG." />
             <Cell label="Falhadas" value={s.missions_failure || 0} color="#F59E0B" tip="Operações falhadas — sem recompensa e com possíveis ferimentos." />
-            <Cell label="Interceções" value={s.missions_police || 0} color="#EF4444" tip="Operações intercetadas pela polícia — risco de detenções e multas." />
+            <Cell label="Interceções" value={s.missions_police || 0} color="#EF4444" tip="Operações terminadas em interceção policial, incluindo equipas apanhadas no regresso." />
           </Grid>
           {(() => {
             const milestones = catalog?.achievement_milestones || [];
@@ -175,7 +179,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             <Cell label="Lavado total" value={fmtMoney(s.laundered_total || 0)} color="#34D399" tip="Total convertido de sujo para limpo (manual e passivo)." />
             <Cell label="Multas/Apreensões" value={fmtMoney(s.fines_paid || 0)} color="#EF4444" tip="Dinheiro perdido para a polícia em multas e apreensões." />
             <Cell label="Fortuna total" value={fmtMoney(netWorth)} tip="Caixa (limpo + sujo) + valor de revenda da frota e do património." />
-            <Cell label="Salários/ciclo" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip={`Ciclo salarial atual, pago a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)}.`} />
+            <Cell label="Salários/semana" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip="Salários brutos atuais. O fecho de custos fixos acontece à segunda-feira, às 20:00." />
           </Grid>
         </Section>
 
@@ -194,27 +198,33 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             />
           )}
           <div className="space-y-1">
-            {state.history.map((m) => (
-              <Card key={m.id} className="flex items-center justify-between lus-card px-2.5 py-1.5 shadow-none">
-                <div>
-                  <p className="text-xs font-semibold text-white">
-                    {m.opportunity.name} <span className="font-mono text-[9px] text-zinc-500">{m.opportunity.district}</span>
-                  </p>
-                  <p className="font-mono text-[10px] text-zinc-500">
-                    {m.team_name}
-                    {m.success_chance != null && <> · prob. {Math.round(m.success_chance * 100)}%</>}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-[10px] font-bold uppercase" style={{ color: OUTCOME_COLORS[m.outcome] || "#8E8E93" }}>
-                    {OUTCOME_LABELS[m.outcome] || m.outcome}
-                  </p>
-                  {m.outcome === "success" && (
-                    <p className="font-mono text-[10px] text-emerald-400">+{fmtMoney(m.opportunity.reward)}</p>
-                  )}
-                </div>
-              </Card>
-            ))}
+            {state.history.map((m) => {
+              const outcome = m.chase_outcome === "caught" ? "police" : m.outcome;
+              const paidReward = Number(m.pending_reward || 0);
+              return (
+                <Card key={m.id} className="flex items-center justify-between lus-card px-2.5 py-1.5 shadow-none">
+                  <div>
+                    <p className="text-xs font-semibold text-white">
+                      {m.opportunity.name} <span className="font-mono text-[9px] text-zinc-500">{m.opportunity.district}</span>
+                    </p>
+                    <p className="font-mono text-[10px] text-zinc-500">
+                      {m.team_name}
+                      {m.success_chance != null && <> · prob. {Math.round(m.success_chance * 100)}%</>}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] font-bold uppercase" style={{ color: OUTCOME_COLORS[outcome] || "#8E8E93" }}>
+                      {OUTCOME_LABELS[outcome] || outcome}
+                    </p>
+                    {(outcome === "success" || outcome === "partial") && paidReward > 0 && (
+                      <p className={`font-mono text-[10px] ${outcome === "success" ? "text-emerald-400" : "text-sky-400"}`}>
+                        +{fmtMoney(paidReward)}
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </Section>
       </SheetContent>
