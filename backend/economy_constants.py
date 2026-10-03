@@ -354,25 +354,24 @@ LAUNDER_PASSIVE_RATE = 0.82
 # MISSION REWARDS (from reward_engine.py)
 # ============================================================================
 
-MISSION_REWARD_MIN = 500
-MISSION_REWARD_MAX = 120000
-MISSION_REWARD_MULTIPLIER_CAP = 2.5
+MISSION_REWARD_MIN = 1500
+MISSION_REWARD_MAX = 90000
+MISSION_REWARD_MULTIPLIER_CAP = 1.75
 
 # Organization level scaling
 ORG_LEVEL_MULTIPLIER_BASE = 1.0
-ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.35
-# At level 5: 1.0 + (4 × 0.35) = 2.4x
-# At level 10: 1.0 + (9 × 0.35) = 4.15x
+ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.12
+# Nível 5: 1,48x; nível 10: 2,08x — crescimento relevante sem hiperinflação.
 
 CATEGORY_MULTIPLIERS = {
-    'assalto': 1.0,
-    'logistica': 0.85,
-    'tecnica': 1.0,
-    'influencia': 0.9,
-    'especial': 1.2,
+    'assalto': 1.05,
+    'logistica': 0.95,
+    'tecnica': 1.10,
+    'influencia': 0.90,
+    'especial': 1.25,
 }
 
-RARE_MISSION_MULTIPLIER = 2.0
+RARE_MISSION_MULTIPLIER = 1.60
 
 # Achievement system
 ACHIEVEMENT_MILESTONES = [10, 50, 150, 400]
