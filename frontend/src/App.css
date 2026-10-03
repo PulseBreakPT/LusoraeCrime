@@ -112,26 +112,58 @@
     isolation: isolate;
 }
 
-/* O pane inteiro recebe o tratamento para que tiles novos durante pan/zoom
-   não "pisquem" claros antes de o filtro ser aplicado. */
+/* Cartografia adaptativa por zoom. O raster OSM é tratado como contexto
+   operacional, mas as ruas nunca ficam abaixo do limiar de leitura. */
 .lus-dark-map .leaflet-tile-pane {
     background: #09090a;
     filter:
-        grayscale(1)
-        invert(0.90)
-        brightness(0.46)
-        contrast(1.32)
-        saturate(0.12);
+        grayscale(0.96)
+        invert(0.88)
+        brightness(0.91)
+        contrast(1.05)
+        saturate(0.16);
+    transition: filter 160ms ease;
+}
+
+/* Vista nacional/regional: continua muito escura, mas sem perder cidades,
+   fronteiras e os eixos rodoviários principais. */
+.lus-dark-map[data-map-detail="overview"] .leaflet-tile-pane {
+    filter:
+        grayscale(0.98)
+        invert(0.88)
+        brightness(0.84)
+        contrast(1.08)
+        saturate(0.14);
+}
+
+/* Escala de gestão: equilíbrio entre atmosfera e informação. */
+.lus-dark-map[data-map-detail="operational"] .leaflet-tile-pane {
+    filter:
+        grayscale(0.96)
+        invert(0.88)
+        brightness(0.91)
+        contrast(1.05)
+        saturate(0.16);
+}
+
+/* Zoom de rua: prioridade total à leitura das vias, nomes e quarteirões. */
+.lus-dark-map[data-map-detail="street"] .leaflet-tile-pane {
+    filter:
+        grayscale(0.92)
+        invert(0.87)
+        brightness(1)
+        contrast(1.02)
+        saturate(0.2);
 }
 
 /* O tile não leva filtros próprios: evita dupla transformação e seams. */
 .lus-dark-map .leaflet-tile {
     filter: none !important;
-    opacity: 0.96;
+    opacity: 1;
 }
 
-/* Véu muito subtil: baixa POIs/cores residuais e deixa pins/rotas dominar,
-   tal como o "calm cartography" do 112i. */
+/* O véu já não usa multiply. Serve apenas para profundidade nas margens,
+   sem apagar estradas finas nem texto. */
 .lus-dark-map::after {
     content: "";
     position: absolute;
@@ -139,9 +171,8 @@
     z-index: 250;
     pointer-events: none;
     background:
-        radial-gradient(circle at 50% 44%, transparent 42%, rgba(0, 0, 0, 0.16) 100%),
-        linear-gradient(180deg, rgba(9, 9, 10, 0.08), rgba(9, 9, 10, 0.18));
-    mix-blend-mode: multiply;
+        radial-gradient(circle at 50% 45%, transparent 56%, rgba(0, 0, 0, 0.07) 100%),
+        linear-gradient(180deg, rgba(9, 9, 10, 0.015), rgba(9, 9, 10, 0.045));
 }
 
 .lus-dark-map .leaflet-control-container {
@@ -453,10 +484,10 @@
     z-index: 10;
     pointer-events: none;
     background:
-        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
-        radial-gradient(60% 45% at 50% 0%, rgba(220, 38, 38, 0.05) 0%, transparent 70%),
-        radial-gradient(130% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.48) 100%),
-        linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, transparent 12%, transparent 86%, rgba(0, 0, 0, 0.5) 100%);
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.006) 0 1px, transparent 1px 4px),
+        radial-gradient(60% 45% at 50% 0%, rgba(220, 38, 38, 0.025) 0%, transparent 72%),
+        radial-gradient(135% 95% at 50% 45%, transparent 62%, rgba(0, 0, 0, 0.18) 100%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, transparent 10%, transparent 89%, rgba(0, 0, 0, 0.16) 100%);
 }
 
 /* ---------- Botões HUD premium (standalone: Intel/Definições/legendas) ---------- */
