@@ -23,6 +23,13 @@ jobs:
   validate:
     name: Build Android AAB
     runs-on: ubuntu-latest
+    env:
+      ANDROID_VERSION_CODE: ${{ vars.ANDROID_VERSION_CODE || '1' }}
+      ANDROID_VERSION_NAME: ${{ vars.ANDROID_VERSION_NAME || '1.0.0' }}
+      ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+      ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+      ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+      ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -92,3 +99,41 @@ jobs:
           path: frontend/android/app/build/outputs/bundle/debug/app-debug.aab
           if-no-files-found: error
           retention-days: 14
+
+      - name: Report release signing status
+        run: |
+          if [[ -z "$ANDROID_UPLOAD_KEYSTORE_BASE64" ]]; then
+            echo "::notice::Upload-key secrets are not configured. Debug AAB validation passed; signed Play release is skipped."
+          else
+            echo "Upload-key secrets detected; a signed release AAB will be built."
+          fi
+
+      - name: Restore Play upload key
+        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        working-directory: frontend
+        run: |
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > android/app/lusorae-upload.jks
+          chmod 600 android/app/lusorae-upload.jks
+
+      - name: Build signed Play release AAB
+        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        working-directory: frontend/android
+        run: |
+          ./gradlew bundleRelease --stacktrace \
+            -Pandroid.injected.signing.store.file="$PWD/app/lusorae-upload.jks" \
+            -Pandroid.injected.signing.store.password="$ANDROID_UPLOAD_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$ANDROID_UPLOAD_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$ANDROID_UPLOAD_KEY_PASSWORD"
+
+      - name: Upload signed Play AAB
+        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: lusorae-google-play-aab
+          path: frontend/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove upload key
+        if: always() && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        run: rm -f frontend/android/app/lusorae-upload.jks
