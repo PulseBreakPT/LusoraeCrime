@@ -197,4 +197,22 @@ describe("offline guest engine", () => {
     expect(state.opportunities.every((o) => o.risk >= 1 && o.risk <= 5)).toBe(true);
   });
 
+  test("migrates legacy activity events used by the network feed", async () => {
+    enableLocalGuestMode();
+    const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
+    raw.events = [
+      {
+        id: "legacy-event",
+        type: "system",
+        text: "Evento antigo do modo convidado.",
+        ts: new Date().toISOString(),
+      },
+    ];
+    localStorage.setItem("lusorae_guest_save_v2", JSON.stringify(raw));
+
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.events[0].kind).toBe("system");
+    expect(state.events[0].message).toBe("Evento antigo do modo convidado.");
+  });
+
 });
