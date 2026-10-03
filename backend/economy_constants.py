@@ -24,7 +24,7 @@ DIRTY_MONEY_HEAT_PER_10K = 0.15
 # PAYROLL CYCLES & MORALE
 # ============================================================================
 
-PAYROLL_CYCLE_MIN = 120  # 120 min reais representam 1 semana económica de jogo
+PAYROLL_CYCLE_MIN = 10080  # compatibilidade UI: 1 semana; liquidação real é segunda às 20:00 (Europe/Lisbon)
 PAYROLL_MORALE_REGEN = 0.4  # morale/loyalty recovered per employee on time payment
 EMPLOYER_SOCIAL_SECURITY_RATE = 0.2375  # TSU patronal normal em Portugal
 POOL_REFRESH_MIN = 5  # minutes between recruitment pool refreshes
@@ -152,6 +152,7 @@ PROPERTY_TYPES = {
 
 PROPERTY_MAX_LEVEL = 3
 PROPERTY_MAINTENANCE_PCT_PER_DAY = 0.00008
+PROPERTY_MAINTENANCE_PCT_PER_WEEK = PROPERTY_MAINTENANCE_PCT_PER_DAY * 7
 PROPERTY_CONDITION_RECOVERY_PER_HOUR = 2.0
 PROPERTY_CONDITION_DECAY_PER_HOUR = 3.0
 PROPERTY_UPGRADE_BASE_S = 90
