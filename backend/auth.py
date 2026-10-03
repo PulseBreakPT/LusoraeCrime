@@ -497,8 +497,15 @@ async def change_password(body: ChangePasswordInput, user: dict = Depends(get_cu
 @router.post("/delete-account")
 async def delete_account(body: DeleteAccountInput, response: Response, user: dict = Depends(get_current_user)):
     full_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
-    if not full_user or not verify_password(body.password, full_user["password_hash"]):
-        raise HTTPException(status_code=400, detail="Palavra-passe incorreta")
+    if not full_user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+
+    # Contas com password confirmam com a password atual. Contas Google-only
+    # não têm password local; a sessão autenticada é a confirmação disponível.
+    if full_user.get("password_hash"):
+        if not body.password or not verify_password(body.password, full_user["password_hash"]):
+            raise HTTPException(status_code=400, detail="Palavra-passe incorreta")
+
     player = await db.players.find_one({"user_id": user["_id"]})
     if player:
         pid = str(player["_id"])
@@ -506,6 +513,7 @@ async def delete_account(body: DeleteAccountInput, response: Response, user: dic
                      db.missions, db.events, db.quests, db.candidates, db.transactions):
             await coll.delete_many({"player_id": pid})
         await db.players.delete_one({"_id": player["_id"]})
+
     await db.users.delete_one({"_id": ObjectId(user["_id"])})
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
