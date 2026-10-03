@@ -14,7 +14,6 @@ import AdminPanel from "./pages/AdminPanel";
 import LegalPage from "./pages/LegalPage";
 import ChangelogPage from "./pages/ChangelogPage";
 import DevLoadingPreview from "./pages/DevLoadingPreview";
-import DevOperationPreview from "./pages/DevOperationPreview";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { Loader2, CheckCircle2, OctagonAlert, TriangleAlert, Info } from "lucide-react";
 
@@ -105,7 +104,6 @@ function App() {
               <Route path="/rgpd" element={<LegalPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
               <Route path="/dev/loading" element={<DevLoadingPreview />} />
-              <Route path="/dev/operation" element={<DevOperationPreview />} />
               <Route
                 path="/"
                 element={
