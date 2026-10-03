@@ -208,9 +208,12 @@ const chargeClean = (save, amount, reason = "Operação") => {
 };
 
 const calcCaps = (save) => {
-  const hideouts = save.properties.filter((p) => p.type_key === "esconderijo").reduce((s,p)=>s + 2 * p.level,0);
-  const garages = save.properties.filter((p) => ["garagem","centro_logistico"].includes(p.type_key))
-    .reduce((s,p)=>s + ((LOCAL_CATALOG.property_types[p.type_key].vehicle_cap || 0) * p.level),0);
+  const hideouts = save.properties
+    .filter((p) => p.type_key === "esconderijo")
+    .reduce((sum, p) => sum + ((LOCAL_CATALOG.property_types[p.type_key]?.cap_employees || 0) * p.level), 0);
+  const garages = save.properties
+    .filter((p) => ["garagem","centro_logistico"].includes(p.type_key))
+    .reduce((sum, p) => sum + ((LOCAL_CATALOG.property_types[p.type_key]?.cap_vehicles || 0) * p.level), 0);
   return {
     employees:{used:save.employees.length,max:4 + hideouts + (save.player.extra_employee_slots || 0)},
     vehicles:{used:save.vehicles.length,max:2 + garages + (save.player.extra_vehicle_slots || 0)},
@@ -699,7 +702,12 @@ const mutateGame=(save,path,payload)=>{
   if(path.startsWith("properties/")){
     const pr=save.properties.find(x=>x.id===p.property_id);
     if(!["properties/buy","properties/optimize"].includes(path)&&!pr)fail(404,"Propriedade não encontrada");
-    if(path==="properties/buy"){const cfg=LOCAL_CATALOG.property_types[p.type_key];if(!cfg)fail(400,"Tipo inválido");if(save.player.level<cfg.min_level)fail(400,"Nível insuficiente");chargeClean(save,cfg.price,"Compra de propriedade");const np={id:uid("prop"),type_key:p.type_key,name:cfg.name,lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,condition:100,upgrading_until:null};save.properties.push(np);return {ok:true,property_id:np.id};}
+    if(path==="properties/buy"){const cfg=LOCAL_CATALOG.property_types[p.type_key];if(!cfg)fail(400,"Tipo inválido");if(save.player.level<cfg.min_level)fail(400,"Nível insuficiente");chargeClean(save,cfg.price,"Compra de propriedade");const nearest=(save.player.districts||[]).slice().sort((a,b)=>{
+      const da=(a.lat-Number(p.lat))**2+(a.lng-Number(p.lng))**2;
+      const db=(b.lat-Number(p.lat))**2+(b.lng-Number(p.lng))**2;
+      return da-db;
+    })[0];
+    const np={id:uid("prop"),type_key:p.type_key,name:cfg.name,district:nearest?.name||"Zona operacional",lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,condition:100,upgrading_until:null};save.properties.push(np);return {ok:true,property_id:np.id};}
     if(path==="properties/sell"){const value=Math.round(pr.price*.7*pr.level);save.player.clean_money+=value;save.properties=save.properties.filter(x=>x.id!==pr.id);return {ok:true};}
     if(path==="properties/upgrade"){if(pr.level>=LOCAL_CATALOG.property_max_level)fail(400,"Nível máximo");const cost=Math.round(pr.price*.6*pr.level);chargeClean(save,cost,"Melhoria de propriedade");pr.upgrading_until=new Date(Date.now()+15000).toISOString();return {ok:true};}
     if(path==="properties/rename"){pr.name=String(p.name||pr.name).slice(0,40);return {ok:true};}
