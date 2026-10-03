@@ -39,6 +39,7 @@ export default function GamePage() {
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(initialGamePanel);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [hudAwake, setHudAwake] = useState(true);
   const shellAlerts = state ? orgAlerts(state) : { total: 0 };
   const { online, stale } = useGameShell({
     state,
@@ -53,6 +54,22 @@ export default function GamePage() {
     setCommandOpen,
     settings,
   });
+  useEffect(() => {
+    let timer = null;
+    const wake = () => {
+      setHudAwake(true);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setHudAwake(false), 5500);
+    };
+    const events = ["pointerdown", "touchstart", "keydown", "wheel"];
+    events.forEach((name) => window.addEventListener(name, wake, { passive: true }));
+    wake();
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach((name) => window.removeEventListener(name, wake));
+    };
+  }, []);
+
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
   const [baseFilter, setBaseFilter] = useState("all");
   const [stamp, setStamp] = useState(null);
@@ -202,8 +219,13 @@ export default function GamePage() {
       .map((e) => ({ name: e.name, role_key: e.role_key, spec: e.spec, rank: e.rank }));
   }
 
+  const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || operationId);
+
   return (
-    <div data-testid="game-page" className="fixed inset-0 overflow-hidden bg-background">
+    <div
+      data-testid="game-page"
+      className={`fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "lus-hud-awake" : "lus-hud-idle"}`}
+    >
       <LiveMap
         state={mapState}
         serverNow={serverNow}
@@ -458,7 +480,7 @@ const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, short
       }`}
     >
       <Icon size={15} className={`${color} h-[17px] w-[17px] md:h-[15px] md:w-[15px]`} />
-      <span className="hidden md:inline">{label}</span>
+      <span className="hidden 2xl:inline">{label}</span>
       {alert && (
         <span
           className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full"
