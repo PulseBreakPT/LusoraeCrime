@@ -1,0 +1,51 @@
+name: Diagnose public backend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-backend.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check preview backend
+        shell: bash
+        run: |
+          set +e
+          echo "=== GET preview ==="
+          curl -sS -D - --max-time 15 https://lusora-patrols.preview.emergentagent.com/api/ -o /tmp/preview-body
+          cat /tmp/preview-body || true
+          echo
+          echo "=== OPTIONS preview from GitHub Pages ==="
+          curl -sS -D - --max-time 15 -X OPTIONS \
+            -H 'Origin: https://pulsebreakpt.github.io' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type,authorization' \
+            https://lusora-patrols.preview.emergentagent.com/api/auth/register \
+            -o /tmp/preview-options
+          cat /tmp/preview-options || true
+          echo
+
+      - name: Check Hostinger backend
+        shell: bash
+        run: |
+          set +e
+          echo "=== GET Hostinger ==="
+          curl -sS -D - --max-time 15 https://srv1758509.hstgr.cloud/api/ -o /tmp/host-body
+          cat /tmp/host-body || true
+          echo
+          echo "=== OPTIONS Hostinger from GitHub Pages ==="
+          curl -sS -D - --max-time 15 -X OPTIONS \
+            -H 'Origin: https://pulsebreakpt.github.io' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type,authorization' \
+            https://srv1758509.hstgr.cloud/api/auth/register \
+            -o /tmp/host-options
+          cat /tmp/host-options || true
+          echo
