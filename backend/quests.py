@@ -15,13 +15,14 @@ from quests_data import (QUEST_DEFS, QUEST_ORDER, DAILY_POOL, WEEKLY_POOL,
 
 # ---------------- Fórmulas (SSS v3) ----------------
 
-LEVEL_MONEY_SLOPE = 0.15      # +15% de dinheiro por nível acima do 1
+LEVEL_MONEY_SLOPE = 0.10      # +10% por nível; progressão sem inflação exponencial
 LEVEL_RESPECT_SLOPE = 0.08    # +8% de respeito por nível acima do 1
 TIER_BONUS = 0.08             # +8% por tier adaptativo (0..3)
 STREAK_BONUS = 0.04           # +4% por dia de série (diárias/semanais)
 STREAK_BONUS_MAX = 0.40       # a série bonifica no máximo +40% (10 dias)
 SPEED_BONUS = 0.10            # +10% se concluída na 1.ª metade da janela
-TOTAL_MULT_CAP = 4.0          # trava de segurança da economia
+QUEST_ECONOMY_MONEY_MULT = 1.35  # acompanha o novo custo de frota/imóveis/TSU
+TOTAL_MULT_CAP = 3.0          # trava de segurança da economia
 
 TIER_THRESHOLDS = (25.0, 55.0, 80.0)  # momentum necessário para tier 1/2/3
 TIER_LABELS = {0: "Iniciado", 1: "Profissional", 2: "Veterano", 3: "Lenda"}
@@ -149,7 +150,7 @@ def compute_quest_mult(player, q, d, now, streak_count):
                 speed_m = 1 + SPEED_BONUS
         except (ValueError, TypeError):
             pass
-    money = min(TOTAL_MULT_CAP, lvl_money * diff * tier_m * streak_m * speed_m)
+    money = min(TOTAL_MULT_CAP, QUEST_ECONOMY_MONEY_MULT * lvl_money * diff * tier_m * streak_m * speed_m)
     respect = min(TOTAL_MULT_CAP, lvl_resp * diff * tier_m)
     labels = []
     if level > 1:
