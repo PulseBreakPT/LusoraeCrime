@@ -92,6 +92,54 @@ jobs:
         working-directory: frontend/android
         run: ./gradlew bundleDebug --stacktrace
 
+      - name: Audit merged Android permissions
+        working-directory: frontend/android
+        run: |
+          MANIFEST="$(find app/build/intermediates -type f -name AndroidManifest.xml | grep -E 'merged_manifests|packaged_manifests' | head -n 1)"
+          test -n "$MANIFEST"
+          echo "Auditing $MANIFEST"
+          python - "$MANIFEST" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          manifest = sys.argv[1]
+          root = ET.parse(manifest).getroot()
+          ns = "{http://schemas.android.com/apk/res/android}"
+          permissions = sorted({
+              node.attrib.get(ns + "name", "")
+              for node in root.iter()
+              if node.tag.endswith("uses-permission") and node.attrib.get(ns + "name")
+          })
+          print("Merged permissions:")
+          for permission in permissions:
+              print(" -", permission)
+
+          unnecessary_sensitive = {
+              "android.permission.ACCESS_COARSE_LOCATION",
+              "android.permission.ACCESS_FINE_LOCATION",
+              "android.permission.ACCESS_BACKGROUND_LOCATION",
+              "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.READ_CONTACTS",
+              "android.permission.WRITE_CONTACTS",
+              "android.permission.GET_ACCOUNTS",
+              "android.permission.READ_SMS",
+              "android.permission.SEND_SMS",
+              "android.permission.RECEIVE_SMS",
+              "android.permission.READ_CALL_LOG",
+              "android.permission.WRITE_CALL_LOG",
+              "android.permission.READ_PHONE_STATE",
+              "android.permission.MANAGE_EXTERNAL_STORAGE",
+              "com.google.android.gms.permission.AD_ID",
+          }
+          found = sorted(set(permissions) & unnecessary_sensitive)
+          if found:
+              print("ERROR: sensitive permissions not required by the current Lusorae feature set:", file=sys.stderr)
+              for permission in found:
+                  print(" -", permission, file=sys.stderr)
+              raise SystemExit(1)
+          PY
+
       - name: Upload test AAB
         uses: actions/upload-artifact@v4
         with:
