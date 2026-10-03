@@ -199,6 +199,10 @@ describe("offline guest engine", () => {
 
   test("migrates legacy activity events used by the network feed", async () => {
     enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
     const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
     raw.events = [
       {
