@@ -67,6 +67,7 @@ export function GameProvider({ children }) {
   // Modo de colocação manual de propriedades: null quando inativo. `point`
   // fica null até o jogador tocar/clicar pela primeira vez no mapa.
   const [placement, setPlacement] = useState(null);
+  const placementValidationRef = useRef(0);
 
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
@@ -506,7 +507,10 @@ export function GameProvider({ children }) {
         fetchRoute(target, origin),
       ]);
       if (roadOutward?.unavailable || roadInward?.unavailable) {
-        toast.error("Não foi possível calcular um percurso rodoviário válido. A equipa não foi despachada.");
+        const reason = roadOutward?.reason || roadInward?.reason;
+        toast.error(reason
+          ? `Percurso indisponível: ${reason}. A equipa não foi despachada.`
+          : "Não foi possível calcular um percurso rodoviário válido. A equipa não foi despachada.");
         haptics.error();
         return { ok: false };
       }
@@ -764,14 +768,61 @@ export function GameProvider({ children }) {
   // Modo de colocação manual — o dinheiro só é debitado em confirmPlacement,
   // que é o único momento em que /properties/buy é chamado; cancelar nunca
   // chega a fazer essa chamada, por isso não precisa de rollback.
-  const startPlacement = (typeKey) => setPlacement({ typeKey, point: null, valid: false });
-  const updatePlacementPoint = (lat, lng) =>
-    setPlacement((p) => (p ? { ...p, point: { lat, lng }, valid: isOnLand(lat, lng) } : p));
-  const cancelPlacement = () => setPlacement(null);
+  const startPlacement = (typeKey) => {
+    placementValidationRef.current += 1;
+    setPlacement({ typeKey, point: null, valid: false, checking: false, reason: null });
+  };
+  const updatePlacementPoint = useCallback(async (lat, lng) => {
+    const point = { lat: Number(lat), lng: Number(lng) };
+    if (![point.lat, point.lng].every(Number.isFinite)) return;
+
+    const validationId = ++placementValidationRef.current;
+
+    if (isLocalGuestMode()) {
+      const valid = isOnLand(point.lat, point.lng);
+      setPlacement((p) => (p ? {
+        ...p, point, valid, checking: false,
+        reason: valid ? null : "Escolhe um ponto em terra firme em Portugal.",
+      } : p));
+      return;
+    }
+
+    // A geometria oficial de Portugal vive no backend. Enquanto valida, o pin
+    // continua visível e pode ser movido novamente sem bloquear o mapa.
+    setPlacement((p) => (p ? { ...p, point, valid: null, checking: true, reason: null } : p));
+    try {
+      const { data } = await api.post("/game/properties/validate-location", point, { timeout: 8000 });
+      if (validationId !== placementValidationRef.current) return;
+      setPlacement((p) => (p ? {
+        ...p,
+        point,
+        valid: !!data?.valid,
+        checking: false,
+        reason: data?.reason || null,
+        district: data?.district || null,
+      } : p));
+    } catch (_error) {
+      if (validationId !== placementValidationRef.current) return;
+      setPlacement((p) => (p ? {
+        ...p,
+        point,
+        valid: false,
+        checking: false,
+        reason: "Não foi possível validar esta localização. Tenta outro ponto.",
+      } : p));
+    }
+  }, []);
+  const cancelPlacement = () => {
+    placementValidationRef.current += 1;
+    setPlacement(null);
+  };
   const confirmPlacement = async () => {
-    if (!placement?.point || !placement.valid) return { ok: false };
+    if (!placement?.point || placement.checking || !placement.valid) return { ok: false };
     const r = await buyProperty(placement.typeKey, placement.point.lat, placement.point.lng);
-    if (r.ok) setPlacement(null);
+    if (r.ok) {
+      placementValidationRef.current += 1;
+      setPlacement(null);
+    }
     return r;
   };
   const upgradeProperty = (propertyId) =>
