@@ -589,7 +589,7 @@ const normAng = (a) => {
 // Construção da coreografia (uma vez por missão)
 // ============================================================================
 // parking: resultado de buildParking; opsCount: nº de operacionais (máx. 6);
-// roster: [{ role_key, spec, rank }] alinhado com mission.member_ids (opcional).
+// roster: [{ name, role_key, spec, rank }] alinhado com mission.member_ids (opcional).
 export function buildChoreography(mission, parking, opsCount, roster) {
   const arrive = Date.parse(mission.arrive_at) / 1000;
   const finish = Date.parse(mission.finish_at) / 1000;
@@ -772,6 +772,7 @@ export function buildChoreography(mission, parking, opsCount, roster) {
     const runOutDur = clamp(pOut.length / runSpeed, 0.8, W * 0.22);
 
     const op = {
+      member: groundMembers[i] || null,
       role, station, spawnPt, holdPt, rallyPt, pIn, pOut, pBoard,
       speed, runSpeed, walkInDur, runOutDur,
       spawnAt: spawnAts[i],
