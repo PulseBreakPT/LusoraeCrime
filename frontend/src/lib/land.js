@@ -1,41 +1,52 @@
-// Réplica exacta de backend/engine.py's is_on_land (_TEJO_SHORE, _LISBON_BOUNDS)
-// — só para feedback visual instantâneo durante a colocação manual de
-// propriedades no mapa. O servidor continua autoritativo em /properties/buy.
+// Lightweight client-side land validator used only in local guest mode.
+// Normal authenticated play validates against backend/data/portugal.geojson
+// (plus water_pt.geojson), which remains the authoritative geography.
 
-const TEJO_SHORE = [
-  [-9.240, 38.690],
-  [-9.200, 38.694],
-  [-9.180, 38.700],
-  [-9.150, 38.703],
-  [-9.130, 38.706],
-  [-9.110, 38.711],
-  [-9.100, 38.720],
-  [-9.093, 38.750],
-  [-9.093, 38.780],
+const MAINLAND = [
+  [-9.52, 41.96], [-8.90, 42.14], [-8.20, 42.15], [-7.15, 41.93],
+  [-6.20, 41.58], [-6.18, 41.02], [-6.70, 40.35], [-6.86, 39.75],
+  [-7.05, 39.03], [-7.45, 38.45], [-7.38, 37.12], [-7.70, 37.00],
+  [-8.20, 36.95], [-8.95, 37.02], [-9.12, 37.38], [-9.52, 38.70],
+  [-9.43, 39.35], [-9.16, 40.15], [-8.95, 40.85], [-8.78, 41.45],
 ];
 
-const BOUNDS = { latMin: 38.685, latMax: 38.800, lngMin: -9.240, lngMax: -9.085 };
+const ISLAND_BOXES = [
+  // Madeira + Porto Santo
+  [-17.30, 32.55, -16.65, 32.90],
+  [-16.45, 32.98, -16.25, 33.16],
+  // Açores
+  [-31.35, 39.34, -31.00, 39.60], // Flores
+  [-31.18, 39.62, -31.02, 39.77], // Corvo
+  [-28.90, 38.45, -28.50, 38.72], // Faial
+  [-28.62, 38.32, -27.95, 38.62], // Pico
+  [-28.38, 38.48, -27.68, 38.82], // São Jorge
+  [-28.18, 38.95, -27.82, 39.18], // Graciosa
+  [-27.45, 38.58, -26.98, 38.87], // Terceira
+  [-25.95, 37.62, -25.00, 38.02], // São Miguel
+  [-25.22, 36.88, -24.86, 37.10], // Santa Maria
+];
+
+function pointInPolygon(lng, lat, polygon) {
+  let inside = false;
+  let j = polygon.length - 1;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if ((yi > lat) !== (yj > lat)) {
+      const cross = ((xj - xi) * (lat - yi)) / Math.max(1e-12, yj - yi) + xi;
+      if (lng < cross) inside = !inside;
+    }
+    j = i;
+  }
+  return inside;
+}
 
 export function isOnLand(lat, lng) {
-  if (lat < BOUNDS.latMin || lat > BOUNDS.latMax || lng < BOUNDS.lngMin || lng > BOUNDS.lngMax) {
-    return false;
-  }
-  const pts = TEJO_SHORE;
-  let shore;
-  if (lng <= pts[0][0]) {
-    shore = pts[0][1];
-  } else if (lng >= pts[pts.length - 1][0]) {
-    shore = pts[pts.length - 1][1];
-  } else {
-    for (let i = 1; i < pts.length; i++) {
-      if (lng <= pts[i][0]) {
-        const [x0, y0] = pts[i - 1];
-        const [x1, y1] = pts[i];
-        const t = (lng - x0) / Math.max(1e-9, x1 - x0);
-        shore = y0 + t * (y1 - y0);
-        break;
-      }
-    }
-  }
-  return lat >= shore + 0.0010;
+  const y = Number(lat);
+  const x = Number(lng);
+  if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
+  if (pointInPolygon(x, y, MAINLAND)) return true;
+  return ISLAND_BOXES.some(([minLng, minLat, maxLng, maxLat]) =>
+    x >= minLng && x <= maxLng && y >= minLat && y <= maxLat
+  );
 }
