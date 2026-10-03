@@ -453,10 +453,10 @@ const MM_FENCES=[
   {key:"quick",name:"Liquidação Rápida",unlock_rank:1},{key:"discreet",name:"Rede Discreta",unlock_rank:2},{key:"exclusive",name:"Comprador Exclusivo",unlock_rank:3},
 ];
 const MM_GOODS=[
-  {key:"chips",name:"Microchips Selados",unlock_rank:1,space:1,base_price:900},
-  {key:"art",name:"Caixas de Arte",unlock_rank:2,space:3,base_price:2600},
-  {key:"medical",name:"Malas Clínicas",unlock_rank:2,space:2,base_price:1700},
-  {key:"cipher",name:"Chaves Cifradas",unlock_rank:3,space:1,base_price:4200},
+  {key:"chips",name:"Microchips Selados",description:"Componentes compactos com procura constante.",unlock_rank:1,space:1,base_price:900},
+  {key:"art",name:"Caixas de Arte",description:"Peças valiosas, volumosas e difíceis de liquidar.",unlock_rank:2,space:3,base_price:2600},
+  {key:"medical",name:"Malas Clínicas",description:"Material médico escasso com mercado estável.",unlock_rank:2,space:2,base_price:1700},
+  {key:"cipher",name:"Chaves Cifradas",description:"Credenciais digitais raras e altamente voláteis.",unlock_rank:3,space:1,base_price:4200},
 ];
 
 const mastermindRank=(xp)=>{
@@ -500,8 +500,13 @@ const mastermindSnapshot=(save)=>{
     approaches:MM_APPROACHES.map(x=>({...x,unlocked:rank.level>=x.unlock_rank})),
     fences:MM_FENCES.map(x=>({...x,unlocked:rank.level>=x.unlock_rank})),
     active_heist:active,
-    market:{goods:MM_GOODS.map((g,i)=>({...g,price:Math.round(g.base_price*(0.9+((Date.now()/60000+i)%7)/35)),
-      trend:i%2?"up":"down",owned:m.market.holdings[g.key]||0,unlocked:rank.level>=g.unlock_rank})),
+    market:{goods:MM_GOODS.map((g,i)=>{
+      const wave=((Math.floor(Date.now()/900000)+i*3)%9)-4;
+      const changePct=wave*3;
+      return {...g,price:Math.round(g.base_price*(1+changePct/100)),
+        change_pct:changePct,trend:changePct>0?"up":changePct<0?"down":"flat",
+        owned:m.market.holdings[g.key]||0,unlocked:rank.level>=g.unlock_rank};
+    }),
       capacity,used,raid_risk_pct:Math.round(3+save.player.heat*.2+(m.bounty||0)*.1),raid_log:m.market.raid_log||[]},
     bounty:{value:m.bounty||0,tier:Math.min(4,Math.floor((m.bounty||0)/25)),name:(m.bounty||0)>=75?"Caçada total":(m.bounty||0)>=50?"Esquadrão rival":(m.bounty||0)>=25?"Rastreio ativo":(m.bounty||0)>0?"Rumores":"Sem contrato",
       progress_pct:m.bounty||0,hunter_remaining_s:0,payoff_cost:Math.max(2000,(m.bounty||0)*180)},
