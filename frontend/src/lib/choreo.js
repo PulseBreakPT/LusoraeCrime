@@ -1117,6 +1117,7 @@ export function buildChoreography(mission, parking, opsCount, roster) {
     n,
     groundCount: n,
     driverInside,
+    driverMember: driverInside && driverMemberIdx >= 0 ? members[driverMemberIdx] || null : null,
     leaderIdx,
     scoutIdx,
     rearIdx,
