@@ -156,9 +156,9 @@ ACTIVITIES = {
 }
 
 WAGERS = {
-    "cautious": {"name": "Aposta Cautelosa", "cost": 1000, "reward_mult": 1.0, "success": 0.05, "unlock_rank": 1},
-    "standard": {"name": "Aposta de Rua", "cost": 5000, "reward_mult": 1.45, "success": 0.0, "unlock_rank": 1},
-    "high": {"name": "Tudo ou Nada", "cost": 15000, "reward_mult": 2.25, "success": -0.08, "unlock_rank": 3},
+    "cautious": {"name": "Aposta Cautelosa", "cost": 500, "reward_mult": 0.90, "success": 0.05, "unlock_rank": 1},
+    "standard": {"name": "Aposta de Rua", "cost": 1500, "reward_mult": 1.20, "success": 0.0, "unlock_rank": 1},
+    "high": {"name": "Tudo ou Nada", "cost": 3500, "reward_mult": 1.70, "success": -0.08, "unlock_rank": 3},
 }
 
 APPROACHES = {
