@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD, matchesSearch,
-  propertyTier, propertyStackRank, propertyStackMult, propertyUpgradeCost, propertyMaintPerDay,
+  propertyTier, propertyStackRank, propertyStackMult, propertyUpgradeCost, propertyMaintPerWeek,
   propertyUpgradePaybackH,
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
@@ -63,11 +63,13 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
   const isUpgrading = (p) => p.upgrading_until && Date.parse(p.upgrading_until) > serverNow();
   const upgradableCount = props.filter((p) => p.level < maxLevel && !isUpgrading(p)).length;
   const canOptimize = props.length > 0 && upgradableCount > 0;
-  const reserve = state.salary_total || 0;
+  const reserve = state.weekly_fixed_total || state.salary_total || 0;
 
-  const maintDayTotal = props.reduce((a, p) => {
+  const maintWeekTotal = props.reduce((a, p) => {
     const pt = catalog?.property_types?.[p.type_key];
-    return a + (pt ? propertyMaintPerDay(pt, p.level, meta) : 0);
+    if (!pt) return a;
+    const basis = p.purchase_price || pt.price;
+    return a + propertyMaintPerWeek({ ...pt, price: basis }, p.level, meta);
   }, 0);
   const avgCondition = props.length ? Math.round(props.reduce((a, p) => a + (p.condition ?? 100), 0) / props.length) : 100;
 
@@ -107,8 +109,8 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                 tip="Lavagem passiva por hora das empresas de fachada — converte sujo em limpo sem taxa, à condição atual de cada imóvel." />
               <Kpi icon={Flame} label="Calor" value={`+${heatPerH.toFixed(1)}/h`} color={heatPerH > 0 ? "#EF4444" : "#71717A"}
                 tip="Calor policial gerado por hora pelas propriedades ilegais (laboratórios). Acima de 70 de calor há risco de rusga." />
-              <Kpi icon={Banknote} label="Valor" value={fmtMoney(sellTotal)} sub={`manut. ${fmtMoney(maintDayTotal)}/dia`} subColor="#F59E0B"
-                tip={`Valor de revenda total do património (${Math.round(sellFrac * 100)}% do preço × nível). A manutenção diária (${fmtMoney(maintDayTotal)}) é debitada automaticamente — sem fundos, a condição degrada-se ${meta.condition_decay_per_hour ?? 2}%/h e os benefícios rendem menos.`} />
+              <Kpi icon={Banknote} label="Valor" value={fmtMoney(sellTotal)} sub={`manut. ${fmtMoney(maintWeekTotal)}/semana`} subColor="#F59E0B"
+                tip={`Valor de revenda total do património. A manutenção fixa semanal (${fmtMoney(maintWeekTotal)}) entra no fecho de segunda-feira às 20:00, juntamente com salários, TSU e frota. Se o fecho falhar, a condição dos imóveis degrada-se.`} />
             </SummaryStrip>
           );
         })()}
@@ -125,7 +127,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             />
           </div>
           <Tip tip={canOptimize
-            ? `Lança as melhorias com melhor retorno real: imóveis produtivos ordenados por payback (custo ÷ ganho/h à condição atual), depois capacidade/bónus do mais barato ao mais caro — preservando sempre uma reserva de ${fmtMoney(reserve)} para o próximo ciclo salarial.`
+            ? `Lança as melhorias com melhor retorno real e preserva ${fmtMoney(reserve)} para o próximo fecho semanal (salários + TSU + frota + imóveis).`
             : props.length === 0 ? "Sem imóveis no património." : "Nenhum imóvel elegível — tudo no nível máximo ou já em obras."}>
             <button
               data-testid="properties-optimize"
@@ -166,15 +168,17 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             if (!pt) return null;
             const tier = propertyTier(pt);
             const maxed = p.level >= maxLevel;
-            const upgradeCost = propertyUpgradeCost(pt, p.level, meta);
-            const sellValue = Math.round(pt.price * sellFrac * p.level);
+            const marketBasis = p.purchase_price || pt.price;
+            const pricedType = { ...pt, price: marketBasis };
+            const upgradeCost = propertyUpgradeCost(pricedType, p.level, meta);
+            const sellValue = Math.round(marketBasis * sellFrac * p.level);
             const originalName = `${pt.name} — ${p.district}`;
             const renamed = p.name !== originalName;
             const condition = p.condition ?? 100;
             const upgrading = isUpgrading(p);
             const upgradeRemaining = upgrading ? Math.max(0, (Date.parse(p.upgrading_until) - serverNow()) / 1000) : 0;
             const upgradeDuration = (meta.upgrade_base_s ?? 0) + (meta.upgrade_per_level_s ?? 0) * (p.level + 1);
-            const maintDay = propertyMaintPerDay(pt, p.level, meta);
+            const maintWeek = propertyMaintPerWeek(pricedType, p.level, meta);
             const stackRank = propertyStackRank(props, p);
             const stackMult = propertyStackMult(stackRank, meta);
             const stacks = stackRank > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
@@ -204,9 +208,9 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <LevelDots level={p.level} max={maxLevel} color={tier.color} />
-                      <Tip tip={`Manutenção diária deste imóvel: ${fmtMoney(maintDay)} (${((meta.maintenance_pct_per_day ?? 0.0015) * 100).toFixed(2)}% do preço × nível). Sem fundos, a condição cai ${meta.condition_decay_per_hour ?? 2}%/h; paga e recupera ${meta.condition_recovery_per_hour ?? 4}%/h.`}>
+                      <Tip tip={`Manutenção fixa semanal deste imóvel: ${fmtMoney(maintWeek)}. É cobrada no fecho de segunda-feira às 20:00; falhar o fecho reduz a condição e os benefícios do imóvel.`}>
                         <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
-                          <Wrench size={9} /> {fmtMoney(maintDay)}/dia
+                          <Wrench size={9} /> {fmtMoney(maintWeek)}/semana
                         </span>
                       </Tip>
                       {stacks && (
@@ -310,7 +314,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                 const roiDays = pt.dirty_per_h ? Math.ceil(pt.price / (pt.dirty_per_h * 24)) : null;
                 const diminished = ownedOfType > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
                 const nextStackPct = Math.round(propertyStackMult(ownedOfType, meta) * 100);
-                const maintDay = propertyMaintPerDay(pt, 1, meta);
+                const maintWeek = propertyMaintPerWeek(pt, 1, meta);
                 const buyTip = locked
                   ? `Desbloqueia ao nível ${pt.min_level} da organização.`
                   : `${fmtMoney(pt.price)} limpos — escolhes a localização exacta no mapa antes de pagar. Benefício imediato: ${propertyBenefit(pt, 1)}.${
@@ -351,9 +355,9 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     </Tip>
 
                     <div className="relative z-[1] mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-                      <Tip tip={`Manutenção diária ao nível 1: ${fmtMoney(maintDay)} — debitada automaticamente; sem fundos, a condição degrada-se e o imóvel rende menos.`}>
+                      <Tip tip={`Manutenção semanal base ao nível 1: ${fmtMoney(maintWeek)}. O preço final e a manutenção variam com a localização escolhida no mapa.`}>
                         <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
-                          <Wrench size={9} /> {fmtMoney(maintDay)}/dia
+                          <Wrench size={9} /> {fmtMoney(maintWeek)}/semana
                         </span>
                       </Tip>
                       {roiDays != null && (
