@@ -23,6 +23,7 @@ from reward_config import (
     ORG_LEVEL_MULTIPLIER_PER_LEVEL,
 )
 from reward_engine import calculate_money_reward
+from property_market import property_market_price
 
 
 def run():
@@ -53,6 +54,15 @@ def run():
     assert len(set(rewards)) == 5
     assert BASE_REWARD_PER_RISK[1] < BASE_REWARD_PER_RISK[5]
     assert ORG_LEVEL_MULTIPLIER_PER_LEVEL <= 0.12
+
+    garage_base = 55000
+    lisboa = property_market_price(garage_base, 38.7223, -9.1393)
+    algarve = property_market_price(garage_base, 37.0194, -7.9304)
+    interior = property_market_price(garage_base, 38.57, -7.91)
+    assert lisboa["zone"] == "Lisboa" and lisboa["price"] == 71500
+    assert algarve["zone"] == "Algarve" and algarve["price"] == 60500
+    assert interior["zone"] == "Interior" and interior["price"] == 46500
+    assert lisboa["price"] > algarve["price"] > interior["price"]
 
     # A equipa inicial deve ter custos semanais plausíveis e inferiores a uma
     # operação de risco 2, sem tornar o primeiro ciclo automaticamente deficitário.
