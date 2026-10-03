@@ -28,7 +28,7 @@ describe("offline guest engine", () => {
 
     const initial = await localGuestRequest("get", "/game/state");
     expect(initial.data.hq_pending).toBe(true);
-    expect(initial.data.player.clean_money).toBe(75000);
+    expect(initial.data.player.clean_money).toBe(100000);
   });
 
   test("places an HQ and creates a playable organization", async () => {
@@ -124,7 +124,7 @@ describe("offline guest engine", () => {
     enableLocalGuestMode();
     const fresh = (await localGuestRequest("get", "/game/state")).data;
     expect(fresh.hq_pending).toBe(true);
-    expect(fresh.player.clean_money).toBe(75000);
+    expect(fresh.player.clean_money).toBe(100000);
   });
   test("supports the existing panels through the local API compatibility layer", async () => {
     enableLocalGuestMode();
@@ -237,6 +237,29 @@ describe("offline guest engine", () => {
     expect(state.vehicles[0].price).toBe(12500);
     expect(state.fuel_prices.gasolina).toBe(2.12);
     expect(state.fuel_prices.gasoleo).toBe(2.22);
+    expect(state.weekly_fixed_total).toBeGreaterThan(state.salary_total);
+    expect(state.weekly_cost_breakdown.employer_social_security).toBeGreaterThan(0);
+  });
+
+  test("scales opportunity rewards with risk without breaking the economy cap", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    const byRisk = new Map();
+    for (const opp of state.opportunities) {
+      if (!byRisk.has(opp.risk) || opp.reward < byRisk.get(opp.risk)) {
+        byRisk.set(opp.risk, opp.reward);
+      }
+      expect(opp.reward).toBeGreaterThanOrEqual(1500);
+      expect(opp.reward).toBeLessThanOrEqual(90000);
+    }
+    const risks = [...byRisk.keys()].sort((a, b) => a - b);
+    for (let i = 1; i < risks.length; i += 1) {
+      expect(byRisk.get(risks[i])).toBeGreaterThan(byRisk.get(risks[i - 1]));
+    }
   });
 
 });
