@@ -3,11 +3,15 @@ import { api } from "../lib/api";
 import { formatApiErrorDetail } from "../lib/game";
 import { useBoot } from "./BootContext";
 import { SocialLogin } from "@capgo/capacitor-social-login";
+import {
+  disableLocalGuestMode,
+  enableLocalGuestMode,
+  isLocalGuestMode,
+  resetLocalGuestGame,
+} from "../game/localGuestEngine";
 
 const AuthContext = createContext(null);
 const GOOGLE_WEB_CLIENT_ID = (process.env.REACT_APP_GOOGLE_WEB_CLIENT_ID || "").trim();
-const GUEST_CREDENTIALS_KEY = "lusorae_guest_credentials_v1";
-const isGuestAccount = (user) => /^guest-[a-f0-9]+@lusorae\.pt$/i.test(user?.email || "");
 
 // Disclaimer de ficção ("é apenas um jogo") — mostrado UMA única vez por
 // conta, no primeiro registo/entrada. A fonte de verdade é o servidor
@@ -166,6 +170,7 @@ export function AuthProvider({ children }) {
 
   const loginWithGoogle = useCallback(async () => {
     try {
+      disableLocalGuestMode();
       await ensureGoogleInitialized();
       const googleResult = await SocialLogin.login({
         provider: "google",
@@ -194,6 +199,21 @@ export function AuthProvider({ children }) {
       return buildAuthError(err);
     }
   }, [ensureGoogleInitialized, startBoot, performBoot, buildAuthError]);
+
+  const playAsGuest = useCallback(async () => {
+    try {
+      enableLocalGuestMode();
+      localStorage.setItem("lusorae_access_token", "local-guest");
+      localStorage.removeItem("lusorae_refresh_token");
+      resetBoot();
+      await startBoot(performBoot);
+      return { ok: true };
+    } catch (err) {
+      disableLocalGuestMode();
+      localStorage.removeItem("lusorae_access_token");
+      return buildAuthError(err);
+    }
+  }, [startBoot, performBoot, resetBoot, buildAuthError]);
 
   // Login
   const login = useCallback(
@@ -253,34 +273,48 @@ export function AuthProvider({ children }) {
 
   // Logout
   const logout = useCallback(async () => {
+    const wasGuest = isLocalGuestMode() || Boolean(user?.is_guest);
     try {
       await api.post("/auth/logout", {}, { timeout: 5000 });
     } catch (_err) {
-      // Ignora erro de logout, apenas limpa local
+      // Logout local/remoto é best-effort; o estado local é sempre limpo.
     }
-    if (GOOGLE_WEB_CLIENT_ID) {
+
+    if (wasGuest) {
+      // Sair do convidado preserva o save; clicar novamente em "Jogar como
+      // convidado" retoma a carreira local.
+      disableLocalGuestMode();
+    } else if (GOOGLE_WEB_CLIENT_ID) {
       try {
         await ensureGoogleInitialized();
         await SocialLogin.logout({ provider: "google" });
       } catch (_err) {
-        // O logout local continua mesmo que a sessão Google já não exista.
+        // A sessão Lusorae termina mesmo que a sessão Google já não exista.
       }
     }
+
     localStorage.removeItem("lusorae_access_token");
     localStorage.removeItem("lusorae_refresh_token");
-    // `false` = "sem sessão" → o ProtectedRoute redireciona para /auth.
-    // (`null` significa "ainda a determinar" e deixava a app presa num
-    // spinner infinito após terminar sessão.)
     setUser(false);
     setGameState(null);
     setCatalog(null);
     resetBoot();
-  }, [resetBoot, ensureGoogleInitialized]);
+  }, [resetBoot, ensureGoogleInitialized, user]);
 
   // Initialize auth on mount
   useEffect(() => {
     if (bootRef.current) return;
     bootRef.current = true;
+
+    if (isLocalGuestMode()) {
+      localStorage.setItem("lusorae_access_token", "local-guest");
+      startBoot(performBoot).catch(() => {
+        disableLocalGuestMode();
+        localStorage.removeItem("lusorae_access_token");
+        setUser(false);
+      });
+      return;
+    }
 
     const token = localStorage.getItem("lusorae_access_token");
     if (!token) {
@@ -334,26 +368,24 @@ export function AuthProvider({ children }) {
 
   const deleteAccount = useCallback(async (password = null) => {
     try {
-      let effectivePassword = password || null;
-      if (isGuestAccount(user)) {
-        try {
-          const guest = JSON.parse(localStorage.getItem(GUEST_CREDENTIALS_KEY) || "null");
-          effectivePassword = guest?.password || null;
-        } catch (_err) {
-          effectivePassword = null;
-        }
+      if (user?.is_guest || isLocalGuestMode()) {
+        resetLocalGuestGame();
+        localStorage.removeItem("lusorae_access_token");
+        localStorage.removeItem("lusorae_refresh_token");
+        setUser(false);
+        setGameState(null);
+        setCatalog(null);
+        resetBoot();
+        return { ok: true };
       }
-      await api.post("/auth/delete-account", { password: effectivePassword }, { timeout: 8000 });
-      if (isGuestAccount(user)) {
-        localStorage.removeItem(GUEST_CREDENTIALS_KEY);
-        localStorage.removeItem("lusorae_guest_initialized");
-      }
-      logout();
+
+      await api.post("/auth/delete-account", { password: password || null }, { timeout: 8000 });
+      await logout();
       return { ok: true };
     } catch (err) {
       return { ok: false, error: formatApiErrorDetail(err.response?.data?.detail) || err.message };
     }
-  }, [logout, user]);
+  }, [logout, user, resetBoot]);
 
   const claimAdmin = useCallback(async () => {
     try {
@@ -382,6 +414,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         loginWithGoogle,
+        playAsGuest,
         googleSignInEnabled: Boolean(GOOGLE_WEB_CLIENT_ID),
         checkAvailability,
         logout,
