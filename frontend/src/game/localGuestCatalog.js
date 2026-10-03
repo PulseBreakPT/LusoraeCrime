@@ -1,4 +1,4 @@
-export const LOCAL_GUEST_SAVE_VERSION = 1;
+export const LOCAL_GUEST_SAVE_VERSION = 2;
 
 export const LOCAL_CATALOG = {
   team_create_cost: 5000,
