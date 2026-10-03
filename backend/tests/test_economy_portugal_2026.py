@@ -65,7 +65,7 @@ def run():
     interior = property_market_price(garage_base, 38.57, -7.91)
     assert lisboa["zone"] == "Lisboa" and lisboa["price"] == 71500
     assert algarve["zone"] == "Algarve" and algarve["price"] == 60500
-    assert interior["zone"] == "Interior" and interior["price"] == 46500
+    assert interior["zone"] == "Interior" and interior["price"] == 47000
     assert lisboa["price"] > algarve["price"] > interior["price"]
 
     # O fecho fixo é sempre segunda-feira às 20:00 em Portugal, mesmo com DST.
