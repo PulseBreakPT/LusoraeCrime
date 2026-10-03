@@ -353,7 +353,7 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
     else:
         if not body.accept_terms:
             raise HTTPException(status_code=400, detail="É necessário aceitar os Termos de Serviço e a Política de Privacidade")
-        org_name = await unique_google_org_name(claims.get("name"), google_sub)
+        org_name = await unique_google_org_name("Império Lusorae", google_sub)
         now = now_utc().isoformat()
         acceptance = terms_acceptance_record(ip)
         acceptance["source"] = "google_sign_in"
@@ -367,7 +367,6 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
                 "providers": ["google"],
                 "google_sub": google_sub,
                 "google_email_verified": True,
-                "google_picture": claims.get("picture"),
                 "terms_acceptance": acceptance,
             })
         except DuplicateKeyError:
