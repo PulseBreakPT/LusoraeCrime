@@ -1224,14 +1224,21 @@ export function propertyUpgradeCost(pt, level, meta) {
   return Math.round((pt?.price || 0) * (meta?.upgrade_cost_pct ?? 0.6) * (level + 1));
 }
 
-// Custo de manutenção diário do imóvel (espelho de _process_property_maintenance).
-export function propertyMaintPerDay(pt, level, meta) {
-  return (pt?.price || 0) * (level || 1) * (meta?.maintenance_pct_per_day ?? 0.0015);
+// Custo fixo semanal do imóvel. O fecho acontece à segunda-feira às 20:00.
+export function propertyMaintPerWeek(pt, level, meta) {
+  const weekly = meta?.maintenance_pct_per_week
+    ?? ((meta?.maintenance_pct_per_day ?? 0.00008) * 7);
+  return (pt?.price || 0) * (level || 1) * weekly;
 }
 
-// Payback em horas de subir 1 nível (só imóveis produtivos; lavagem devolve 90%).
+// Alias legado para componentes antigos; devolve o equivalente diário teórico.
+export function propertyMaintPerDay(pt, level, meta) {
+  return propertyMaintPerWeek(pt, level, meta) / 7;
+}
+
+// Payback em horas de subir 1 nível (lavagem passiva devolve 82%).
 export function propertyUpgradePaybackH(pt, condition, cost) {
-  const rate = (pt?.dirty_per_h || 0) + (pt?.launder_per_h || 0) * 0.9;
+  const rate = (pt?.dirty_per_h || 0) + (pt?.launder_per_h || 0) * 0.82;
   const gain = rate * Math.max(0, Math.min(100, condition ?? 100)) / 100;
   return gain > 0 ? cost / gain : null;
 }
