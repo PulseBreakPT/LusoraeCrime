@@ -15,6 +15,7 @@ from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY, LISBON_SPOTS
 from engine import now_utc, add_event, vehicle_doc, starting_employee
 from legal_data import current_version
 from economy_constants import INITIAL_CLEAN_MONEY, INITIAL_DIRTY_MONEY
+from economy_calendar import next_weekly_settlement
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -254,6 +255,7 @@ async def create_player_for_user(user_id: str, org_name: str, with_default_hq: b
         "hq": hq, "districts": districts, "region": region,
         "priorities": {"active": HQ_DEFAULT_PRIORITY},
         "last_tick": now, "created_at": now,
+        "next_payroll_at": next_weekly_settlement(now_utc()).isoformat(),
     })
     pid = str(result.inserted_id)
     team_res = await db.teams.insert_one({
