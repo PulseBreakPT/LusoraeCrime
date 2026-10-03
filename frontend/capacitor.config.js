@@ -1,5 +1,3 @@
-const { CapacitorConfig } = require("@capacitor/cli");
-
 const config = {
   appId: "pt.lusorae.crime",
   appName: "Lusorae",
