@@ -6,7 +6,6 @@ import {
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
-import { VehicleGlyph } from "./VehicleGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -202,14 +201,14 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="fleet-list">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="fleet-list">
           {state.vehicles.length === 0 && (
             <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens veículos — compra o primeiro no stand abaixo.
             </p>
           )}
           {state.vehicles.length > 0 && sortedVehicles.length === 0 && (
-            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+            <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Nenhum veículo com esse nome na garagem.
             </p>
           )}
@@ -247,16 +246,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             }
             return (
               <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
-                {/* Cabeçalho: placa com silhueta + identidade */}
-                <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                    <VehicleGlyph
-                      modelKey={v.model_key} accent={tier.color}
-                      paintColor={catalog?.shop?.vehicle_paints?.[v.paint_key]?.color}
-                      className="h-[44px] w-[96px]"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                <div className="relative z-[1] min-w-0">
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <FavoriteStar testId={`vehicle-favorite-${v.id}`} active={favoriteVehicleIds.includes(v.id)} onToggle={() => toggleFavoriteVehicle(v.id)} />
@@ -505,7 +495,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-6">
           <SectionHeader icon={ShoppingCart} title="Stand de veículos" meta={catalog ? `${Object.keys(catalog.vehicle_models || {}).length} modelos` : undefined} />
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.vehicle_models).map(([key, m]) => {
                 const tier = vehicleTier(m);
@@ -513,12 +503,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 const owned = state.vehicles.filter((v) => v.model_key === key).length;
                 return (
                   <Card key={key} data-testid={`stand-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
-                    <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                        <VehicleGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
-                        {locked && <Lock size={13} className="absolute text-zinc-400" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
+                    <div className="relative z-[1] min-w-0">
                         <div className="flex items-start justify-between gap-1.5">
                           <p className="truncate text-sm font-semibold text-white">{m.name}</p>
                           <TierChip tier={tier} />
@@ -555,7 +540,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           </Tip>
                         </div>
                       </div>
-                    </div>
 
                     <div className="relative z-[1] mt-2">
                       <AdequacyRow model={m} catalog={catalog} testId={`stand-adequacy-${key}`} />
