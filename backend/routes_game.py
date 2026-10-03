@@ -73,6 +73,10 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
 from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
+from economy_constants import (
+    EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
+    LAUNDER_BASE_RATE, LAUNDER_MAX_RATE, LAUNDER_PASSIVE_RATE,
+)
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
@@ -442,6 +446,16 @@ async def catalog():
             "difficulty_mults": DIFFICULTY_MULT,
             "momentum_claim": MOMENTUM_CLAIM,
         },
+        "economy_meta": {
+            "employer_social_security_rate": EMPLOYER_SOCIAL_SECURITY_RATE,
+            "vehicle_annual_fixed_costs": VEHICLE_ANNUAL_FIXED_COSTS,
+            "launder_base_rate": LAUNDER_BASE_RATE,
+            "launder_max_rate": LAUNDER_MAX_RATE,
+            "launder_passive_rate": LAUNDER_PASSIVE_RATE,
+            "economic_week_minutes": PAYROLL_CYCLE_MIN,
+            "mission_reward_min": MONEY_REWARD_MIN,
+            "mission_reward_max": MONEY_REWARD_MAX,
+        },
         # Loja — tudo pago em dinheiro do jogo (clean_money), sem moeda
         # premium/pagamentos reais.
         "shop": {
@@ -517,6 +531,14 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
     quests_out = [enrich_quest(Quest.from_mongo(q).model_dump(), player) for q in quest_docs]
     quests_out += locked_principals({q["quest_key"] for q in quest_docs}, player["level"])
 
+    gross_salary = int(sum(e.get("salary", 0) for e in employees))
+    employer_ss = int(round(gross_salary * EMPLOYER_SOCIAL_SECURITY_RATE))
+    fleet_weekly = int(round(sum(
+        VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
+        for v in vehicles
+    )))
+    weekly_fixed_total = gross_salary + employer_ss + fleet_weekly
+
     return {
         "server_time": now_iso,
         "player": p,
@@ -538,7 +560,13 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
             "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
         },
         "bonuses": bonuses,
-        "salary_total": sum(e.get("salary", 0) for e in employees),
+        "salary_total": gross_salary,
+        "weekly_fixed_total": weekly_fixed_total,
+        "weekly_cost_breakdown": {
+            "gross_salaries": gross_salary,
+            "employer_social_security": employer_ss,
+            "fleet_fixed": fleet_weekly,
+        },
         "fuel_prices": FUEL_PRICES,
         "hot_category": hot_category(now_utc()),
     }
@@ -2211,13 +2239,22 @@ async def optimize_properties(user: dict = Depends(get_current_user)):
     if not upgradable:
         raise HTTPException(status_code=400, detail="Nenhum imóvel elegível — tudo no nível máximo ou já em obras")
     employees = await db.employees.find({"player_id": pid}).to_list(300)
-    reserve = sum(e.get("salary", 0) for e in employees)
+    vehicles = await db.vehicles.find({"player_id": pid}).to_list(200)
+    gross_reserve = int(sum(e.get("salary", 0) for e in employees))
+    reserve = (
+        gross_reserve
+        + int(round(gross_reserve * EMPLOYER_SOCIAL_SECURITY_RATE))
+        + int(round(sum(
+            VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
+            for v in vehicles
+        )))
+    )
 
     def plan_for(p):
         pt = PROPERTY_TYPES[p["type_key"]]
         cost = int(pt["price"] * 0.6 * (p["level"] + 1))
-        # Ganho por hora de subir 1 nível (lavagem devolve 90%), à condição atual.
-        rate = (pt.get("dirty_per_h") or 0) + (pt.get("launder_per_h") or 0) * 0.9
+        # Ganho por hora de subir 1 nível, usando a mesma taxa passiva do motor.
+        rate = (pt.get("dirty_per_h") or 0) + (pt.get("launder_per_h") or 0) * LAUNDER_PASSIVE_RATE
         gain_h = rate * property_condition_factor(p)
         payback_h = (cost / gain_h) if gain_h > 0 else None
         return {"prop": p, "pt": pt, "cost": cost, "gain_h": gain_h, "payback_h": payback_h}
@@ -2418,7 +2455,7 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
         LAUNDER_PROPERTY_BONUS_PER_LEVEL * pr["level"] * property_condition_factor(pr)
         for pr in props if property_active(pr, now)
     )
-    rate = min(0.95, 0.75 + bonuses["launder_rate"] + property_bonus)
+    rate = min(LAUNDER_MAX_RATE, LAUNDER_BASE_RATE + bonuses["launder_rate"] + property_bonus)
     clean_gain = int(body.amount * rate)
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {
         "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,
