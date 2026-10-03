@@ -91,13 +91,13 @@ export const ResourceBar = () => {
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="lus-topbar mx-auto flex w-fit max-w-full items-stretch gap-1 rounded-xl border px-3 py-2 sm:gap-2 sm:px-4 sm:py-2.5">
+      <div className="lus-topbar mx-auto flex w-fit max-w-full items-center gap-1 rounded-xl border px-1.5 py-1.5 sm:gap-1.5 sm:px-2 sm:py-1.5">
         <Tip
           tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
           side="bottom"
           align="start"
         >
-          <div className="flex shrink-0 items-center gap-1.5 border-r border-border pr-2 sm:gap-2 sm:pr-3">
+          <div className="lus-minimal-stat lus-level-readout flex shrink-0 items-center gap-1.5 px-1.5">
             <div className="flex flex-col items-center">
               <Badge variant="outline" className="flex h-7 w-7 items-center justify-center rounded border-primary/30 bg-primary/15 p-0 font-mono text-xs font-bold text-primary">
                 {p.level}
@@ -140,7 +140,7 @@ export const ResourceBar = () => {
           tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."
         />
         <Tip tip={`Calor policial: ${hs.label}. ${hs.desc} Baixa naturalmente com o tempo ou com subornos no Império.`} side="bottom" className="min-w-0">
-          <div data-testid="stat-heat" className="flex min-w-0 items-center gap-1.5 px-1 sm:gap-2 sm:px-1.5">
+          <div data-testid="stat-heat" className="lus-minimal-stat flex min-w-0 items-center gap-1.5 px-1.5">
             <Flame size={15} className="shrink-0" style={{ color: hs.color }} />
             <div className="min-w-0">
               <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">
@@ -192,7 +192,7 @@ export const ResourceBar = () => {
 
 const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "center", testId, className = "" }) => (
   <Tip tip={tip} side="bottom" align={align} className="min-w-0">
-    <div data-testid={testId} className={`flex min-w-0 items-center gap-1.5 px-1 sm:gap-2 sm:px-1.5 ${className}`}>
+    <div data-testid={testId} className={`lus-minimal-stat flex min-w-0 items-center gap-1.5 px-1.5 ${className}`}>
       <Icon size={15} className="shrink-0" style={{ color }} />
       <div className="min-w-0">
         <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">{label}</p>
