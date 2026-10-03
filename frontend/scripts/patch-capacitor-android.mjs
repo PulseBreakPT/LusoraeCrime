@@ -72,3 +72,15 @@ if (fs.existsSync(variables)) {
   fs.writeFileSync(variables, gradle, "utf8");
   console.log("Android configurado para compile/target SDK 36.");
 }
+
+
+const appGradle = path.join(root, "android", "app", "build.gradle");
+if (fs.existsSync(appGradle)) {
+  let gradle = fs.readFileSync(appGradle, "utf8");
+  const versionCode = String(process.env.ANDROID_VERSION_CODE || "1").replace(/\D/g, "") || "1";
+  const versionName = String(process.env.ANDROID_VERSION_NAME || "1.0.0").replace(/[^0-9A-Za-z._-]/g, "");
+  gradle = gradle.replace(/versionCode\s+\d+/, `versionCode ${versionCode}`);
+  gradle = gradle.replace(/versionName\s+"[^"]+"/, `versionName "${versionName}"`);
+  fs.writeFileSync(appGradle, gradle, "utf8");
+  console.log(`Versão Android configurada: ${versionName} (code ${versionCode}).`);
+}
