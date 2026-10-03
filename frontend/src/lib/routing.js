@@ -208,7 +208,7 @@ export async function fetchRoute(origin, target) {
     + ";" + Number(target.lng).toFixed(6) + "," + Number(target.lat).toFixed(6);
   const query =
     "steps=false&annotations=duration,distance&geometries=geojson"
-    + "&overview=full&alternatives=false&radiuses=250;250";
+    + "&overview=full&alternatives=false&radiuses=200;200";
   const url = OSRM_BASE + "/" + coordinates + "?" + query;
 
   const promise = fetch(url)

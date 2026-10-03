@@ -56,6 +56,16 @@ const blendMapPoint = (a, b, t) => {
   };
 };
 
+// Quando uma rota OSRM chega alguns ms depois do despacho, não saltamos logo
+// para a posição "teórica" atual. Fazemos catch-up SOBRE a própria estrada.
+// A janela termina sempre bastante antes do fim da fase para não atrasar a missão.
+const routeReveal = (readyAtMs, nowMs, phaseEndMs, maxWindowMs = 900) => {
+  if (!Number.isFinite(Number(readyAtMs))) return 1;
+  const remainingAtReady = Math.max(0, Number(phaseEndMs) - Number(readyAtMs));
+  const windowMs = Math.max(120, Math.min(maxWindowMs, remainingAtReady * 0.55));
+  return smooth01((Number(nowMs) - Number(readyAtMs)) / Math.max(1, windowMs));
+};
+
 const PROP_ICONS = {
   esconderijo: Shield,
   garagem: Warehouse,
@@ -314,18 +324,37 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
       }
 
       const parking = buildParking(mission, outward);
-      const returnOrigin = parking.repark ? parking.park2 : parking.park;
       const parkTime = timeAtDistanceFraction(outward, parking.cum, parking.parkFrac);
+      const outwardReadyAt = serverNow();
 
+      // CRÍTICO: publica a ida imediatamente. Antes esperávamos também pela
+      // rota de regresso; durante essa espera o carro ficava parado e depois
+      // saltava vários quilómetros para recuperar o relógio da missão.
+      setRoute({
+        outward,
+        inward: null,
+        parking,
+        parkTime,
+        unavailable: false,
+        outwardReadyAt,
+        inwardReadyAt: null,
+      });
+
+      // Tal como no 112i, o regresso é planeado separadamente. Usamos o ponto
+      // da estrada (anchor), não o ponto lateral de estacionamento, para evitar
+      // snaps grandes ao iniciar a rota de volta.
+      const returnOrigin = parking.anchor || mission.target;
       let inward = await fetchRoute(returnOrigin, mission.origin);
       if (!cancelled && inward.unavailable) {
-        // O ponto lateral de estacionamento pode não fazer snap. O alvo é o
-        // segundo ponto rodoviário conhecido para obter um regresso válido.
         inward = await fetchRoute(mission.target, mission.origin);
       }
       if (cancelled) return;
 
-      setRoute({ outward, inward, parking, parkTime, unavailable: false });
+      const inwardReadyAt = serverNow();
+      setRoute((current) => {
+        if (!current || current.outward !== outward) return current;
+        return { ...current, inward, inwardReadyAt };
+      });
     };
 
     loadRoadPlans();
@@ -375,7 +404,11 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     }
 
     if (now < arrive) {
-      const phaseT = clamp01((now - depart) / Math.max(1, arrive - depart));
+      const actualPhaseT = clamp01((now - depart) / Math.max(1, arrive - depart));
+      // Se o OSRM demorou a responder, recupera suavemente a diferença ao
+      // longo da estrada. Sem este reveal, a primeira frame válida podia
+      // colocar o veículo instantaneamente 10–30% à frente no percurso.
+      const phaseT = actualPhaseT * routeReveal(route.outwardReadyAt, now, arrive);
       // 94% da janela segue os tempos de cada troço OSRM; o final apenas
       // encosta o carro da estrada ao ponto de estacionamento.
       const roadT = clamp01(phaseT / 0.94);
@@ -424,7 +457,9 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
       };
     }
 
-    const roadT = clamp01((phaseT - leaveWindow) / Math.max(0.001, 1 - leaveWindow));
+    const actualRoadT = clamp01((phaseT - leaveWindow) / Math.max(0.001, 1 - leaveWindow));
+    const reveal = routeReveal(route.inwardReadyAt, now, ret);
+    const roadT = actualRoadT * reveal;
     const travelSeconds = roadT * Math.max(0, route.inward.duration || 0);
     const roadPose = pointOnTimedRoute(route.inward, travelSeconds) || routeStart;
     return {
