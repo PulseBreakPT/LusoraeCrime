@@ -79,8 +79,8 @@ PROPERTY_TYPES = {
         'name': 'Empresa de Fachada',
         'min_level': 2,
         'launder_per_h': 1400,  # was 2000, -30%
-        'launder_rate': 0.90,
-        'desc': 'Lava dinheiro sujo automaticamente (90% de retorno).'
+        'launder_rate': 0.82,
+        'desc': 'Lava dinheiro sujo automaticamente (82% de retorno).'
     },
     'armazem': {
         'name': 'Armazém',
@@ -139,8 +139,8 @@ PROPERTY_TYPES = {
         'name': 'Casa de Câmbio',
         'min_level': 3,
         'launder_per_h': 1750,  # was 2500, -30%
-        'launder_rate': 0.90,
-        'desc': 'Duplica a capacidade de lavagem automática através de câmbios internacionais.'
+        'launder_rate': 0.82,
+        'desc': 'Aumenta a capacidade de lavagem automática através de câmbios internacionais (82% de retorno).'
     },
     'centro_logistico': {
         'name': 'Centro Logístico',
