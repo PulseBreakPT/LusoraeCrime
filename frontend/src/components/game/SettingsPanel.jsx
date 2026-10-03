@@ -271,7 +271,7 @@ const DeleteAccountForm = () => {
         tip="Elimina permanentemente a conta e toda a organização."
       />
       <a
-        href={`${process.env.PUBLIC_URL || ""}/delete-account.html`}
+        href={`${(process.env.PUBLIC_URL || "").replace(/\/$/, "")}/delete-account.html`}
         target="_blank"
         rel="noreferrer"
         className="mt-2 block text-center font-mono text-[9px] uppercase tracking-wider text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
