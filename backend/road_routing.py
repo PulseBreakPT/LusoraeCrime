@@ -164,6 +164,7 @@ class RoadRouter:
                 return cached
 
             last_error = None
+            transient_error = False
             for radius in SNAP_RADII_M:
                 # Respeita o servidor público: no máximo ~1 pedido/s.
                 await asyncio.sleep(max(0.0, 1.05 - (time.monotonic() - self.last_request)))
@@ -189,8 +190,13 @@ class RoadRouter:
                         last_error = "Sem percurso rodoviário entre estes locais."
                         continue
                     route = _normalize(data["routes"][0])
-                except (httpx.HTTPError, ValueError, KeyError) as exc:
+                except httpx.HTTPError as exc:
+                    transient_error = True
                     last_error = str(exc) or "Serviço rodoviário temporariamente indisponível."
+                    continue
+                except (ValueError, KeyError) as exc:
+                    transient_error = True
+                    last_error = str(exc) or "O serviço rodoviário devolveu uma resposta inválida."
                     continue
 
                 now = datetime.now(timezone.utc)
@@ -207,7 +213,7 @@ class RoadRouter:
                 return route
 
         raise HTTPException(
-            status_code=503 if last_error and "temporariamente" in last_error.lower() else 422,
+            status_code=503 if transient_error else 422,
             detail=last_error or "Não foi possível calcular um percurso rodoviário válido.",
         )
 
