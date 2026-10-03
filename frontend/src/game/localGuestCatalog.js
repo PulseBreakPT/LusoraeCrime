@@ -1,4 +1,4 @@
-export const LOCAL_GUEST_SAVE_VERSION = 3;
+export const LOCAL_GUEST_SAVE_VERSION = 4;
 
 export const LOCAL_CATALOG = {
   team_create_cost: 5000,
@@ -36,7 +36,7 @@ export const LOCAL_CATALOG = {
     falsificador:{name:"Falsificador",spec:"tecnica",salary:560,attrs:["inteligencia","discricao","hack"]},
     espiao:{name:"Espião",spec:"tecnica",salary:650,attrs:["discricao","inteligencia","negociacao"]},
     gestor:{name:"Gestor de Empresa",spec:"influencia",salary:590,attrs:["inteligencia","negociacao","sangue_frio"]},
-    sniper:{name:"Franco-Atirador",spec:"assalto",salary:720,attrs:["tiro","discricao","sangue_frio"]},
+    sniper:{name:"Franco-Atirador",spec:"assalto",salary:640,attrs:["tiro","discricao","sangue_frio"]},
     arrombador:{name:"Arrombador",spec:"assalto",salary:500,attrs:["forca","discricao","inteligencia"]},
     piloto:{name:"Piloto de Fuga",spec:"logistica",salary:560,attrs:["conducao","sangue_frio","discricao"]},
     estafeta:{name:"Estafeta",spec:"logistica",salary:400,attrs:["conducao","resistencia","discricao"]},
@@ -129,7 +129,17 @@ export const LOCAL_CATALOG = {
     influencia:{speed:.15,seats_fit:.35,discretion:.50},
     logistica:{speed:.15,seats_fit:.55,discretion:.30},
   },
-  fleet_meta:{sell_fraction:.4,repair_cost_pct:.002},
+  fleet_meta:{sell_fraction:.4,repair_cost_pct:.003},
+  property_meta:{
+    maintenance_pct_per_day:.00008,
+    condition_recovery_per_hour:2,
+    condition_decay_per_hour:3,
+    upgrade_base_s:90,
+    upgrade_per_level_s:60,
+    stack_diminish:[1,.7,.5],
+    sell_fraction:.7,
+    upgrade_cost_pct:.6,
+  },
   property_max_level:3,
   property_types:{
     esconderijo:{name:"Esconderijo",desc:"Alarga a capacidade de operacionais.",min_level:1,price:85000,cap_employees:4,employee_cap:4},
@@ -179,6 +189,25 @@ export const LOCAL_CATALOG = {
     contrabando:{name:"Rota de Contrabando",category:"logistica"},
     espionagem:{name:"Espionagem Corporativa",category:"tecnica"},
     negociacao:{name:"Acordo de Bastidores",category:"influencia"},
+  },
+  economy_meta:{
+    employer_social_security_rate:.2375,
+    economic_week_minutes:120,
+    vehicle_annual_fixed_costs:{
+      usado:1250,moto:700,van:1800,desportivo:2500,suv_blindado:3600,
+      supercarro:6000,carrinha_entrega:1600,berlina_blindada:3000,
+      buggy_todo_terreno:1200,limousine:3600,carro_furtivo:2400,
+    },
+    launder_base_rate:.78,
+    launder_max_rate:.90,
+    launder_passive_rate:.82,
+    mission_rewards:{
+      min:1500,max:90000,
+      base_by_risk:{1:2500,2:4800,3:9000,4:16500,5:30000},
+      org_level_per_level:.12,
+      category_mult:{assalto:1.05,logistica:.95,tecnica:1.10,influencia:.90,especial:1.25},
+      rare_mult:1.6,
+    },
   },
   shop:{
     speedup_cost_per_min:140,
