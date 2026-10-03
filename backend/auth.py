@@ -311,6 +311,84 @@ async def register(body: RegisterInput, request: Request, response: Response):
             "access_token": access, "refresh_token": refresh_tok}
 
 
+@router.post("/google")
+async def google_login(body: GoogleLoginInput, request: Request, response: Response):
+    """Autenticação Google para Android/Web com validação server-side."""
+    client_id = os.environ.get("GOOGLE_WEB_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Google Sign-In ainda não está configurado no servidor")
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            body.id_token,
+            google_requests.Request(),
+            client_id,
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Credencial Google inválida ou expirada")
+
+    google_sub = str(claims.get("sub") or "").strip()
+    email = str(claims.get("email") or "").lower().strip()
+    if not google_sub or not email or not bool(claims.get("email_verified")):
+        raise HTTPException(status_code=401, detail="A Conta Google não forneceu um email verificado")
+
+    ip = request.client.host if request.client else "unknown"
+    user = await db.users.find_one({"google_sub": google_sub})
+    if not user:
+        user = await db.users.find_one({"email": email})
+
+    if user:
+        if user.get("banned"):
+            raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'Motivo não especificado')}")
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"google_sub": google_sub, "google_email_verified": True},
+             "$addToSet": {"providers": "google"}},
+        )
+        user = await db.users.find_one({"_id": user["_id"]})
+        user_id = str(user["_id"])
+        player = await db.players.find_one({"user_id": user_id})
+        if not player:
+            await create_player_for_user(user_id, user.get("name", "Organização Recuperada"))
+    else:
+        if not body.accept_terms:
+            raise HTTPException(status_code=400, detail="É necessário aceitar os Termos de Serviço e a Política de Privacidade")
+        org_name = await unique_google_org_name(claims.get("name"), google_sub)
+        now = now_utc().isoformat()
+        acceptance = terms_acceptance_record(ip)
+        acceptance["source"] = "google_sign_in"
+        try:
+            result = await db.users.insert_one({
+                "email": email,
+                "name": org_name,
+                "role": "player",
+                "created_at": now,
+                "auth_provider": "google",
+                "providers": ["google"],
+                "google_sub": google_sub,
+                "google_email_verified": True,
+                "google_picture": claims.get("picture"),
+                "terms_acceptance": acceptance,
+            })
+        except DuplicateKeyError:
+            user = await db.users.find_one({"email": email})
+            if not user:
+                raise HTTPException(status_code=409, detail="Não foi possível concluir o acesso Google")
+            result = None
+
+        if result:
+            user_id = str(result.inserted_id)
+            await create_player_for_user(user_id, org_name)
+            user = await db.users.find_one({"_id": result.inserted_id})
+        else:
+            user_id = str(user["_id"])
+
+    access = create_access_token(user_id, email)
+    refresh_tok = create_refresh_token(user_id)
+    set_auth_cookies(response, access, refresh_tok)
+    return {**user_public(user), "access_token": access, "refresh_token": refresh_tok}
+
+
 @router.post("/check-availability")
 async def check_availability(body: AvailabilityInput):
     """Verificação em tempo real de disponibilidade (registo)."""
