@@ -27,7 +27,7 @@ import { DisclaimerModal } from "../components/game/DisclaimerModal";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
-import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
+import { orgAlerts, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon } from "lucide-react";
 
@@ -194,23 +194,10 @@ export default function GamePage() {
   }
 
   const alerts = shellAlerts;
-  const tr = teamsReadiness(state);
   const p = state.player;
   const wantedStars = state.street?.wanted?.stars || 0;
   const empireAlert = p.heat >= 70 || p.dirty_money >= 15000;
 
-  const hrTipParts = [];
-  if (alerts.injured) hrTipParts.push(`${alerts.injured} ferido(s)`);
-  if (alerts.arrested) hrTipParts.push(`${alerts.arrested} preso(s)`);
-  if (alerts.exhausted) hrTipParts.push(`${alerts.exhausted} exausto(s)`);
-  if (alerts.nearExhausted) hrTipParts.push(`${alerts.nearExhausted} perto da exaustão`);
-  if (alerts.betrayal) hrTipParts.push(`${alerts.betrayal} risco de traição`);
-  if (alerts.payrollShort) hrTipParts.push("fundos insuficientes para os salários");
-  else if (alerts.payrollDueSoon) hrTipParts.push("salários por pagar em breve");
-  const fleetTipParts = [];
-  if (alerts.lowFuel) fleetTipParts.push(`${alerts.lowFuel} sem combustível`);
-  if (alerts.damaged) fleetTipParts.push(`${alerts.damaged} avariado(s)`);
-  if (alerts.nearBreakdown) fleetTipParts.push(`${alerts.nearBreakdown} perto de avariar`);
   const weaponsDamaged = (state.weapons || []).filter((w) => w.condition < 30).length;
   const weaponsUnequipped = (state.weapons || []).filter((w) => !w.employee_id).length;
   const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollShort ? 1 : alerts.payrollDueSoon ? 1 : 0);
