@@ -12,55 +12,106 @@ const OUTCOME_LABELS = { success: "Sucesso", partial: "Parcial", failure: "Falho
 const OUTCOME_COLORS = { success: "#34D399", partial: "#38BDF8", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
 
 const RecommendedActions = ({ onNavigate }) => {
-  const { state, bribePolice, launder } = useGame();
+  const { state } = useGame();
   const p = state.player;
   const recs = [];
+
+  // SSS: uma recomendação por destino. Antes podiam aparecer 3–4 botões
+  // "Abrir Operacionais" ou "Abrir Frota" ao mesmo tempo e ainda executar
+  // lavagem/suborno diretamente fora do painel canónico do Império.
+  const empireIssues = [];
   const bribeCost = Math.max(1000, Math.round(p.heat * 150));
   if (p.heat >= 40) {
-    recs.push({
-      id: "bribe", text: `Calor a ${Math.round(p.heat)}% — a polícia aproxima-se`,
-      action: `Subornar · ${fmtMoney(bribeCost)}`, run: () => bribePolice(), can: p.clean_money >= bribeCost,
-    });
+    empireIssues.push(`calor ${Math.round(p.heat)}% · suborno ${fmtMoney(bribeCost)}`);
   }
   const dirtyCap = state.caps?.dirty_money?.max || 0;
   const dirtyNearCap = dirtyCap > 0 && p.dirty_money >= dirtyCap * 0.9;
   if (dirtyNearCap) {
-    // Prioridade sobre o aviso genérico de lavagem: aqui há produção dos
-    // laboratórios a ser deitada fora em tempo real.
-    recs.push({
-      id: "dirtycap", text: `Cofre de sujo a ${Math.round((p.dirty_money / dirtyCap) * 100)}% (${fmtMoney(p.dirty_money)}/${fmtMoney(dirtyCap)}) — produção a ser desperdiçada`,
-      action: `Lavar tudo (+${fmtMoney(Math.floor(p.dirty_money * 0.75))})`, run: () => launder(p.dirty_money), can: true,
-    });
+    empireIssues.push(`cofre de sujo a ${Math.round((p.dirty_money / dirtyCap) * 100)}%`);
   } else if (p.dirty_money >= 15000) {
+    empireIssues.push(`${fmtMoney(p.dirty_money)} sujos por gerir`);
+  }
+  if (empireIssues.length) {
     recs.push({
-      id: "launder", text: `${fmtMoney(p.dirty_money)} sujos no cofre — um alvo apetecível`,
-      action: `Lavar tudo (+${fmtMoney(Math.floor(p.dirty_money * 0.75))})`, run: () => launder(p.dirty_money), can: true,
+      id: "empire",
+      text: empireIssues.join(" · "),
+      action: "Abrir Império",
+      run: () => onNavigate && onNavigate("empire"),
+      can: true,
     });
   }
+
+  const fleetIssues = [];
   const damaged = state.vehicles.filter((v) => v.condition < 50).length;
-  if (damaged) recs.push({ id: "fleet", text: `${damaged} veículo(s) em mau estado`, action: "Abrir Frota", run: () => onNavigate && onNavigate("fleet"), can: true });
   const lowFuel = state.vehicles.filter((v) => v.fuel_l < v.tank_l * 0.25).length;
-  if (lowFuel) recs.push({ id: "fuel", text: `${lowFuel} veículo(s) quase sem combustível`, action: "Abrir Frota", run: () => onNavigate && onNavigate("fleet"), can: true });
-  const tired = state.employees.filter((e) => e.fatigue > 60).length;
-  if (tired) recs.push({ id: "rest", text: `${tired} operacional(is) exaustos — vão falhar operações`, action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true });
-  const troubled = state.employees.filter((e) => e.status === "injured" || e.status === "arrested").length;
-  if (troubled) recs.push({ id: "troubled", text: `${troubled} operacional(is) feridos ou presos`, action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true });
-  const disloyal = state.employees.filter((e) => (e.betrayal_risk || 0) >= 25).length;
-  if (disloyal) recs.push({ id: "loyalty", text: `${disloyal} operacional(is) com risco de traição`, action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true });
-  const teamsNoVehicle = state.teams.filter((t) => !t.vehicle_id).length;
-  if (teamsNoVehicle) recs.push({ id: "novehicle", text: `${teamsNoVehicle} equipa(s) sem veículo`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
-  const teamsNoMembers = state.teams.filter((t) => state.employees.every((e) => e.team_id !== t.id)).length;
-  if (teamsNoMembers) recs.push({ id: "nomembers", text: `${teamsNoMembers} equipa(s) sem membros`, action: "Abrir Equipas", run: () => onNavigate && onNavigate("teams"), can: true });
-  const claimable = (state.quests || []).filter((q) => q.status === "completed").length;
-  if (claimable) recs.push({ id: "quests", text: `${claimable} recompensa(s) de missão por reclamar`, action: "Abrir Objetivos", run: () => onNavigate && onNavigate("quests"), can: true });
-  if (state.salary_total > 0 && p.clean_money < state.salary_total) {
+  if (damaged) fleetIssues.push(`${damaged} em mau estado`);
+  if (lowFuel) fleetIssues.push(`${lowFuel} com pouco combustível`);
+  if (fleetIssues.length) {
     recs.push({
-      id: "payroll", text: `Fundos insuficientes para o ciclo salarial (${fmtMoney(state.salary_total)})`,
-      action: "Abrir Operacionais", run: () => onNavigate && onNavigate("employees"), can: true,
+      id: "fleet",
+      text: `Frota: ${fleetIssues.join(" · ")}`,
+      action: "Abrir Frota",
+      run: () => onNavigate && onNavigate("fleet"),
+      can: true,
     });
   }
+
+  const employeeIssues = [];
+  const tired = state.employees.filter((e) => e.fatigue > 60).length;
+  const troubled = state.employees.filter((e) => e.status === "injured" || e.status === "arrested").length;
+  const disloyal = state.employees.filter((e) => (e.betrayal_risk || 0) >= 25).length;
+  if (tired) employeeIssues.push(`${tired} exausto(s)`);
+  if (troubled) employeeIssues.push(`${troubled} ferido(s)/preso(s)`);
+  if (disloyal) employeeIssues.push(`${disloyal} com risco de traição`);
+  if (state.salary_total > 0 && p.clean_money < state.salary_total) {
+    employeeIssues.push(`reserva salarial curta: ${fmtMoney(state.salary_total)}`);
+  }
+  if (employeeIssues.length) {
+    recs.push({
+      id: "employees",
+      text: `Operacionais: ${employeeIssues.join(" · ")}`,
+      action: "Abrir Operacionais",
+      run: () => onNavigate && onNavigate("employees"),
+      can: true,
+    });
+  }
+
+  const teamIssues = [];
+  const teamsNoVehicle = state.teams.filter((t) => !t.vehicle_id).length;
+  const teamsNoMembers = state.teams.filter((t) => state.employees.every((e) => e.team_id !== t.id)).length;
+  if (teamsNoVehicle) teamIssues.push(`${teamsNoVehicle} sem veículo`);
+  if (teamsNoMembers) teamIssues.push(`${teamsNoMembers} sem membros`);
+  if (teamIssues.length) {
+    recs.push({
+      id: "teams",
+      text: `Equipas: ${teamIssues.join(" · ")}`,
+      action: "Abrir Equipas",
+      run: () => onNavigate && onNavigate("teams"),
+      can: true,
+    });
+  }
+
+  const claimable = (state.quests || []).filter((q) => q.status === "completed").length;
+  if (claimable) {
+    recs.push({
+      id: "quests",
+      text: `${claimable} recompensa(s) de objetivo por reclamar`,
+      action: "Abrir Objetivos",
+      run: () => onNavigate && onNavigate("quests"),
+      can: true,
+    });
+  }
+
   const degraded = (state.properties || []).filter((pr) => (pr.condition ?? 100) < 50).length;
-  if (degraded) recs.push({ id: "properties", text: `${degraded} imóvel(is) degradado(s) — manutenção em atraso`, action: "Abrir Imóveis", run: () => onNavigate && onNavigate("properties"), can: true });
+  if (degraded) {
+    recs.push({
+      id: "properties",
+      text: `${degraded} imóvel(is) degradado(s) — manutenção em atraso`,
+      action: "Abrir Imóveis",
+      run: () => onNavigate && onNavigate("properties"),
+      can: true,
+    });
+  }
 
   return (
     <div className="mt-4" data-testid="intel-recommendations">
