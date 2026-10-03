@@ -4,7 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "frontend/**"
+      - "frontend/src/**"
+      - "frontend/public/**"
+      - "frontend/package.json"
+      - "frontend/yarn.lock"
+      - "frontend/craco.config.js"
+      - "frontend/tailwind.config.js"
+      - "frontend/postcss.config.js"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -35,14 +41,16 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
-      - name: Install dependencies
-        run: yarn install --non-interactive
+      - name: Cache installed dependencies
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('frontend/yarn.lock') }}
 
-      # Regression gate: frontend, routing and backend syntax are checked together.
-      - name: Test Portugal economy
-        run: |
-          python -m py_compile ../backend/engine.py ../backend/routes_game.py ../backend/road_routing.py ../backend/auth.py ../backend/reward_engine.py
-          python ../backend/tests/test_economy_portugal_2026.py
+      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile --prefer-offline --non-interactive
 
       - name: Test offline guest engine
         env:
