@@ -23,14 +23,14 @@ O mapa é o centro da experiência. O mundo nasce à volta do Quartel-General es
 | GitHub Pages | Frontend publicado automaticamente |
 | URL | https://pulsebreakpt.github.io/LusoraeCrime/ |
 | Build | React/CRACO via GitHub Actions |
-| Rotas SPA | Preparadas para o subdiretório \`/LusoraeCrime\` |
+| Rotas SPA | Preparadas para o subdiretório `/LusoraeCrime` |
 | Login e registo no Pages | **Ocultos por feature flag**, não removidos |
 | Sistema de autenticação | Continua implementado no código |
 | Backend completo | FastAPI + MongoDB, destinado à stack Docker/VPS |
 | Deploy de produção | Docker Compose + Caddy + HTTPS automático |
 | Modo atual | Single-player persistente; multiplayer está documentado como evolução futura |
 
-A build pública do GitHub Pages usa \`REACT_APP_AUTH_UI_ENABLED=false\`. Isto esconde o ecrã de login/registo sem apagar a implementação. Para uma build privada ou de produção, a interface pode voltar a ser exposta alterando a flag.
+A build pública do GitHub Pages usa `REACT_APP_AUTH_UI_ENABLED=false`. Isto esconde o ecrã de login/registo sem apagar a implementação. Para uma build privada ou de produção, a interface pode voltar a ser exposta alterando a flag.
 
 ---
 
@@ -81,7 +81,7 @@ O loop principal combina gestão, planeamento e execução:
 9. **Controlar territórios**, contactos e atividades de rua.
 10. **Planear grandes golpes** através do sistema Mastermind.
 
-O motor usa um modelo de progressão persistente e data-driven: o conteúdo vive sobretudo em \`game_data.py\`, \`economy_constants.py\`, \`quests_data.py\`, \`street_data.py\` e \`mastermind_data.py\`.
+O motor usa um modelo de progressão persistente e data-driven: o conteúdo vive sobretudo em `game_data.py`, `economy_constants.py`, `quests_data.py`, `street_data.py` e `mastermind_data.py`.
 
 ---
 
@@ -397,7 +397,7 @@ Outros sistemas:
 - distância e dificuldade;
 - bónus permanentes por marcos de sucesso.
 
-No tuning atual, o ciclo de folha salarial está definido para **120 minutos** no backend. Os valores de economia são centralizados em \`backend/economy_constants.py\`, para manter o balanceamento auditável.
+No tuning atual, o ciclo de folha salarial está definido para **120 minutos** no backend. Os valores de economia são centralizados em `backend/economy_constants.py`, para manter o balanceamento auditável.
 
 ---
 
@@ -539,8 +539,8 @@ O frontend funciona como um cockpit tático sobre o mapa.
 
 ### Centro de Comando
 
-- \`Ctrl/Cmd + K\` abre pesquisa global;
-- \`/\` também pode abrir pesquisa;
+- `Ctrl/Cmd + K` abre pesquisa global;
+- `/` também pode abrir pesquisa;
 - pesquisa tolerante a acentos e termos parciais;
 - navegação por teclado;
 - histórico de comandos;
@@ -550,13 +550,13 @@ O frontend funciona como um cockpit tático sobre o mapa.
 
 ### Atalhos
 
-Os painéis principais suportam atalhos numéricos \`1–9\`.
+Os painéis principais suportam atalhos numéricos `1–9`.
 
 ### Ferramentas de gestão
 
 - sincronização manual;
 - último painel memorizado;
-- deep links via \`?panel=\`;
+- deep links via `?panel=`;
 - exportação CSV de transações;
 - briefing operacional copiável;
 - descanso em massa;
@@ -665,7 +665,7 @@ A aceitação do disclaimer é auditada no backend com versão e registo tempora
 
 ## Arquitetura
 
-\`\`\`text
+```text
 ┌────────────────────────────────────────────────────────────────┐
 │                        Browser / Mobile Web                    │
 │  React 19 · CRACO · Tailwind · React Router · Leaflet         │
@@ -687,7 +687,7 @@ A aceitação do disclaimer é auditada no backend com versão e registo tempora
 Produção:
 Internet → Caddy → React estático
                  └→ /api/* → FastAPI → MongoDB
-\`\`\`
+```
 
 ### Filosofia do motor
 
@@ -747,17 +747,17 @@ O backend usa um **tick lazy**: o estado avança durante leituras/ações releva
 
 | Rota | Função |
 |---|---|
-| \`/\` | Jogo protegido |
-| \`/auth\` | Login/registo; oculto na build pública atual |
-| \`/termos\` | Termos |
-| \`/privacidade\` | Privacidade |
-| \`/rgpd\` | RGPD |
-| \`/changelog\` | Histórico de versões |
-| \`/painel\` | Administração/moderação |
-| \`/dev/loading\` | Preview de desenvolvimento |
-| \`/dev/operation\` | Preview de operação |
+| `/` | Jogo protegido |
+| `/auth` | Login/registo; oculto na build pública atual |
+| `/termos` | Termos |
+| `/privacidade` | Privacidade |
+| `/rgpd` | RGPD |
+| `/changelog` | Histórico de versões |
+| `/painel` | Administração/moderação |
+| `/dev/loading` | Preview de desenvolvimento |
+| `/dev/operation` | Preview de operação |
 
-O \`BrowserRouter\` usa \`process.env.PUBLIC_URL\`, permitindo funcionar corretamente em \`/LusoraeCrime\` no GitHub Pages.
+O `BrowserRouter` usa `process.env.PUBLIC_URL`, permitindo funcionar corretamente em `/LusoraeCrime` no GitHub Pages.
 
 ---
 
@@ -768,15 +768,15 @@ A API é organizada por domínio.
 <details>
 <summary><strong>Autenticação — /api/auth</strong></summary>
 
-- \`POST /register\`
-- \`POST /check-availability\`
-- \`POST /login\`
-- \`POST /logout\`
-- \`GET /me\`
-- \`POST /claim-admin\`
-- \`POST /change-password\`
-- \`POST /delete-account\`
-- \`POST /refresh\`
+- `POST /register`
+- `POST /check-availability`
+- `POST /login`
+- `POST /logout`
+- `GET /me`
+- `POST /claim-admin`
+- `POST /change-password`
+- `POST /delete-account`
+- `POST /refresh`
 
 </details>
 
@@ -784,135 +784,135 @@ A API é organizada por domínio.
 <summary><strong>Jogo principal — /api/game</strong></summary>
 
 **Estado e operações**
-- \`GET /catalog\`
-- \`GET /state\`
-- \`POST /dispatch/preview\`
-- \`POST /dispatch\`
-- \`POST /dispatch/recommend_opportunity\`
-- \`POST /dispatch/recommend_team\`
-- \`POST /dispatch/recommend_repeat\`
-- \`POST /opportunities/favorite\`
-- \`POST /missions/recall\`
+- `GET /catalog`
+- `GET /state`
+- `POST /dispatch/preview`
+- `POST /dispatch`
+- `POST /dispatch/recommend_opportunity`
+- `POST /dispatch/recommend_team`
+- `POST /dispatch/recommend_repeat`
+- `POST /opportunities/favorite`
+- `POST /missions/recall`
 
 **Equipas e RH**
-- \`POST /teams/create\`
-- \`POST /employees/recruit\`
-- \`POST /recruitment/refresh\`
-- \`POST /employees/assign\`
-- \`POST /employees/train\`
-- \`POST /employees/rest\`
-- \`POST /employees/promote\`
-- \`POST /employees/bonus\`
-- \`POST /employees/heal\`
-- \`POST /employees/release\`
-- \`POST /employees/fire\`
-- \`POST /employees/rename\`
-- \`POST /employees/optimize\`
+- `POST /teams/create`
+- `POST /employees/recruit`
+- `POST /recruitment/refresh`
+- `POST /employees/assign`
+- `POST /employees/train`
+- `POST /employees/rest`
+- `POST /employees/promote`
+- `POST /employees/bonus`
+- `POST /employees/heal`
+- `POST /employees/release`
+- `POST /employees/fire`
+- `POST /employees/rename`
+- `POST /employees/optimize`
 
 **Frota**
-- \`POST /vehicles/buy\`
-- \`POST /vehicles/sell\`
-- \`POST /vehicles/refuel\`
-- \`POST /vehicles/repair\`
-- \`POST /vehicles/assign\`
-- \`POST /vehicles/transfer\`
-- \`POST /vehicles/rename\`
-- \`POST /vehicles/optimize\`
+- `POST /vehicles/buy`
+- `POST /vehicles/sell`
+- `POST /vehicles/refuel`
+- `POST /vehicles/repair`
+- `POST /vehicles/assign`
+- `POST /vehicles/transfer`
+- `POST /vehicles/rename`
+- `POST /vehicles/optimize`
 
 **Armamento**
-- \`POST /weapons/buy\`
-- \`POST /weapons/sell\`
-- \`POST /weapons/repair\`
-- \`POST /weapons/assign\`
-- \`POST /weapons/unassign\`
-- \`POST /weapons/auto_assign\`
-- \`POST /weapons/optimize\`
+- `POST /weapons/buy`
+- `POST /weapons/sell`
+- `POST /weapons/repair`
+- `POST /weapons/assign`
+- `POST /weapons/unassign`
+- `POST /weapons/auto_assign`
+- `POST /weapons/optimize`
 
 **Imóveis e QG**
-- \`POST /properties/buy\`
-- \`POST /properties/sell\`
-- \`POST /properties/upgrade\`
-- \`POST /properties/rename\`
-- \`POST /properties/optimize\`
-- \`POST /hq/validate\`
-- \`POST /hq/place\`
-- \`POST /hq/upgrade\`
-- \`POST /hq/priority\`
+- `POST /properties/buy`
+- `POST /properties/sell`
+- `POST /properties/upgrade`
+- `POST /properties/rename`
+- `POST /properties/optimize`
+- `POST /hq/validate`
+- `POST /hq/place`
+- `POST /hq/upgrade`
+- `POST /hq/priority`
 
 **Economia, quests e loja**
-- \`POST /police/bribe\`
-- \`POST /launder\`
-- \`GET /transactions\`
-- \`POST /settings\`
-- \`POST /quests/claim\`
-- \`POST /quests/claim_all\`
-- \`POST /quests/choose\`
-- \`POST /shop/speedup\`
-- \`POST /shop/buy_slot\`
-- \`POST /shop/vip\`
-- \`POST /shop/cosmetic\`
-- \`POST /vehicles/equip_paint\`
-- \`POST /teams/equip_emblem\`
-- \`POST /hq/equip_skin\`
+- `POST /police/bribe`
+- `POST /launder`
+- `GET /transactions`
+- `POST /settings`
+- `POST /quests/claim`
+- `POST /quests/claim_all`
+- `POST /quests/choose`
+- `POST /shop/speedup`
+- `POST /shop/buy_slot`
+- `POST /shop/vip`
+- `POST /shop/cosmetic`
+- `POST /vehicles/equip_paint`
+- `POST /teams/equip_emblem`
+- `POST /hq/equip_skin`
 
 </details>
 
 <details>
 <summary><strong>Cidade Viva — /api/game/street</strong></summary>
 
-- \`GET /state\`
-- \`POST /plan\`
-- \`POST /gear/buy\`
-- \`POST /territory\`
-- \`POST /contacts/call\`
-- \`POST /garage\`
-- \`POST /activities/start\`
-- \`POST /activities/claim\`
+- `GET /state`
+- `POST /plan`
+- `POST /gear/buy`
+- `POST /territory`
+- `POST /contacts/call`
+- `POST /garage`
+- `POST /activities/start`
+- `POST /activities/claim`
 
 </details>
 
 <details>
 <summary><strong>Mastermind — /api/game/mastermind</strong></summary>
 
-- \`GET /state\`
-- \`POST /heists/intel\`
-- \`POST /heists/create\`
-- \`POST /heists/prep/start\`
-- \`POST /heists/prep/claim\`
-- \`POST /heists/launch\`
-- \`POST /heists/claim\`
-- \`POST /heists/abort\`
-- \`POST /market/trade\`
-- \`POST /bounty\`
-- \`POST /cache/scan\`
+- `GET /state`
+- `POST /heists/intel`
+- `POST /heists/create`
+- `POST /heists/prep/start`
+- `POST /heists/prep/claim`
+- `POST /heists/launch`
+- `POST /heists/claim`
+- `POST /heists/abort`
+- `POST /market/trade`
+- `POST /bounty`
+- `POST /cache/scan`
 
 </details>
 
 <details>
 <summary><strong>Administração — /api/admin</strong></summary>
 
-- \`GET /dashboard\`
-- \`GET /users\`
-- \`GET /user/{user_id}\`
-- \`POST /user/{user_id}/grant-resources\`
-- \`POST /user/{user_id}/reset-progress\`
-- \`POST /user/{user_id}/ban\`
-- \`POST /user/{user_id}/unban\`
-- \`POST /user/{user_id}/role\`
-- \`POST /user/{user_id}/grant-admin\`
-- \`POST /user/{user_id}/revoke-admin\`
-- \`GET /logs\`
-- \`GET /server-stats\`
+- `GET /dashboard`
+- `GET /users`
+- `GET /user/{user_id}`
+- `POST /user/{user_id}/grant-resources`
+- `POST /user/{user_id}/reset-progress`
+- `POST /user/{user_id}/ban`
+- `POST /user/{user_id}/unban`
+- `POST /user/{user_id}/role`
+- `POST /user/{user_id}/grant-admin`
+- `POST /user/{user_id}/revoke-admin`
+- `GET /logs`
+- `GET /server-stats`
 
 </details>
 
 <details>
 <summary><strong>Legal — /api/legal</strong></summary>
 
-- \`GET /meta\`
-- \`GET /documents/{doc_id}\`
-- \`GET /changelog\`
-- \`POST /disclaimer-ack\`
+- `GET /meta`
+- `GET /documents/{doc_id}`
+- `GET /changelog`
+- `POST /disclaimer-ack`
 
 </details>
 
@@ -929,36 +929,36 @@ A API é organizada por domínio.
 
 ### Backend
 
-Cria \`backend/.env\` com valores teus:
+Cria `backend/.env` com valores teus:
 
-\`\`\`env
+```env
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=lusorae
 JWT_SECRET=trocar-por-um-segredo-forte
 CORS_ORIGINS=http://localhost:3000
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=trocar-esta-password
-\`\`\`
+```
 
 Depois:
 
-\`\`\`bash
+```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8001 --reload
-\`\`\`
+```
 
 ### Frontend
 
-\`\`\`bash
+```bash
 cd frontend
 yarn install
 REACT_APP_BACKEND_URL=http://localhost:8001 yarn start
-\`\`\`
+```
 
-Para mostrar a autenticação localmente, não definas \`REACT_APP_AUTH_UI_ENABLED=false\`.
+Para mostrar a autenticação localmente, não definas `REACT_APP_AUTH_UI_ENABLED=false`.
 
 ---
 
@@ -966,22 +966,22 @@ Para mostrar a autenticação localmente, não definas \`REACT_APP_AUTH_UI_ENABL
 
 ### GitHub Pages
 
-O workflow \`.github/workflows/pages.yml\`:
+O workflow `.github/workflows/pages.yml`:
 
-1. corre em pushes para \`main\` que alterem frontend/workflow;
+1. corre em pushes para `main` que alterem frontend/workflow;
 2. instala Node 20;
-3. instala dependências com \`yarn --frozen-lockfile\`;
+3. instala dependências com `yarn install --frozen-lockfile`;
 4. faz build de produção;
-5. gera fallback SPA em \`404.html\`;
-6. adiciona \`.nojekyll\`;
+5. gera fallback SPA em `404.html`;
+6. adiciona `.nojekyll`;
 7. envia o artefacto;
-8. publica com \`actions/deploy-pages\`.
+8. publica com `actions/deploy-pages`.
 
 ### Produção completa com Docker
 
-A pasta \`deploy/\` contém:
+A pasta `deploy/` contém:
 
-- \`docker-compose.yml\`;
+- `docker-compose.yml`;
 - Dockerfile do frontend;
 - Dockerfile do backend;
 - Caddyfile;
@@ -992,7 +992,7 @@ A pasta \`deploy/\` contém:
 
 Topologia:
 
-\`\`\`text
+```text
 Internet :80/:443
         │
         ▼
@@ -1002,11 +1002,11 @@ Internet :80/:443
                        │
                        ▼
                     MongoDB
-\`\`\`
+```
 
 O Caddy trata de HTTPS automático e serve a SPA; o MongoDB não é exposto diretamente à Internet na configuração Docker fornecida.
 
-Consulta \`deploy/HOSTINGER.md\` para o guia operacional completo.
+Consulta `deploy/HOSTINGER.md` para o guia operacional completo.
 
 ---
 
@@ -1024,7 +1024,7 @@ O projeto já inclui várias medidas:
 - validação de email;
 - validação de nome de organização;
 - CORS explícito;
-- roles \`admin\` e \`moderator\`;
+- roles `admin` e `moderator`;
 - rotas administrativas separadas;
 - refresh automático de sessão;
 - timeout de pedidos no frontend;
@@ -1041,7 +1041,7 @@ O projeto já inclui várias medidas:
 
 ## Estrutura do repositório
 
-\`\`\`text
+```text
 LusoraeCrime/
 ├── .github/
 │   └── workflows/
@@ -1094,7 +1094,7 @@ LusoraeCrime/
 ├── memory/
 │   └── PRD.md
 └── README.md
-\`\`\`
+```
 
 ---
 
@@ -1106,8 +1106,8 @@ O repositório inclui:
 - testes específicos de autenticação Bearer/JWT;
 - testes de disclaimer/legal;
 - suites de regressão;
-- relatórios em \`test_reports/\`;
-- testes de API em \`backend_test.py\`;
+- relatórios em `test_reports/`;
+- testes de API em `backend_test.py`;
 - health check opcional no frontend;
 - validações de build através do GitHub Actions.
 
@@ -1128,7 +1128,7 @@ A identidade visual definida no projeto segue um **tactical command-center HUD**
 - alta densidade de informação;
 - mapa como elemento principal;
 - tipografia mono para métricas e timers;
-- animações com suporte a \`prefers-reduced-motion\`;
+- animações com suporte a `prefers-reduced-motion`;
 - foco em contraste e acessibilidade.
 
 ---
@@ -1173,7 +1173,7 @@ Itens ainda documentados como evolução possível:
 
 ## Licença
 
-Neste momento o repositório não contém um ficheiro \`LICENSE\`. Não assumas que o código pode ser redistribuído, sublicenciado ou reutilizado fora dos termos definidos pelo proprietário do repositório.
+Neste momento o repositório não contém um ficheiro `LICENSE`. Não assumas que o código pode ser redistribuído, sublicenciado ou reutilizado fora dos termos definidos pelo proprietário do repositório.
 
 ---
 
