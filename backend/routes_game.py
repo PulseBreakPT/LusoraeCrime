@@ -73,6 +73,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
 from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
+from property_market import property_market_price
 from economy_constants import (
     EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
     LAUNDER_BASE_RATE, LAUNDER_MAX_RATE, LAUNDER_PASSIVE_RATE,
@@ -2120,25 +2121,41 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
     if body.type_key not in PROPERTY_TYPES:
         raise HTTPException(status_code=400, detail="Tipo de propriedade inválido")
     if not is_on_land(body.lat, body.lng):
-        raise HTTPException(status_code=400, detail="Localização inválida — escolhe um ponto em terra dentro de Lisboa")
+        raise HTTPException(status_code=400, detail="Localização inválida — escolhe um ponto em terra em Portugal")
     player = await get_player(user)
     pid = str(player["_id"])
     pt = PROPERTY_TYPES[body.type_key]
     if player["level"] < pt["min_level"]:
         raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {pt['min_level']}")
-    if player["clean_money"] < pt["price"]:
-        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    market = property_market_price(pt["price"], body.lat, body.lng)
+    price = market["price"]
+    if player["clean_money"] < price:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dinheiro limpo insuficiente — preço regional: {price:,} € ({market['zone']})",
+        )
     district = nearest_district(body.lat, body.lng)
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -pt["price"], "stats.properties_bought": 1}})
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -price, "stats.properties_bought": 1}})
     await db.properties.insert_one({
         "player_id": pid, "type_key": body.type_key,
         "name": f"{pt['name']} — {district}", "district": district,
         "lat": body.lat, "lng": body.lng,
-        "level": 1, "bought_at": now_utc().isoformat(),
+        "level": 1,
+        "purchase_price": price,
+        "market_zone": market["zone"],
+        "market_multiplier": market["multiplier"],
+        "bought_at": now_utc().isoformat(),
     })
-    await add_event(db, pid, "property", f"{pt['name']} comprado em {district} por {pt['price']:,} €.")
-    await record_tx(db, pid, "property_buy", -pt["price"], "clean", player["clean_money"] - pt["price"], f"Compra de {pt['name']}")
-    return {"ok": True}
+    await add_event(
+        db, pid, "property",
+        f"{pt['name']} comprado em {district} por {price:,} € "
+        f"(índice {market['zone']} ×{market['multiplier']:.2f}).",
+    )
+    await record_tx(
+        db, pid, "property_buy", -price, "clean", player["clean_money"] - price,
+        f"Compra de {pt['name']} — {market['zone']}",
+    )
+    return {"ok": True, "price": price, "market_zone": market["zone"], "market_multiplier": market["multiplier"]}
 
 
 @router.post("/properties/sell")
@@ -2156,7 +2173,8 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
         used = await db.employees.count_documents({"player_id": pid})
         if used > caps["employees"] - pt["cap_employees"] * prop["level"]:
             raise HTTPException(status_code=400, detail="Não podes vender: os teus operacionais ficariam sem espaço")
-    value = int(pt["price"] * 0.7 * prop["level"])
+    market_basis = int(prop.get("purchase_price") or pt["price"])
+    value = int(market_basis * 0.7 * prop["level"])
     prop_id_str = str(prop["_id"])
     if pt.get("cap_vehicles"):
         stranded = await db.vehicles.find({"player_id": pid, "property_id": prop_id_str}).to_list(100)
@@ -2191,7 +2209,8 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
     if prop.get("upgrading_until") and parse_dt(prop["upgrading_until"]) > now:
         raise HTTPException(status_code=400, detail="Já está a ser melhorado")
     pt = PROPERTY_TYPES[prop["type_key"]]
-    cost = int(pt["price"] * 0.6 * (prop["level"] + 1))
+    market_basis = int(prop.get("purchase_price") or pt["price"])
+    cost = int(market_basis * 0.6 * (prop["level"] + 1))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     target_level = prop["level"] + 1
