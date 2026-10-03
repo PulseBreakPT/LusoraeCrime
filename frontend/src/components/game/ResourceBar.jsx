@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoneyShort, heatStatus } from "../../lib/game";
+import { fmtMoneyShort } from "../../lib/game";
 import { Tip, AnimatedNumber, useFlash } from "./hud";
-import { Banknote, Coins, Flame, Trophy } from "lucide-react";
+import { Banknote, Coins, Trophy } from "lucide-react";
 
 export const ResourceBar = () => {
   const { state } = useGame();
@@ -28,7 +28,6 @@ export const ResourceBar = () => {
   if (!state) return null;
 
   const p = state.player;
-  const hs = heatStatus(p.heat);
   const nextRespect = p.next_level_respect;
   const respectTip = nextRespect
     ? `Nível ${p.level} · ${p.respect}/${nextRespect} de respeito. Faltam ${Math.max(0, nextRespect - p.respect)} para o nível ${p.level + 1}.`
@@ -70,14 +69,6 @@ export const ResourceBar = () => {
           className={dirtyFlash ? "lus-flash-amber" : ""}
         />
 
-        <Tip tip={`Calor policial: ${hs.label}. ${hs.desc}`} side="bottom" align="end">
-          <div data-testid="stat-heat" className="lus-minimal-stat flex shrink-0 items-center gap-1.5 px-1">
-            <Flame size={15} className="shrink-0" style={{ color: hs.color }} />
-            <span className="font-mono text-[13px] font-bold leading-none text-white sm:text-sm">
-              {Math.round(p.heat)}%
-            </span>
-          </div>
-        </Tip>
       </div>
     </div>
   );
