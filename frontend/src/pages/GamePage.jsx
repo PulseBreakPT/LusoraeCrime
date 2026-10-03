@@ -214,25 +214,24 @@ export default function GamePage() {
       {!focusMode && <ResourceBar />}
       {!focusMode && showFps && <FpsMeter />}
       {!focusMode && availableMissions.length > 0 && (
-        <button
-          type="button"
+        <div
+          role="status"
           data-testid="available-missions-hud"
-          onClick={() => openFromNav("operations")}
-          className="lus-optional-hud lus-available-missions-hud"
+          className="lus-optional-hud lus-available-missions-hud pointer-events-none"
           aria-label={`${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
-          title={`${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
+          title="Indicador de operações disponíveis — usa o dock Operações para abrir."
         >
           <Target size={21} aria-hidden="true" />
           <span className="lus-available-missions-count">{availableMissions.length}</span>
-        </button>
+        </div>
       )}
       {!focusMode && wantedStars > 0 && (
-        <button
-          type="button"
+        <div
+          role="status"
           data-testid="wanted-stars-hud"
-          onClick={() => setOpenPanel("street")}
-          className="lus-optional-hud pointer-events-auto absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
+          className="lus-optional-hud pointer-events-none absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
           aria-label={`Nível de procurado: ${wantedStars} de 5 estrelas`}
+          title="Indicador de procurado — gere a Cidade através do dock."
         >
           <span className="flex gap-0.5">
             {[0, 1, 2, 3, 4].map((index) => (
@@ -243,7 +242,7 @@ export default function GamePage() {
               />
             ))}
           </span>
-        </button>
+        </div>
       )}
       {(!online || stale) && (
         <div
