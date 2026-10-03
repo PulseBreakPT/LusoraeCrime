@@ -104,6 +104,7 @@ async def migrate_v4():
 @app.on_event("startup")
 async def startup():
     await db.users.create_index("email", unique=True)
+    await db.users.create_index("google_sub", unique=True, sparse=True)
     await db.login_attempts.create_index("identifier")
     await db.players.create_index("user_id")
     await db.teams.create_index("player_id")
