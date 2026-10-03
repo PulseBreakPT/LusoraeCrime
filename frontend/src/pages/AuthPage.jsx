@@ -17,6 +17,9 @@ const BG = "https://images.unsplash.com/photo-1731234361187-4702894e725a?crop=en
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const ORG_FORBIDDEN_RE = /[<>{}[\]\\/;`]/;
 
+// Mantém login/registo no código e permite ocultá-los por ambiente.
+const AUTH_UI_ENABLED = process.env.REACT_APP_AUTH_UI_ENABLED !== "false";
+
 // Código de sessão gerado uma vez por carregamento da página (HUD inferior)
 const SESSION_CODE = (() => {
   const chars = "0123456789ABCDEF";
@@ -337,6 +340,24 @@ export default function AuthPage() {
   };
 
   if (user) return <Navigate to="/" replace />;
+
+  // No GitHub Pages, o acesso fica oculto sem remover a implementação.
+  if (!AUTH_UI_ENABLED) {
+    return (
+      <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050506] px-4">
+        <img src={BG} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050506] via-[#050506]/90 to-[#050506]/70" />
+        <div className="relative z-10 w-full max-w-xl rounded-xl border border-white/10 bg-black/60 p-8 text-center shadow-2xl backdrop-blur-md">
+          <ShieldCheck className="mx-auto h-8 w-8 text-red-500" aria-hidden="true" />
+          <h1 className="mt-4 font-display text-4xl font-bold uppercase tracking-tight text-white">Lusorae</h1>
+          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.3em] text-red-400">Acesso reservado</p>
+          <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-zinc-400">
+            O sistema de acesso está temporariamente oculto nesta versão pública.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const isLocked = lockoutSeconds > 0;
   const submitDisabled = submitting || isLocked;
