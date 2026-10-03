@@ -4183,3 +4183,151 @@ html.lus-focus-mode .lus-optional-hud {
         padding-right: 0.2rem !important;
     }
 }
+
+/* LUSORAE NAV V5 — FOUR-GROUP GAMEPLAY NAVIGATION */
+
+/* O mapa é o palco principal. Moldura e grelha deixam de ser elementos
+   permanentes: a informação útil vem dos próprios marcadores. */
+.lus-hud-frame,
+.lus-grid {
+    display: none !important;
+}
+
+/* Quatro destinos de primeiro nível, sem barra ou caixa permanente. */
+.lus-dock {
+    gap: 0.75rem !important;
+    padding: 0 !important;
+}
+
+.lus-dock .lus-hud-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+}
+
+.lus-dock .lus-hud-btn-active::before {
+    left: 36% !important;
+    right: 36% !important;
+    bottom: 0 !important;
+    height: 2px !important;
+    opacity: 0.65;
+    box-shadow: 0 0 3px rgba(248, 113, 113, 0.24) !important;
+}
+
+/* O submenu só existe enquanto o utilizador escolhe uma área. */
+.lus-nav-tray {
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(8, 8, 10, 0.92);
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.lus-nav-action {
+    min-height: 52px;
+    background: transparent;
+    border: 1px solid transparent;
+    transition:
+        background-color 140ms ease,
+        border-color 140ms ease,
+        transform 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.lus-nav-action:hover,
+.lus-nav-action:focus-visible {
+    background: rgba(255, 255, 255, 0.055);
+    border-color: rgba(255, 255, 255, 0.055);
+    outline: none;
+}
+
+.lus-nav-action:active {
+    transform: scale(0.97);
+}
+
+.lus-nav-action.is-active {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.lus-nav-action svg {
+    filter:
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.54))
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.20));
+}
+
+/* Evento novo: texto transitório pousado no mapa. Sem faixa permanente. */
+.lus-activity-ticker {
+    min-height: 34px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.72),
+        0 2px 7px rgba(0, 0, 0, 0.30);
+    animation: lus-ticker-in 180ms ease-out;
+}
+
+@keyframes lus-ticker-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* A barra de recursos mantém só quatro grupos visuais e nunca cria uma
+   superfície contínua sobre o mapa. */
+[data-testid="resource-bar"] .lus-topbar {
+    gap: 0.6rem !important;
+}
+
+[data-testid="resource-bar"] .lus-minimal-stat {
+    min-height: 28px !important;
+    padding-left: 0.15rem !important;
+    padding-right: 0.15rem !important;
+}
+
+/* Estrelas de procurado: estado crítico, não um cartão. */
+[data-testid="wanted-stars-hud"] {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.72);
+}
+
+@media (max-width: 420px) {
+    .lus-dock {
+        gap: 0.55rem !important;
+    }
+
+    .lus-dock .lus-hud-btn {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+    }
+
+    .lus-nav-tray {
+        width: min(94vw, 24rem) !important;
+    }
+
+    .lus-nav-action {
+        min-height: 50px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lus-activity-ticker {
+        animation: none !important;
+    }
+}
