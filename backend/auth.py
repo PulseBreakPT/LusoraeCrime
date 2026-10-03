@@ -5,6 +5,8 @@ import jwt
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
@@ -171,6 +173,11 @@ class LoginInput(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class GoogleLoginInput(BaseModel):
+    id_token: str = Field(min_length=20, max_length=8192)
+    accept_terms: bool = True
+
+
 class AvailabilityInput(BaseModel):
     org_name: str | None = Field(default=None, max_length=60)
     email: str | None = Field(default=None, max_length=254)
@@ -182,7 +189,7 @@ class ChangePasswordInput(BaseModel):
 
 
 class DeleteAccountInput(BaseModel):
-    password: str
+    password: str | None = Field(default=None, max_length=128)
 
 
 def user_public(user: dict) -> dict:
