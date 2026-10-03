@@ -78,7 +78,7 @@ jobs:
       - name: Install frontend dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
         working-directory: frontend
-        run: yarn install --frozen-lockfile --prefer-offline --non-interactive
+        run: yarn install --prefer-offline --non-interactive
 
       - name: Build production web bundle
         working-directory: frontend
@@ -160,6 +160,7 @@ jobs:
           PY
 
       - name: Upload test AAB
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: lusorae-android-debug-aab
@@ -169,10 +170,12 @@ jobs:
 
       - name: Report release signing status
         run: |
-          if [[ -z "$ANDROID_UPLOAD_KEYSTORE_BASE64" ]]; then
-            echo "::notice::Upload-key secrets are not configured. Debug AAB validation passed; signed Play release is skipped."
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            echo "::notice::Native validation passed. Signed Play release is reserved for manual release runs."
+          elif [[ -z "$ANDROID_UPLOAD_KEYSTORE_BASE64" ]]; then
+            echo "::notice::Upload-key secrets are not configured. Native validation passed; signed Play release is skipped."
           else
-            echo "Upload-key secrets detected; a signed release AAB will be built."
+            echo "Upload-key secrets detected; a signed Play release AAB will be built."
           fi
 
       - name: Validate production release configuration
