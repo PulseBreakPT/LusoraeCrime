@@ -1295,7 +1295,7 @@ export const PlacementControls = () => {
   if (!placement) return null;
   const propertyType = catalog?.property_types?.[placement.typeKey];
   const typeName = propertyType?.name || "Propriedade";
-  const invalid = placement.point && !placement.valid;
+  const invalid = placement.point && !placement.checking && placement.valid === false;
   const market = placement.point && placement.valid && propertyType?.price
     ? propertyMarketPrice(propertyType.price, placement.point.lat, placement.point.lng)
     : null;
@@ -1307,8 +1307,8 @@ export const PlacementControls = () => {
     >
       <div className="lus-panel animate-slide-up rounded-xl border p-3 shadow-2xl">
         <div className="flex items-center gap-1.5">
-          <span className={`inline-block h-1.5 w-1.5 animate-pulse rounded-full ${invalid ? "bg-red-500" : "bg-emerald-400"}`} />
-          <p className={`font-mono text-[9px] font-bold uppercase tracking-[0.24em] ${invalid ? "text-red-400" : "text-emerald-300"}`}>
+          <span className={`inline-block h-1.5 w-1.5 animate-pulse rounded-full ${placement.checking ? "bg-amber-400" : invalid ? "bg-red-500" : "bg-emerald-400"}`} />
+          <p className={`font-mono text-[9px] font-bold uppercase tracking-[0.24em] ${placement.checking ? "text-amber-300" : invalid ? "text-red-400" : "text-emerald-300"}`}>
             Modo de colocação
           </p>
         </div>
