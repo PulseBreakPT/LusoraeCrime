@@ -4,7 +4,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Card } from "../ui/card";
 import {
   Send, Users, Car, Crosshair, Building2, Banknote, Siren, CheckCircle2,
-  Cpu, Radar, Target, ChevronDown, ChevronUp, Maximize2, Minimize2,
+  Cpu, Radar, Target, ChevronDown, Maximize2, Minimize2, Bell,
 } from "lucide-react";
 import { parseActivityMessage, classifyEvent } from "../../lib/game";
 import { useFlash } from "./hud";
@@ -419,21 +419,28 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("log");
   const [filter, setFilter] = useState("all");
+  const [tickerVisible, setTickerVisible] = useState(false);
   const containerRef = useRef(null);
   const events = state?.events || [];
   const firstId = events[0]?.id;
-  const newFlash = useFlash(firstId);
   const nowMs = serverNow();
   const { rows, counts } = useFeedData(events, filter, nowMs);
   const { unread, markSeen } = useUnread(events, state?.player?.id);
-  // Nova operação → a barra passa a mostrar o EM DIRETO (sem abrir sozinha).
   const liveMissions = useLiveOps(state, () => setTab("live"));
   const liveCount = liveMissions.length;
 
-  // Clicar fora fecha a lista, tal como um popover/dropdown normal — e Escape
-  // também, para consistência com o resto da interface (desktop).
+  // O mapa fica limpo: cada novo evento surge como uma linha transitória e
+  // desaparece sozinho. O histórico completo vive atrás do sino.
   useEffect(() => {
-    if (!open) return;
+    if (!firstId || open) return undefined;
+    setTickerVisible(true);
+    const id = setTimeout(() => setTickerVisible(false), 5000);
+    return () => clearTimeout(id);
+  }, [firstId, open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    setTickerVisible(false);
     const onPointerDown = (ev) => {
       if (containerRef.current && !containerRef.current.contains(ev.target)) setOpen(false);
     };
@@ -446,23 +453,27 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
     };
   }, [open]);
 
-  // Abrir a lista no separador Registos marca tudo como visto.
-  useEffect(() => { if (open && tab === "log") markSeen(); }, [open, tab, markSeen]);
+  useEffect(() => {
+    if (open && tab === "log") markSeen();
+  }, [open, tab, markSeen]);
 
   useEffect(() => {
     if (filter !== "all" && !counts[filter]) setFilter("all");
   }, [filter, counts]);
 
   if (!state || suppressed || (events.length === 0 && liveCount === 0)) return null;
+
   const latest = events[0];
   const latestDest = latest ? classifyEvent(latest.kind, latest.message) : null;
   const LatestIcon = latest ? iconFor(latest, latestDest) : Radar;
   const visible = rows.slice(0, 14);
-  const liveFirst = liveCount > 0 ? liveMissions[liveMissions.length - 1] : null;
-  const livePhase = liveFirst ? phaseInfo(liveFirst, nowMs) : null;
 
   return (
-    <div ref={containerRef} data-testid="activity-feed-mobile" className="pointer-events-none absolute bottom-[4.2rem] left-2 right-2 z-20 md:hidden">
+    <div
+      ref={containerRef}
+      data-testid="activity-feed-mobile"
+      className="pointer-events-none absolute bottom-[4.5rem] left-2 right-2 z-30 md:left-4 md:right-auto md:w-[24rem]"
+    >
       {open && (
         <Card
           data-testid="activity-feed-mobile-list"
@@ -490,7 +501,10 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
                   <FeedList
                     rows={visible}
                     nowMs={nowMs}
-                    onNavigate={(panel, dest) => { setOpen(false); onNavigate && onNavigate(panel, dest); }}
+                    onNavigate={(panel, dest) => {
+                      setOpen(false);
+                      onNavigate && onNavigate(panel, dest);
+                    }}
                     firstId={firstId}
                     newFlash={false}
                   />
@@ -500,41 +514,47 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           )}
         </Card>
       )}
-      <button
-        data-testid="activity-feed-mobile-toggle"
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`pointer-events-auto flex w-full items-center gap-2 rounded-md border border-white/10 bg-[#0a0a0c]/95 px-2.5 py-1.5 text-left shadow-2xl ${newFlash && !open && liveCount === 0 ? "lus-feed-new" : ""}`}
-      >
-        {liveFirst ? (
-          <>
-            <span className="lus-lo-rec shrink-0" />
-            <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-300">
-              <span className="font-bold uppercase text-white">{liveFirst.team_name}</span>
-              <span className="mx-1 text-zinc-600">·</span>
-              <span style={{ color: livePhase?.color }}>{livePhase?.label}</span>
-              {liveCount > 1 && <span className="ml-1 text-zinc-500">+{liveCount - 1}</span>}
-            </span>
-          </>
-        ) : (
-          <>
-            <span
-              className="lus-feed-ico"
-              style={{ color: latestDest.color, background: `${latestDest.color}14`, borderColor: `${latestDest.color}33` }}
-            >
+
+      <div className="flex items-end justify-end gap-2">
+        {tickerVisible && !open && latest && latestDest && (
+          <button
+            type="button"
+            data-testid="activity-feed-ticker"
+            onClick={() => {
+              setTickerVisible(false);
+              onNavigate && onNavigate(latestDest.panel, latestDest);
+            }}
+            className="lus-activity-ticker pointer-events-auto flex min-w-0 flex-1 items-center gap-2 text-left"
+          >
+            <span className="lus-feed-ico shrink-0" style={{ color: latestDest.color }}>
               <LatestIcon size={11} strokeWidth={2.2} />
             </span>
-            <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-400">
+            <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-300">
               {parseActivityMessage(latest.message)}
             </span>
-          </>
+            <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>
+          </button>
         )}
-        {unread > 0 && !open && (
-          <span className="lus-feed-unread font-mono">{unread > 9 ? "9+" : unread}</span>
-        )}
-        {latest && <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>}
-        <ChevronUp size={11} className={`shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+
+        <button
+          data-testid="activity-feed-mobile-toggle"
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="lus-hud-btn pointer-events-auto relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300"
+          aria-label={open ? "Fechar Central da rede" : "Abrir Central da rede"}
+          title="Central da rede"
+        >
+          <Bell size={17} />
+          {(unread > 0 || liveCount > 0) && !open && (
+            <span
+              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[8px] font-bold text-white"
+              style={{ background: liveCount > 0 ? "#EF4444" : "#F59E0B" }}
+            >
+              {liveCount > 0 ? liveCount : unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   );
 };
