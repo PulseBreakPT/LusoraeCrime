@@ -100,6 +100,28 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Create ephemeral CI signing key
+        working-directory: frontend/android
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore app/ci-release.jks \
+            -storepass ci-validation-only \
+            -keypass ci-validation-only \
+            -alias ci-validation \
+            -keyalg RSA -keysize 2048 -validity 30 \
+            -dname "CN=Lusorae CI,O=PulseBreakPT,C=PT"
+
+      - name: Build CI-signed release validation
+        working-directory: frontend/android
+        run: |
+          ./gradlew bundleRelease --stacktrace \
+            -Pandroid.injected.signing.store.file="$PWD/app/ci-release.jks" \
+            -Pandroid.injected.signing.store.password="ci-validation-only" \
+            -Pandroid.injected.signing.key.alias="ci-validation" \
+            -Pandroid.injected.signing.key.password="ci-validation-only"
+          test -s app/build/outputs/bundle/release/app-release.aab
+          rm -f app/ci-release.jks app/build/outputs/bundle/release/app-release.aab
+
       - name: Report release signing status
         run: |
           if [[ -z "$ANDROID_UPLOAD_KEYSTORE_BASE64" ]]; then
@@ -107,6 +129,16 @@ jobs:
           else
             echo "Upload-key secrets detected; a signed release AAB will be built."
           fi
+
+      - name: Validate production release configuration
+        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        run: |
+          test -n "$GOOGLE_WEB_CLIENT_ID" || { echo "::error::GOOGLE_WEB_CLIENT_ID is required for a Play release"; exit 1; }
+          test -n "$ANDROID_BACKEND_URL" || { echo "::error::ANDROID_BACKEND_URL is required for a Play release"; exit 1; }
+          [[ "$ANDROID_BACKEND_URL" == https://* ]] || { echo "::error::ANDROID_BACKEND_URL must use HTTPS"; exit 1; }
+          test -n "$ANDROID_UPLOAD_KEYSTORE_PASSWORD" || { echo "::error::ANDROID_UPLOAD_KEYSTORE_PASSWORD is required"; exit 1; }
+          test -n "$ANDROID_UPLOAD_KEY_ALIAS" || { echo "::error::ANDROID_UPLOAD_KEY_ALIAS is required"; exit 1; }
+          test -n "$ANDROID_UPLOAD_KEY_PASSWORD" || { echo "::error::ANDROID_UPLOAD_KEY_PASSWORD is required"; exit 1; }
 
       - name: Restore Play upload key
         if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
