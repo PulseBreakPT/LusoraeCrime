@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1 — Build
 # -----------------------------------------------------------------------------
-FROM node:20-bookworm-slim AS build
+FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -27,12 +27,15 @@ ENV CI=false \
     NODE_OPTIONS=--max-old-space-size=2048
 
 COPY frontend/package.json frontend/yarn.lock ./
-RUN yarn install --frozen-lockfile --network-timeout 300000
+RUN yarn install --non-interactive --network-timeout 300000
 
 COPY frontend/ ./
 
 ARG SITE_DOMAIN=srv1758509.hstgr.cloud
-ENV REACT_APP_BACKEND_URL=https://${SITE_DOMAIN}
+ARG GOOGLE_WEB_CLIENT_ID=
+ENV REACT_APP_BACKEND_URL=https://${SITE_DOMAIN} \
+    REACT_APP_AUTH_UI_ENABLED=true \
+    REACT_APP_GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID}
 
 RUN yarn build
 
