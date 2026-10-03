@@ -55,11 +55,12 @@ jobs:
       - name: Test offline guest engine
         env:
           CI: "true"
-        run: yarn test --watchAll=false --runInBand src/game/localGuestEngine.test.js src/lib/mapTiles.test.js src/lib/game.activity.test.js src/lib/routing.test.js src/lib/uiActionOwnership.test.js
+        run: yarn test --watchAll=false --runInBand --runTestsByPath src/game/localGuestEngine.test.js src/lib/mapTiles.test.js src/lib/game.activity.test.js src/lib/routing.test.js src/lib/uiActionOwnership.test.js
 
       - name: Build frontend
         env:
           CI: "false"
+          GENERATE_SOURCEMAP: "false"
           REACT_APP_BACKEND_URL: ${{ vars.PUBLIC_BACKEND_URL || 'https://lusora-patrols.preview.emergentagent.com' }}
           REACT_APP_AUTH_UI_ENABLED: "true"
           REACT_APP_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
