@@ -3739,3 +3739,240 @@ html.lus-compact-hud .lus-hud-btn svg {
 html.lus-focus-mode .lus-optional-hud {
     display: none !important;
 }
+
+
+/* ==========================================================================
+   SSS MINIMAL HUD — gameplay-first
+   Inspirado na filosofia visual do Distrito 112: o mapa e as operações ficam
+   em primeiro plano; a UI permanente reduz-se a ícones, valores e alertas.
+   ========================================================================== */
+
+.lus-topbar {
+    border-color: transparent !important;
+    background: rgba(5, 5, 6, 0.10) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(3px) saturate(1.05);
+    -webkit-backdrop-filter: blur(3px) saturate(1.05);
+}
+
+.lus-topbar::before,
+.lus-topbar::after {
+    display: none !important;
+}
+
+.lus-minimal-stat {
+    min-height: 34px;
+    border-radius: 9px;
+    background: rgba(5, 5, 6, 0.12);
+    box-shadow:
+        0 5px 14px rgba(0, 0, 0, 0.28),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.88);
+    transition:
+        opacity 180ms ease,
+        background-color 180ms ease,
+        transform 180ms ease;
+}
+
+.lus-minimal-stat:hover {
+    background: rgba(12, 12, 14, 0.28);
+    transform: translateY(-1px);
+}
+
+.lus-minimal-stat svg {
+    filter:
+        drop-shadow(0 2px 2px rgba(0, 0, 0, 0.92))
+        drop-shadow(0 0 4px currentColor);
+}
+
+.lus-level-readout {
+    background: rgba(80, 10, 14, 0.13);
+}
+
+.lus-level-readout .border-primary\/30 {
+    border-color: rgba(239, 68, 68, 0.18) !important;
+    background: rgba(127, 29, 29, 0.18) !important;
+    box-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.42),
+        0 0 9px rgba(239, 68, 68, 0.10);
+}
+
+/* Botões isolados: praticamente só o ícone; a superfície aparece em hover,
+   foco ou estado ativo. */
+.lus-hud-btn {
+    min-width: 40px;
+    min-height: 40px;
+    border-color: transparent !important;
+    background: rgba(5, 5, 6, 0.08) !important;
+    background-image: none !important;
+    box-shadow: 0 5px 13px rgba(0, 0, 0, 0.30) !important;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.lus-hud-btn:hover,
+.lus-hud-btn:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(8, 8, 10, 0.28) !important;
+    box-shadow:
+        0 7px 18px rgba(0, 0, 0, 0.42),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
+}
+
+.lus-hud-btn svg {
+    filter:
+        drop-shadow(0 2px 2px rgba(0, 0, 0, 0.95))
+        drop-shadow(0 0 4px currentColor);
+    opacity: 0.92;
+}
+
+.lus-hud-btn-active {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(18, 18, 21, 0.34) !important;
+    box-shadow:
+        0 7px 18px rgba(0, 0, 0, 0.45),
+        0 0 10px rgba(239, 68, 68, 0.11) !important;
+}
+
+/* Dock sem "barra": os ícones parecem pousados sobre o jogo. */
+.lus-dock {
+    gap: 0.18rem !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+.lus-dock::before,
+.lus-dock::after {
+    display: none !important;
+}
+
+.lus-dock .lus-hud-btn {
+    width: 42px;
+    height: 42px;
+    padding: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(5, 5, 6, 0.10) !important;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.26) !important;
+}
+
+.lus-dock .lus-hud-btn:hover {
+    background: rgba(10, 10, 12, 0.28) !important;
+}
+
+.lus-dock .lus-hud-btn-active {
+    background: rgba(20, 20, 23, 0.36) !important;
+    box-shadow:
+        0 6px 16px rgba(0, 0, 0, 0.42),
+        0 0 11px rgba(239, 68, 68, 0.12) !important;
+}
+
+.lus-dock .lus-hud-btn-active::before {
+    left: 42% !important;
+    right: 42% !important;
+    bottom: 1px !important;
+    height: 3px !important;
+    background: #f87171 !important;
+    box-shadow: 0 0 7px rgba(248, 113, 113, 0.75) !important;
+}
+
+/* Moldura e grelha deixam de competir com a cartografia. */
+.lus-hud-frame {
+    opacity: 0.18;
+}
+
+.lus-grid {
+    opacity: 0.10;
+}
+
+/* UI contextual: após alguns segundos sem input, a instrumentação recua.
+   Alertas críticos e conteúdos abertos continuam visíveis. */
+.lus-hud-awake [data-testid="resource-bar"],
+.lus-hud-awake .lus-optional-hud,
+.lus-hud-awake .lus-dock,
+.lus-hud-awake [data-testid="activity-feed-mobile"] {
+    opacity: 1;
+}
+
+.lus-hud-idle [data-testid="resource-bar"] {
+    opacity: 0.42;
+}
+
+.lus-hud-idle .lus-optional-hud {
+    opacity: 0.34;
+}
+
+.lus-hud-idle .lus-dock {
+    opacity: 0.58;
+}
+
+.lus-hud-idle [data-testid="activity-feed-mobile"] {
+    opacity: 0.48;
+}
+
+.lus-hud-idle [data-testid="wanted-stars-hud"],
+.lus-hud-idle [data-testid="connection-banner"] {
+    opacity: 1 !important;
+}
+
+[data-testid="resource-bar"],
+.lus-optional-hud,
+.lus-dock,
+[data-testid="activity-feed-mobile"] {
+    transition: opacity 280ms ease;
+}
+
+/* Feed compacto mobile: mantém contexto sem criar outra grande placa preta. */
+[data-testid="activity-feed-mobile"] > button {
+    border-color: rgba(255, 255, 255, 0.055) !important;
+    background: rgba(5, 5, 6, 0.34) !important;
+    box-shadow: 0 7px 18px rgba(0, 0, 0, 0.32) !important;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* Em telemóvel o HUD é quase exclusivamente iconográfico. */
+@media (max-width: 767px) {
+    .lus-topbar {
+        max-width: calc(100vw - 1rem) !important;
+    }
+
+    .lus-minimal-stat {
+        min-height: 32px;
+        padding-left: 0.34rem !important;
+        padding-right: 0.34rem !important;
+        background: rgba(5, 5, 6, 0.08);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.24);
+    }
+
+    .lus-minimal-stat svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .lus-dock .lus-hud-btn {
+        width: 40px;
+        height: 40px;
+    }
+
+    .lus-dock .lus-hud-btn svg {
+        width: 19px !important;
+        height: 19px !important;
+    }
+
+    .lus-hud-frame,
+    .lus-grid {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-testid="resource-bar"],
+    .lus-optional-hud,
+    .lus-dock,
+    [data-testid="activity-feed-mobile"] {
+        transition: none;
+    }
+}
