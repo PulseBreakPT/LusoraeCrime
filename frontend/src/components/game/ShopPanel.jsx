@@ -169,7 +169,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                   <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                     <meta.icon size={11} /> {meta.label}
                   </p>
-                  <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-3">
                     {Object.entries(items).map(([key, item]) => {
                       const owns = isOwned(cat, key);
                       const can = money >= item.cost;
@@ -277,7 +277,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                 </p>
               );
             })()}
-            <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-3">
               {Object.entries(shop.vip_plans || {}).map(([key, plan]) => {
                 const can = money >= plan.cost;
                 return (
@@ -306,7 +306,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
 
         {/* ---------------- Slots ---------------- */}
         {tab === "slots" && (
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2" data-testid="shop-tab-slots-content">
+          <div className="mt-3 grid grid-cols-2 gap-2" data-testid="shop-tab-slots-content">
             {[
               { kind: "vehicle", label: "Veículos", icon: Car, used: state.caps?.vehicles?.used ?? (state.vehicles || []).length, cap: state.caps?.vehicles?.max || 0, base: shop.slot_cost_vehicle_base, n: state.player.extra_vehicle_slots || 0 },
               { kind: "employee", label: "Funcionários", icon: Users, used: state.caps?.employees?.used ?? (state.employees || []).length, cap: state.caps?.employees?.max || 0, base: shop.slot_cost_employee_base, n: state.player.extra_employee_slots || 0 },
