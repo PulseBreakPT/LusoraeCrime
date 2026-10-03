@@ -12,6 +12,26 @@ const uid = (prefix = "id") =>
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const money = (n) => Math.max(0, Math.round(Number(n) || 0));
 
+const normalizeRisk = (value) => {
+  const n = Number(value) || 1;
+  // v1 do modo convidado gravava uma pseudo-percentagem (29/40/51/62)
+  // onde toda a UI do Lusorae espera uma escala ordinal de 1 a 5.
+  if (n > 5) return clamp(Math.round((n - 18) / 11), 1, 5);
+  return clamp(Math.round(n), 1, 5);
+};
+
+const normalizeSavedRisk = (save) => {
+  for (const collection of ["opportunities", "missions", "history"]) {
+    for (const item of save[collection] || []) {
+      item.risk = normalizeRisk(item.risk);
+      if (item.opportunity?.risk != null) {
+        item.opportunity.risk = normalizeRisk(item.opportunity.risk);
+      }
+    }
+  }
+  return save;
+};
+
 const fail = (status, detail) => {
   const error = new Error(detail);
   error.response = { status, data: { detail } };
@@ -106,7 +126,8 @@ const makeOpportunities = (save, count = 9) => {
       description: "Oportunidade local detetada pela rede de inteligência da organização.",
       district: district.name || "Zona operacional", district_key: district.key || "hq",
       lat: district.lat + ((i % 3) - 1) * 0.003, lng: district.lng + (((i + 1) % 3) - 1) * 0.003,
-      risk: 18 + tier * 11, reward: 1800 + tier * 1600 + i * 170,
+      risk: tier, reward: 1800 + tier * 1600 + i * 170,
+      respect: 25 + tier * 20,
       pays: i % 5 === 0 ? "clean" : "dirty", min_level: Math.min(6, tier),
       min_members: tier >= 3 ? 2 : 1, status: "active", rare: i === count - 1,
       required_models: [], police_force: i % 3 ? "PSP" : "GNR",
@@ -176,6 +197,9 @@ const loadSave = () => {
     save.events ||= [];
     save.history ||= [];
     save.quests ||= [];
+    normalizeSavedRisk(save);
+    save.version = LOCAL_GUEST_SAVE_VERSION;
+    persist(save);
     return save;
   } catch (_e) {
     return createInitialSave();
@@ -238,7 +262,8 @@ const missionChance = (save, opp, team) => {
     const a=e.attrs||{}; return sum + ((a.forca||0)+(a.inteligencia||0)+(a.discricao||0)+(a.tiro||0)+(a.hack||0)+(a.negociacao||0))/6;
   },0)/members.length : 0;
   const vehicle = save.vehicles.find((v)=>v.id===team.vehicle_id);
-  let chance = 0.46 + skill * 0.035 - (opp.risk || 0) * 0.003 - save.player.heat * 0.0015;
+  const risk = normalizeRisk(opp.risk);
+  let chance = 0.54 + skill * 0.035 - risk * 0.045 - save.player.heat * 0.0015;
   if (team.spec === opp.category) chance += 0.08;
   if (members.length >= (opp.min_members || 1)) chance += 0.04;
   if (vehicle) chance += clamp((vehicle.condition-50)/500, -0.1, 0.1);
@@ -269,15 +294,17 @@ const finalizeMission = (save, mission) => {
     const reward=money(mission.reward);
     if(mission.pays==="clean") save.player.clean_money += reward;
     else save.player.dirty_money += reward;
-    save.player.respect += Math.max(20,Math.round((mission.risk||20)*2.2));
-    save.player.heat=clamp(save.player.heat+(mission.risk||20)*0.16,0,100);
+    const risk = normalizeRisk(mission.risk);
+    save.player.respect += Math.max(20, risk * 24);
+    save.player.heat=clamp(save.player.heat + risk * 2.2,0,100);
     save.player.stats.missions_success=(save.player.stats.missions_success||0)+1;
     save.player.stats.total_earned=(save.player.stats.total_earned||0)+reward;
     mission.pending_reward=reward; mission.pending_pays=mission.pays;
     tx(save,"mission_reward",reward,mission.pays==="clean"?"clean":"dirty",mission.opportunity?.name || "Operação");
     addEvent(save,"success",`${team?.name||"Equipa"} concluiu ${mission.opportunity?.name||"a operação"} com sucesso.`);
   } else {
-    save.player.heat=clamp(save.player.heat+(mission.risk||20)*0.28,0,100);
+    const risk = normalizeRisk(mission.risk);
+    save.player.heat=clamp(save.player.heat + risk * 4.5,0,100);
     save.player.stats.missions_failed=(save.player.stats.missions_failed||0)+1;
     mission.pending_reward=0; mission.pending_pays=mission.pays;
     addEvent(save,"warning",`${team?.name||"Equipa"} falhou ${mission.opportunity?.name||"a operação"}.`);
