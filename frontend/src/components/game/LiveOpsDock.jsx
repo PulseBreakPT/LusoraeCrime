@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtMoney, chanceColor, CATEGORY_COLORS } from "../../lib/game";
-import { Radio, Crosshair, Siren, X, Video } from "lucide-react";
+import { Radio, Crosshair, Siren, X } from "lucide-react";
 
 /*
  * Operação em Direto — painel embutível com a "transmissão" das operações.
@@ -123,7 +123,7 @@ export function LiveOpsPanel({ state, serverNow }) {
           Sem operações no terreno
         </p>
         <p className="mt-1 font-mono text-[10px] leading-relaxed text-zinc-600">
-          Despacha uma equipa para veres a transmissão em direto — rádio, fases e chance ao vivo.
+          Despacha uma equipa para acompanhares no mapa o percurso, os membros, as fases e a chance ao vivo.
         </p>
       </div>
     );
@@ -179,7 +179,7 @@ export function LiveOpsPanel({ state, serverNow }) {
 
   return (
     <div data-testid="liveops-panel">
-      {/* Cabeçalho — alvo + seguir câmara */}
+      {/* Cabeçalho — alvo + seguir unidade no mapa */}
       <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-1.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="lus-lo-rec" />
@@ -189,15 +189,6 @@ export function LiveOpsPanel({ state, serverNow }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            data-testid="liveops-camera"
-            title="Abrir a câmara da operação — acompanhar a equipa no interior do alvo"
-            onClick={() => window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: sel.id } }))}
-            className="flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/60 hover:text-red-200"
-          >
-            <Video size={11} /> Câmara
-          </button>
           <button
             type="button"
             data-testid="liveops-follow"
