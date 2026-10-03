@@ -99,14 +99,14 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
           const sellTotal = props.reduce((a, p) => {
             const pt = catalog?.property_types?.[p.type_key];
-            return a + (pt ? Math.round(pt.price * sellFrac * p.level) : 0);
+            return a + (pt ? Math.round((p.purchase_price || pt.price) * sellFrac * p.level) : 0);
           }, 0);
           return (
             <SummaryStrip cols={4} className="mt-3" testId="properties-summary">
               <Kpi icon={TrendingUp} label="Produção" value={`${fmtMoney(dirtyPerH)}/h`} color="#F59E0B"
                 tip="Dinheiro sujo gerado por hora pelos laboratórios — acumula automaticamente à condição atual (rendimentos decrescentes por unidade repetida), mas gera calor." />
               <Kpi icon={Droplets} label="Lavagem" value={`${fmtMoney(launderPerH)}/h`} color="#34D399"
-                tip="Lavagem passiva por hora das empresas de fachada — converte sujo em limpo sem taxa, à condição atual de cada imóvel." />
+                tip="Capacidade de lavagem passiva por hora das empresas de fachada. O dinheiro convertido devolve 82% em limpo, à condição atual de cada imóvel." />
               <Kpi icon={Flame} label="Calor" value={`+${heatPerH.toFixed(1)}/h`} color={heatPerH > 0 ? "#EF4444" : "#71717A"}
                 tip="Calor policial gerado por hora pelas propriedades ilegais (laboratórios). Acima de 70 de calor há risco de rusga." />
               <Kpi icon={Banknote} label="Valor" value={fmtMoney(sellTotal)} sub={`manut. ${fmtMoney(maintWeekTotal)}/semana`} subColor="#F59E0B"
