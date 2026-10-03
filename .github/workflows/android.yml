@@ -73,7 +73,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/node_modules
-          key: ${{ runner.os }}-node22-modules-${{ hashFiles('frontend/yarn.lock') }}
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('frontend/package.json', 'frontend/yarn.lock') }}
 
       - name: Install frontend dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
