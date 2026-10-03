@@ -151,6 +151,29 @@ const makeDistricts = (lat, lng) => {
 
 const oppTypes = Object.entries(LOCAL_CATALOG.opportunity_types);
 
+const shuffle = (items) => {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
+const geoDistanceKm = (a, b) => {
+  if (!a || !b) return 0;
+  const lat1 = Number(a.lat), lng1 = Number(a.lng), lat2 = Number(b.lat), lng2 = Number(b.lng);
+  if (![lat1, lng1, lat2, lng2].every(Number.isFinite)) return 0;
+  const r = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const p1 = lat1 * Math.PI / 180;
+  const p2 = lat2 * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(p1) * Math.cos(p2) * Math.sin(dLng / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
+};
+
 const missionRewardForOpportunity = (save, risk, category, distKm, rare, seedIndex = 0) => {
   const meta = LOCAL_CATALOG.economy_meta?.mission_rewards || {};
   const base = Number(meta.base_by_risk?.[risk] || 2500);
@@ -166,34 +189,100 @@ const missionRewardForOpportunity = (save, risk, category, distKm, rare, seedInd
 
 const makeOpportunities = (save, count = 5) => {
   if (!save.player.hq) return [];
-  const districts = save.player.districts || [];
+  const districts = (save.player.districts || []).filter((d) => isFiniteGeoPoint(d));
   const now = Date.now();
   const level = Number(save.player.level || 1);
   const eligibleTypes = oppTypes.filter(([, cfg]) => Number(cfg.min_level || 1) <= level);
   if (!eligibleTypes.length) return [];
+
   const amount = Math.min(5, Math.max(0, count));
-  return Array.from({ length: amount }, (_, i) => {
-    const [typeKey, cfg] = eligibleTypes[i % eligibleTypes.length];
-    const district = districts[i % Math.max(1, districts.length)] || save.player.hq;
+  const active = (save.opportunities || []).filter((o) => o.status === "active");
+  const activeTypes = new Set(active.map((o) => o.type_key).filter(Boolean));
+  const activeDistricts = new Set(active.map((o) => o.district_key || o.district).filter(Boolean));
+  const recentTypes = [...(save.player.recent_spawn_type_keys || [])].slice(-12);
+  const recentDistricts = [...(save.player.recent_spawn_district_keys || [])].slice(-12);
+
+  const typePool = shuffle(eligibleTypes);
+  const districtPool = shuffle(districts.length ? districts : [save.player.hq]);
+  const generatedTypes = [];
+  const generatedDistricts = [];
+  const generated = [];
+  const reservedPoints = active
+    .filter((o) => isFiniteGeoPoint(o))
+    .map((o) => ({ lat: Number(o.lat), lng: Number(o.lng) }));
+
+  const pickType = () => {
+    const used = new Set(generatedTypes);
+    const fresh = typePool.filter(([key]) =>
+      !activeTypes.has(key) && !used.has(key) && !recentTypes.includes(key)
+    );
+    const nonActive = typePool.filter(([key]) => !activeTypes.has(key) && !used.has(key));
+    const unique = typePool.filter(([key]) => !used.has(key));
+    const pool = fresh.length ? fresh : nonActive.length ? nonActive : unique.length ? unique : typePool;
+    return pool[Math.floor(Math.random() * pool.length)];
+  };
+
+  const pickDistrict = () => {
+    const used = new Set(generatedDistricts);
+    const keyOf = (d) => d.key || d.name || "hq";
+    const fresh = districtPool.filter((d) =>
+      !activeDistricts.has(keyOf(d)) && !used.has(keyOf(d)) && !recentDistricts.includes(keyOf(d))
+    );
+    const nonActive = districtPool.filter((d) => !activeDistricts.has(keyOf(d)) && !used.has(keyOf(d)));
+    const unique = districtPool.filter((d) => !used.has(keyOf(d)));
+    const pool = fresh.length ? fresh : nonActive.length ? nonActive : unique.length ? unique : districtPool;
+    return pool[Math.floor(Math.random() * pool.length)] || save.player.hq;
+  };
+
+  const pointNearDistrict = (district) => {
+    let candidate = { lat: Number(district.lat), lng: Number(district.lng) };
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const radiusKm = 0.35 + Math.random() * 1.05;
+      const lat = Number(district.lat) + (radiusKm / 111) * Math.sin(angle);
+      const cos = Math.max(0.25, Math.cos(Number(district.lat) * Math.PI / 180));
+      const lng = Number(district.lng) + (radiusKm / (111 * cos)) * Math.cos(angle);
+      candidate = { lat, lng };
+      if (reservedPoints.every((p) => geoDistanceKm(candidate, p) >= 0.5)) break;
+    }
+    reservedPoints.push(candidate);
+    return candidate;
+  };
+
+  for (let i = 0; i < amount; i += 1) {
+    const [typeKey, cfg] = pickType();
+    const district = pickDistrict();
+    const districtKey = district.key || district.name || "hq";
+    const point = pointNearDistrict(district);
+    generatedTypes.push(typeKey);
+    generatedDistricts.push(districtKey);
+
     const tier = clamp(Number(cfg.risk || 1), 1, 5);
-    const distKm = 1 + i * 0.8;
-    const rare = i === amount - 1;
-    const reward = missionRewardForOpportunity(save, tier, cfg.category, distKm, rare, i);
-    return {
+    const distKm = Math.max(0.2, geoDistanceKm(save.player.hq, point));
+    const rare = Math.random() < 0.14 || (i === amount - 1 && Math.random() < 0.35);
+    const reward = missionRewardForOpportunity(save, tier, cfg.category, distKm, rare, i + Math.floor(Math.random() * 17));
+
+    generated.push({
       id: uid("opp"), type_key: typeKey, name: cfg.name, category: cfg.category,
       description: "Oportunidade local detetada pela rede de inteligência da organização.",
-      district: district.name || "Zona operacional", district_key: district.key || "hq",
-      lat: district.lat + ((i % 3) - 1) * 0.003, lng: district.lng + (((i + 1) % 3) - 1) * 0.003,
+      district: district.name || "Zona operacional", district_key: districtKey,
+      lat: point.lat, lng: point.lng,
       risk: tier, reward,
       respect: 25 + tier * 20,
-      pays: i % 5 === 0 ? "clean" : "dirty", min_level: Number(cfg.min_level || 1),
+      pays: Math.random() < 0.18 ? "clean" : "dirty",
+      min_level: Number(cfg.min_level || 1),
       min_members: tier >= 3 ? 2 : 1, status: "active", rare,
-      required_models: [], police_force: i % 3 ? "PSP" : "GNR",
-      created_at: new Date(now - i * 45000).toISOString(),
-      expires_at: new Date(now + (20 + i * 3) * 60000).toISOString(),
-      duration_s: 18 + tier * 6, dist_km: distKm,
-    };
-  });
+      required_models: [], police_force: Math.random() < 0.68 ? "PSP" : "GNR",
+      created_at: new Date(now - Math.floor(Math.random() * 30000)).toISOString(),
+      expires_at: new Date(now + (14 + Math.floor(Math.random() * 18)) * 60000).toISOString(),
+      duration_s: 18 + tier * 6 + Math.floor(Math.random() * 15),
+      dist_km: Number(distKm.toFixed(2)),
+    });
+  }
+
+  save.player.recent_spawn_type_keys = [...recentTypes, ...generatedTypes].slice(-12);
+  save.player.recent_spawn_district_keys = [...recentDistricts, ...generatedDistricts].slice(-12);
+  return generated;
 };
 
 const initialStreet = () => ({
@@ -228,7 +317,15 @@ const createInitialSave = () => {
       priorities:{active:"equilibrio"}, favorite_types:[], owned_cosmetics:[],
       extra_vehicle_slots:0, extra_employee_slots:0, vip_until:null, hq_skin_key:null,
       next_payroll_at:nextWeeklySettlementIso(now), pool_refresh_at:null,
-      stats:{missions_success:0,missions_failed:0,total_earned:0},
+      stats:{
+        missions_total:0, missions_success:0, missions_partial:0, missions_failure:0, missions_police:0,
+        missions_failed:0, total_earned:0, earned_dirty:0, earned_clean:0, fines_paid:0,
+        laundered_total:0, by_category:{}, success_by_category:{}, high_value_ops:0,
+        ops_dispatched:0, recruits_hired:0, recruits_informador:0, trainings_completed:0,
+        employees_promoted:0, employees_rested:0, bonuses_paid:0, vehicles_bought:0,
+        vehicles_repaired:0, vehicles_refueled:0, properties_bought:0, properties_upgraded:0,
+        teams_created:0, bribes_paid:0, raids_survived:0, _local_stats_version:2,
+      },
     },
     teams:[team], employees, candidates:[
       makeCandidate("hacker",0), makeCandidate("mecanico",1), makeCandidate("negociador",2), makeCandidate("seguranca",3),
@@ -257,6 +354,7 @@ const loadSave = () => {
     save.quests ||= [];
     normalizeSavedRisk(save);
     normalizeSavedEvents(save);
+    normalizeSavedStats(save);
     normalizeSavedEconomy(save);
     save.version = LOCAL_GUEST_SAVE_VERSION;
     persist(save);
@@ -286,6 +384,51 @@ const normalizeSavedEvents = (save) => {
       ? event.text
       : "",
   }));
+  return save;
+};
+
+const normalizeSavedStats = (save) => {
+  const defaults = {
+    missions_total:0, missions_success:0, missions_partial:0, missions_failure:0, missions_police:0,
+    missions_failed:0, total_earned:0, earned_dirty:0, earned_clean:0, fines_paid:0,
+    laundered_total:0, by_category:{}, success_by_category:{}, high_value_ops:0,
+    ops_dispatched:0, recruits_hired:0, recruits_informador:0, trainings_completed:0,
+    employees_promoted:0, employees_rested:0, bonuses_paid:0, vehicles_bought:0,
+    vehicles_repaired:0, vehicles_refueled:0, properties_bought:0, properties_upgraded:0,
+    teams_created:0, bribes_paid:0, raids_survived:0, _local_stats_version:2,
+  };
+  const previous = save.player?.stats || {};
+  const stats = { ...defaults, ...previous };
+  stats.by_category = { ...(previous.by_category || {}) };
+  stats.success_by_category = { ...(previous.success_by_category || {}) };
+
+  if (Number(previous._local_stats_version || 0) < 2) {
+    const terminal = (save.history || []).filter((m) =>
+      ["success","partial","failure","police"].includes(m.outcome)
+    );
+    stats.missions_total = terminal.length;
+    stats.missions_success = terminal.filter((m) => m.outcome === "success").length;
+    stats.missions_partial = terminal.filter((m) => m.outcome === "partial").length;
+    stats.missions_failure = terminal.filter((m) => m.outcome === "failure").length;
+    stats.missions_police = terminal.filter((m) => m.outcome === "police").length;
+    stats.missions_failed = stats.missions_failure;
+    stats.by_category = {};
+    stats.success_by_category = {};
+    stats.high_value_ops = 0;
+    for (const m of terminal) {
+      const category = m.category || m.opportunity?.category;
+      if (category) stats.by_category[category] = (stats.by_category[category] || 0) + 1;
+      if (m.outcome === "success" && category) {
+        stats.success_by_category[category] = (stats.success_by_category[category] || 0) + 1;
+      }
+      if (m.outcome === "success" && Number(m.pending_reward || m.reward || 0) >= 8000) {
+        stats.high_value_ops += 1;
+      }
+    }
+    stats._local_stats_version = 2;
+  }
+
+  save.player.stats = stats;
   return save;
 };
 
@@ -461,6 +604,11 @@ const finalizeMission = (save, mission) => {
   }
   mission.phase="done"; mission.outcome=success?"success":"failure"; mission.return_at=nowIso();
   save.opportunities = save.opportunities.filter((o) => o.id !== mission.opportunity_id);
+  normalizeSavedStats(save);
+  const stats = save.player.stats;
+  stats.missions_total=(stats.missions_total||0)+1;
+  stats.by_category ||= {};
+  stats.by_category[mission.category]=(stats.by_category[mission.category]||0)+1;
   if(success){
     const reward=money(mission.reward);
     if(mission.pays==="clean") save.player.clean_money += reward;
@@ -468,15 +616,21 @@ const finalizeMission = (save, mission) => {
     const risk = normalizeRisk(mission.risk);
     save.player.respect += Math.max(20, risk * 24);
     save.player.heat=clamp(save.player.heat + risk * 2.2,0,100);
-    save.player.stats.missions_success=(save.player.stats.missions_success||0)+1;
-    save.player.stats.total_earned=(save.player.stats.total_earned||0)+reward;
+    stats.missions_success=(stats.missions_success||0)+1;
+    stats.success_by_category ||= {};
+    stats.success_by_category[mission.category]=(stats.success_by_category[mission.category]||0)+1;
+    stats.total_earned=(stats.total_earned||0)+reward;
+    if(mission.pays==="clean") stats.earned_clean=(stats.earned_clean||0)+reward;
+    else stats.earned_dirty=(stats.earned_dirty||0)+reward;
+    if(reward>=8000) stats.high_value_ops=(stats.high_value_ops||0)+1;
     mission.pending_reward=reward; mission.pending_pays=mission.pays;
     tx(save,"mission_reward",reward,mission.pays==="clean"?"clean":"dirty",mission.opportunity?.name || "Operação");
     addEvent(save,"success",`${team?.name||"Equipa"} concluiu ${mission.opportunity?.name||"a operação"} com sucesso.`);
   } else {
     const risk = normalizeRisk(mission.risk);
     save.player.heat=clamp(save.player.heat + risk * 4.5,0,100);
-    save.player.stats.missions_failed=(save.player.stats.missions_failed||0)+1;
+    stats.missions_failure=(stats.missions_failure||0)+1;
+    stats.missions_failed=stats.missions_failure;
     mission.pending_reward=0; mission.pending_pays=mission.pays;
     addEvent(save,"warning",`${team?.name||"Equipa"} falhou ${mission.opportunity?.name||"a operação"}.`);
   }
@@ -886,6 +1040,8 @@ const mutateGame=(save,path,payload)=>{
       origin,origin_property_id:vehicle.property_id||null,
       target:{lat:Number(opp.lat),lng:Number(opp.lng)},opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
     team.status="on_mission";members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
+    normalizeSavedStats(save);
+    save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
     addEvent(save,"dispatch",`${team.name} saiu para ${opp.name}.`);return {ok:true,mission_id:mission.id};
   }
   if(path==="missions/recall"){
