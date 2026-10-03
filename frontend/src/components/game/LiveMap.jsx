@@ -15,6 +15,28 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 
+const isFiniteMapPoint = (point) =>
+  !!point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng));
+
+const normaliseMissionForMap = (mission, hq) => {
+  if (!mission) return null;
+  const target = isFiniteMapPoint(mission.target)
+    ? { lat: Number(mission.target.lat), lng: Number(mission.target.lng) }
+    : isFiniteMapPoint(hq)
+    ? { lat: Number(hq.lat), lng: Number(hq.lng) }
+    : null;
+  const origin = isFiniteMapPoint(mission.origin)
+    ? { lat: Number(mission.origin.lat), lng: Number(mission.origin.lng) }
+    : target;
+  if (!origin || !target) return null;
+  return {
+    ...mission,
+    origin,
+    target,
+    depart_at: mission.depart_at || mission.started_at || mission.arrive_at,
+  };
+};
+
 const safeRiskLevel = (value) => Math.max(0, Math.min(5, Math.round(Number(value) || 0)));
 const safeRiskDots = (value) => {
   const risk = safeRiskLevel(value);
@@ -191,9 +213,9 @@ const PlacementPreview = ({ placement, onPick }) => {
 const PanTo = ({ target }) => {
   const map = useMap();
   useEffect(() => {
-    if (!target) return;
-    if (map.getZoom() < 13) map.flyTo([target.lat, target.lng], 13.5, { duration: 0.7 });
-    else map.panTo([target.lat, target.lng], { animate: true, duration: 0.6 });
+    if (!isFiniteMapPoint(target)) return;
+    if (map.getZoom() < 13) map.flyTo([Number(target.lat), Number(target.lng)], 13.5, { duration: 0.7 });
+    else map.panTo([Number(target.lat), Number(target.lng)], { animate: true, duration: 0.6 });
   }, [target, map]);
   return null;
 };
@@ -887,20 +909,24 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           </Marker>
         );
       })}
-      {state.missions.map((m) => (
-        <MissionUnit
-          key={m.id}
-          mission={m}
-          serverNow={serverNow}
-          dim={baseFilter !== "all" && (m.origin_property_id || "hq") !== baseFilter}
-          followed={m.id === followId}
-          onToggleFollow={() => setFollowId((cur) => (cur === m.id ? null : m.id))}
-          roster={(m.member_ids || [])
-            .map((id) => empById[id])
-            .filter(Boolean)
-            .map((e) => ({ role_key: e.role_key, spec: e.spec, rank: e.rank }))}
-        />
-      ))}
+      {state.missions.map((m) => {
+        const safeMission = normaliseMissionForMap(m, state.player?.hq);
+        if (!safeMission) return null;
+        return (
+          <MissionUnit
+            key={safeMission.id}
+            mission={safeMission}
+            serverNow={serverNow}
+            dim={baseFilter !== "all" && (safeMission.origin_property_id || "hq") !== baseFilter}
+            followed={safeMission.id === followId}
+            onToggleFollow={() => setFollowId((cur) => (cur === safeMission.id ? null : safeMission.id))}
+            roster={(safeMission.member_ids || [])
+              .map((id) => empById[id])
+              .filter(Boolean)
+              .map((e) => ({ role_key: e.role_key, spec: e.spec, rank: e.rank }))}
+          />
+        );
+      })}
       {state.vehicles
         .filter((v) => v.transfer?.from && v.transfer?.to && v.transfer?.started_at)
         .map((v) => (
