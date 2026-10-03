@@ -76,31 +76,31 @@ OBJECTIVE_COMPLEXITY_PER_REQUIREMENT = 0.05  # +5% por requisito
 
 # Valor base mínimo e máximo para recompensas monetárias
 # O algoritmo garante que nenhuma operação sairá destes limites
-MONEY_REWARD_MIN = 500        # Operação trivial mínima
-MONEY_REWARD_MAX = 120000     # Operação extrema máxima (aumentado para permitir spread)
+MONEY_REWARD_MIN = 1500        # Operação trivial mínima
+MONEY_REWARD_MAX = 90000     # Operação extrema máxima (aumentado para permitir spread)
 
 # Multiplicador base por dificuldade
 # Define o "valor" de uma operação de risco 1 ao nível 1
 BASE_REWARD_PER_RISK = {
-    1: 1500,   # Risco muito baixo
-    2: 2500,   # Risco baixo
-    3: 4500,   # Risco médio
-    4: 8500,   # Risco alto
-    5: 15000,  # Risco muito alto
+    1: 2500,   # operação local de baixo valor
+    2: 4800,   # operação pequena / uma equipa reduzida
+    3: 9000,   # operação profissional média
+    4: 16500,  # operação de alto risco
+    5: 30000,  # operação de elite; grandes golpes vivem no Mastermind
 }
 
 # Escalamento por nível da organização
 ORG_LEVEL_MULTIPLIER_BASE = 1.0
-ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.35  # +35% por nível
+ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.12  # +12% por nível; evita inflação exponencial
 
 # Escalamento por tipo de operação (category)
 # Alguns tipos são intrinsecamente mais valiosos
 CATEGORY_MULTIPLIERS = {
-    "assalto": 1.0,      # Roubo — baseline
-    "logistica": 0.85,   # Entrega — mais seguro, menos recompensa
-    "tecnica": 1.0,      # Hacking — mesma dificuldade
-    "influencia": 0.9,   # Influência — mais variável
-    "especial": 1.2,     # Especial — operações raras, mais valor
+    "assalto": 1.05,
+    "logistica": 0.95,
+    "tecnica": 1.10,
+    "influencia": 0.90,
+    "especial": 1.25,
     "__default__": 1.0,
 }
 
@@ -128,6 +128,7 @@ RARE_ITEM_CHANCE_EXTREME_RISK = 0.10  # 10% em operações extremas
 
 BONUS_REWARD_CHANCE = 0.05  # 5% chance de bónus em operações muito difíceis
 BONUS_REWARD_MULTIPLIER = 1.5  # +50% quando ocorre
+RARE_MISSION_REWARD_MULTIPLIER = 1.60
 
 # ============================================================================
 # LIMITES E PROTEÇÃO CONTRA EXPLOITS
@@ -135,11 +136,11 @@ BONUS_REWARD_MULTIPLIER = 1.5  # +50% quando ocorre
 
 # Limite máximo de multiplicadores que podem ser stackados
 # Previne combinações absurdas (achievement + property + org level)
-MAX_COMBINED_MULTIPLIER = 2.5  # Máximo 2.5× após todos os multiplicadores
+MAX_COMBINED_MULTIPLIER = 1.75  # propriedades/talentos não podem inflacionar o saque sem limite
 
 # Penalidade por repetição da mesma missão tipo
 # Evita farm de operações simples
-REPEAT_PENALTY_MULTIPLIER = 0.85  # -15% por cada repetição consecutiva
+REPEAT_PENALTY_MULTIPLIER = 0.88  # -15% por cada repetição consecutiva
 REPEAT_PENALTY_RESETS_AFTER_MIN = 60  # Reseta a penalidade após X minutos
 
 # Penalidade por usar team abaixo do requisito
