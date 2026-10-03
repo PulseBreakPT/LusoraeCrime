@@ -100,10 +100,15 @@
     font-family: "Inter", sans-serif;
 }
 
-/* Color grade subtil dos tiles — levanta o mapa do preto absoluto e dá
-   profundidade cinematográfica sem o tornar claro. */
+/* Base OpenStreetMap sem API key. O OSM standard é claro; o color grade
+   abaixo transforma-o no mapa tático escuro do Lusorae sem depender de
+   providers pagos (CARTO/MapTiler/etc.). */
 .leaflet-tile {
-    filter: brightness(1.14) contrast(1.07) saturate(1.22);
+    filter: none;
+}
+
+.leaflet-tile.lus-osm-base-tile {
+    filter: brightness(0.62) invert(1) contrast(1.16) hue-rotate(180deg) saturate(0.58);
 }
 
 .leaflet-control-attribution {
