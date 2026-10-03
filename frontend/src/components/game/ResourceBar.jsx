@@ -87,7 +87,9 @@ export const ResourceBar = () => {
   const { dirtyPerH, launderPerH } = passiveRates(state, catalog, serverNow());
   const tr = teamsReadiness(state, serverNow());
   const activeOps = state.missions.length;
-  const payrollShort = (state.salary_total || 0) > 0 && p.clean_money < state.salary_total;
+  const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
+  const weeklyBreakdown = state.weekly_cost_breakdown || {};
+  const payrollShort = weeklyFixed > 0 && p.clean_money < weeklyFixed;
 
   return (
     <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
@@ -117,7 +119,7 @@ export const ResourceBar = () => {
           testId="stat-clean-money" icon={Banknote} color="#10B981" label="Limpo"
           value={<AnimatedNumber value={p.clean_money} format={money} />}
           sub={launderPerH > 0 ? `+${money(launderPerH)}/h` : null} subColor="#34D399"
-          tip="Dinheiro limpo — paga compras, reparações, salários e subornos. Cresce com lavagem (taxa 25%) e empresas de fachada."
+          tip="Dinheiro limpo — paga compras, reparações, fecho semanal e subornos. A lavagem manual devolve 78% na taxa base e pode melhorar até 90% com a organização certa."
           className={moneyFlash ? "lus-flash rounded" : ""}
         />
         {(() => {
@@ -169,11 +171,11 @@ export const ResourceBar = () => {
             tip={activeOps > 0 ? `${activeOps} operação(ões) em curso — acompanha as unidades no mapa.` : "Sem operações em curso — seleciona uma oportunidade no mapa e despacha uma equipa."}
           />
           <Stat
-            testId="stat-payroll" icon={HandCoins} color={payrollShort ? "#EF4444" : "#F59E0B"} label="Salários" value={fmtMoney(state.salary_total || 0)}
+            testId="stat-payroll" icon={HandCoins} color={payrollShort ? "#EF4444" : "#F59E0B"} label="Fecho semanal" value={fmtMoney(weeklyFixed)}
             sub={payrollShort ? "fundos insuficientes!" : p.next_payroll_at ? <PayrollCountdown targetAt={p.next_payroll_at} serverNow={serverNow} /> : null} subColor={payrollShort ? "#EF4444" : "#F59E0B"} align="end"
             tip={payrollShort
-              ? `Não tens dinheiro limpo suficiente para o próximo ciclo salarial (${fmtMoney(state.salary_total)}) — os operacionais vão perder moral e lealdade, e quem estiver disponível pode abandonar a organização.`
-              : `Ciclo salarial pago a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} com dinheiro limpo. Falhar pagamentos quebra a moral e a lealdade — e há quem abandone ou traia.`}
+              ? `Faltam ${fmtMoney(Math.max(0, weeklyFixed - p.clean_money))} para o fecho de segunda-feira às 20:00. O fecho inclui salários, TSU patronal, custos fixos da frota e imóveis.`
+              : `Segunda-feira às 20:00 · total ${fmtMoney(weeklyFixed)}: salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)} + TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)} + frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} + imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}. Combustível e reparações são variáveis e ficam fora deste fecho.`}
           />
           <Tip tip="Hora da rede — sincronizada com o servidor. Lisboa nunca dorme; tu também não devias." side="bottom" align="end" className="hidden lg:inline-flex">
             <div data-testid="stat-clock" className="flex min-w-0 flex-col items-end justify-center border-l border-border pl-2">
