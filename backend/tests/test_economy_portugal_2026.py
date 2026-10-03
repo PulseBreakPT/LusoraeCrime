@@ -1,5 +1,6 @@
 """Standalone economy regression checks for Portugal 2026 balance."""
 from pathlib import Path
+from datetime import datetime, timezone
 import sys
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -9,6 +10,7 @@ from economy_constants import (
     INITIAL_CLEAN_MONEY,
     EMPLOYER_SOCIAL_SECURITY_RATE,
     PROPERTY_MAINTENANCE_PCT_PER_DAY,
+    PROPERTY_MAINTENANCE_PCT_PER_WEEK,
     VEHICLE_ANNUAL_FIXED_COSTS,
     VEHICLE_REPAIR_BASE_MULTIPLIER,
     FUEL_PRICES,
@@ -24,6 +26,7 @@ from reward_config import (
 )
 from reward_engine import calculate_money_reward
 from property_market import property_market_price
+from economy_calendar import next_weekly_settlement, is_weekly_settlement, PORTUGAL_TZ
 
 
 def run():
@@ -31,6 +34,7 @@ def run():
     assert EMPLOYER_SOCIAL_SECURITY_RATE == 0.2375
     assert FUEL_PRICES == {"gasolina": 2.12, "gasoleo": 2.22}
     assert 0 < PROPERTY_MAINTENANCE_PCT_PER_DAY < 0.0002
+    assert abs(PROPERTY_MAINTENANCE_PCT_PER_WEEK - PROPERTY_MAINTENANCE_PCT_PER_DAY * 7) < 1e-12
     assert VEHICLE_REPAIR_BASE_MULTIPLIER == 0.003
     assert VEHICLE_ANNUAL_FIXED_COSTS["usado"] == 1250
     assert VEHICLE_ANNUAL_FIXED_COSTS["supercarro"] == 6000
@@ -63,6 +67,14 @@ def run():
     assert algarve["zone"] == "Algarve" and algarve["price"] == 60500
     assert interior["zone"] == "Interior" and interior["price"] == 46500
     assert lisboa["price"] > algarve["price"] > interior["price"]
+
+    # O fecho fixo é sempre segunda-feira às 20:00 em Portugal, mesmo com DST.
+    reference = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)  # sábado
+    settlement = next_weekly_settlement(reference)
+    local = settlement.astimezone(PORTUGAL_TZ)
+    assert local.weekday() == 0
+    assert (local.hour, local.minute) == (20, 0)
+    assert is_weekly_settlement(settlement)
 
     # A equipa inicial deve ter custos semanais plausíveis e inferiores a uma
     # operação de risco 2, sem tornar o primeiro ciclo automaticamente deficitário.
