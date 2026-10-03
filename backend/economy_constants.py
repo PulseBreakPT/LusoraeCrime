@@ -24,7 +24,7 @@ DIRTY_MONEY_HEAT_PER_10K = 0.15
 # PAYROLL CYCLES & MORALE
 # ============================================================================
 
-PAYROLL_CYCLE_MIN = 120  # minutes between salary cycles
+PAYROLL_CYCLE_MIN = 120  # 120 min reais representam 1 semana económica de jogo
 PAYROLL_MORALE_REGEN = 0.4  # morale/loyalty recovered per employee on time payment
 POOL_REFRESH_MIN = 5  # minutes between recruitment pool refreshes
 
@@ -51,18 +51,18 @@ TEAM_COST_SCALING_BASE = 0.5  # exponent for team scaling
 # ============================================================================
 
 PROPERTY_COSTS = {
-    'esconderijo': 30000,        # was 20000, +50%
-    'garagem': 22500,            # was 15000, +50%
-    'empresa_legal': 52500,      # was 35000, +50%
-    'armazem': 37500,            # was 25000, +50%
-    'laboratorio': 60000,        # was 40000, +50%
-    'oficina': 45000,            # was 30000, +50%
-    'porto_clandestino': 90000,  # was 60000, +50%
-    'posto_vigilancia': 42000,   # was 28000, +50%
-    'escritorio_advocacia': 48000,  # was 32000, +50%
-    'arsenal': 57000,            # was 38000, +50%
-    'casa_cambio': 63000,        # was 42000, +50%
-    'centro_logistico': 82500,   # was 55000, +50%
+    'esconderijo': 85000,
+    'garagem': 55000,
+    'empresa_legal': 140000,
+    'armazem': 180000,
+    'laboratorio': 220000,
+    'oficina': 165000,
+    'porto_clandestino': 420000,
+    'posto_vigilancia': 95000,
+    'escritorio_advocacia': 220000,
+    'arsenal': 140000,
+    'casa_cambio': 280000,
+    'centro_logistico': 450000,
 }
 
 # Property types and configurations
@@ -177,17 +177,17 @@ PASSIVE_INCOME_BONUSES = {
 # ============================================================================
 
 VEHICLE_PURCHASE_PRICES = {
-    'usado': 6000,
-    'moto': 12000,
-    'van': 18000,
-    'desportivo': 30000,
-    'suv_blindado': 45000,
-    'supercarro': 65000,
-    'carrinha_entrega': 9000,
-    'berlina_blindada': 22000,
-    'buggy_todo_terreno': 20000,
-    'limousine': 50000,
-    'carro_furtivo': 55000,
+    'usado': 12500,
+    'moto': 9000,
+    'van': 26000,
+    'desportivo': 55000,
+    'suv_blindado': 95000,
+    'supercarro': 185000,
+    'carrinha_entrega': 21000,
+    'berlina_blindada': 65000,
+    'buggy_todo_terreno': 18000,
+    'limousine': 75000,
+    'carro_furtivo': 48000,
 }
 
 VEHICLE_FUEL_CONSUMPTION = {
@@ -205,8 +205,9 @@ VEHICLE_FUEL_CONSUMPTION = {
 }
 
 FUEL_PRICES = {
-    'gasolina': 1.80,
-    'gasoleo': 1.60,
+    # DGEG, referência Portugal Continental 24-09-2026 (arredondado ao cêntimo).
+    'gasolina': 2.12,
+    'gasoleo': 2.22,
 }
 
 REFUEL_DURATION_BASE_S = 15
@@ -316,16 +317,16 @@ BONUS_SCALE = 1.0  # max(100, employee_salary) × this
 # ============================================================================
 
 TRAINING_COSTS = {
-    'combate': 3000,
-    'conducao': 2500,
-    'hacking': 3500,
-    'discricao': 2800,
-    'negociacao': 3000,
-    'primeiros_socorros': 2600,
-    'logistica': 2400,
-    'gestao': 3200,
-    'lideranca': 4000,
-    'treino_fisico': 2700,
+    'combate': 950,
+    'conducao': 700,
+    'hacking': 1400,
+    'discricao': 900,
+    'negociacao': 850,
+    'primeiros_socorros': 450,
+    'logistica': 650,
+    'gestao': 1100,
+    'lideranca': 1200,
+    'treino_fisico': 500,
 }
 
 # ============================================================================
