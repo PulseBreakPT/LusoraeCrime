@@ -74,10 +74,11 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
 from reward_engine import calculate_full_reward
 from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
 from property_market import property_market_price
+from economy_calendar import WEEKLY_SETTLEMENT_WEEKDAY, WEEKLY_SETTLEMENT_HOUR
 from economy_constants import (
     EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
     LAUNDER_BASE_RATE, LAUNDER_MAX_RATE, LAUNDER_PASSIVE_RATE,
-    VEHICLE_REPAIR_BASE_MULTIPLIER,
+    VEHICLE_REPAIR_BASE_MULTIPLIER, PROPERTY_MAINTENANCE_PCT_PER_WEEK,
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
@@ -455,6 +456,12 @@ async def catalog():
             "launder_max_rate": LAUNDER_MAX_RATE,
             "launder_passive_rate": LAUNDER_PASSIVE_RATE,
             "economic_week_minutes": PAYROLL_CYCLE_MIN,
+            "weekly_settlement": {
+                "weekday": WEEKLY_SETTLEMENT_WEEKDAY,
+                "hour": WEEKLY_SETTLEMENT_HOUR,
+                "timezone": "Europe/Lisbon",
+            },
+            "property_maintenance_pct_per_week": PROPERTY_MAINTENANCE_PCT_PER_WEEK,
             "mission_reward_min": MONEY_REWARD_MIN,
             "mission_reward_max": MONEY_REWARD_MAX,
         },
@@ -539,7 +546,13 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
         for v in vehicles
     )))
-    weekly_fixed_total = gross_salary + employer_ss + fleet_weekly
+    property_weekly = int(round(sum(
+        (pr.get("purchase_price") or PROPERTY_TYPES[pr["type_key"]]["price"])
+        * max(1, int(pr.get("level", 1)))
+        * PROPERTY_MAINTENANCE_PCT_PER_WEEK
+        for pr in properties
+    )))
+    weekly_fixed_total = gross_salary + employer_ss + fleet_weekly + property_weekly
 
     return {
         "server_time": now_iso,
@@ -568,6 +581,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
             "gross_salaries": gross_salary,
             "employer_social_security": employer_ss,
             "fleet_fixed": fleet_weekly,
+            "property_fixed": property_weekly,
         },
         "fuel_prices": FUEL_PRICES,
         "hot_category": hot_category(now_utc()),
@@ -2267,6 +2281,12 @@ async def optimize_properties(user: dict = Depends(get_current_user)):
         + int(round(sum(
             VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
             for v in vehicles
+        )))
+        + int(round(sum(
+            (p.get("purchase_price") or PROPERTY_TYPES[p["type_key"]]["price"])
+            * max(1, int(p.get("level", 1)))
+            * PROPERTY_MAINTENANCE_PCT_PER_WEEK
+            for p in props
         )))
     )
 
