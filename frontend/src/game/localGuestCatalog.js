@@ -147,7 +147,7 @@ export const LOCAL_CATALOG = {
   property_types:{
     esconderijo:{name:"Esconderijo",desc:"Alarga a capacidade de operacionais.",min_level:1,price:85000,cap_employees:4,employee_cap:4},
     garagem:{name:"Garagem",desc:"Espaço extra para a frota.",min_level:1,price:55000,cap_vehicles:2,vehicle_cap:2},
-    empresa_legal:{name:"Empresa de Fachada",desc:"Lava dinheiro sujo automaticamente.",min_level:2,price:140000,launder_per_h:1400,passive_clean:220},
+    empresa_legal:{name:"Empresa de Fachada",desc:"Lava dinheiro sujo automaticamente com retorno de 82%.",min_level:2,price:140000,launder_per_h:1400,launder_rate:.82,passive_clean:220},
     armazem:{name:"Armazém",desc:"Aumenta recompensas de logística.",min_level:2,price:180000,bonus_pct:.05,bonus_category:"logistica",bonus_label:"recompensas de logística"},
     laboratorio:{name:"Laboratório",desc:"Produz dinheiro sujo passivamente, mas gera calor.",min_level:3,price:220000,dirty_per_h:2100,heat_per_h:.8,passive_dirty:420},
     oficina:{name:"Oficina",desc:"Reduz o custo de reparações.",min_level:3,price:165000,repair_discount_pct:.15,repair_discount:.15},
@@ -155,7 +155,7 @@ export const LOCAL_CATALOG = {
     posto_vigilancia:{name:"Posto de Vigilância",desc:"Aumenta recompensas técnicas.",min_level:2,price:95000,bonus_pct:.05,bonus_category:"tecnica",bonus_label:"recompensas técnicas"},
     escritorio_advocacia:{name:"Escritório de Advocacia",desc:"Aumenta recompensas de influência.",min_level:2,price:220000,bonus_pct:.05,bonus_category:"influencia",bonus_label:"recompensas de influência",legal_bonus:.18},
     arsenal:{name:"Arsenal",desc:"Aumenta recompensas de assalto.",min_level:3,price:140000,bonus_pct:.05,bonus_category:"assalto",bonus_label:"recompensas de assalto"},
-    casa_cambio:{name:"Casa de Câmbio",desc:"Lavagem automática avançada.",min_level:3,price:280000,launder_per_h:1750,passive_clean:620},
+    casa_cambio:{name:"Casa de Câmbio",desc:"Lavagem automática avançada com retorno de 82%.",min_level:3,price:280000,launder_per_h:1750,launder_rate:.82,passive_clean:620},
     centro_logistico:{name:"Centro Logístico",desc:"Amplia bastante a capacidade da frota.",min_level:4,price:450000,cap_vehicles:3,vehicle_cap:3},
   },
   hq_max_level:8,
