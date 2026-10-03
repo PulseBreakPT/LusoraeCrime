@@ -334,12 +334,33 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
 
     ip = request.client.host if request.client else "unknown"
     user = await db.users.find_one({"google_sub": google_sub})
+    matched_by_google_sub = bool(user)
     if not user:
         user = await db.users.find_one({"email": email})
 
     if user:
         if user.get("banned"):
             raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'Motivo não especificado')}")
+
+        # Um email "verified" não significa sempre que a Google é a autoridade
+        # atual desse endereço. Para Gmail e Google Workspace (hd presente), a
+        # identidade é autoritativa. Para domínios externos, nunca anexamos
+        # silenciosamente Google a uma conta password já existente.
+        google_is_authoritative = email.endswith("@gmail.com") or bool(claims.get("hd"))
+        if (
+            not matched_by_google_sub
+            and user.get("password_hash")
+            and not user.get("google_sub")
+            and not google_is_authoritative
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Já existe uma conta Lusorae com este email. "
+                    "Entra com a palavra-passe existente antes de associares um fornecedor externo."
+                ),
+            )
+
         await db.users.update_one(
             {"_id": user["_id"]},
             {"$set": {"google_sub": google_sub, "google_email_verified": True},
@@ -370,17 +391,17 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
                 "terms_acceptance": acceptance,
             })
         except DuplicateKeyError:
-            user = await db.users.find_one({"email": email})
-            if not user:
-                raise HTTPException(status_code=409, detail="Não foi possível concluir o acesso Google")
-            result = None
+            # Evita autenticar por acidente uma conta criada em paralelo apenas
+            # porque o email colidiu. O cliente pode repetir o login e o fluxo
+            # normal acima volta a validar a associação.
+            raise HTTPException(
+                status_code=409,
+                detail="A conta foi criada em paralelo. Repete o acesso Google para concluir a associação.",
+            )
 
-        if result:
-            user_id = str(result.inserted_id)
-            await create_player_for_user(user_id, org_name)
-            user = await db.users.find_one({"_id": result.inserted_id})
-        else:
-            user_id = str(user["_id"])
+        user_id = str(result.inserted_id)
+        await create_player_for_user(user_id, org_name)
+        user = await db.users.find_one({"_id": result.inserted_id})
 
     access = create_access_token(user_id, email)
     refresh_tok = create_refresh_token(user_id)
