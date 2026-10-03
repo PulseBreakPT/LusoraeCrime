@@ -181,20 +181,29 @@ export const LOCAL_CATALOG = {
     negociacao:{name:"Acordo de Bastidores",category:"influencia"},
   },
   shop:{
-    speedup_cost_per_min:140,speedup_cost_min:500,
-    slot_cost_vehicle_base:8000,slot_cost_employee_base:6500,slot_cost_scale_per_unit:0.35,
+    speedup_cost_per_min:140,
+    speedup_cost_min:500,
+    slot_cost_vehicle_base:8000,
+    slot_cost_employee_base:6500,
+    slot_cost_scale_per_unit:0.35,
     vip_plans:{
-      week:{name:"VIP 7 dias",days:7,price:18000,description:"Bónus de qualidade de vida durante 7 dias."},
-      month:{name:"VIP 30 dias",days:30,price:52000,description:"Bónus de qualidade de vida durante 30 dias."},
+      week:{label:"VIP 7 dias",name:"VIP 7 dias",days:7,cost:18000,price:18000,description:"Bónus de qualidade de vida durante 7 dias."},
+      month:{label:"VIP 30 dias",name:"VIP 30 dias",days:30,cost:52000,price:52000,description:"Bónus de qualidade de vida durante 30 dias."},
     },
     vehicle_paints:{
-      graphite:{name:"Grafite",price:2500}, midnight:{name:"Midnight",price:3500}, crimson:{name:"Crimson",price:4000},
+      graphite:{label:"Grafite",name:"Grafite",color:"#52525B",cost:2500,price:2500},
+      midnight:{label:"Midnight",name:"Midnight",color:"#111827",cost:3500,price:3500},
+      crimson:{label:"Crimson",name:"Crimson",color:"#991B1B",cost:4000,price:4000},
     },
     team_emblems:{
-      wolf:{name:"Lobo",price:2200}, crown:{name:"Coroa",price:3000}, ghost:{name:"Fantasma",price:3500},
+      wolf:{label:"Lobo",name:"Lobo",color:"#94A3B8",cost:2200,price:2200},
+      crown:{label:"Coroa",name:"Coroa",color:"#EAB308",cost:3000,price:3000},
+      ghost:{label:"Fantasma",name:"Fantasma",color:"#A78BFA",cost:3500,price:3500},
     },
     hq_skins:{
-      bunker:{name:"Bunker",price:6500}, marble:{name:"Mármore Negro",price:8500}, neon:{name:"Neon Tático",price:9000},
+      bunker:{label:"Bunker",name:"Bunker",color:"#475569",cost:6500,price:6500},
+      marble:{label:"Mármore Negro",name:"Mármore Negro",color:"#27272A",cost:8500,price:8500},
+      neon:{label:"Neon Tático",name:"Neon Tático",color:"#EF4444",cost:9000,price:9000},
     },
   },
 };
