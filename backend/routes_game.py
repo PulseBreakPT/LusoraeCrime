@@ -76,6 +76,7 @@ from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
 from economy_constants import (
     EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
     LAUNDER_BASE_RATE, LAUNDER_MAX_RATE, LAUNDER_PASSIVE_RATE,
+    VEHICLE_REPAIR_BASE_MULTIPLIER,
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
@@ -418,7 +419,7 @@ async def catalog():
             "mismatch_penalty": VEHICLE_MISMATCH_PENALTY,
             "max_speed_ref": 26.0,           # supercarro — referência do score de velocidade
             "sell_fraction": 0.4,            # espelho da rota /vehicles/sell
-            "repair_cost_pct": 0.002,        # espelho da rota /vehicles/repair
+            "repair_cost_pct": VEHICLE_REPAIR_BASE_MULTIPLIER,
             "transfer_cost_per_km": VEHICLE_TRANSFER_COST_PER_KM,
         },
         # QI dos imóveis (SSS v6): manutenção, condição, obras e rendimentos
@@ -1648,7 +1649,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
         oficina_pct * p["level"] * property_condition_factor(p) * property_stack_mult(prop_ranks[p["_id"]])
         for p in props if p["type_key"] == "oficina" and property_active(p, now)
     ) + bonuses["repair_discount"])
-    cost = max(50, int(missing * vehicle["price"] * 0.012 * (1 - discount)))  # 0.012 = 1.2% (redesigned, 6x increase)
+    cost = max(50, int(missing * vehicle["price"] * VEHICLE_REPAIR_BASE_MULTIPLIER * (1 - discount)))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_repaired": 1}})
