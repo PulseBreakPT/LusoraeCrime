@@ -14,6 +14,12 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 
+const safeRiskLevel = (value) => Math.max(0, Math.min(5, Math.round(Number(value) || 0)));
+const safeRiskDots = (value) => {
+  const risk = safeRiskLevel(value);
+  return "●".repeat(risk) + "○".repeat(5 - risk);
+};
+
 const PROP_ICONS = {
   esconderijo: Shield,
   garagem: Warehouse,
@@ -855,7 +861,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
                 </p>
                 <div className="mt-1 space-y-0.5">
                   <TipRow label="recompensa" value={`${fmtMoney(opp.reward)} ${opp.pays === "clean" ? "limpos" : "sujos"}`} color={opp.pays === "clean" ? "#10B981" : "#F59E0B"} />
-                  <TipRow label="risco" value={"●".repeat(opp.risk) + "○".repeat(5 - opp.risk)} color="#EF4444" />
+                  <TipRow label="risco" value={safeRiskDots(opp.risk)} color="#EF4444" />
                   <TipRow label="respeito" value={`+${opp.respect}`} color="#0A84FF" />
                   {taken && activeMission ? (
                     <>
