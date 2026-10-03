@@ -177,8 +177,8 @@ const createInitialSave = () => {
     ],
     vehicles:[vehicle], weapons:[], properties:[], opportunities:[], missions:[], history:[],
     events:[
-      {id:uid("evt"),type:"system",text:"Modo convidado local iniciado. O jogo funciona sem servidor.",ts:nowIso()},
-      {id:uid("evt"),type:"team",text:"Crew Alfa está pronta com dois operacionais e um Sedan Usado.",ts:nowIso()},
+      {id:uid("evt"),kind:"system",message:"Modo convidado local iniciado. O jogo funciona sem servidor.",ts:nowIso()},
+      {id:uid("evt"),kind:"team",message:"Crew Alfa está pronta com dois operacionais e um Sedan Usado.",ts:nowIso()},
     ],
     transactions:[], quests:[], street:initialStreet(), mastermind:initialMastermind(),
   };
@@ -198,6 +198,7 @@ const loadSave = () => {
     save.history ||= [];
     save.quests ||= [];
     normalizeSavedRisk(save);
+    normalizeSavedEvents(save);
     save.version = LOCAL_GUEST_SAVE_VERSION;
     persist(save);
     return save;
@@ -211,9 +212,22 @@ const persist = (save) => {
   localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 };
 
-const addEvent = (save, type, text) => {
-  save.events.unshift({ id:uid("evt"), type, text, ts:nowIso() });
+const addEvent = (save, kind, message) => {
+  save.events.unshift({ id:uid("evt"), kind, message, ts:nowIso() });
   save.events = save.events.slice(0, 40);
+};
+
+const normalizeSavedEvents = (save) => {
+  save.events = (save.events || []).map((event) => ({
+    ...event,
+    kind: event.kind || event.type || "system",
+    message: typeof event.message === "string"
+      ? event.message
+      : typeof event.text === "string"
+      ? event.text
+      : "",
+  }));
+  return save;
 };
 
 const tx = (save, kind, amount, wallet, text) => {
