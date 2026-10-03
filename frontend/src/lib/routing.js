@@ -1,3 +1,6 @@
+import { api } from "./api";
+import { isLocalGuestMode } from "../game/localGuestEngine";
+
 // OSRM road routing used by the live map.
 //
 // The movement model mirrors the proven 112i approach:
@@ -10,7 +13,7 @@
 
 const OSRM_BASE = "https://router.project-osrm.org/route/v1/driving";
 const ROUTE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const STORAGE_KEY = "lusorae_road_route_cache_v2";
+const STORAGE_KEY = "lusorae_road_route_cache_v3";
 const MAX_PERSISTED_ROUTES = 40;
 
 const routeCache = new Map();
@@ -130,6 +133,45 @@ function normalizeRoute(data) {
   };
 }
 
+function normalizePreparedRoute(data) {
+  if (!data) throw new Error("Percurso rodoviário vazio");
+
+  // O backend Lusorae já devolve o formato final consumido pelo mapa.
+  if (Array.isArray(data.latlngs)) {
+    const latlngs = data.latlngs
+      .map((point) => [Number(point?.[0]), Number(point?.[1])])
+      .filter((point) => finite(point[0]) && finite(point[1]));
+    const times = Array.isArray(data.times) ? data.times.map(Number) : [];
+    if (
+      latlngs.length < 2
+      || times.length !== latlngs.length
+      || times.some((value) => !finite(value) || value < 0)
+    ) {
+      throw new Error("Percurso rodoviário devolvido pelo servidor é inválido");
+    }
+    return {
+      ...data,
+      latlngs,
+      times,
+      distance: Math.max(0, Number(data.distance) || 0),
+      duration: Math.max(0, Number(data.duration) || times[times.length - 1] || 0),
+      unavailable: false,
+    };
+  }
+
+  // Compatibilidade com uma resposta OSRM crua (modo convidado/local).
+  return normalizeRoute(data);
+}
+
+function routeErrorMessage(error) {
+  return String(
+    error?.response?.data?.detail
+    || error?.message
+    || error
+    || "Rota indisponível"
+  );
+}
+
 function unavailableRoute(origin, target, reason) {
   return {
     latlngs: [],
@@ -207,7 +249,9 @@ export async function fetchRoute(origin, target) {
     return unavailableRoute(origin || {}, target || {}, "Coordenadas inválidas");
   }
 
-  const key = routeKey(origin, target);
+  const cleanOrigin = { lat: Number(origin.lat), lng: Number(origin.lng) };
+  const cleanTarget = { lat: Number(target.lat), lng: Number(target.lng) };
+  const key = routeKey(cleanOrigin, cleanTarget);
   if (routeCache.has(key)) return routeCache.get(key);
 
   const persisted = readPersisted(key);
@@ -218,34 +262,46 @@ export async function fetchRoute(origin, target) {
 
   if (inflight.has(key)) return inflight.get(key);
 
-  const coordinates =
-    Number(origin.lng).toFixed(6) + "," + Number(origin.lat).toFixed(6)
-    + ";" + Number(target.lng).toFixed(6) + "," + Number(target.lat).toFixed(6);
-  const query =
-    "steps=false&annotations=duration,distance&geometries=geojson"
-    + "&overview=full&alternatives=false&radiuses=200;200";
-  const url = OSRM_BASE + "/" + coordinates + "?" + query;
+  const promise = (async () => {
+    try {
+      let route;
 
-  const promise = fetch(url)
-    .then((response) => {
-      if (!response.ok) throw new Error("OSRM HTTP " + response.status);
-      return response.json();
-    })
-    .then((data) => {
-      if (data?.code !== "Ok" || !data?.routes?.length) {
-        throw new Error("Sem percurso rodoviário disponível");
+      if (!isLocalGuestMode()) {
+        // Produção: o backend é a fonte autoritativa. Isto elimina CORS e
+        // rate-limit do OSRM no browser e partilha a cache com /dispatch.
+        const { data } = await api.post(
+          "/game/road-route",
+          { origin: cleanOrigin, target: cleanTarget },
+          { timeout: 25000 }
+        );
+        route = normalizePreparedRoute(data);
+      } else {
+        // Guest/local não tem backend real: mantém um fallback direto.
+        const coordinates =
+          Number(cleanOrigin.lng).toFixed(6) + "," + Number(cleanOrigin.lat).toFixed(6)
+          + ";" + Number(cleanTarget.lng).toFixed(6) + "," + Number(cleanTarget.lat).toFixed(6);
+        const query =
+          "steps=false&annotations=duration,distance&geometries=geojson"
+          + "&overview=full&alternatives=false&radiuses=1000;1000";
+        const response = await fetch(OSRM_BASE + "/" + coordinates + "?" + query);
+        if (!response.ok) throw new Error("OSRM HTTP " + response.status);
+        const data = await response.json();
+        if (data?.code !== "Ok" || !data?.routes?.length) {
+          throw new Error("Sem percurso rodoviário disponível");
+        }
+        route = normalizeRoute(data);
       }
-      const route = normalizeRoute(data);
+
       routeCache.set(key, route);
       persistRoute(key, route);
-      inflight.delete(key);
       return route;
-    })
-    .catch((error) => {
+    } catch (error) {
+      // Falhas nunca entram na cache: um retry seguinte pode funcionar.
+      return unavailableRoute(cleanOrigin, cleanTarget, routeErrorMessage(error));
+    } finally {
       inflight.delete(key);
-      // Deliberately do NOT cache failures. A later retry may succeed.
-      return unavailableRoute(origin, target, error);
-    });
+    }
+  })();
 
   inflight.set(key, promise);
   return promise;
