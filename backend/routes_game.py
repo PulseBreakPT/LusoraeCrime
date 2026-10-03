@@ -72,6 +72,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        SLOT_COST_VEHICLE_BASE, SLOT_COST_EMPLOYEE_BASE, SLOT_COST_SCALE_PER_UNIT,
                        VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
+from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
@@ -733,14 +734,16 @@ async def _prepare_dispatch(player, opp, team):
         category=opp["category"],
         failure_probability=1.0 - chance,  # Probabilidade de falha
         is_rare_mission=opp.get("weight", 1) >= 8,  # Missões com weight alto são raras
-        multiplier_stack=min(2.5, mult),  # Limitar stack para evitar abuso
+        multiplier_stack=1.0,  # bónus de propriedades/conquistas é aplicado UMA vez abaixo
         repeat_count=0,  # TODO: rastrear repetições consecutivas se desejado
         vehicles_dict=VEHICLE_MODELS,
         specialization_match=spec_match,
     )
 
-    # Aplicar multiplicadores existentes (achievements, properties, temp bonus) e penalidades
+    # Aplicar multiplicadores existentes uma única vez. Antes, "mult" entrava
+    # no reward_engine e voltava a ser multiplicado aqui, inflacionando o saque.
     reward = int(reward_data["money"] * mult * age_mult * split_mult)
+    reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
 
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
