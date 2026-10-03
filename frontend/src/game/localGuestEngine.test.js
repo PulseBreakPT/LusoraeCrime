@@ -126,4 +126,55 @@ describe("offline guest engine", () => {
     expect(fresh.hq_pending).toBe(true);
     expect(fresh.player.clean_money).toBe(75000);
   });
+  test("supports the existing panels through the local API compatibility layer", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    let state = (await localGuestRequest("get", "/game/state")).data;
+
+    const weapon = await localGuestRequest("post", "/game/weapons/buy", {
+      model_key: "pistola",
+    });
+    expect(weapon.data.weapon_id).toBeTruthy();
+
+    const property = await localGuestRequest("post", "/game/properties/buy", {
+      type_key: "garagem",
+      lat: 38.724,
+      lng: -9.141,
+    });
+    expect(property.data.property_id).toBeTruthy();
+
+    await localGuestRequest("post", "/game/street/plan", {
+      approach_key: "ghost",
+      escape_key: "speed",
+      gear_keys: [],
+    });
+    const street = (await localGuestRequest("get", "/game/street/state")).data;
+    expect(street.plan.approach_key).toBe("ghost");
+
+    await localGuestRequest("post", "/game/mastermind/heists/intel", {
+      target_key: "auction",
+    });
+    const mastermind = (await localGuestRequest("get", "/game/mastermind/state")).data;
+    expect(mastermind.targets.find((target) => target.key === "auction").intel).toBeTruthy();
+
+    await localGuestRequest("post", "/game/shop/cosmetic", {
+      category: "team_emblem",
+      key: "wolf",
+    });
+    state = (await localGuestRequest("get", "/game/state")).data;
+    await localGuestRequest("post", "/game/teams/equip_emblem", {
+      team_id: state.teams[0].id,
+      emblem_key: "wolf",
+    });
+    state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.teams[0].emblem_key).toBe("wolf");
+
+    expect(state.weapons.length).toBe(1);
+    expect(state.properties.length).toBe(1);
+  });
+
 });
