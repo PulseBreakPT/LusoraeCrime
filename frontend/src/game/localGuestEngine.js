@@ -113,6 +113,20 @@ const makeDistricts = (lat, lng) => {
 };
 
 const oppTypes = Object.entries(LOCAL_CATALOG.opportunity_types);
+
+const missionRewardForOpportunity = (save, risk, category, distKm, rare, seedIndex = 0) => {
+  const meta = LOCAL_CATALOG.economy_meta?.mission_rewards || {};
+  const base = Number(meta.base_by_risk?.[risk] || 2500);
+  const levelMult = 1 + Math.max(0, (save.player.level || 1) - 1) * (meta.org_level_per_level || 0.12);
+  const categoryMult = Number(meta.category_mult?.[category] || 1);
+  const distanceMult = 1 + Math.min(0.25, Math.max(0, Number(distKm) || 0) * 0.02);
+  const rareMult = rare ? Number(meta.rare_mult || 1.6) : 1;
+  const variation = 0.92 + ((seedIndex * 7) % 17) / 100;
+  const raw = base * levelMult * categoryMult * distanceMult * rareMult * variation;
+  const rounded = Math.round(raw / 100) * 100;
+  return clamp(rounded, Number(meta.min || 1500), Number(meta.max || 90000));
+};
+
 const makeOpportunities = (save, count = 9) => {
   if (!save.player.hq) return [];
   const districts = save.player.districts || [];
@@ -121,19 +135,22 @@ const makeOpportunities = (save, count = 9) => {
     const [typeKey, cfg] = oppTypes[i % oppTypes.length];
     const district = districts[i % Math.max(1, districts.length)] || save.player.hq;
     const tier = 1 + (i % 4);
+    const distKm = 1 + i * 0.8;
+    const rare = i === count - 1;
+    const reward = missionRewardForOpportunity(save, tier, cfg.category, distKm, rare, i);
     return {
       id: uid("opp"), type_key: typeKey, name: cfg.name, category: cfg.category,
       description: "Oportunidade local detetada pela rede de inteligência da organização.",
       district: district.name || "Zona operacional", district_key: district.key || "hq",
       lat: district.lat + ((i % 3) - 1) * 0.003, lng: district.lng + (((i + 1) % 3) - 1) * 0.003,
-      risk: tier, reward: 1800 + tier * 1600 + i * 170,
+      risk: tier, reward,
       respect: 25 + tier * 20,
       pays: i % 5 === 0 ? "clean" : "dirty", min_level: Math.min(6, tier),
-      min_members: tier >= 3 ? 2 : 1, status: "active", rare: i === count - 1,
+      min_members: tier >= 3 ? 2 : 1, status: "active", rare,
       required_models: [], police_force: i % 3 ? "PSP" : "GNR",
       created_at: new Date(now - i * 45000).toISOString(),
       expires_at: new Date(now + (20 + i * 3) * 60000).toISOString(),
-      duration_s: 18 + tier * 6, dist_km: 1 + i * 0.8,
+      duration_s: 18 + tier * 6, dist_km: distKm,
     };
   });
 };
@@ -165,7 +182,7 @@ const createInitialSave = () => {
       providers:["guest"], has_password:false, is_guest:true, disclaimer_accepted:false,
     },
     player: {
-      id:"guest-player", org_name:"Império Convidado", clean_money:75000, dirty_money:5000,
+      id:"guest-player", org_name:"Império Convidado", clean_money:100000, dirty_money:5000,
       respect:0, level:1, heat:0, hq:null, districts:[], region:"",
       priorities:{active:"equilibrio"}, favorite_types:[], owned_cosmetics:[],
       extra_vehicle_slots:0, extra_employee_slots:0, vip_until:null, hq_skin_key:null,
@@ -232,6 +249,7 @@ const normalizeSavedEvents = (save) => {
 };
 
 const normalizeSavedEconomy = (save) => {
+  const previousEconomyVersion = Number(save.version || 1);
   for (const employee of save.employees || []) {
     const role = LOCAL_CATALOG.specializations[employee.role_key];
     if (role?.salary) employee.salary = role.salary;
@@ -260,6 +278,14 @@ const normalizeSavedEconomy = (save) => {
   for (const property of save.properties || []) {
     const type = LOCAL_CATALOG.property_types[property.type_key];
     if (type?.price) property.price = type.price;
+  }
+  if (
+    previousEconomyVersion < 4
+    && !(save.properties || []).length
+    && Number(save.player?.clean_money || 0) < 100000
+  ) {
+    save.player.clean_money = 100000;
+    addEvent(save, "system", "Capital de transição atualizado para a economia Portugal 2026: 100 000 € limpos.");
   }
   return save;
 };
@@ -419,6 +445,14 @@ const tick = (save) => {
       clean += (cfg.passive_clean||0)*p.level*passiveHours;
       dirty += (cfg.passive_dirty||0)*p.level*passiveHours;
     });
+    const maintenancePct=LOCAL_CATALOG.property_meta?.maintenance_pct_per_day||0.00008;
+    const propertyOperating=save.properties.reduce((sum,p)=>{
+      const cfg=LOCAL_CATALOG.property_types[p.type_key]||{};
+      return sum+(Number(cfg.price||0)*Number(p.level||1)*maintenancePct/24*passiveHours);
+    },0);
+    if(propertyOperating>0){
+      save.player.clean_money=Math.max(0,save.player.clean_money-propertyOperating);
+    }
     if(clean){save.player.clean_money += clean;}
     if(dirty){save.player.dirty_money += dirty;}
     save.player.heat=clamp(save.player.heat-elapsed/900,0,100);
@@ -426,10 +460,22 @@ const tick = (save) => {
 
   const payrollAt=Date.parse(save.player.next_payroll_at||0);
   if(payrollAt && now>=payrollAt){
-    const total=save.employees.reduce((s,e)=>s+(e.salary||0),0);
-    if(save.player.clean_money>=total){save.player.clean_money-=total;tx(save,"payroll",-total,"clean","Salários");}
-    else save.employees.forEach((e)=>{e.morale=clamp((e.morale||70)-12,0,100);e.loyalty=clamp((e.loyalty||70)-5,0,100);});
-    save.player.next_payroll_at=new Date(now+120*60000).toISOString();
+    const economy=LOCAL_CATALOG.economy_meta||{};
+    const gross=save.employees.reduce((s,e)=>s+(e.salary||0),0);
+    const employerSs=Math.round(gross*(economy.employer_social_security_rate||0.2375));
+    const fleetWeekly=Math.round(save.vehicles.reduce(
+      (sum,v)=>sum+((economy.vehicle_annual_fixed_costs?.[v.model_key]||0)/52),0
+    ));
+    const total=gross+employerSs+fleetWeekly;
+    if(save.player.clean_money>=total){
+      save.player.clean_money-=total;
+      tx(save,"weekly_costs",-total,"clean","Salários + TSU + custos fixos da frota");
+      addEvent(save,"system",`Custos semanais pagos: ${total.toLocaleString("pt-PT")} € (salários ${gross.toLocaleString("pt-PT")} € + TSU ${employerSs.toLocaleString("pt-PT")} € + frota ${fleetWeekly.toLocaleString("pt-PT")} €).`);
+    } else {
+      save.employees.forEach((e)=>{e.morale=clamp((e.morale||70)-12,0,100);e.loyalty=clamp((e.loyalty||70)-5,0,100);});
+      addEvent(save,"warning",`Sem fundos para os custos semanais de ${total.toLocaleString("pt-PT")} €.`);
+    }
+    save.player.next_payroll_at=new Date(now+(economy.economic_week_minutes||120)*60000).toISOString();
   }
   save.last_tick=now;
   return save;
@@ -488,9 +534,9 @@ const streetSnapshot = (save) => {
       {key:"high",name:"Alta",cost:3500,reward_mult:1.7,unlocked:rank.level>=2},
     ],
     activities:[
-      {key:"race",name:"Corrida Clandestina",description:"Velocidade e controlo sob pressão.",duration_s:20,base_success:.68,reward_min:2500,reward_max:5200,unlock_rank:1,unlocked:true},
-      {key:"chop_shop",name:"Entrega à Desmontagem",description:"Entrega um veículo sem levantar suspeitas.",duration_s:22,base_success:.72,reward_min:3200,reward_max:6200,unlock_rank:2,unlocked:rank.level>=2},
-      {key:"smuggling",name:"Rota Clandestina",description:"Move carga entre zonas controladas.",duration_s:26,base_success:.64,reward_min:4200,reward_max:8200,unlock_rank:2,unlocked:rank.level>=2},
+      {key:"race",name:"Corrida Clandestina",description:"Velocidade e controlo sob pressão.",duration_s:20,base_success:.68,reward_min:4000,reward_max:7500,unlock_rank:1,unlocked:true},
+      {key:"chop_shop",name:"Entrega à Desmontagem",description:"Entrega um veículo sem levantar suspeitas.",duration_s:22,base_success:.72,reward_min:7500,reward_max:13500,unlock_rank:2,unlocked:rank.level>=2},
+      {key:"smuggling",name:"Rota Clandestina",description:"Move carga entre zonas controladas.",duration_s:26,base_success:.64,reward_min:12000,reward_max:22000,unlock_rank:3,unlocked:rank.level>=3},
     ],
     approaches:[
       {key:"ghost",name:"Fantasma",description:"Discrição máxima."},
@@ -517,11 +563,11 @@ const streetSnapshot = (save) => {
 };
 
 const MM_TARGETS=[
-  {key:"auction",name:"Leilão da Meia-Noite",description:"Obras raras mudam de mãos numa rede privada.",base_reward:42000,base_success:0.68,heat:18,unlock_rank:1,
+  {key:"auction",name:"Leilão da Meia-Noite",description:"Obras raras mudam de mãos numa rede privada.",base_reward:90000,base_success:0.68,heat:18,unlock_rank:1,
    preps:[{key:"routes",name:"Rotas de saída",cost:1800,duration_s:12,required:true},{key:"inside",name:"Ajuda interna",cost:2600,duration_s:14,required:true},{key:"signals",name:"Silenciar alarmes",cost:2200,duration_s:13,required:false}]},
-  {key:"estuary",name:"Reserva do Estuário",description:"Carga financeira protegida em trânsito.",base_reward:78000,base_success:0.58,heat:26,unlock_rank:2,
+  {key:"estuary",name:"Reserva do Estuário",description:"Carga financeira protegida em trânsito.",base_reward:175000,base_success:0.58,heat:26,unlock_rank:2,
    preps:[{key:"tracker",name:"Rastrear comboio",cost:3200,duration_s:15,required:true},{key:"vehicle",name:"Veículo de apoio",cost:4500,duration_s:17,required:true},{key:"inside",name:"Credenciais",cost:3000,duration_s:14,required:false}]},
-  {key:"sovereign",name:"Nó Soberano",description:"Infraestrutura cifrada com segurança máxima.",base_reward:140000,base_success:0.48,heat:34,unlock_rank:4,
+  {key:"sovereign",name:"Nó Soberano",description:"Infraestrutura cifrada com segurança máxima.",base_reward:310000,base_success:0.48,heat:34,unlock_rank:4,
    preps:[{key:"keys",name:"Chaves de acesso",cost:6500,duration_s:18,required:true},{key:"network",name:"Mapa de rede",cost:5200,duration_s:18,required:true},{key:"escape",name:"Janela de fuga",cost:4800,duration_s:16,required:true}]},
 ];
 const MM_APPROACHES=[
@@ -611,7 +657,20 @@ const publicState=(save)=>{
     properties:clone(save.properties),opportunities:clone(save.opportunities),missions:clone(save.missions),
     history:clone(save.history),events:clone(save.events),quests:clone(save.quests),caps,
     bonuses:{heal:0,legal:0,bribe_discount:0,repair_discount:save.properties.some(p=>p.type_key==="oficina") ? 0.15 : 0},
-    salary_total:save.employees.reduce((s,e)=>s+(e.salary||0),0),fuel_prices:clone(LOCAL_CATALOG.fuel_prices),
+    ...(()=>{
+      const economy=LOCAL_CATALOG.economy_meta||{};
+      const gross=save.employees.reduce((s,e)=>s+(e.salary||0),0);
+      const employerSs=Math.round(gross*(economy.employer_social_security_rate||0.2375));
+      const fleetWeekly=Math.round(save.vehicles.reduce(
+        (sum,v)=>sum+((economy.vehicle_annual_fixed_costs?.[v.model_key]||0)/52),0
+      ));
+      return {
+        salary_total:gross,
+        weekly_fixed_total:gross+employerSs+fleetWeekly,
+        weekly_cost_breakdown:{gross_salaries:gross,employer_social_security:employerSs,fleet_fixed:fleetWeekly},
+      };
+    })(),
+    fuel_prices:clone(LOCAL_CATALOG.fuel_prices),
     hot_category:"assalto",
   };
 };
@@ -756,7 +815,7 @@ const mutateGame=(save,path,payload)=>{
     if(path==="vehicles/buy"){const model=LOCAL_CATALOG.vehicle_models[p.model_key];if(!model)fail(400,"Modelo inválido");if(caps.vehicles.used>=caps.vehicles.max)fail(400,"Capacidade da frota atingida");if(save.player.level<model.min_level)fail(400,"Nível insuficiente");chargeClean(save,model.price,"Compra de veículo");const nv=makeVehicle(p.model_key);save.vehicles.push(nv);return {ok:true,vehicle_id:nv.id};}
     if(path==="vehicles/sell"){if(v.team_id)fail(400,"Desatribui o veículo antes de vender");const refund=Math.round(v.price*.4);save.player.clean_money+=refund;tx(save,"vehicle_sale",refund,"clean","Venda de veículo");save.vehicles=save.vehicles.filter(x=>x.id!==v.id);return {ok:true};}
     if(path==="vehicles/refuel"){const liters=Math.max(0,v.tank_l-v.fuel_l),cost=Math.ceil(liters*(LOCAL_CATALOG.fuel_prices[v.fuel_type]||1.7));chargeClean(save,cost,"Combustível");v.fuel_l=v.tank_l;return {ok:true,cost};}
-    if(path==="vehicles/repair"){const cost=Math.max(50,Math.round((100-v.condition)*v.price*.002));chargeClean(save,cost,"Reparação");v.condition=100;return {ok:true,cost};}
+    if(path==="vehicles/repair"){const cost=Math.max(50,Math.round((100-v.condition)*v.price*.003));chargeClean(save,cost,"Reparação");v.condition=100;return {ok:true,cost};}
     if(path==="vehicles/assign"){save.teams.forEach(t=>{if(t.vehicle_id===v.id)t.vehicle_id=null;});if(v.team_id){const old=save.teams.find(t=>t.id===v.team_id);if(old?.vehicle_id===v.id)old.vehicle_id=null;}v.team_id=p.team_id||null;if(p.team_id){const t=save.teams.find(t=>t.id===p.team_id);if(t){if(t.vehicle_id){const old=save.vehicles.find(x=>x.id===t.vehicle_id);if(old)old.team_id=null;}t.vehicle_id=v.id;}}return {ok:true};}
     if(path==="vehicles/transfer"){v.transfer={to_property_id:p.to_property_id||null,ends_at:new Date(Date.now()+12000).toISOString()};return {ok:true};}
     if(path==="vehicles/rename"){v.name=String(p.name||v.name).slice(0,40);return {ok:true};}
@@ -792,7 +851,7 @@ const mutateGame=(save,path,payload)=>{
   if(path==="hq/priority"){save.player.priorities.active=p.priority||"equilibrio";return {ok:true};}
   if(path==="hq/equip_skin"){save.player.hq_skin_key=p.skin_key||null;return {ok:true};}
   if(path==="police/bribe"){const cost=Math.max(1200,Math.round(save.player.heat*120));chargeClean(save,cost,"Suborno");save.player.heat=Math.max(0,save.player.heat-28);return {ok:true,cost};}
-  if(path==="launder"){const amount=Math.min(money(p.amount),save.player.dirty_money);if(amount<=0)fail(400,"Montante inválido");save.player.dirty_money-=amount;const received=Math.round(amount*.82);save.player.clean_money+=received;tx(save,"launder",received,"clean","Lavagem");return {ok:true,received};}
+  if(path==="launder"){const amount=Math.min(money(p.amount),save.player.dirty_money);if(amount<=0)fail(400,"Montante inválido");save.player.dirty_money-=amount;const received=Math.round(amount*(LOCAL_CATALOG.economy_meta?.launder_base_rate||.78));save.player.clean_money+=received;tx(save,"launder",received,"clean","Lavagem");return {ok:true,received};}
   if(path==="settings"){save.player.settings={...(save.player.settings||{}),...p};return {ok:true};}
   if(path==="quests/claim_all")return {ok:true,claimed:0,rewards:[]};
   if(path.startsWith("quests/"))return {ok:true,rewards:[]};
@@ -842,13 +901,14 @@ const mutateGame=(save,path,payload)=>{
   if(path==="street/activities/start"){
     if(save.street.active_job)fail(409,"Já existe uma atividade em curso");
     const defs={
-      race:{name:"Corrida Clandestina",reward:3500,duration:20,chance:.68},
-      chop_shop:{name:"Entrega à Desmontagem",reward:4200,duration:22,chance:.72},
-      smuggling:{name:"Rota Clandestina",reward:5500,duration:26,chance:.64},
+      race:{name:"Corrida Clandestina",reward:5200,duration:20,chance:.68},
+      chop_shop:{name:"Entrega à Desmontagem",reward:10500,duration:22,chance:.72},
+      smuggling:{name:"Rota Clandestina",reward:17000,duration:26,chance:.64},
     };
     const d=defs[p.job_key];if(!d)fail(400,"Atividade inválida");
     const rank=streetRank(save.street.rep||0);
-    if(["chop_shop","smuggling"].includes(p.job_key)&&rank.level<2)fail(400,"Esta atividade requer nível de rua 2");
+    if(p.job_key==="chop_shop"&&rank.level<2)fail(400,"Esta atividade requer nível de rua 2");
+    if(p.job_key==="smuggling"&&rank.level<3)fail(400,"Esta atividade requer nível de rua 3");
     const vehicle=save.vehicles.find(v=>v.id===p.vehicle_id);if(!vehicle)fail(400,"Seleciona um veículo");
     const district=save.street.districts.find(x=>x.key===p.district_key);if(!district)fail(400,"Seleciona uma zona");
     const stake=p.job_key==="race"?({cautious:500,standard:1500,high:3500}[p.wager_key]||1500):0;
