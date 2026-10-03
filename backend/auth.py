@@ -193,13 +193,39 @@ class DeleteAccountInput(BaseModel):
 
 
 def user_public(user: dict) -> dict:
+    providers = user.get("providers")
+    if not providers:
+        providers = ["password"] if user.get("password_hash") else (["google"] if user.get("google_sub") else [])
     return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name", ""),
             "role": user.get("role", "player"),
+            "providers": providers,
+            "has_password": bool(user.get("password_hash")),
             # Disclaimer de ficção: aceite UMA única vez por conta (no primeiro
             # registo/entrada). O frontend usa este campo para nunca repetir o
             # aviso — a fonte de verdade é o registo de auditoria gravado por
             # POST /legal/disclaimer-ack (last_disclaimer).
             "disclaimer_accepted": bool((user.get("last_disclaimer") or {}).get("accepted"))}
+
+
+async def unique_google_org_name(display_name: str | None, google_sub: str) -> str:
+    """Cria um nome de organização válido e único para novas contas Google."""
+    base = re.sub(r"\s+", " ", (display_name or "")).strip()
+    base = ORG_NAME_FORBIDDEN.sub("", base)
+    if len(base) < 3:
+        base = "Organização Lusorae"
+    base = base[:40]
+    if not await org_name_taken(base):
+        return base
+    suffix = re.sub(r"[^A-Za-z0-9]", "", google_sub or "")[-6:].upper() or "GOOGLE"
+    candidate = f"{base[:max(3, 39 - len(suffix))]} {suffix}".strip()[:40]
+    if not await org_name_taken(candidate):
+        return candidate
+    for n in range(2, 1000):
+        tail = f"{suffix}{n}"
+        candidate = f"{base[:max(3, 39 - len(tail))]} {tail}".strip()[:40]
+        if not await org_name_taken(candidate):
+            return candidate
+    raise HTTPException(status_code=409, detail="Não foi possível gerar um nome de organização único")
 
 
 async def create_player_for_user(user_id: str, org_name: str, with_default_hq: bool = False):
@@ -270,6 +296,7 @@ async def register(body: RegisterInput, request: Request, response: Response):
         result = await db.users.insert_one({
             "email": email, "password_hash": hash_password(body.password),
             "name": org_name, "role": "player", "created_at": now,
+            "auth_provider": "password", "providers": ["password"],
             "terms_acceptance": terms_acceptance_record(ip),
         })
     except DuplicateKeyError:
@@ -320,7 +347,7 @@ async def login(body: LoginInput, request: Request, response: Response):
         await db.login_attempts.delete_one({"identifier": identifier})
 
     user = await db.users.find_one({"email": email})
-    if not user or not verify_password(body.password, user["password_hash"]):
+    if not user or not user.get("password_hash") or not verify_password(body.password, user["password_hash"]):
         await db.login_attempts.update_one(
             {"identifier": identifier},
             {"$inc": {"count": 1},
@@ -379,7 +406,11 @@ async def claim_admin(user: dict = Depends(get_current_user)):
 async def change_password(body: ChangePasswordInput, user: dict = Depends(get_current_user)):
     validate_password_or_400(body.new_password)
     full_user = await db.users.find_one({"_id": ObjectId(user["_id"])})
-    if not full_user or not verify_password(body.current_password, full_user["password_hash"]):
+    if not full_user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+    if not full_user.get("password_hash"):
+        raise HTTPException(status_code=400, detail="Esta conta usa acesso Google e não tem palavra-passe local")
+    if not verify_password(body.current_password, full_user["password_hash"]):
         raise HTTPException(status_code=400, detail="Palavra-passe atual incorreta")
     await db.users.update_one({"_id": full_user["_id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
     return {"ok": True}
@@ -434,6 +465,7 @@ async def seed_admin():
         result = await db.users.insert_one({
             "email": admin_email, "password_hash": hash_password(admin_password),
             "name": "Sindicato Lusorae", "role": "admin",
+            "auth_provider": "password", "providers": ["password"],
             "created_at": now_utc().isoformat(),
         })
         await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae", with_default_hq=True)
