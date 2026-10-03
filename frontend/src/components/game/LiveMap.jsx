@@ -119,17 +119,21 @@ const unitIcon = (phase, chased) => {
 // Ícones cacheados por assinatura visual (mesmo padrão do oppIconCached) e
 // marcadores NÃO interativos — puramente visuais, custo mínimo por frame.
 const opIconCache = new Map();
-const opIconCached = (kind) => {
-  let icon = opIconCache.get(kind);
+const opIconCached = (kind, employeeName) => {
+  const name = employeeName || "Operacional";
+  const key = `${kind}|${name}`;
+  let icon = opIconCache.get(key);
   if (!icon) {
+    const nameMarkup = renderToStaticMarkup(<span className="op-name">{name}</span>);
     const html = `
       <div class="op-pin op-${kind}">
+        ${nameMarkup}
         <span class="op-face-wrap" data-face><span class="op-face"></span></span>
         ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
         <span class="op-carry-badge"></span>
       </div>`;
     icon = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
-    opIconCache.set(kind, icon);
+    opIconCache.set(key, icon);
   }
   return icon;
 };
@@ -223,8 +227,7 @@ const PanTo = ({ target }) => {
 // Nota: os antigos controlos de câmara (+/−/centrar/enquadrar) foram removidos —
 // em mobile o zoom faz-se com os dedos e em desktop com a roda do rato/duplo clique.
 
-// Arrastar o mapa liberta a câmara do modo seguir — comportamento standard
-// de qualquer "follow cam".
+// Arrastar o mapa liberta o seguimento automático da unidade.
 const FollowManager = ({ onCancel }) => {
   useMapEvents({ dragstart: () => onCancel() });
   return null;
@@ -473,7 +476,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         commLineRef.current.setLatLngs([]);
       }
 
-      // 5) Follow cam — sem animação: o próprio rAF é a animação.
+      // 5) Seguimento no mapa — sem animação extra: o próprio rAF move a vista.
       if (followed && p.phase !== "done") map.panTo([p.lat, p.lng], { animate: false });
 
       // 6) Fase mudou → re-render (ícone, dash, tooltip). setState com o mesmo
@@ -627,21 +630,11 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
                 key={`${mission.id}-op-${i}`}
                 ref={(el) => { opMarkersRef.current[i] = el; }}
                 position={[st?.lat ?? choreo.park.lat, st?.lng ?? choreo.park.lng]}
-                icon={opIconCached(choreo.kind)}
+                icon={opIconCached(choreo.kind, op.member?.name || `Operacional ${i + 1}`)}
                 interactive={false}
                 keyboard={false}
                 zIndexOffset={520}
-              >
-                <LTooltip
-                  permanent
-                  direction="top"
-                  offset={[0, -8]}
-                  opacity={1}
-                  className="lus-op-name-tip"
-                >
-                  {op.member?.name || `Operacional ${i + 1}`}
-                </LTooltip>
-              </Marker>
+              />
             );
           })}
         </>
@@ -687,7 +680,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               <TipRow label="rota" value={`${(route.distance / 1000).toFixed(1)} km`} color="#22D3EE" />
             )}
             <p className="mt-1 text-[9px] text-cyan-500/80">
-              {followed ? "A câmara está a segui-la — clica para largar" : "Clica para a câmara seguir esta unidade"}
+              {followed ? "O mapa está a seguir esta unidade — clica para largar" : "Clica para seguir esta unidade no mapa"}
             </p>
           </div>
         </LTooltip>
