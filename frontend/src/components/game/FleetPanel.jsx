@@ -8,7 +8,6 @@ import { cn } from "../../lib/utils";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { VehicleGlyph } from "./VehicleGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
