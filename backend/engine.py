@@ -103,8 +103,12 @@ from economy_constants import (
 from quests import process_quests, make_instance, effective_quest_rewards
 from live_ops import build_return_script, update_memory
 from quests_data import QUEST_DEFS
-from economy_constants import (EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
-                               LAUNDER_PASSIVE_RATE)
+from economy_constants import (
+    EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
+    LAUNDER_PASSIVE_RATE, PROPERTY_MAINTENANCE_PCT_PER_WEEK,
+    PROPERTY_CONDITION_RECOVERY_PER_WEEK, PROPERTY_CONDITION_DECAY_MISSED_WEEK,
+)
+from economy_calendar import next_weekly_settlement, is_weekly_settlement
 
 logger = logging.getLogger(__name__)
 
@@ -2218,17 +2222,34 @@ async def _maybe_grant_bailout(db, player, employees):
 
 
 async def _process_payroll(db, player, employees, now):
-    """Ciclo económico semanal: salário bruto + TSU patronal + custo fixo da frota."""
+    """Liquida todos os custos fixos à segunda-feira, 20:00 Europe/Lisbon.
+
+    Fixos: salários brutos, TSU patronal, fração semanal dos custos anuais da
+    frota e exploração/manutenção dos imóveis. Combustível, reparações e
+    desgaste continuam variáveis e nunca entram neste fecho.
+    """
     pid = str(player["_id"])
-    if not player.get("next_payroll_at"):
-        player["next_payroll_at"] = (now + timedelta(minutes=PAYROLL_CYCLE_MIN)).isoformat()
+    scheduled = player.get("next_payroll_at")
+
+    # Migração transparente dos saves antigos que usavam ciclos móveis de 120 min.
+    if scheduled:
+        try:
+            due = parse_dt(scheduled)
+        except (TypeError, ValueError):
+            due = None
+        if due is None or not is_weekly_settlement(due):
+            player["next_payroll_at"] = next_weekly_settlement(now).isoformat()
+            return
+    else:
+        player["next_payroll_at"] = next_weekly_settlement(now).isoformat()
         return
 
     cycles = 0
     while parse_dt(player["next_payroll_at"]) <= now and cycles < 4:
         cycles += 1
-        player["next_payroll_at"] = (
-            parse_dt(player["next_payroll_at"]) + timedelta(minutes=PAYROLL_CYCLE_MIN)
+        current_due = parse_dt(player["next_payroll_at"])
+        player["next_payroll_at"] = next_weekly_settlement(
+            current_due + timedelta(seconds=1)
         ).isoformat()
 
         gross_payroll = int(sum(e.get("salary", 0) for e in employees))
@@ -2240,7 +2261,15 @@ async def _process_payroll(db, player, employees, now):
             for v in vehicles
         )))
 
-        total = gross_payroll + employer_ss + fleet_weekly
+        props = await db.properties.find({"player_id": pid}).to_list(200)
+        property_weekly = int(round(sum(
+            (p.get("purchase_price") or PROPERTY_TYPES[p["type_key"]]["price"])
+            * max(1, int(p.get("level", 1)))
+            * PROPERTY_MAINTENANCE_PCT_PER_WEEK
+            for p in props
+        )))
+
+        total = gross_payroll + employer_ss + fleet_weekly + property_weekly
         if total <= 0:
             continue
 
@@ -2248,12 +2277,13 @@ async def _process_payroll(db, player, employees, now):
             player["clean_money"] -= total
             await add_event(
                 db, pid, "system",
-                f"Custos semanais pagos: -{total:,} € "
-                f"(salários {gross_payroll:,} € + TSU {employer_ss:,} € + frota {fleet_weekly:,} €).",
+                f"Fecho semanal pago: -{total:,} € "
+                f"(salários {gross_payroll:,} € + TSU {employer_ss:,} € + "
+                f"frota {fleet_weekly:,} € + imóveis {property_weekly:,} €).",
             )
             await record_tx(
                 db, pid, "weekly_costs", -total, "clean", player["clean_money"],
-                "Salários + TSU + custos fixos da frota",
+                "Fecho semanal — salários + TSU + frota + imóveis",
             )
             idle_ids = [e["_id"] for e in employees if e.get("status") == "idle"]
             if idle_ids:
@@ -2269,12 +2299,30 @@ async def _process_payroll(db, player, employees, now):
                     {"_id": {"$in": idle_ids}, "loyalty": {"$gt": 100.0}},
                     {"$set": {"loyalty": 100.0}},
                 )
+            if props:
+                for p in props:
+                    condition = min(
+                        100.0,
+                        float(p.get("condition", 100.0)) + PROPERTY_CONDITION_RECOVERY_PER_WEEK,
+                    )
+                    await db.properties.update_one(
+                        {"_id": p["_id"]}, {"$set": {"condition": condition}}
+                    )
         else:
             await add_event(
                 db, pid, "police",
-                f"Sem fundos para os custos semanais ({total:,} €)! "
-                "Moral e lealdade em queda.",
+                f"Sem fundos para o fecho semanal ({total:,} €)! "
+                "Moral, lealdade e condição dos imóveis em queda.",
             )
+            for p in props:
+                condition = max(
+                    0.0,
+                    float(p.get("condition", 100.0)) - PROPERTY_CONDITION_DECAY_MISSED_WEEK,
+                )
+                await db.properties.update_one(
+                    {"_id": p["_id"]}, {"$set": {"condition": condition}}
+                )
+
             for e in employees:
                 e["loyalty"] = max(0.0, e.get("loyalty", 70) - 8)
                 e["morale"] = max(0.0, e.get("morale", 70) - 10)
@@ -2672,28 +2720,6 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
                     await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_laundered": share}})
 
 
-async def _process_property_maintenance(db, player, props, minutes, now):
-    """Cada imóvel tem um custo diário de manutenção. Se a organização não
-    conseguir pagá-lo, os imóveis degradam-se lentamente (menos condição, menos
-    benefício); se conseguir, recuperam condição aos poucos."""
-    if minutes <= 0 or not props:
-        return
-    hours = minutes / 60
-    total_cost = sum(
-        (p.get("purchase_price") or PROPERTY_TYPES[p["type_key"]]["price"])
-        * p["level"] * PROPERTY_MAINTENANCE_PCT_PER_DAY / 24 * hours
-        for p in props
-    )
-    can_pay = player["clean_money"] >= total_cost
-    if can_pay and total_cost > 0:
-        player["clean_money"] -= int(total_cost)
-    delta = (PROPERTY_CONDITION_RECOVERY_PER_HOUR if can_pay else -PROPERTY_CONDITION_DECAY_PER_HOUR) * hours
-    for p in props:
-        new_condition = max(0.0, min(100.0, p.get("condition", 100.0) + delta))
-        if new_condition != p.get("condition", 100.0):
-            await db.properties.update_one({"_id": p["_id"]}, {"$set": {"condition": new_condition}})
-
-
 async def _complete_property_upgrades(db, player, props, now):
     for p in props:
         upgrading_until = p.get("upgrading_until")
@@ -2830,7 +2856,6 @@ async def advance(db, player):
 
     props = await db.properties.find({"player_id": pid}).to_list(200)
     await _apply_passive_income(db, player, props, minutes / 60, bonuses, now)
-    await _process_property_maintenance(db, player, props, minutes, now)
     await _complete_property_upgrades(db, player, props, now)
     await _complete_hq_upgrade(db, player, now)
     await _maybe_raid(db, player, props, minutes, now)
