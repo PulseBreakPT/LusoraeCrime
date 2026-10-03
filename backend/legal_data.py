@@ -229,7 +229,108 @@ LEGAL_DOCUMENTS = {
                     },
                 ],
             },
-        ],
+        ,
+            {
+                            "version": "1.1",
+                            "effective_date": "2026-10-03",
+                            "summary": "Atualização Google Play: Google Sign-In, minimização de dados e eliminação de conta dentro e fora da aplicação.",
+                            "sections": [
+                                {
+                                    "heading": "1. Introdução",
+                                    "paragraphs": [
+                                        "Esta Política de Privacidade explica que informação o Lusorae recolhe, como a utiliza e que escolhas tens sobre os teus dados.",
+                                        "Levamos a privacidade a sério: recolhemos apenas o mínimo necessário para a plataforma funcionar. Para informação detalhada sobre os teus direitos ao abrigo do RGPD, consulta a nossa página dedicada ao RGPD.",
+                                    ],
+                                },
+                                {
+                                    "heading": "2. Informação que recolhemos",
+                                    "paragraphs": [
+                                        "Recolhemos apenas os dados estritamente necessários:",
+                                    ],
+                                    "bullets": [
+                                        "Dados de conta: endereço de email, nome da organização (escolhido por ti) e palavra-passe (guardada de forma cifrada e irreversível — nunca em texto simples).",
+                                        "Dados de jogo: progresso, recursos, equipas, funcionários fictícios, veículos, propriedades e histórico de eventos do teu império virtual.",
+                                        "Dados de aceitação legal: data, hora e versão dos Termos de Serviço e Política de Privacidade que aceitaste.",
+                                        "Dados técnicos de segurança: endereço IP associado a tentativas de início de sessão (para proteção contra ataques de força bruta) e ao momento do registo.",
+                                    ],
+                                },
+                                {
+                                    "heading": "3. Como utilizamos a informação",
+                                    "bullets": [
+                                        "Autenticar a tua conta e manter a tua sessão iniciada.",
+                                        "Guardar e sincronizar o teu progresso de jogo.",
+                                        "Proteger a plataforma contra abusos, fraude e acessos não autorizados.",
+                                        "Cumprir obrigações legais, incluindo o registo da aceitação dos documentos legais.",
+                                        "Comunicar contigo sobre a tua conta quando estritamente necessário.",
+                                    ],
+                                    "paragraphs": [
+                                        "Não utilizamos os teus dados para publicidade. Não vendemos, alugamos ou cedemos os teus dados a terceiros para fins comerciais.",
+                                    ],
+                                },
+                                {
+                                    "heading": "4. Armazenamento e segurança",
+                                    "paragraphs": [
+                                        "Os teus dados são guardados em servidores seguros, com acesso restrito. Aplicamos medidas técnicas e organizativas adequadas:",
+                                    ],
+                                    "bullets": [
+                                        "Palavras-passe cifradas com bcrypt (hash com salt, irreversível).",
+                                        "Comunicações protegidas por HTTPS/TLS.",
+                                        "Sessões geridas com tokens de curta duração e cookies httpOnly.",
+                                        "Bloqueio automático de tentativas de acesso repetidas (proteção contra força bruta).",
+                                        "Acesso administrativo restrito e registado.",
+                                    ],
+                                },
+                                {
+                                    "heading": "5. Partilha com terceiros",
+                                    "paragraphs": [
+                                        "Não partilhamos os teus dados pessoais com terceiros, exceto:",
+                                    ],
+                                    "bullets": [
+                                        "Fornecedores de infraestrutura técnica (alojamento e base de dados), estritamente para operar a plataforma.",\n                            "Google, apenas quando escolhes Google Sign-In, para autenticar a identidade da conta.",
+                                        "Autoridades competentes, quando exigido por lei.",
+                                    ],
+                                },
+                                {
+                                    "heading": "6. Cookies",
+                                    "paragraphs": [
+                                        "Na versão web, o Lusorae utiliza apenas cookies/armazenamento estritamente necessários ao funcionamento. Na aplicação Android, os tokens de sessão são geridos pelo cliente e enviados por HTTPS:",
+                                    ],
+                                    "bullets": [
+                                        "access_token — cookie de sessão (httpOnly) que te mantém autenticado. Expira em 1 hora.",
+                                        "refresh_token — cookie (httpOnly) que permite renovar a sessão sem novo login. Expira em 7 dias.",
+                                    ],
+                                    "paragraphs_after": [
+                                        "Não utilizamos cookies de publicidade, de rastreio entre sites ou de terceiros. Também é utilizado o armazenamento local do navegador (localStorage) para guardar preferências de interface e o estado da sessão.",
+                                    ],
+                                },
+                                {
+                                    "heading": "7. Analytics",
+                                    "paragraphs": [
+                                        "Atualmente o Lusorae não utiliza qualquer serviço de analytics de terceiros (como Google Analytics).",
+                                        "Se no futuro adotarmos ferramentas de medição de utilização, esta política será atualizada antes da sua ativação e serás informado na plataforma.",
+                                    ],
+                                },
+                                {
+                                    "heading": "8. Conservação dos dados",
+                                    "paragraphs": [
+                                        "Os teus dados são conservados enquanto a tua conta existir. Ao eliminares a conta, todos os dados pessoais e de jogo são apagados de forma permanente e imediata.",
+                                        "Registos técnicos de segurança (tentativas de login) são conservados apenas pelo tempo necessário à proteção da plataforma.",
+                                    ],
+                                },
+                                {
+                                    "heading": "9. Alterações a esta política",
+                                    "paragraphs": [
+                                        "Esta política pode ser atualizada. Cada versão tem número e data de entrada em vigor, e o histórico é preservado. Alterações relevantes serão comunicadas na plataforma.",
+                                    ],
+                                },
+                                {
+                                    "heading": "10. Contacto",
+                                    "paragraphs": [
+                                        f"Para qualquer questão sobre privacidade ou sobre os teus dados, contacta-nos através de {CONTACT_EMAIL}. Respondemos no prazo máximo de 30 dias.",
+                                    ],
+                                },
+                            ],
+                        }],
     },
     "rgpd": {
         "id": "rgpd",
@@ -338,7 +439,110 @@ LEGAL_DOCUMENTS = {
                     },
                 ],
             },
-        ],
+        ,
+            {
+                            "version": "1.1",
+                            "effective_date": "2026-10-03",
+                            "summary": "Atualização para Google Sign-In, aplicação Android e eliminação de conta compatível com Google Play.",
+                            "sections": [
+                                {
+                                    "heading": "1. O que é isto?",
+                                    "paragraphs": [
+                                        "O RGPD (Regulamento Geral sobre a Proteção de Dados) é a lei europeia que protege os teus dados pessoais. Esta página explica, em linguagem simples, que dados o Lusorae recolhe, porquê, durante quanto tempo, e que direitos tens sobre eles.",
+                                        "Responsável pelo tratamento: Lusorae. Contacto: " + CONTACT_EMAIL + ".",
+                                    ],
+                                },
+                                {
+                                    "heading": "2. Que dados recolhemos",
+                                    "bullets": [
+                                        "Email — para criares conta, entrares e recuperares o acesso.",\n                            "Identificador Google — apenas quando escolhes Google Sign-In; usado para autenticação e associação segura da conta. Não guardamos a foto de perfil Google.",
+                                        "Nome da organização — o nome público do teu império no jogo (escolhido por ti; evita usar o teu nome real).",
+                                        "Palavra-passe — apenas para contas email/password; guardada como hash bcrypt irreversível.",
+                                        "Endereço IP — apenas para segurança (bloqueio de tentativas de login abusivas e registo da aceitação dos termos).",
+                                        "Dados de jogo — o teu progresso: recursos, equipas, veículos, propriedades e eventos. São dados fictícios do jogo, mas estão associados à tua conta.",
+                                        "Aceitação legal — data, hora e versão dos documentos que aceitaste ao registar-te.",
+                                    ],
+                                    "paragraphs": [
+                                        "Não recolhemos: nome real, morada, telefone, dados de pagamento, localização real, contactos, nem qualquer dado sensível.",
+                                    ],
+                                },
+                                {
+                                    "heading": "3. Para que usamos os dados (finalidade)",
+                                    "bullets": [
+                                        "Criar e gerir a tua conta (execução do contrato — art. 6.º/1/b RGPD).",
+                                        "Guardar o teu progresso de jogo (execução do contrato).",
+                                        "Proteger a plataforma contra abusos e ataques (interesse legítimo — art. 6.º/1/f).",
+                                        "Registar a aceitação dos termos (obrigação legal e interesse legítimo).",
+                                    ],
+                                    "paragraphs": [
+                                        "Não fazemos definição de perfis, decisões automatizadas com efeitos legais, nem marketing com os teus dados.",
+                                    ],
+                                },
+                                {
+                                    "heading": "4. Durante quanto tempo guardamos (conservação)",
+                                    "bullets": [
+                                        "Dados de conta e de jogo — enquanto a conta existir. Apagados imediatamente quando eliminas a conta.",
+                                        "Registos de tentativas de login — no máximo 15 minutos após o bloqueio expirar; são limpos automaticamente.",
+                                        "Registo de aceitação dos termos — enquanto a conta existir (é apagado com ela).",
+                                    ],
+                                },
+                                {
+                                    "heading": "5. Como protegemos os dados (segurança)",
+                                    "bullets": [
+                                        "Palavras-passe cifradas com bcrypt — irreversível.",
+                                        "Ligações protegidas por HTTPS/TLS.",
+                                        "Sessões com tokens de curta duração e cookies httpOnly (inacessíveis a scripts).",
+                                        "Bloqueio automático após 5 tentativas de login falhadas (15 minutos).",
+                                        "Acesso à base de dados restrito à equipa técnica.",
+                                    ],
+                                },
+                                {
+                                    "heading": "6. Cookies",
+                                    "paragraphs": [
+                                        "Usamos apenas cookies estritamente necessários (sessão e renovação de sessão). Não há cookies de publicidade nem de rastreio. Por serem estritamente necessários, não exigem consentimento prévio ao abrigo da lei. Detalhes na Política de Privacidade.",
+                                    ],
+                                },
+                                {
+                                    "heading": "7. Os teus direitos",
+                                    "paragraphs": [
+                                        "O RGPD dá-te direitos concretos sobre os teus dados. Podes exercê-los diretamente na plataforma ou por email:",
+                                    ],
+                                    "bullets": [
+                                        "Direito de acesso — saber que dados temos sobre ti. Pede-nos uma cópia por email.",
+                                        "Direito de retificação — corrigir dados errados. Podes alterar a palavra-passe nas Definições; para corrigir o email, contacta-nos.",
+                                        "Direito ao apagamento (direito ao esquecimento) — eliminar a conta e todos os dados. Disponível diretamente nas Definições do jogo, com efeito imediato e irreversível.",
+                                        "Direito à portabilidade — receber os teus dados num formato estruturado e legível por máquina (JSON). Pede por email.",
+                                        "Direito de oposição e limitação — opores-te a determinados tratamentos ou pedir a sua limitação.",
+                                        "Direito de reclamação — apresentar queixa à CNPD (Comissão Nacional de Proteção de Dados) em www.cnpd.pt.",
+                                    ],
+                                },
+                                {
+                                    "heading": "8. Eliminação da conta",
+                                    "paragraphs": [
+                                        "Podes eliminar a tua conta a qualquer momento em Definições → Conta → Eliminar conta. Contas com password confirmam com a password atual; contas Google-only confirmam através da sessão autenticada. Também existe um processo de pedido fora da aplicação na página pública de eliminação de conta.",
+                                        "A eliminação é imediata e permanente: conta, progresso de jogo, equipas, funcionários, veículos, propriedades, eventos e registo de aceitação legal — tudo é apagado. Não guardamos cópias.",
+                                    ],
+                                },
+                                {
+                                    "heading": "9. Transferências internacionais",
+                                    "paragraphs": [
+                                        "Os dados são tratados em servidores localizados na União Europeia ou em infraestruturas com garantias adequadas de proteção equivalente, conforme exigido pelo RGPD.",
+                                    ],
+                                },
+                                {
+                                    "heading": "10. Menores",
+                                    "paragraphs": [
+                                        "O Lusorae destina-se a maiores de 16 anos. Não recolhemos conscientemente dados de menores de 16 anos. Se acreditas que um menor criou uma conta, contacta-nos para a sua remoção.",
+                                    ],
+                                },
+                                {
+                                    "heading": "11. Contacto",
+                                    "paragraphs": [
+                                        f"Para exercer qualquer direito ou esclarecer dúvidas: {CONTACT_EMAIL}. Respondemos no prazo máximo de 30 dias, conforme exigido pelo RGPD.",
+                                    ],
+                                },
+                            ],
+                        }],
     },
 }
 
