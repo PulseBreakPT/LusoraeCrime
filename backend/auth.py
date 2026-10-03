@@ -14,6 +14,7 @@ from db import db
 from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY, LISBON_SPOTS
 from engine import now_utc, add_event, vehicle_doc, starting_employee
 from legal_data import current_version
+from economy_constants import INITIAL_CLEAN_MONEY, INITIAL_DIRTY_MONEY
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -247,7 +248,7 @@ async def create_player_for_user(user_id: str, org_name: str, with_default_hq: b
         hq, districts, region = None, [], ""
     result = await db.players.insert_one({
         "user_id": user_id, "org_name": org_name,
-        "clean_money": 75000, "dirty_money": 5000,
+        "clean_money": INITIAL_CLEAN_MONEY, "dirty_money": INITIAL_DIRTY_MONEY,
         "respect": 0, "level": 1, "heat": 0.0,
         "frac_dirty": 0.0, "frac_clean": 0.0, "frac_launder": 0.0, "v2": True,
         "hq": hq, "districts": districts, "region": region,
@@ -265,7 +266,7 @@ async def create_player_for_user(user_id: str, org_name: str, with_default_hq: b
     await db.teams.update_one({"_id": team_res.inserted_id}, {"$set": {"vehicle_id": str(veh_res.inserted_id)}})
     for role in ("assaltante", "motorista"):
         await db.employees.insert_one(starting_employee(pid, role, now, team_id=tid))
-    await add_event(db, pid, "system", f"{org_name} foi fundada com 75.000 € limpos e 5.000 € sujos de capital inicial.")
+    await add_event(db, pid, "system", f"{org_name} foi fundada com {INITIAL_CLEAN_MONEY:,.0f} € limpos e {INITIAL_DIRTY_MONEY:,.0f} € sujos de capital inicial.")
     await add_event(db, pid, "team", "Crew Alfa está pronta: um assaltante, um motorista e um Sedan Usado na garagem.")
     return pid
 
