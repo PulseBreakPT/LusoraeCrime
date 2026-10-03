@@ -7,7 +7,6 @@ import {
   weaponWearPerMission, weaponAdequacy,
 } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
-import { WeaponGlyph } from "./WeaponGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -236,14 +235,14 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="weapons-list">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="weapons-list">
           {weapons.length === 0 && (
             <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens armas — compra a primeira no arsenal abaixo.
             </p>
           )}
           {weapons.length > 0 && sortedWeapons.length === 0 && (
-            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+            <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Nenhuma arma com esse nome no arsenal.
             </p>
           )}
@@ -274,39 +273,33 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
             return (
               <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
-                {/* Cabeçalho: placa com silhueta + identidade */}
-                <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="lus-weapon-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                    <WeaponGlyph modelKey={w.model_key} accent={tier.color} className="h-[44px] w-[96px]" />
+                <div className="relative z-[1] min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 truncate text-sm font-bold text-white">{w.name}</p>
+                    <TierChip tier={tier} />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-1.5">
-                      <p className="truncate text-sm font-bold text-white">{w.name}</p>
-                      <TierChip tier={tier} />
-                    </div>
-                    <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
-                      {catalog?.weapon_categories?.[model.category]?.name || model.category}
-                      {model.loud && (
-                        <Tip tip={`Arma ruidosa — multiplica o calor da operação por ×${meta.loud_heat_mult ?? 1.3} e denuncia abordagens discretas.`}>
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">
-                            <Volume2 size={9} /> ruidosa
-                          </span>
-                        </Tip>
-                      )}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <JamChip model={model} condition={w.condition} meta={meta} testId={`weapon-jam-${w.id}`} />
-                      <Tip tip={`Desgaste base de condição por missão deste modelo (durabilidade ${model.durability}): missões arriscadas desgastam ainda mais (+${Math.round((meta.wear_risk_mult ?? 1.5) * 100) / 100} por ponto de risco).`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
-                          <Wrench size={9} /> −{wear.toFixed(1)}/missão
+                  <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                    {catalog?.weapon_categories?.[model.category]?.name || model.category}
+                    {model.loud && (
+                      <Tip tip={`Arma ruidosa — multiplica o calor da operação por ×${meta.loud_heat_mult ?? 1.3} e denuncia abordagens discretas.`}>
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">
+                          <Volume2 size={9} /> ruidosa
                         </span>
                       </Tip>
-                      <Tip tip={`${w.missions_done ?? 0} missões no total, ${w.missions_since_repair ?? 0} desde a última reparação.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
-                          <Crosshair size={9} /> {w.missions_done ?? 0} op.
-                        </span>
-                      </Tip>
-                    </div>
+                    )}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <JamChip model={model} condition={w.condition} meta={meta} testId={`weapon-jam-${w.id}`} />
+                    <Tip tip={`Desgaste base de condição por missão deste modelo (durabilidade ${model.durability}): missões arriscadas desgastam ainda mais (+${Math.round((meta.wear_risk_mult ?? 1.5) * 100) / 100} por ponto de risco).`}>
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                        <Wrench size={9} /> −{wear.toFixed(1)}/missão
+                      </span>
+                    </Tip>
+                    <Tip tip={`${w.missions_done ?? 0} missões no total, ${w.missions_since_repair ?? 0} desde a última reparação.`}>
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                        <Crosshair size={9} /> {w.missions_done ?? 0} op.
+                      </span>
+                    </Tip>
                   </div>
                 </div>
 
@@ -432,7 +425,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Swords} title="Arsenal" meta={catalog ? `${Object.keys(catalog.weapon_models || {}).length} modelos` : undefined} />
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.weapon_models).map(([key, m]) => {
                 const tier = weaponTier(m);
@@ -442,33 +435,27 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 const wear = weaponWearPerMission(m, meta);
                 return (
                   <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
-                    <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="lus-weapon-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                        <WeaponGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
-                        {locked && <Lock size={13} className="absolute text-zinc-400" />}
+                    <div className="relative z-[1] min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 truncate text-sm font-semibold text-white">{m.name}</p>
+                        <TierChip tier={tier} />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-1.5">
-                          <p className="truncate text-sm font-semibold text-white">{m.name}</p>
-                          <TierChip tier={tier} />
-                        </div>
-                        <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
-                          {catalog?.weapon_categories?.[m.category]?.name || m.category}
-                          {locked && (
+                      <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                        {catalog?.weapon_categories?.[m.category]?.name || m.category}
+                        {locked && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">
+                            <Lock size={9} /> nível {m.min_level}
+                          </span>
+                        )}
+                        {m.loud && (
+                          <Tip tip={`Arma ruidosa — multiplica o calor da operação por ×${meta.loud_heat_mult ?? 1.3}.`}>
                             <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">
-                              <Lock size={9} /> nível {m.min_level}
+                              <Volume2 size={9} /> ruidosa
                             </span>
-                          )}
-                          {m.loud && (
-                            <Tip tip={`Arma ruidosa — multiplica o calor da operação por ×${meta.loud_heat_mult ?? 1.3}.`}>
-                              <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">
-                                <Volume2 size={9} /> ruidosa
-                              </span>
-                            </Tip>
-                          )}
-                        </p>
-                        <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-zinc-500">{m.desc}</p>
-                      </div>
+                          </Tip>
+                        )}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-[10px] leading-tight text-zinc-500">{m.desc}</p>
                     </div>
 
                     <div className="relative z-[1] mt-2">
