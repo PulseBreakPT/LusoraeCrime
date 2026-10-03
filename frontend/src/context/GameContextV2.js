@@ -8,6 +8,8 @@ import { usePersistedState } from "../lib/persist";
 import { haptics } from "../lib/haptics";
 import { audio } from "../lib/audio";
 import { isOnLand } from "../lib/land";
+import { fetchRoute } from "../lib/routing";
+import { isLocalGuestMode } from "../game/localGuestEngine";
 
 // Som temático por ação — o prefixo mais específico ganha. Ações fora desta
 // lista ficam em silêncio (o toast e o toque de interface já dão feedback).
@@ -483,8 +485,42 @@ export function GameProvider({ children }) {
   }, [refresh]);
 
   // All game actions
-  const dispatchTeam = (opportunityId, teamId) =>
-    action("dispatch", { opportunity_id: opportunityId, team_id: teamId }, "Equipa destacada");
+  const dispatchTeam = async (opportunityId, teamId) => {
+    // Regra do 112i: calcula/valida as duas rotas ANTES de alterar o jogo.
+    // Assim uma missão nunca nasce sem o percurso que o veículo vai seguir.
+    const opp = state?.opportunities?.find((item) => item.id === opportunityId);
+    const team = state?.teams?.find((item) => item.id === teamId);
+    const vehicle = state?.vehicles?.find((item) => item.id === team?.vehicle_id);
+    const property = vehicle?.property_id
+      ? state?.properties?.find((item) => item.id === vehicle.property_id)
+      : null;
+    const originSource = property || state?.player?.hq;
+    const origin = originSource ? { lat: Number(originSource.lat), lng: Number(originSource.lng) } : null;
+    const target = opp ? { lat: Number(opp.lat), lng: Number(opp.lng) } : null;
+
+    let roadOutward = null;
+    let roadInward = null;
+    if (origin && target && [origin.lat, origin.lng, target.lat, target.lng].every(Number.isFinite)) {
+      [roadOutward, roadInward] = await Promise.all([
+        fetchRoute(origin, target),
+        fetchRoute(target, origin),
+      ]);
+      if (roadOutward?.unavailable || roadInward?.unavailable) {
+        toast.error("Não foi possível calcular um percurso rodoviário válido. A equipa não foi despachada.");
+        haptics.error();
+        return { ok: false };
+      }
+    }
+
+    const payload = { opportunity_id: opportunityId, team_id: teamId };
+    if (isLocalGuestMode() && roadOutward && roadInward) {
+      payload.route_outward = roadOutward;
+      payload.route_inward = roadInward;
+    }
+    // Em modo servidor as rotas já ficaram na cache de 7 dias do mapa. Não
+    // enviamos campos extra à API; o primeiro frame consegue lê-las síncronamente.
+    return action("dispatch", payload, "Equipa destacada");
+  };
   const recallTeam = (missionId) =>
     action("missions/recall", { mission_id: missionId }, "Equipa chamada de volta");
   const previewDispatch = useCallback(async (opportunityId, teamId) => {

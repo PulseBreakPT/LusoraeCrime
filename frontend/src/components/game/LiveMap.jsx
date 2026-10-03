@@ -7,7 +7,7 @@ import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes,
 import { useGame } from "../../context/GameContextV2";
 import { propertyMarketPrice } from "../../lib/propertyMarket";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS, OPP_URGENT_SECONDS } from "../../lib/game";
-import { fetchRoute, pointOnTimedRoute, sliceTimedRoute, timeAtDistanceFraction } from "../../lib/routing";
+import { fetchRoute, peekRoute, pointOnTimedRoute, sliceTimedRoute, timeAtDistanceFraction } from "../../lib/routing";
 import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
 import PoliceLayer from "./PoliceLayer";
 import MapBaseLayer from "./MapBaseLayer";
@@ -64,6 +64,30 @@ const routeReveal = (readyAtMs, nowMs, phaseEndMs, maxWindowMs = 900) => {
   const remainingAtReady = Math.max(0, Number(phaseEndMs) - Number(readyAtMs));
   const windowMs = Math.max(120, Math.min(maxWindowMs, remainingAtReady * 0.55));
   return smooth01((Number(nowMs) - Number(readyAtMs)) / Math.max(1, windowMs));
+};
+
+const validRoadPlan = (plan) =>
+  !!plan && !plan.unavailable && Array.isArray(plan.latlngs) && plan.latlngs.length > 1
+  && Array.isArray(plan.times) && plan.times.length === plan.latlngs.length;
+
+const initialMissionRouteState = (mission) => {
+  const outward = validRoadPlan(mission.road_outward)
+    ? mission.road_outward
+    : peekRoute(mission.origin, mission.target);
+  if (!validRoadPlan(outward)) return null;
+  const inward = validRoadPlan(mission.road_inward)
+    ? mission.road_inward
+    : peekRoute(mission.target, mission.origin);
+  const parking = buildParking(mission, outward);
+  return {
+    outward,
+    inward: validRoadPlan(inward) ? inward : null,
+    parking,
+    parkTime: timeAtDistanceFraction(outward, parking.cum, parking.parkFrac),
+    unavailable: false,
+    outwardReadyAt: null,
+    inwardReadyAt: null,
+  };
 };
 
 const PROP_ICONS = {
@@ -301,7 +325,7 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
 
 const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, roster, showOperatorNames = true }) => {
   const map = useMap();
-  const [route, setRoute] = useState(null);
+  const [route, setRoute] = useState(() => initialMissionRouteState(mission));
   const markerRef = useRef(null);
   const svgRef = useRef(null);
   const carRootRef = useRef(null);
@@ -325,32 +349,26 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
 
       const parking = buildParking(mission, outward);
       const parkTime = timeAtDistanceFraction(outward, parking.cum, parking.parkFrac);
-      const outwardReadyAt = serverNow();
+      const outwardReadyAt = route?.outward ? null : serverNow();
 
-      // CRÍTICO: publica a ida imediatamente. Antes esperávamos também pela
-      // rota de regresso; durante essa espera o carro ficava parado e depois
-      // saltava vários quilómetros para recuperar o relógio da missão.
-      setRoute({
+      setRoute((current) => ({
         outward,
-        inward: null,
+        inward: current?.inward || null,
         parking,
         parkTime,
         unavailable: false,
         outwardReadyAt,
-        inwardReadyAt: null,
-      });
+        inwardReadyAt: current?.inwardReadyAt ?? null,
+      }));
 
-      // Tal como no 112i, o regresso é planeado separadamente. Usamos o ponto
-      // da estrada (anchor), não o ponto lateral de estacionamento, para evitar
-      // snaps grandes ao iniciar a rota de volta.
-      const returnOrigin = parking.anchor || mission.target;
-      let inward = await fetchRoute(returnOrigin, mission.origin);
-      if (!cancelled && inward.unavailable) {
-        inward = await fetchRoute(mission.target, mission.origin);
-      }
+      // O regresso replica o 112i: plano separado, alvo -> base. Nunca se
+      // inverte a ida e nunca se inicia de um ponto lateral artificial.
+      let inward = validRoadPlan(mission.road_inward)
+        ? mission.road_inward
+        : await fetchRoute(mission.target, mission.origin);
       if (cancelled) return;
 
-      const inwardReadyAt = serverNow();
+      const inwardReadyAt = route?.inward ? null : serverNow();
       setRoute((current) => {
         if (!current || current.outward !== outward) return current;
         return { ...current, inward, inwardReadyAt };

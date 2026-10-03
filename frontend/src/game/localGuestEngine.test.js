@@ -93,6 +93,42 @@ describe("offline guest engine", () => {
     expect(state.teams[0].status).toBe("on_mission");
   });
 
+  test("persists pre-routed mission geometry before movement starts", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", { lat: 38.7223, lng: -9.1393 });
+    let state = (await localGuestRequest("get", "/game/state")).data;
+    const team = state.teams[0];
+    const opportunity = state.opportunities[0];
+    const origin = state.player.hq;
+    const target = { lat: opportunity.lat, lng: opportunity.lng };
+    const outward = {
+      latlngs: [[origin.lat, origin.lng], [(origin.lat + target.lat) / 2, (origin.lng + target.lng) / 2], [target.lat, target.lng]],
+      times: [0, 30, 60], duration: 60, distance: 900, source: "test", unavailable: false,
+    };
+    const inward = {
+      latlngs: [[target.lat, target.lng], [(origin.lat + target.lat) / 2, (origin.lng + target.lng) / 2], [origin.lat, origin.lng]],
+      times: [0, 35, 70], duration: 70, distance: 920, source: "test", unavailable: false,
+    };
+
+    const dispatch = await localGuestRequest("post", "/game/dispatch", {
+      team_id: team.id,
+      opportunity_id: opportunity.id,
+      route_outward: outward,
+      route_inward: inward,
+    });
+    expect(dispatch.data.ok).toBe(true);
+
+    state = (await localGuestRequest("get", "/game/state")).data;
+    const mission = state.missions[0];
+    expect(mission.road_outward.latlngs).toHaveLength(3);
+    expect(mission.road_inward.latlngs).toHaveLength(3);
+    expect(mission.road_outward.times[0]).toBe(0);
+    expect(mission.road_outward.times[mission.road_outward.times.length - 1]).toBeGreaterThanOrEqual(20);
+    expect(mission.road_inward.times[mission.road_inward.times.length - 1]).toBeGreaterThanOrEqual(20);
+    expect(Date.parse(mission.arrive_at)).toBeGreaterThan(Date.parse(mission.depart_at));
+    expect(Date.parse(mission.return_at)).toBeGreaterThan(Date.parse(mission.finish_at));
+  });
+
   test("persists the guest career across leaving guest mode", async () => {
     enableLocalGuestMode();
     await localGuestRequest("post", "/game/hq/place", {

@@ -160,6 +160,21 @@ function readPersisted(key) {
   }
 }
 
+export function peekRoute(origin, target) {
+  if (!origin || !target || !finite(origin.lat) || !finite(origin.lng) || !finite(target.lat) || !finite(target.lng)) {
+    return null;
+  }
+  const key = routeKey(origin, target);
+  const memory = routeCache.get(key);
+  if (memory?.latlngs?.length > 1 && memory?.times?.length === memory.latlngs.length) return memory;
+  const persisted = readPersisted(key);
+  if (persisted?.latlngs?.length > 1 && persisted?.times?.length === persisted.latlngs.length) {
+    routeCache.set(key, persisted);
+    return persisted;
+  }
+  return null;
+}
+
 function persistRoute(key, route) {
   if (!route || route.unavailable) return;
   try {

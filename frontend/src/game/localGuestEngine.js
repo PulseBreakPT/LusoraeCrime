@@ -435,6 +435,38 @@ const normalizeSavedStats = (save) => {
 const isFiniteGeoPoint = (point) =>
   !!point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng));
 
+const scaleRoadPlan = (route, durationS) => {
+  if (!route || route.unavailable || !Array.isArray(route.latlngs) || route.latlngs.length < 2) return null;
+  const rawTimes = Array.isArray(route.times) && route.times.length === route.latlngs.length
+    ? route.times.map((value) => Math.max(0, Number(value) || 0))
+    : null;
+  const rawTotal = rawTimes?.[rawTimes.length - 1] || Number(route.duration) || 0;
+  const target = Math.max(1, Number(durationS) || rawTotal || 1);
+  const times = rawTimes && rawTotal > 0
+    ? rawTimes.map((value) => value * target / rawTotal)
+    : route.latlngs.map((_, index) => target * index / Math.max(1, route.latlngs.length - 1));
+  times[times.length - 1] = target;
+  return {
+    latlngs: route.latlngs.map((point) => [Number(point[0]), Number(point[1])]),
+    times,
+    duration: target,
+    distance: Math.max(0, Number(route.distance) || 0),
+    source: route.source || "OSRM / OpenStreetMap",
+    estimated: route.estimated !== false,
+    liveTraffic: false,
+    unavailable: false,
+  };
+};
+
+const routeTravelSeconds = (route, vehicle) => {
+  const model = LOCAL_CATALOG.vehicle_models[vehicle?.model_key] || {};
+  const speed = Math.max(4, Number(vehicle?.speed || model.speed || 10));
+  const condition = clamp(Number(vehicle?.condition ?? 100), 0, 100);
+  const effectiveSpeed = speed * (0.6 + 0.4 * Math.pow(condition / 100, 1.35));
+  const roadMeters = Math.max(0, Number(route?.distance) || 0);
+  return Math.max(20, roadMeters > 0 ? roadMeters / effectiveSpeed : 20);
+};
+
 const vehicleOriginFor = (save, vehicle) => {
   const property = vehicle?.property_id
     ? (save.properties || []).find((p) => p.id === vehicle.property_id)
@@ -1029,16 +1061,34 @@ const mutateGame=(save,path,payload)=>{
     if(vehicle.condition<30)fail(400,"O veículo precisa de reparação");
     const fuelNeeded=Math.max(1,opp.dist_km*2*vehicle.cons/100);
     if(vehicle.fuel_l<fuelNeeded)fail(400,"Combustível insuficiente para a viagem");
-    const start=Date.now(),eta=10000+opp.dist_km*1200,oper=(opp.duration_s||24)*1000,ret=eta*.8;
+    const start=Date.now();
     const origin=vehicleOriginFor(save,vehicle) || {lat:Number(opp.lat),lng:Number(opp.lng)};
+    const target={lat:Number(opp.lat),lng:Number(opp.lng)};
+    const rawOutward=p.route_outward;
+    const rawInward=p.route_inward;
+    const outwardTravelS=rawOutward && !rawOutward.unavailable
+      ? routeTravelSeconds(rawOutward,vehicle)
+      : Math.max(20,(10000+opp.dist_km*1200)/1000);
+    const inwardTravelS=rawInward && !rawInward.unavailable
+      ? routeTravelSeconds(rawInward,vehicle)
+      : outwardTravelS;
+    const eta=Math.round(outwardTravelS*1000);
+    const ret=Math.round(inwardTravelS*1000);
+    const oper=(opp.duration_s||24)*1000;
+    const roadOutward=scaleRoadPlan(rawOutward,outwardTravelS);
+    const roadInward=scaleRoadPlan(rawInward,inwardTravelS);
+    const roadRoundKm=((Number(rawOutward?.distance)||0)+(Number(rawInward?.distance)||0))/1000;
+    const missionFuelNeeded=Math.max(1,(roadRoundKm>0?roadRoundKm:opp.dist_km*2)*vehicle.cons/100);
+    if(vehicle.fuel_l<missionFuelNeeded)fail(400,"Combustível insuficiente para a viagem rodoviária");
     const departAt=new Date(start).toISOString();
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
       member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:opp.reward,pays:opp.pays,
-      fuel_needed:fuelNeeded,distance_km:opp.dist_km,chance:missionChance(save,opp,team),phase:"en_route",
+      fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:missionChance(save,opp,team),phase:"en_route",
       depart_at:departAt,started_at:departAt,arrive_at:new Date(start+eta).toISOString(),
       finish_at:new Date(start+eta+oper).toISOString(),return_at:new Date(start+eta+oper+ret).toISOString(),
-      origin,origin_property_id:vehicle.property_id||null,
-      target:{lat:Number(opp.lat),lng:Number(opp.lng)},opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
+      origin,origin_property_id:vehicle.property_id||null,target,
+      road_outward:roadOutward,road_inward:roadInward,
+      opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
     team.status="on_mission";members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
