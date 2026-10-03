@@ -38,6 +38,11 @@ jobs:
       - name: Install dependencies
         run: yarn install --non-interactive
 
+      - name: Test offline guest engine
+        env:
+          CI: "true"
+        run: yarn test --watchAll=false --runInBand src/game/localGuestEngine.test.js
+
       - name: Build frontend
         env:
           CI: "false"
