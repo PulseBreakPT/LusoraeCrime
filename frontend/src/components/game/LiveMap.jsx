@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Home, Shield, Warehouse, FlaskConical, Landmark, Anchor, Wrench, Boxes, Map as MapIcon, X, Star, Check, UserRound } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
+import { propertyMarketPrice } from "../../lib/propertyMarket";
 import { CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS, missionPosition, fmtMoney, fmtDuration, propertyBenefit, STATUS_LABELS, STATUS_COLORS, OPP_URGENT_SECONDS } from "../../lib/game";
 import { fetchRoute, buildCumulative, pointOnRoute, sliceRoute } from "../../lib/routing";
 import { buildChoreography, buildParking, vehiclePoseAt, missionStateAt, opStateAt, commAt, CHOREO_LABELS } from "../../lib/choreo";
@@ -1046,8 +1047,12 @@ export const MapLegend = () => {
 export const PlacementControls = () => {
   const { placement, confirmPlacement, cancelPlacement, catalog } = useGame();
   if (!placement) return null;
-  const typeName = catalog?.property_types?.[placement.typeKey]?.name || "Propriedade";
+  const propertyType = catalog?.property_types?.[placement.typeKey];
+  const typeName = propertyType?.name || "Propriedade";
   const invalid = placement.point && !placement.valid;
+  const market = placement.point && placement.valid && propertyType?.price
+    ? propertyMarketPrice(propertyType.price, placement.point.lat, placement.point.lng)
+    : null;
   return (
     <div
       data-testid="placement-controls"
@@ -1068,8 +1073,13 @@ export const PlacementControls = () => {
             ? "toca no mapa para escolheres a localização."
             : invalid
             ? "local inválido: escolhe um ponto em terra firme."
-            : "localização válida. Confirma para comprares."}
+            : `localização válida · ${market?.zone || "Portugal"} · ${market?.price?.toLocaleString("pt-PT") || "—"} €.`}
         </p>
+        {market && (
+          <p className="mt-1 font-mono text-[9px] text-zinc-500">
+            Base {propertyType.price.toLocaleString("pt-PT")} € × índice regional {market.multiplier.toFixed(2)}
+          </p>
+        )}
         <div className="mt-2 flex items-center gap-2">
           <Button
             data-testid="placement-confirm"
