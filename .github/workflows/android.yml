@@ -35,11 +35,11 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
-      - name: Setup Java 17
+      - name: Setup Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Install Android 16 / API 36 SDK
         run: |
@@ -59,6 +59,7 @@ jobs:
         working-directory: frontend
         env:
           CI: "false"
+          PUBLIC_URL: "/"
           REACT_APP_AUTH_UI_ENABLED: "true"
           REACT_APP_BACKEND_URL: ${{ vars.ANDROID_BACKEND_URL || 'https://lusora-patrols.preview.emergentagent.com' }}
           REACT_APP_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
