@@ -6,6 +6,8 @@ import { SocialLogin } from "@capgo/capacitor-social-login";
 
 const AuthContext = createContext(null);
 const GOOGLE_WEB_CLIENT_ID = (process.env.REACT_APP_GOOGLE_WEB_CLIENT_ID || "").trim();
+const GUEST_CREDENTIALS_KEY = "lusorae_guest_credentials_v1";
+const isGuestAccount = (user) => /^guest-[a-f0-9]+@lusorae\.pt$/i.test(user?.email || "");
 
 // Disclaimer de ficção ("é apenas um jogo") — mostrado UMA única vez por
 // conta, no primeiro registo/entrada. A fonte de verdade é o servidor
@@ -332,13 +334,26 @@ export function AuthProvider({ children }) {
 
   const deleteAccount = useCallback(async (password = null) => {
     try {
-      await api.post("/auth/delete-account", { password: password || null }, { timeout: 8000 });
+      let effectivePassword = password || null;
+      if (isGuestAccount(user)) {
+        try {
+          const guest = JSON.parse(localStorage.getItem(GUEST_CREDENTIALS_KEY) || "null");
+          effectivePassword = guest?.password || null;
+        } catch (_err) {
+          effectivePassword = null;
+        }
+      }
+      await api.post("/auth/delete-account", { password: effectivePassword }, { timeout: 8000 });
+      if (isGuestAccount(user)) {
+        localStorage.removeItem(GUEST_CREDENTIALS_KEY);
+        localStorage.removeItem("lusorae_guest_initialized");
+      }
       logout();
       return { ok: true };
     } catch (err) {
       return { ok: false, error: formatApiErrorDetail(err.response?.data?.detail) || err.message };
     }
-  }, [logout]);
+  }, [logout, user]);
 
   const claimAdmin = useCallback(async () => {
     try {
