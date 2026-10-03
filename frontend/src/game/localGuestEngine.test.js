@@ -262,4 +262,28 @@ describe("offline guest engine", () => {
     }
   });
 
+  test("charges the regional property price and persists its market basis", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    const before = (await localGuestRequest("get", "/game/state")).data.player.clean_money;
+    const result = await localGuestRequest("post", "/game/properties/buy", {
+      type_key: "garagem",
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    expect(result.data.price).toBe(71500);
+    expect(result.data.market_zone).toBe("Lisboa");
+
+    const after = (await localGuestRequest("get", "/game/state")).data;
+    const garage = after.properties.find((p) => p.type_key === "garagem");
+    expect(garage.purchase_price).toBe(71500);
+    expect(garage.market_multiplier).toBe(1.3);
+    expect(after.player.clean_money).toBe(before - 71500);
+  });
+
 });
