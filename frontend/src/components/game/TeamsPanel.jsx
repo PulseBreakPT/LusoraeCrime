@@ -300,7 +300,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Users} />
           <PanelKicker>Comando · Operações</PanelKicker>
@@ -354,9 +354,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
           </Tip>
         </div>
 
-        <div className="mt-4 space-y-3" data-testid="teams-list">
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" data-testid="teams-list">
           {state.teams.length === 0 && (
-            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+            <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens equipas — forma a primeira abaixo para começares a operar.
             </p>
           )}
