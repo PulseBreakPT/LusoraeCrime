@@ -55,11 +55,18 @@ describe("UI action ownership", () => {
   });
 
   test("HUD counters are indicators, not duplicate navigation buttons", () => {
-    const missions = gamePage.match(/<div[\s\S]{0,260}data-testid="available-missions-hud"[\s\S]{0,380}<\/div>/);
-    const wanted = gamePage.match(/<div[\s\S]{0,260}data-testid="wanted-stars-hud"[\s\S]{0,500}<\/div>/);
-    expect(missions?.[0]).toBeTruthy();
-    expect(wanted?.[0]).toBeTruthy();
-    expect(missions?.[0]).not.toContain("onClick=");
-    expect(wanted?.[0]).not.toContain("onClick=");
+    const blockFor = (testId) => {
+      const marker = `data-testid="${testId}"`;
+      const at = gamePage.indexOf(marker);
+      expect(at).toBeGreaterThan(-1);
+      const start = gamePage.lastIndexOf("<div", at);
+      const end = gamePage.indexOf("</div>", at);
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(at);
+      return gamePage.slice(start, end + "</div>".length);
+    };
+
+    expect(blockFor("available-missions-hud")).not.toContain("onClick=");
+    expect(blockFor("wanted-stars-hud")).not.toContain("onClick=");
   });
 });
