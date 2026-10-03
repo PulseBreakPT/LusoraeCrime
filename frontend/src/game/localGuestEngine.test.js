@@ -177,4 +177,24 @@ describe("offline guest engine", () => {
     expect(state.properties.length).toBe(1);
   });
 
+  test("migrates legacy risk values so rendering can never request a negative repeat count", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
+    raw.version = 1;
+    raw.opportunities[0].risk = 29;
+    raw.opportunities[1].risk = 40;
+    raw.opportunities[2].risk = 51;
+    raw.opportunities[3].risk = 62;
+    localStorage.setItem("lusorae_guest_save_v2", JSON.stringify(raw));
+
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.opportunities.slice(0, 4).map((o) => o.risk)).toEqual([1, 2, 3, 4]);
+    expect(state.opportunities.every((o) => o.risk >= 1 && o.risk <= 5)).toBe(true);
+  });
+
 });
