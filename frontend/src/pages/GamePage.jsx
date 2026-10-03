@@ -239,7 +239,7 @@ export default function GamePage() {
               <Star
                 key={index}
                 size={13}
-                className={index < wantedStars ? "fill-amber-400 text-amber-300" : "text-zinc-700"}
+                className={index < wantedStars ? "fill-red-600 text-red-500" : "fill-transparent text-white/90"}
               />
             ))}
           </span>
