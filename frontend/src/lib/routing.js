@@ -244,6 +244,22 @@ function persistRoute(key, route) {
   }
 }
 
+async function fetchDirectOsrm(cleanOrigin, cleanTarget) {
+  const coordinates =
+    Number(cleanOrigin.lng).toFixed(6) + "," + Number(cleanOrigin.lat).toFixed(6)
+    + ";" + Number(cleanTarget.lng).toFixed(6) + "," + Number(cleanTarget.lat).toFixed(6);
+  const query =
+    "steps=false&annotations=duration,distance&geometries=geojson"
+    + "&overview=full&alternatives=false&radiuses=1000;1000";
+  const response = await fetch(OSRM_BASE + "/" + coordinates + "?" + query);
+  if (!response.ok) throw new Error("OSRM HTTP " + response.status);
+  const data = await response.json();
+  if (data?.code !== "Ok" || !data?.routes?.length) {
+    throw new Error("Sem percurso rodoviário disponível");
+  }
+  return normalizeRoute(data);
+}
+
 export async function fetchRoute(origin, target) {
   if (!origin || !target || !finite(origin.lat) || !finite(origin.lng) || !finite(target.lat) || !finite(target.lng)) {
     return unavailableRoute(origin || {}, target || {}, "Coordenadas inválidas");
@@ -267,29 +283,22 @@ export async function fetchRoute(origin, target) {
       let route;
 
       if (!isLocalGuestMode()) {
-        // Produção: o backend é a fonte autoritativa. Isto elimina CORS e
-        // rate-limit do OSRM no browser e partilha a cache com /dispatch.
-        const { data } = await api.post(
-          "/game/road-route",
-          { origin: cleanOrigin, target: cleanTarget },
-          { timeout: 25000 }
-        );
-        route = normalizePreparedRoute(data);
-      } else {
-        // Guest/local não tem backend real: mantém um fallback direto.
-        const coordinates =
-          Number(cleanOrigin.lng).toFixed(6) + "," + Number(cleanOrigin.lat).toFixed(6)
-          + ";" + Number(cleanTarget.lng).toFixed(6) + "," + Number(cleanTarget.lat).toFixed(6);
-        const query =
-          "steps=false&annotations=duration,distance&geometries=geojson"
-          + "&overview=full&alternatives=false&radiuses=1000;1000";
-        const response = await fetch(OSRM_BASE + "/" + coordinates + "?" + query);
-        if (!response.ok) throw new Error("OSRM HTTP " + response.status);
-        const data = await response.json();
-        if (data?.code !== "Ok" || !data?.routes?.length) {
-          throw new Error("Sem percurso rodoviário disponível");
+        // Produção: prefere o backend autoritativo. Enquanto um deployment
+        // antigo ainda não tiver /road-route, cai para OSRM direto sem quebrar
+        // o jogo. Erros 422 são definitivos e não inventam linha reta.
+        try {
+          const { data } = await api.post(
+            "/game/road-route",
+            { origin: cleanOrigin, target: cleanTarget },
+            { timeout: 25000 }
+          );
+          route = normalizePreparedRoute(data);
+        } catch (backendError) {
+          if (backendError?.response?.status === 422) throw backendError;
+          route = await fetchDirectOsrm(cleanOrigin, cleanTarget);
         }
-        route = normalizeRoute(data);
+      } else {
+        route = await fetchDirectOsrm(cleanOrigin, cleanTarget);
       }
 
       routeCache.set(key, route);
