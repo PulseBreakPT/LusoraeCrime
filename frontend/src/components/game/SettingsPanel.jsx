@@ -99,7 +99,7 @@ const ThresholdInput = ({ value, onChange, disabled, testId }) => (
 );
 
 const ChangePasswordForm = () => {
-  const { changePassword } = useAuth();
+  const { user, changePassword } = useAuth();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -107,6 +107,16 @@ const ChangePasswordForm = () => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+
+  if (user && !user.has_password) {
+    return (
+      <Card className="border-sky-500/15 bg-sky-500/5 p-2 shadow-none">
+        <p className="text-[10px] leading-snug text-sky-200">
+          Conta Google — não existe palavra-passe local para alterar. O acesso é protegido pela tua Conta Google.
+        </p>
+      </Card>
+    );
+  }
 
   const submit = async () => {
     setError("");
@@ -214,16 +224,17 @@ const ClaimAdminForm = () => {
 };
 
 const DeleteAccountForm = () => {
-  const { deleteAccount } = useAuth();
+  const { user, deleteAccount } = useAuth();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const needsPassword = Boolean(user?.has_password);
 
   const run = async () => {
     setError("");
-    if (!password) return setError("Introduz a tua palavra-passe para confirmar.");
+    if (needsPassword && !password) return setError("Introduz a tua palavra-passe para confirmar.");
     setBusy(true);
-    const res = await deleteAccount(password);
+    const res = await deleteAccount(needsPassword ? password : null);
     setBusy(false);
     if (!res.ok) setError(res.error || "Não foi possível eliminar a conta.");
   };
@@ -231,14 +242,23 @@ const DeleteAccountForm = () => {
   return (
     <Card className="border-red-500/20 bg-red-500/5 p-2 shadow-none">
       <p className="text-[10px] leading-snug text-red-300">
-        Esta ação é irreversível: apaga a organização, o efetivo, a frota, os imóveis e todo o progresso. Não há forma de recuperar depois.
+        Esta ação é irreversível: apaga a conta Lusorae, organização, efetivo, frota, imóveis e progresso associado.
       </p>
-      <Input
-        data-testid="settings-delete-password-input"
-        type="password" placeholder="Palavra-passe para confirmar" value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="mt-2 border-red-500/20 bg-black/40 font-mono text-xs text-white placeholder:text-zinc-600"
-      />
+      {!needsPassword && (
+        <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
+          Como esta é uma conta Google, a confirmação usa a sessão autenticada atual e não pede uma palavra-passe Lusorae.
+        </p>
+      )}
+      {needsPassword && (
+        <Input
+          data-testid="settings-delete-password-input"
+          type="password"
+          placeholder="Palavra-passe para confirmar"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="mt-2 border-red-500/20 bg-black/40 font-mono text-xs text-white placeholder:text-zinc-600"
+        />
+      )}
       {error && <p className="mt-1 text-[10px] text-red-400">{error}</p>}
       <ConfirmButton
         testId="settings-delete-account-button"
@@ -246,10 +266,18 @@ const DeleteAccountForm = () => {
         label="Eliminar conta"
         confirmLabel="Tens a certeza? Clica outra vez."
         onConfirm={run}
-        disabled={busy || !password}
+        disabled={busy || (needsPassword && !password)}
         className="mt-2"
         tip="Elimina permanentemente a conta e toda a organização."
       />
+      <a
+        href={`${process.env.PUBLIC_URL || ""}/delete-account.html`}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 block text-center font-mono text-[9px] uppercase tracking-wider text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
+      >
+        Ajuda e pedido de eliminação fora da app
+      </a>
     </Card>
   );
 };
@@ -282,9 +310,10 @@ const ABOUT_ITEMS = [
     key: "privacy", label: "Política de Privacidade",
     content: (
       <p className="text-[10px] leading-snug text-zinc-500">
-        Guardamos apenas o necessário para a conta funcionar: email, palavra-passe encriptada e o progresso do
-        jogo. As preferências de interface ficam só no teu dispositivo. Nada é vendido nem partilhado com
-        terceiros. Podes eliminar a conta e todos os dados associados a qualquer momento em Conta → Eliminar conta.
+        Guardamos apenas o necessário para a conta funcionar: email, identificador de autenticação, dados de
+        segurança e progresso do jogo. Em contas Google, a Google fornece a identidade necessária ao login; não
+        guardamos a tua foto de perfil. Não vendemos dados pessoais. Podes eliminar a conta e os dados associados
+        a qualquer momento em Conta → Eliminar conta.
       </p>
     ),
   },
