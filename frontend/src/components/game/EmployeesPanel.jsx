@@ -524,7 +524,7 @@ const CandidateCard = ({ c }) => {
 };
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, refreshPool, startPlacement, restEmployee, favoriteEmployeeIds, optimizeEmployees } = useGame();
+  const { state, catalog, serverNow, refreshPool, restEmployee, favoriteEmployeeIds, optimizeEmployees } = useGame();
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
@@ -656,24 +656,13 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         {capFull && (
           <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none" data-testid="hr-cap-full">
             <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
-            {canBuyHideout ? (
-              <Button
-                data-testid="hr-buy-hideout-inline"
-                variant="outline" size="sm"
-                onClick={() => { startPlacement("esconderijo"); onOpenChange(false); }}
-                className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
-              >
-                <Warehouse size={10} /> Comprar esconderijo · {fmtMoney(hideout.price)}
-              </Button>
-            ) : (
-              <button
-                data-testid="hr-nav-properties"
-                onClick={() => onNavigate && onNavigate("properties")}
-                className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
-              >
-                Ver Imóveis
-              </button>
-            )}
+            <button
+              data-testid="hr-nav-properties"
+              onClick={() => onNavigate && onNavigate("properties")}
+              className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+            >
+              {canBuyHideout ? `Abrir Imóveis · esconderijo desde ${fmtMoney(hideout.price)}` : "Ver Imóveis"}
+            </button>
           </Card>
         )}
 
