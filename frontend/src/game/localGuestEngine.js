@@ -285,6 +285,48 @@ const normalizeSavedEvents = (save) => {
   return save;
 };
 
+const isFiniteGeoPoint = (point) =>
+  !!point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng));
+
+const vehicleOriginFor = (save, vehicle) => {
+  const property = vehicle?.property_id
+    ? (save.properties || []).find((p) => p.id === vehicle.property_id)
+    : null;
+  const source = isFiniteGeoPoint(property) ? property : save.player?.hq;
+  if (!isFiniteGeoPoint(source)) return null;
+  return { lat: Number(source.lat), lng: Number(source.lng) };
+};
+
+const normalizeSavedMissionGeometry = (save) => {
+  const repair = (mission) => {
+    if (!mission || typeof mission !== "object") return mission;
+    const vehicle = (save.vehicles || []).find((v) => v.id === mission.vehicle_id);
+    const opportunity = (save.opportunities || []).find((o) => o.id === mission.opportunity_id);
+
+    let target = mission.target;
+    if (!isFiniteGeoPoint(target) && isFiniteGeoPoint(opportunity)) {
+      target = { lat: Number(opportunity.lat), lng: Number(opportunity.lng) };
+    }
+
+    let origin = mission.origin;
+    if (!isFiniteGeoPoint(origin)) {
+      origin = vehicleOriginFor(save, vehicle);
+    }
+    if (!isFiniteGeoPoint(origin) && isFiniteGeoPoint(target)) origin = { ...target };
+    if (!isFiniteGeoPoint(target) && isFiniteGeoPoint(origin)) target = { ...origin };
+
+    if (isFiniteGeoPoint(origin)) mission.origin = origin;
+    if (isFiniteGeoPoint(target)) mission.target = target;
+    mission.depart_at ||= mission.started_at || mission.arrive_at || nowIso();
+    mission.started_at ||= mission.depart_at;
+    mission.origin_property_id ??= vehicle?.property_id || null;
+    return mission;
+  };
+
+  save.missions = (save.missions || []).map(repair);
+  save.history = (save.history || []).map(repair);
+};
+
 const normalizeSavedEconomy = (save) => {
   const previousEconomyVersion = Number(save.version || 1);
   for (const employee of save.employees || []) {
@@ -331,6 +373,7 @@ const normalizeSavedEconomy = (save) => {
     save.player.clean_money = 100000;
     addEvent(save, "system", "Capital de transição atualizado para a economia Portugal 2026: 100 000 € limpos.");
   }
+  normalizeSavedMissionGeometry(save);
   if (previousEconomyVersion < 5 || !isMonday20Lisbon(save.player?.next_payroll_at)) {
     save.player.next_payroll_at = nextWeeklySettlementIso(Date.now());
     if (previousEconomyVersion < 5) {
@@ -820,12 +863,15 @@ const mutateGame=(save,path,payload)=>{
     const fuelNeeded=Math.max(1,opp.dist_km*2*vehicle.cons/100);
     if(vehicle.fuel_l<fuelNeeded)fail(400,"Combustível insuficiente para a viagem");
     const start=Date.now(),eta=10000+opp.dist_km*1200,oper=(opp.duration_s||24)*1000,ret=eta*.8;
+    const origin=vehicleOriginFor(save,vehicle) || {lat:Number(opp.lat),lng:Number(opp.lng)};
+    const departAt=new Date(start).toISOString();
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
       member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:opp.reward,pays:opp.pays,
       fuel_needed:fuelNeeded,distance_km:opp.dist_km,chance:missionChance(save,opp,team),phase:"en_route",
-      started_at:new Date(start).toISOString(),arrive_at:new Date(start+eta).toISOString(),
+      depart_at:departAt,started_at:departAt,arrive_at:new Date(start+eta).toISOString(),
       finish_at:new Date(start+eta+oper).toISOString(),return_at:new Date(start+eta+oper+ret).toISOString(),
-      target:{lat:opp.lat,lng:opp.lng},opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
+      origin,origin_property_id:vehicle.property_id||null,
+      target:{lat:Number(opp.lat),lng:Number(opp.lng)},opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
     team.status="on_mission";members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     addEvent(save,"dispatch",`${team.name} saiu para ${opp.name}.`);return {ok:true,mission_id:mission.id};
   }
