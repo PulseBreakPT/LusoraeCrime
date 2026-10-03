@@ -84,7 +84,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Warehouse} />
           <PanelKicker>Património · Território</PanelKicker>
@@ -145,7 +145,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           </Tip>
         </div>
 
-        <div className="mt-3 space-y-2" data-testid="properties-list">
+        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3" data-testid="properties-list">
           {state.player.heat >= 70 && props.some((p) => p.type_key === "laboratorio") && (
             <Alert variant="destructive" data-testid="raid-warning" className="border-red-600/40 bg-red-600/10 py-2">
               <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
@@ -154,7 +154,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             </Alert>
           )}
           {props.length === 0 && (
-            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+            <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens propriedades — expande o teu império no mercado abaixo.
             </p>
           )}
@@ -184,7 +184,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const stacks = stackRank > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
             const paybackH = !maxed ? propertyUpgradePaybackH(pt, condition, upgradeCost) : null;
             return (
-              <Card key={p.id} data-testid={`property-card-${p.id}`} className="lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
+              <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 {/* Cabeçalho: placa com emblema + identidade */}
                 <div className="relative z-[1] flex items-stretch gap-2.5">
                   <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
@@ -305,7 +305,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Landmark} title="Mercado imobiliário" meta={catalog ? `${Object.keys(catalog.property_types || {}).length} tipos` : undefined} />
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.property_types).map(([key, pt]) => {
                 const tier = propertyTier(pt);
@@ -321,7 +321,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do benefício (rendimentos decrescentes).` : ""
                     }`;
                 return (
-                  <Card key={key} data-testid={`market-card-${key}`} className={cn("lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
+                  <Card key={key} data-testid={`market-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
                     <div className="relative z-[1] flex items-stretch gap-2.5">
                       <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <PropertyGlyph typeKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
