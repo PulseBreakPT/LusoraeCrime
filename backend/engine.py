@@ -154,7 +154,7 @@ def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
 
 
-MISSION_STATS_VERSION = 2
+MISSION_STATS_VERSION = 3
 
 
 def default_stats():
@@ -192,7 +192,7 @@ async def reconcile_mission_stats(db, player):
     pid = str(player["_id"])
     missions = await db.missions.find({
         "player_id": pid,
-        "phase": "done",
+        "phase": {"$in": ["returning", "done"]},
         "outcome": {"$in": ["success", "partial", "failure", "police"]},
     }).to_list(10000)
 
@@ -200,13 +200,21 @@ async def reconcile_mission_stats(db, player):
     by_category = {}
     success_by_category = {}
     for mission in missions:
-        outcome = "police" if mission.get("chase_outcome") == "caught" else mission.get("outcome")
-        if outcome not in ("success", "partial", "failure", "police"):
+        raw_outcome = mission.get("outcome")
+        if raw_outcome not in ("success", "partial", "failure", "police"):
             continue
         total += 1
         category = (mission.get("opportunity") or {}).get("category")
         if category:
             by_category[category] = by_category.get(category, 0) + 1
+
+        # Success/partial ainda em regresso não têm resultado terminal: podem
+        # chegar ao QG ou acabar apanhados numa perseguição. Contam já para o
+        # total, mas só entram numa categoria quando regressarem.
+        if mission.get("phase") == "returning" and raw_outcome in ("success", "partial"):
+            continue
+
+        outcome = "police" if mission.get("chase_outcome") == "caught" else raw_outcome
         if outcome == "success":
             success += 1
             if category:
