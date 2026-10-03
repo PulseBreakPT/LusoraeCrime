@@ -142,7 +142,24 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   const canAffordNext = !!nextTier && state.player.clean_money >= nextTier.upgrade_cost;
   const meetsOrgLevel = !!nextTier && state.player.level >= nextTier.min_org_level;
 
-  const tips = hqAdvisorTips(state, catalog);
+  const rawTips = hqAdvisorTips(state, catalog);
+  // Uma ação por destino: o consultor pode detetar vários problemas que se
+  // resolvem no mesmo painel (ex.: fadiga + salários -> Operacionais).
+  const severityRank = { danger: 3, warn: 2, opportunity: 1, info: 0 };
+  const tips = Array.from(rawTips.reduce((groups, tip) => {
+    const key = tip.navigate || tip.id;
+    const current = groups.get(key);
+    if (!current) {
+      groups.set(key, { ...tip });
+      return groups;
+    }
+    current.label = `${current.label} · ${tip.label}`;
+    if ((severityRank[tip.severity] ?? 0) > (severityRank[current.severity] ?? 0)) {
+      current.severity = tip.severity;
+    }
+    current.score = Math.max(Number(current.score) || 0, Number(tip.score) || 0);
+    return groups;
+  }, new Map()).values());
   const perf = hqPerformanceMetrics(state);
   const priority = state.player.priorities?.active || catalog.hq_default_priority || "equilibrio";
 
