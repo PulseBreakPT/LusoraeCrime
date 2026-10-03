@@ -25,6 +25,7 @@ set -euo pipefail
 
 SITE_DOMAIN="${SITE_DOMAIN:-srv1758509.hstgr.cloud}"
 ACME_EMAIL="${ACME_EMAIL:-tiago.mrj17@gmail.com}"
+GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$SCRIPT_DIR"
@@ -119,10 +120,17 @@ BACKEND_PORT=8001
 ADMIN_EMAIL=${ACME_EMAIL}
 ADMIN_PASSWORD=${ADMIN_PW}
 
-CORS_ORIGINS=https://${SITE_DOMAIN}
+# OAuth 2.0 Web Client ID do mesmo projeto Google Cloud usado pela app Android.
+GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID}
+
+# Web de produção + GitHub Pages + origem local do Capacitor Android.
+CORS_ORIGINS=https://${SITE_DOMAIN},https://pulsebreakpt.github.io,https://localhost
 EOF
   chmod 600 "$ENV_FILE"
   ok ".env.production criado."
+  if [[ -z "${GOOGLE_WEB_CLIENT_ID}" ]]; then
+    echo "   ⚠ GOOGLE_WEB_CLIENT_ID em falta — o jogo funciona, mas o botão Google fica indisponível até configurares OAuth."
+  fi
   echo
   echo "   ┌─────────────────────────────────────────────┐"
   echo "   │ CREDENCIAIS DE ADMIN (guarda já!)            │"
