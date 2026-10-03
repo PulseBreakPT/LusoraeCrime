@@ -275,9 +275,9 @@ def calculate_money_reward(
     category_mult = CATEGORY_MULTIPLIERS.get(category, CATEGORY_MULTIPLIERS["__default__"])
     reward *= category_mult
 
-    # Missões raras (apenas 2× máximo)
+    # Missões raras pagam mais, mas não duplicam automaticamente a economia.
     if is_rare_mission:
-        reward *= 2.0
+        reward *= RARE_MISSION_REWARD_MULTIPLIER
 
     # Stack de multiplicadores (achievement, property, etc.)
     # Limitar para evitar combinações absurdas
