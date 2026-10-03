@@ -134,7 +134,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const idle = e.status === "idle";
 
   return (
-    <Card data-testid={`employee-card-${e.id}`} className="lus-card lus-doss-card p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
+    <Card data-testid={`employee-card-${e.id}`} className="h-full min-w-0 lus-card lus-doss-card p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
       <div className="relative z-[1] flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
@@ -464,7 +464,7 @@ const CandidateCard = ({ c }) => {
   if (lackMoney) blockers.push(`faltam ${fmtMoney(c.cost - state.player.clean_money)}`);
 
   return (
-    <Card data-testid={`candidate-card-${c.id}`} className="lus-card p-3 shadow-none">
+    <Card data-testid={`candidate-card-${c.id}`} className="h-full min-w-0 lus-card p-3 shadow-none">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">
@@ -577,7 +577,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel" data-testid="employees-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="employees-panel">
         <SheetHeader>
           <PanelWatermark icon={IdCard} />
           <PanelKicker>Recursos · Efetivo</PanelKicker>
@@ -740,9 +740,9 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     </Tip>
                   )}
                 </div>
-                <div className="mt-2 space-y-2" data-testid="employees-list">
+                <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3" data-testid="employees-list">
                   {sortedEmployees.length === 0 && (
-                    <p className="font-mono text-[11px] text-zinc-600">Ninguém no plantel bate certo com esses filtros — limpa-os e tenta de novo.</p>
+                    <p className="col-span-full font-mono text-[11px] text-zinc-600">Ninguém no plantel bate certo com esses filtros — limpa-os e tenta de novo.</p>
                   )}
                   {sortedEmployees.map((e) => (
                     <EmployeeCard key={e.id} e={e} onNavigate={onNavigate} />
@@ -790,7 +790,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                   {locked ? (
                     <p className="font-mono text-[10px] text-zinc-600">Sobe de nível para desbloquear esta fonte de recrutamento.</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
                       {cands.map((c) => (
                         <CandidateCard key={c.id} c={c} />
                       ))}
