@@ -31,18 +31,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install --non-interactive
 
       - name: Build frontend
         env:
           CI: "false"
           REACT_APP_BACKEND_URL: "https://lusora-patrols.preview.emergentagent.com"
-          REACT_APP_AUTH_UI_ENABLED: "false"
+          REACT_APP_AUTH_UI_ENABLED: "true"
+          REACT_APP_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: yarn build
 
       - name: Add GitHub Pages SPA fallback
