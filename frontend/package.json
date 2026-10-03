@@ -60,12 +60,20 @@
     "tailwind-merge": "3.2.0",
     "tailwindcss-animate": "1.0.7",
     "vaul": "1.1.2",
-    "zod": "3.24.4"
+    "zod": "3.24.4",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capgo/capacitor-social-login": "8.3.40"
   },
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:prepare": "yarn build && cap sync android",
+    "android:bundle": "cd android && ./gradlew bundleRelease"
   },
   "browserslist": {
     "production": [
@@ -94,7 +102,8 @@
     "eslint-plugin-react-hooks": "5.2.0",
     "globals": "15.15.0",
     "postcss": "8.5.10",
-    "tailwindcss": "3.4.17"
+    "tailwindcss": "3.4.17",
+    "@capacitor/cli": "8.5.2"
   },
   "resolutions": {
     "react-router": "7.15.0",
