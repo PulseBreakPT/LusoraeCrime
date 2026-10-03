@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --non-interactive
 
+      - name: Test Portugal economy
+        run: python backend/tests/test_economy_portugal_2026.py
+
       - name: Test offline guest engine
         env:
           CI: "true"
