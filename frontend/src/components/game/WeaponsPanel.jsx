@@ -236,7 +236,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3" data-testid="weapons-list">
+        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="weapons-list">
           {weapons.length === 0 && (
             <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens armas — compra a primeira no arsenal abaixo.
@@ -275,7 +275,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             return (
               <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
                 {/* Cabeçalho: placa com silhueta + identidade */}
-                <div className="relative z-[1] flex items-stretch gap-2.5">
+                <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
                   <div className="lus-weapon-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <WeaponGlyph modelKey={w.model_key} accent={tier.color} className="h-[44px] w-[96px]" />
                   </div>
@@ -432,7 +432,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Swords} title="Arsenal" meta={catalog ? `${Object.keys(catalog.weapon_models || {}).length} modelos` : undefined} />
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.weapon_models).map(([key, m]) => {
                 const tier = weaponTier(m);
@@ -442,7 +442,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 const wear = weaponWearPerMission(m, meta);
                 return (
                   <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
-                    <div className="relative z-[1] flex items-stretch gap-2.5">
+                    <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
                       <div className="lus-weapon-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <WeaponGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
