@@ -551,15 +551,12 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   return (
     <>
       {/* Alvo físico da operação — marcador vermelho visível do despacho ao fim.
-          Clique abre a Câmara da Operação (vista tática do interior). */}
+          O progresso é acompanhado integralmente no próprio mapa. */}
       <Marker
         position={[mission.target.lat, mission.target.lng]}
         icon={missionTargetIconCached(phase === "operating")}
         zIndexOffset={340}
         opacity={dim ? 0.25 : 1}
-        eventHandlers={{
-          click: () => window.dispatchEvent(new CustomEvent("lus:open-operation", { detail: { id: mission.id } })),
-        }}
       >
         <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
           <div className="min-w-[150px]">
@@ -579,8 +576,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               <p className="mt-0.5 text-[9px] text-cyan-500/80">Motorista ao volante — pronto para a fuga</p>
             )}
             {choreo && <p className="mt-1 text-[9px] text-zinc-500">{CHOREO_LABELS[choreo.kind]}</p>}
-            <p className="mt-1 text-[9px] text-red-400/90">
-              {phase === "operating" ? "Clica para abrir a câmara da operação" : "Clica para veres o interior do alvo"}
+            <p className="mt-1 text-[9px] text-cyan-400/90">
+              Acompanha no mapa os membros, deslocações e ações da equipa.
             </p>
           </div>
         </LTooltip>
@@ -634,7 +631,17 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
                 interactive={false}
                 keyboard={false}
                 zIndexOffset={520}
-              />
+              >
+                <LTooltip
+                  permanent
+                  direction="top"
+                  offset={[0, -8]}
+                  opacity={1}
+                  className="lus-op-name-tip"
+                >
+                  {op.member?.name || `Operacional ${i + 1}`}
+                </LTooltip>
+              </Marker>
             );
           })}
         </>
@@ -924,7 +931,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             roster={(safeMission.member_ids || [])
               .map((id) => empById[id])
               .filter(Boolean)
-              .map((e) => ({ role_key: e.role_key, spec: e.spec, rank: e.rank }))}
+              .map((e) => ({ id: e.id, name: e.name, role_key: e.role_key, spec: e.spec, rank: e.rank }))}
           />
         );
       })}
