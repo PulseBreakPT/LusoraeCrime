@@ -46,16 +46,21 @@ const ToggleSwitch = ({ checked, onChange, testId, disabled }) => (
   />
 );
 
-const Section = ({ icon: Icon, title, children, testId }) => (
+const Section = ({ icon: Icon, title, children, testId, hidden = false }) => {
+  if (hidden) return null;
+  return (
   <div className="mt-6 first:mt-0" data-testid={testId}>
     <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
       <Icon size={12} /> {title}
     </h3>
     <Card className="space-y-2 lus-card p-3 shadow-none">{children}</Card>
   </div>
-);
+  );
+};
 
-const Row = ({ label, hint, children, testId }) => (
+const Row = ({ label, hint, children, testId, hidden = false }) => {
+  if (hidden) return null;
+  return (
   <div className="flex items-center justify-between gap-3 py-1" data-testid={testId}>
     <div className="min-w-0">
       <p className="text-[11px] font-semibold text-zinc-300">{label}</p>
@@ -63,7 +68,8 @@ const Row = ({ label, hint, children, testId }) => (
     </div>
     <div className="shrink-0">{children}</div>
   </div>
-);
+  );
+};
 
 // Slider de volume compacto (0–100%), coerente com o resto do painel.
 const VolumeSlider = ({ value, onChange, disabled, testId }) => (
@@ -339,6 +345,7 @@ const ABOUT_ITEMS = [
 
 export const SettingsPanel = ({ open, onOpenChange }) => {
   const { state, updateAutomationSettings } = useGame();
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const { logout } = useAuth();
   const {
     showSeconds, setShowSeconds, compactNumbers, setCompactNumbers,
@@ -370,10 +377,21 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Conta, interface, jogabilidade, automatizações, áudio e notificações.</SheetDescription>
+          <SheetDescription className="text-zinc-500">Preferências essenciais. As opções técnicas ficam escondidas até precisares delas.</SheetDescription>
         </SheetHeader>
 
-        <Section icon={UserCog} title="Conta" testId="settings-section-account">
+        <Button
+          type="button"
+          variant="outline"
+          data-testid="settings-advanced-toggle"
+          onClick={() => setAdvancedOpen((value) => !value)}
+          className="mt-3 w-full justify-between border-white/10 bg-white/[0.03] font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300"
+        >
+          <span>{advancedOpen ? "Ocultar avançado" : "Mostrar avançado"}</span>
+          <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+        </Button>
+
+        <Section icon={UserCog} title="Conta" testId="settings-section-account" hidden={!advancedOpen}>
           <ChangePasswordForm />
           <ClaimAdminForm />
           <Button
@@ -388,10 +406,10 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
         </Section>
 
         <Section icon={Monitor} title="Interface" testId="settings-section-interface">
-          <Row label="Mostrar segundos nos temporizadores" testId="settings-row-show-seconds">
+          <Row label="Mostrar segundos nos temporizadores" testId="settings-row-show-seconds" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-show-seconds" checked={showSeconds} onChange={setShowSeconds} />
           </Row>
-          <Row label="Números compactos" hint="1,2 M em vez de 1 200 000" testId="settings-row-compact-numbers">
+          <Row label="Números compactos" hint="1,2 M em vez de 1 200 000" testId="settings-row-compact-numbers" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-compact-numbers" checked={compactNumbers} onChange={setCompactNumbers} />
           </Row>
           <Row label="Tooltips de ajuda" testId="settings-row-show-tooltips">
@@ -407,16 +425,16 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
               }}
             />
           </Row>
-          <Row label="Memorizar filtros" testId="settings-row-remember-filters">
+          <Row label="Memorizar filtros" testId="settings-row-remember-filters" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-remember-filters" checked={rememberFilters} onChange={setRememberFilters} />
           </Row>
-          <Row label="Memorizar ordenação" testId="settings-row-remember-sort">
+          <Row label="Memorizar ordenação" testId="settings-row-remember-sort" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-remember-sort" checked={rememberSort} onChange={setRememberSort} />
           </Row>
-          <Row label="Confirmar apenas ações irreversíveis" hint="Desliga para executar de imediato, sem confirmação" testId="settings-row-confirm-irreversible">
+          <Row label="Confirmar apenas ações irreversíveis" hint="Desliga para executar de imediato, sem confirmação" testId="settings-row-confirm-irreversible" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-confirm-irreversible" checked={confirmIrreversible} onChange={setConfirmIrreversible} />
           </Row>
-          <Row label="Mostrar contador de FPS" hint="Indicador de fluidez no canto do ecrã" testId="settings-row-show-fps">
+          <Row label="Mostrar contador de FPS" hint="Indicador de fluidez no canto do ecrã" testId="settings-row-show-fps" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-show-fps" checked={showFps} onChange={setShowFps} />
           </Row>
           <Row label="Modo focado" hint="Mantém apenas o mapa e os controlos essenciais" testId="settings-row-focus-mode">
@@ -443,13 +461,13 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Row label="Ocultar operações impossíveis" hint="Esconde do mapa as que nenhuma equipa consegue cumprir agora" testId="settings-row-hide-impossible">
             <ToggleSwitch testId="settings-toggle-hide-impossible" checked={hideImpossibleMissions} onChange={setHideImpossibleMissions} />
           </Row>
-          <Row label="Repetir automaticamente a última configuração" testId="settings-row-repeat-config">
+          <Row label="Repetir automaticamente a última configuração" testId="settings-row-repeat-config" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-repeat-config" checked={repeatLastConfig} onChange={setRepeatLastConfig} />
           </Row>
-          <Row label="Abrir automaticamente o relatório da operação" hint="Abre o Intel quando uma equipa regressa" testId="settings-row-auto-report">
+          <Row label="Abrir automaticamente o relatório da operação" hint="Abre os Relatórios quando uma equipa regressa" testId="settings-row-auto-report" hidden={!advancedOpen}>
             <ToggleSwitch testId="settings-toggle-auto-report" checked={autoOpenReport} onChange={setAutoOpenReport} />
           </Row>
-          <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success">
+          <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success" hidden={!advancedOpen}>
             <Input
               data-testid="settings-low-success-input"
               type="number" min="10" max="95" step="5"
@@ -460,7 +478,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           </Row>
         </Section>
 
-        <Section icon={Cog} title="Automatizações" testId="settings-section-automations">
+        <Section icon={Cog} title="Automatizações" testId="settings-section-automations" hidden={!advancedOpen}>
           <Row label="Reparar veículos automaticamente" hint="Abaixo da durabilidade indicada" testId="settings-row-auto-repair">
             <div className="flex items-center gap-2">
               <ThresholdInput
@@ -594,7 +612,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           ))}
         </Section>
 
-        <Section icon={Info} title="Sobre" testId="settings-section-about">
+        <Section icon={Info} title="Sobre" testId="settings-section-about" hidden={!advancedOpen}>
           <Row label="Versão do jogo" testId="settings-row-version">
             <span className="font-mono text-[11px] text-zinc-400">v{GAME_VERSION}</span>
           </Row>
