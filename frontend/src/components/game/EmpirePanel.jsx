@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtDuration, passiveRates, heatStatus, orgAlerts, NOTIFY_COLOR } from "../../lib/game";
+import { fmtMoney, fmtDuration, passiveRates, heatStatus } from "../../lib/game";
 import { Tip, MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -9,7 +9,7 @@ import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Table, TableBody, TableCell, TableRow } from "../ui/table";
 import {
-  Building2, Banknote, MapPin, Siren, LayoutGrid, ChevronRight, TrendingUp, TrendingDown,
+  Building2, Banknote, MapPin, Siren, TrendingUp, TrendingDown,
   AlertTriangle, History, ChevronDown, Clock,
 } from "lucide-react";
 
@@ -23,7 +23,7 @@ const TX_LABELS = {
   launder_out: "Lavagem (saída)", launder_in: "Lavagem (entrada)", team_create: "Nova equipa",
 };
 
-export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
+export const EmpirePanel = ({ open, onOpenChange }) => {
   const { state, catalog, serverNow, launder, bribePolice, fetchTransactions } = useGame();
   const [amount, setAmount] = useState("");
   const [showLedger, setShowLedger] = useState(false);
@@ -34,10 +34,8 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   }, [open, fetchTransactions]);
   if (!state) return null;
   const p = state.player;
-  const nav = (panel) => onNavigate && onNavigate(panel);
   const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
   const hs = heatStatus(p.heat);
-  const alerts = orgAlerts(state);
   const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
   const weeklyBreakdown = state.weekly_cost_breakdown || {};
   const fixedPerH = weeklyFixed / (7 * 24);
@@ -184,31 +182,6 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           </Card>
         </div>
 
-        <div className="mt-6">
-          <SectionHeader icon={LayoutGrid} title="Acesso rápido" />
-          <div className="grid grid-cols-2 gap-2">
-            <QuickNav testId="empire-nav-employees" label="Operacionais"
-              value={`${state.caps.employees.used}/${state.caps.employees.max} · ${fmtMoney(state.salary_total || 0)}/semana`}
-              alert={alerts.hr > 0 || p.clean_money < weeklyFixed} alertText={p.clean_money < weeklyFixed ? "reserva semanal curta!" : alerts.hr > 0 ? `${alerts.hr} a precisar de atenção` : null}
-              tip={p.clean_money < weeklyFixed ? `Faltam ${fmtMoney(Math.max(0, weeklyFixed - p.clean_money))} para o fecho semanal completo.` : alerts.hr > 0 ? `${alerts.hr} operacional(is) feridos, presos, exaustos ou com risco de traição — abre Operacionais.` : "Efetivo, recrutamento, formações e promoções."}
-              onClick={() => nav("employees")} />
-            <QuickNav testId="empire-nav-fleet" label="Frota"
-              value={`${state.caps.vehicles.used}/${state.caps.vehicles.max} veículos`}
-              alert={alerts.fleet > 0} alertText={alerts.fleet > 0 ? `${alerts.fleet} a precisar de atenção` : null}
-              tip={alerts.fleet > 0 ? `${alerts.fleet} veículo(s) sem combustível ou avariados — abre a Frota.` : "Combustível, reparações e atribuições."}
-              onClick={() => nav("fleet")} />
-            <QuickNav testId="empire-nav-properties" label="Imóveis"
-              value={`${state.properties.length} propriedades`}
-              alert={alerts.raidRisk} alertText={alerts.raidRisk ? "risco de rusga!" : null}
-              tip={alerts.raidRisk ? "Calor alto — risco de rusga aos laboratórios." : "Capacidades, produção passiva e lavagem automática."}
-              onClick={() => nav("properties")} />
-            <QuickNav testId="empire-nav-quests" label="Missões"
-              value={`${alerts.claimable} por reclamar`}
-              alert={alerts.claimable > 0}
-              tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) à tua espera.` : "História, diárias, semanais e alertas."}
-              onClick={() => nav("quests")} />
-          </div>
-        </div>
 
         <div className="mt-6">
           <SectionHeader icon={Banknote} title="Lavagem de dinheiro" />
@@ -363,27 +336,5 @@ const StatBox = ({ label, value, accent = "#FFFFFF", tip }) => (
       <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">{label}</p>
       <p className="mt-1 truncate font-mono text-lg font-bold leading-tight" style={{ color: accent }}>{value}</p>
     </Card>
-  </Tip>
-);
-
-const QuickNav = ({ testId, label, value, alert, alertText, tip, onClick }) => (
-  <Tip tip={tip} block>
-    <button
-      data-testid={testId}
-      onClick={onClick}
-      className="group relative h-full w-full rounded-xl border lus-card p-3 text-left transition-colors hover:bg-white/[0.08]"
-    >
-      <p className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500">
-        {label} <ChevronRight size={11} className="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-      </p>
-      <p className="mt-1 truncate font-mono text-xs font-bold text-white">{value}</p>
-      {alertText && <p className="mt-0.5 font-mono text-[9px] text-amber-400">{alertText}</p>}
-      {alert && (
-        <span
-          className="absolute right-1.5 top-1.5 h-1.5 w-1.5 animate-pulse rounded-full"
-          style={{ background: NOTIFY_COLOR, boxShadow: `0 0 5px ${NOTIFY_COLOR}` }}
-        />
-      )}
-    </button>
   </Tip>
 );
