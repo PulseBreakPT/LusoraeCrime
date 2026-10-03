@@ -56,14 +56,14 @@ const blendMapPoint = (a, b, t) => {
   };
 };
 
-// Quando uma rota OSRM chega alguns ms depois do despacho, não saltamos logo
-// para a posição "teórica" atual. Fazemos catch-up SOBRE a própria estrada.
-// A janela termina sempre bastante antes do fim da fase para não atrasar a missão.
-const routeReveal = (readyAtMs, nowMs, phaseEndMs, maxWindowMs = 900) => {
-  if (!Number.isFinite(Number(readyAtMs))) return 1;
-  const remainingAtReady = Math.max(0, Number(phaseEndMs) - Number(readyAtMs));
-  const windowMs = Math.max(120, Math.min(maxWindowMs, remainingAtReady * 0.55));
-  return smooth01((Number(nowMs) - Number(readyAtMs)) / Math.max(1, windowMs));
+// Se uma rota chegar atrasada, o relógio VISUAL começa no momento em que ela
+// ficou disponível e percorre o resto da geometria até ao fim da fase. Assim
+// nunca existe um "catch-up" de 0,9 s que pareça teletransporte.
+const routePhaseProgress = (readyAtMs, nowMs, phaseStartMs, phaseEndMs) => {
+  const normal = clamp01((Number(nowMs) - Number(phaseStartMs)) / Math.max(1, Number(phaseEndMs) - Number(phaseStartMs)));
+  if (readyAtMs == null || !Number.isFinite(Number(readyAtMs))) return normal;
+  const visualStart = Math.max(Number(phaseStartMs), Math.min(Number(readyAtMs), Number(phaseEndMs) - 1));
+  return clamp01((Number(nowMs) - visualStart) / Math.max(1, Number(phaseEndMs) - visualStart));
 };
 
 const validRoadPlan = (plan) =>
@@ -226,8 +226,8 @@ const propIcon = (typeKey) => {
   return makeDivIcon(html, 28);
 };
 
-const placementIcon = (valid) => {
-  const color = valid ? "#34D399" : "#EF4444";
+const placementIcon = (valid, checking = false) => {
+  const color = checking ? "#F59E0B" : valid ? "#34D399" : "#EF4444";
   const html = `
     <div class="prop-pin placement-pin" style="--mk:${color};border-color:${color}">
       ${renderToStaticMarkup(<Warehouse size={13} strokeWidth={2.5} />)}
@@ -246,7 +246,7 @@ const PlacementPreview = ({ placement, onPick }) => {
   return (
     <Marker
       position={[placement.point.lat, placement.point.lng]}
-      icon={placementIcon(placement.valid)}
+      icon={placementIcon(placement.valid, placement.checking)}
       draggable={true}
       eventHandlers={{
         dragend: (e) => {
@@ -422,11 +422,9 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     }
 
     if (now < arrive) {
-      const actualPhaseT = clamp01((now - depart) / Math.max(1, arrive - depart));
-      // Se o OSRM demorou a responder, recupera suavemente a diferença ao
-      // longo da estrada. Sem este reveal, a primeira frame válida podia
-      // colocar o veículo instantaneamente 10–30% à frente no percurso.
-      const phaseT = actualPhaseT * routeReveal(route.outwardReadyAt, now, arrive);
+      // Rota presente desde o despacho => relógio normal. Rota antiga que só
+      // chegou depois => recomeça visualmente em 0 e percorre-a sem saltos.
+      const phaseT = routePhaseProgress(route.outwardReadyAt, now, depart, arrive);
       // 94% da janela segue os tempos de cada troço OSRM; o final apenas
       // encosta o carro da estrada ao ponto de estacionamento.
       const roadT = clamp01(phaseT / 0.94);
@@ -458,12 +456,14 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
       return { ...returnStart, phase: "returning", state: "routing", progress: phaseT, bearing: null, moving: false };
     }
 
-    // Regresso OSRM independente. Pequena janela inicial apenas para sair da
-    // berma e fazer snap ao primeiro ponto da rota.
+    // O relógio de movimento é separado do relógio lógico. Se a geometria do
+    // regresso só ficar disponível a meio da fase, o carro parte dali em vez
+    // de aparecer instantaneamente dezenas de ruas à frente.
+    const motionT = routePhaseProgress(route.inwardReadyAt, now, finish, ret);
     const leaveWindow = Math.min(0.08, 2500 / Math.max(1, ret - finish));
     const routeStart = pointOnTimedRoute(route.inward, 0) || returnStart;
-    if (phaseT < leaveWindow) {
-      const position = blendMapPoint(returnStart, routeStart, phaseT / Math.max(0.001, leaveWindow));
+    if (motionT < leaveWindow) {
+      const position = blendMapPoint(returnStart, routeStart, motionT / Math.max(0.001, leaveWindow));
       return {
         ...position,
         phase: "returning",
@@ -475,9 +475,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
       };
     }
 
-    const actualRoadT = clamp01((phaseT - leaveWindow) / Math.max(0.001, 1 - leaveWindow));
-    const reveal = routeReveal(route.inwardReadyAt, now, ret);
-    const roadT = actualRoadT * reveal;
+    const roadT = clamp01((motionT - leaveWindow) / Math.max(0.001, 1 - leaveWindow));
     const travelSeconds = roadT * Math.max(0, route.inward.duration || 0);
     const roadPose = pointOnTimedRoute(route.inward, travelSeconds) || routeStart;
     return {
@@ -857,55 +855,102 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
   const tr = vehicle.transfer;
   const origin = tr.from;
   const target = tr.to;
-  const [route, setRoute] = useState(null);
+  const [route, setRoute] = useState(() => peekRoute(origin, target));
+  const markerRef = useRef(null);
+  const routeReadyAtRef = useRef(route ? null : null);
+  const posRef = useRef({ lat: origin.lat, lng: origin.lng });
+  const [, setClockTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    const cached = peekRoute(origin, target);
+    if (cached && !cached.unavailable) {
+      routeReadyAtRef.current = null;
+      setRoute(cached);
+      return () => { cancelled = true; };
+    }
+
     fetchRoute(origin, target).then((info) => {
       if (cancelled) return;
+      routeReadyAtRef.current = info?.unavailable ? null : serverNow();
       setRoute(info);
     });
     return () => { cancelled = true; };
-  }, [vehicle.id, origin.lat, origin.lng, target.lat, target.lng]);
+  }, [vehicle.id, origin.lat, origin.lng, target.lat, target.lng, serverNow]);
 
   const computePos = () => {
     const now = serverNow();
     const started = Date.parse(tr.started_at);
     const ends = Date.parse(tr.ends_at);
-    const t = Math.min(1, Math.max(0, (now - started) / Math.max(1, ends - started)));
+    const logicalT = clamp01((now - started) / Math.max(1, ends - started));
     if (!route || route.unavailable || !route.latlngs?.length) {
-      return t >= 1 ? { lat: target.lat, lng: target.lng } : { lat: origin.lat, lng: origin.lng };
+      return {
+        lat: origin.lat,
+        lng: origin.lng,
+        progress: logicalT,
+        bearing: null,
+        moving: false,
+      };
     }
-    const pose = pointOnTimedRoute(route, t * Math.max(0, route.duration || 0));
-    return pose ? { lat: pose.lat, lng: pose.lng } : { lat: origin.lat, lng: origin.lng };
+
+    // Tal como nas missões: uma rota que chega tarde começa no ponto inicial
+    // e usa o tempo restante. Nunca salta para a percentagem lógica atual.
+    const motionT = routePhaseProgress(routeReadyAtRef.current, now, started, ends);
+    const pose = pointOnTimedRoute(route, motionT * Math.max(0, route.duration || 0));
+    return pose
+      ? { lat: pose.lat, lng: pose.lng, progress: logicalT, bearing: pose.bearing, moving: true }
+      : { lat: origin.lat, lng: origin.lng, progress: logicalT, bearing: null, moving: false };
   };
 
-  const [pos, setPos] = useState(() => computePos());
   useEffect(() => {
-    const id = setInterval(() => setPos(computePos()), 350);
-    return () => clearInterval(id);
+    let raf;
+    let lastTick = 0;
+    const loop = (frameNow) => {
+      const p = computePos();
+      posRef.current = p;
+      if (markerRef.current) markerRef.current.setLatLng([p.lat, p.lng]);
+      if (frameNow - lastTick > 1000) {
+        lastTick = frameNow;
+        setClockTick((value) => value + 1);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle, route, serverNow]);
 
+  const pos = posRef.current || computePos();
   const remaining = Math.max(0, (Date.parse(tr.ends_at) - serverNow()) / 1000);
   const icon = useMemo(() => transferIcon(), []);
 
   return (
     <>
       {route?.latlngs && !route.unavailable && route.latlngs.length > 1 && (
-        <Polyline
-          positions={route.latlngs}
-          smoothFactor={2}
-          pathOptions={{ color: TRANSFER_COLOR, weight: 2, opacity: dim ? 0.15 : 0.6, dashArray: "4 6" }}
-          interactive={false}
-        />
+        <>
+          <Polyline
+            positions={route.latlngs}
+            smoothFactor={1}
+            pathOptions={{ color: "#071016", weight: 5, opacity: dim ? 0.1 : 0.58, lineCap: "round", lineJoin: "round" }}
+            interactive={false}
+          />
+          <Polyline
+            positions={route.latlngs}
+            smoothFactor={1}
+            pathOptions={{ color: TRANSFER_COLOR, weight: 2.2, opacity: dim ? 0.2 : 0.9, dashArray: "5 6", lineCap: "round", lineJoin: "round" }}
+            interactive={false}
+          />
+        </>
       )}
-      <Marker position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={480} opacity={dim ? 0.25 : 1}>
+      <Marker ref={markerRef} position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={480} opacity={dim ? 0.25 : 1}>
         <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
           <div className="min-w-[140px]">
             <p className="text-[11px] font-bold text-white">{vehicle.name}</p>
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: TRANSFER_COLOR }}>Em transferência</p>
+            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: TRANSFER_COLOR }}>
+              {route?.unavailable ? "Percurso indisponível" : route ? "Em transferência" : "A calcular percurso"}
+            </p>
             <TipRow label="chega em" value={fmtDuration(remaining)} color={TRANSFER_COLOR} />
+            {route?.distance > 0 && <TipRow label="rota" value={(route.distance / 1000).toFixed(1) + " km"} color={TRANSFER_COLOR} />}
           </div>
         </LTooltip>
       </Marker>
@@ -967,7 +1012,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       attributionControl={true}
     >
       <MapBaseLayer />
-      <MapBackgroundClick onClick={() => onSelectOpp(null)} />
+      {!placement && <MapBackgroundClick onClick={() => onSelectOpp(null)} />}
       <ZoomObserver onZoom={setZoom} />
       <FollowManager onCancel={() => setFollowId(null)} />
       {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
@@ -1272,9 +1317,11 @@ export const PlacementControls = () => {
           {" — "}
           {!placement.point
             ? "toca no mapa para escolheres a localização."
+            : placement.checking
+            ? "a validar a localização em Portugal…"
             : invalid
-            ? "local inválido: escolhe um ponto em terra firme."
-            : `localização válida · ${market?.zone || "Portugal"} · ${market?.price?.toLocaleString("pt-PT") || "—"} €.`}
+            ? (placement.reason || "local inválido: escolhe um ponto em terra firme.")
+            : `localização válida · ${placement.district || market?.zone || "Portugal"} · ${market?.price?.toLocaleString("pt-PT") || "—"} €.`}
         </p>
         {market && (
           <p className="mt-1 font-mono text-[9px] text-zinc-500">
@@ -1285,7 +1332,7 @@ export const PlacementControls = () => {
           <Button
             data-testid="placement-confirm"
             onClick={confirmPlacement}
-            disabled={!placement.point || !placement.valid}
+            disabled={!placement.point || placement.checking || !placement.valid}
             variant="success"
             className="flex-1 gap-1.5 rounded-full disabled:opacity-40"
           >
