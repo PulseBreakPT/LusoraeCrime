@@ -35,7 +35,7 @@ api.interceptors.request.use((config) => {
 // sessão local e emite um evento global para a app redirecionar para o login
 // com aviso de "sessão expirada" — nunca fica em loading infinito.
 // ---------------------------------------------------------------------------
-const AUTH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
+const AUTH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/google", "/auth/refresh", "/auth/logout"];
 let refreshPromise = null;
 
 const expireSession = () => {
