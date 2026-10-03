@@ -74,6 +74,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
 from reward_engine import calculate_full_reward
 from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
 from property_market import property_market_price
+from road_routing import road_router
 from economy_calendar import WEEKLY_SETTLEMENT_WEEKDAY, WEEKLY_SETTLEMENT_HOUR
 from economy_constants import (
     EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
@@ -135,6 +136,16 @@ async def get_player(user: dict, allow_pending: bool = False) -> dict:
     player["hq"].setdefault("upgrade_history", [])
     player.setdefault("priorities", {"active": "equilibrio"})
     return player
+
+
+class MapPointInput(BaseModel):
+    lat: float
+    lng: float
+
+
+class RoadRouteInput(BaseModel):
+    origin: MapPointInput
+    target: MapPointInput
 
 
 class DispatchInput(BaseModel):
@@ -843,6 +854,17 @@ async def _validate_dispatch_inputs(body: DispatchInput, user: dict):
     return player, opp, team
 
 
+@router.post("/road-route")
+async def road_route(body: RoadRouteInput, user: dict = Depends(get_current_user)):
+    """Percurso rodoviário autoritativo usado pelo mapa e pelo despacho.
+
+    Fica no backend para evitar CORS/rate-limit no browser e partilha a mesma
+    cache persistente que o próprio /dispatch.
+    """
+    await get_player(user)
+    return await road_router.get(body.origin.model_dump(), body.target.model_dump())
+
+
 @router.post("/dispatch/preview")
 async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current_user)):
     player, opp, team = await _validate_dispatch_inputs(body, user)
@@ -881,6 +903,15 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     vehicle = prep["vehicle"]
     members = prep["members"]
     repeat_type = team.get("last_type_key") == opp["type_key"]
+
+    # Resolve ida e regresso ANTES de alterar qualquer estado. A missão nasce
+    # sempre com geometria real persistida; se o serviço rodoviário falhar,
+    # nada é debitado, ocupado ou marcado como "taken".
+    target_point = {"lat": float(opp["lat"]), "lng": float(opp["lng"])}
+    road_outward, road_inward = await asyncio.gather(
+        road_router.get(prep["origin"], target_point),
+        road_router.get(target_point, prep["origin"]),
+    )
 
     # Pequenos imprevistos, decididos só no momento do despacho (não na
     # pré-visualização, para esta continuar a mostrar sempre o valor de base):
@@ -960,6 +991,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "origin": {"lat": prep["origin"]["lat"], "lng": prep["origin"]["lng"]},
         "origin_property_id": prep["origin"]["property_id"],
         "target": {"lat": opp["lat"], "lng": opp["lng"]},
+        "road_outward": road_outward,
+        "road_inward": road_inward,
         "phase": "en_route", "outcome": None,
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
         "finish_at": finish.isoformat(), "return_at": ret.isoformat(),
@@ -2143,6 +2176,19 @@ async def optimize_weapons(user: dict = Depends(get_current_user)):
 
 # ---------------- Propriedades ----------------
 
+@router.post("/properties/validate-location")
+async def validate_property_location(body: MapPointInput, user: dict = Depends(get_current_user)):
+    """Validação geográfica oficial para o modo de colocação do mapa."""
+    player = await get_player(user)
+    valid = is_in_portugal(body.lat, body.lng) and not in_water_body(body.lat, body.lng)
+    district = nearest_district(body.lat, body.lng, player.get("districts")) if valid else None
+    return {
+        "valid": valid,
+        "district": district,
+        "reason": None if valid else "Escolhe um ponto em terra firme em Portugal.",
+    }
+
+
 @router.post("/properties/buy")
 async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_user)):
     if body.type_key not in PROPERTY_TYPES:
@@ -2161,7 +2207,7 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
             status_code=400,
             detail=f"Dinheiro limpo insuficiente — preço regional: {price:,} € ({market['zone']})",
         )
-    district = nearest_district(body.lat, body.lng)
+    district = nearest_district(body.lat, body.lng, player.get("districts"))
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -price, "stats.properties_bought": 1}})
     await db.properties.insert_one({
         "player_id": pid, "type_key": body.type_key,
