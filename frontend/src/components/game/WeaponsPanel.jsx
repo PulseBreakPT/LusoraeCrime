@@ -172,7 +172,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Swords} />
           <PanelKicker>Arsenal · Equipamento</PanelKicker>
@@ -236,9 +236,9 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
         </div>
 
-        <div className="mt-3 space-y-2" data-testid="weapons-list">
+        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3" data-testid="weapons-list">
           {weapons.length === 0 && (
-            <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
+            <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens armas — compra a primeira no arsenal abaixo.
             </p>
           )}
@@ -251,7 +251,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             <button
               data-testid="weapons-nav-employees"
               onClick={() => onNavigate && onNavigate("employees")}
-              className="w-full rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-center font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
+              className="col-span-full w-full rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-center font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
             >
               Sem operacionais para equipar — recruta em Operacionais
             </button>
@@ -273,7 +273,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             const profMax = meta.proficiency_max ?? 100;
             const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
             return (
-              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="lus-card lus-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
+              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
                 {/* Cabeçalho: placa com silhueta + identidade */}
                 <div className="relative z-[1] flex items-stretch gap-2.5">
                   <div className="lus-weapon-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
@@ -432,7 +432,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Swords} title="Arsenal" meta={catalog ? `${Object.keys(catalog.weapon_models || {}).length} modelos` : undefined} />
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.weapon_models).map(([key, m]) => {
                 const tier = weaponTier(m);
@@ -441,7 +441,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 const owned = weapons.filter((w) => w.model_key === key).length;
                 const wear = weaponWearPerMission(m, meta);
                 return (
-                  <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("lus-card lus-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
+                  <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
                     <div className="relative z-[1] flex items-stretch gap-2.5">
                       <div className="lus-weapon-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <WeaponGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
