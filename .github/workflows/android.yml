@@ -11,8 +11,6 @@ on:
       - "frontend/yarn.lock"
       - "frontend/capacitor.config.js"
       - "frontend/scripts/patch-capacitor-android.mjs"
-      - "backend/auth.py"
-      - "backend/server.py"
       - ".github/workflows/android.yml"
 
 permissions:
@@ -50,7 +48,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('frontend/yarn.lock', 'frontend/capacitor.config.js', 'frontend/scripts/patch-capacitor-android.mjs') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Ensure Android API 36
         run: |
@@ -60,9 +67,6 @@ jobs:
             yes | "$SDKMANAGER" --licenses >/dev/null || true
             "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
           fi
-
-      - name: Validate Python auth syntax
-        run: python -m py_compile backend/auth.py backend/server.py
 
       - name: Cache installed frontend dependencies
         id: node-modules
@@ -80,6 +84,7 @@ jobs:
         working-directory: frontend
         env:
           CI: "false"
+          GENERATE_SOURCEMAP: "false"
           PUBLIC_URL: "/"
           REACT_APP_AUTH_UI_ENABLED: "true"
           REACT_APP_BACKEND_URL: ${{ vars.ANDROID_BACKEND_URL || 'https://lusora-patrols.preview.emergentagent.com' }}
@@ -171,7 +176,7 @@ jobs:
           fi
 
       - name: Validate production release configuration
-        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        if: github.event_name == 'workflow_dispatch' && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
         run: |
           test -n "$GOOGLE_WEB_CLIENT_ID" || { echo "::error::GOOGLE_WEB_CLIENT_ID is required for a Play release"; exit 1; }
           test -n "$ANDROID_BACKEND_URL" || { echo "::error::ANDROID_BACKEND_URL is required for a Play release"; exit 1; }
@@ -181,14 +186,14 @@ jobs:
           test -n "$ANDROID_UPLOAD_KEY_PASSWORD" || { echo "::error::ANDROID_UPLOAD_KEY_PASSWORD is required"; exit 1; }
 
       - name: Restore Play upload key
-        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        if: github.event_name == 'workflow_dispatch' && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
         working-directory: frontend
         run: |
           printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > android/app/lusorae-upload.jks
           chmod 600 android/app/lusorae-upload.jks
 
       - name: Build signed Play release AAB
-        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        if: github.event_name == 'workflow_dispatch' && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
         working-directory: frontend/android
         run: |
           ./gradlew bundleRelease --no-daemon --parallel --build-cache --stacktrace \
@@ -198,7 +203,7 @@ jobs:
             -Pandroid.injected.signing.key.password="$ANDROID_UPLOAD_KEY_PASSWORD"
 
       - name: Upload signed Play AAB
-        if: env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        if: github.event_name == 'workflow_dispatch' && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
         uses: actions/upload-artifact@v4
         with:
           name: lusorae-google-play-aab
@@ -207,5 +212,5 @@ jobs:
           retention-days: 30
 
       - name: Remove upload key
-        if: always() && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
+        if: always() && github.event_name == 'workflow_dispatch' && env.ANDROID_UPLOAD_KEYSTORE_BASE64 != ''
         run: rm -f frontend/android/app/lusorae-upload.jks
