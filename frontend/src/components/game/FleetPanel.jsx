@@ -296,7 +296,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       </Tip>
                     </div>
                   </div>
-                </div>
 
                 {busy && mission && (
                   <div className="relative z-[1] mt-1.5">
