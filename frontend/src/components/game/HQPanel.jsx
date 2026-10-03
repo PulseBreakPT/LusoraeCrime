@@ -32,7 +32,6 @@ const useTick = (active) => {
 const TABS = [
   { key: "geral", label: "Geral" },
   { key: "melhorias", label: "Melhorias" },
-  { key: "desempenho", label: "Desempenho" },
   { key: "prioridades", label: "Prioridades" },
 ];
 
