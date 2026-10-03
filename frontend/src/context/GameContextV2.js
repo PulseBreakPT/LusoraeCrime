@@ -803,12 +803,15 @@ export function GameProvider({ children }) {
       } : p));
     } catch (_error) {
       if (validationId !== placementValidationRef.current) return;
+      // Compatibilidade com um backend ainda sem o endpoint novo: usa a
+      // validação local Portugal-wide; /properties/buy continua autoritativo.
+      const fallbackValid = isOnLand(point.lat, point.lng);
       setPlacement((p) => (p ? {
         ...p,
         point,
-        valid: false,
+        valid: fallbackValid,
         checking: false,
-        reason: "Não foi possível validar esta localização. Tenta outro ponto.",
+        reason: fallbackValid ? null : "Escolhe um ponto em terra firme em Portugal.",
       } : p));
     }
   }, []);
