@@ -135,7 +135,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
               const cost = speedupCost(t.remaining, shop.speedup_cost_per_min ?? 40, shop.speedup_cost_min ?? 100);
               const can = money >= cost;
               return (
-                <Card key={t.key} className="h-full min-w-0 flex items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none lus-card">
+                <Card key={t.key} className="h-full min-w-0 flex flex-col items-stretch gap-2 rounded-md border px-2.5 py-2 shadow-none lus-card sm:flex-row sm:items-center sm:gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
                     <t.icon size={15} />
                   </span>
@@ -151,7 +151,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                     can={can}
                     blockedReasons={[!can ? "Dinheiro insuficiente." : null].filter(Boolean)}
                     onConfirm={() => speedup(t.kind, t.id)}
-                    className="w-auto shrink-0"
+                    className="w-full shrink-0 sm:w-auto"
                   />
                 </Card>
               );
@@ -174,7 +174,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                       const owns = isOwned(cat, key);
                       const can = money >= item.cost;
                       return (
-                        <Card key={key} className="h-full min-w-0 flex items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none lus-card">
+                        <Card key={key} className="h-full min-w-0 flex flex-col items-stretch gap-2 rounded-md border px-2.5 py-2 shadow-none lus-card sm:flex-row sm:items-center sm:gap-2.5">
                           <span className="h-6 w-6 shrink-0 rounded-full border border-white/20" style={{ background: item.color }} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-semibold text-white">{item.label}</p>
@@ -198,7 +198,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, vehicleId] = selection.split(":");
                                 equipPaint(vehicleId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-32 shrink-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-32/g border-white/10 bg-black/60 font-mono text-[10px] text-white">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -221,7 +221,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, teamId] = selection.split(":");
                                 equipEmblem(teamId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-32 shrink-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-32/g border-white/10 bg-black/60 font-mono text-[10px] text-white">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -247,7 +247,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                               can={can}
                               blockedReasons={[!can ? "Dinheiro insuficiente." : null].filter(Boolean)}
                               onConfirm={() => buyCosmetic(cat, key)}
-                              className="w-auto shrink-0"
+                              className="w-full shrink-0 sm:w-auto"
                             />
                           )}
                         </Card>
@@ -281,7 +281,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
               {Object.entries(shop.vip_plans || {}).map(([key, plan]) => {
                 const can = money >= plan.cost;
                 return (
-                  <Card key={key} className="h-full min-w-0 flex items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none lus-card">
+                  <Card key={key} className="h-full min-w-0 flex flex-col items-stretch gap-2 rounded-md border px-2.5 py-2 shadow-none lus-card sm:flex-row sm:items-center sm:gap-2.5">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-400">
                       <Crown size={15} />
                     </span>
@@ -295,7 +295,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                       can={can}
                       blockedReasons={[!can ? "Dinheiro insuficiente." : null].filter(Boolean)}
                       onConfirm={() => buyVip(key)}
-                      className="w-auto shrink-0"
+                      className="w-full shrink-0 sm:w-auto"
                     />
                   </Card>
                 );
@@ -314,7 +314,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
               const cost = Math.round((s.base || 0) * (1 + s.n * (shop.slot_cost_scale_per_unit ?? 0.35)));
               const can = money >= cost;
               return (
-                <Card key={s.kind} className="h-full min-w-0 flex items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none lus-card">
+                <Card key={s.kind} className="h-full min-w-0 flex flex-col items-stretch gap-2 rounded-md border px-2.5 py-2 shadow-none lus-card sm:flex-row sm:items-center sm:gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300">
                     <s.icon size={15} />
                   </span>
@@ -328,7 +328,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                     can={can}
                     blockedReasons={[!can ? "Dinheiro insuficiente." : null].filter(Boolean)}
                     onConfirm={() => buySlot(s.kind)}
-                    className="w-auto shrink-0"
+                    className="w-full shrink-0 sm:w-auto"
                   />
                 </Card>
               );
