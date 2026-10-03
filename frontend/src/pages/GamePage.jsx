@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useGame } from "../context/GameContextV2";
 import { useSettings } from "../context/SettingsContext";
-import LiveMap, { MapLegend, PlacementControls, MapBaseFilter } from "../components/game/LiveMap";
+import LiveMap, { MapLegend, PlacementControls } from "../components/game/LiveMap";
 import { ResourceBar } from "../components/game/ResourceBar";
 import { OpportunityCard } from "../components/game/OpportunityCard";
 import OperationView from "../components/game/OperationView";
@@ -21,16 +21,15 @@ import { SettingsPanel } from "../components/game/SettingsPanel";
 import { StreetPanel } from "../components/game/StreetPanel";
 import { MastermindPanel } from "../components/game/MastermindPanel";
 import { CommandCenter } from "../components/game/CommandCenter";
-import { ActivityFeed, ActivityFeedMobile } from "../components/game/ActivityFeed";
+import { ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
 import { DisclaimerModal } from "../components/game/DisclaimerModal";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { fmtMoney, orgAlerts, teamsReadiness, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star, Vault } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -39,6 +38,8 @@ export default function GamePage() {
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(initialGamePanel);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [navGroup, setNavGroup] = useState(null);
+  const [mapLegendOpen, setMapLegendOpen] = useState(false);
   const [hudAwake, setHudAwake] = useState(true);
   const shellAlerts = state ? orgAlerts(state) : { total: 0 };
   const { online, stale } = useGameShell({
@@ -132,7 +133,20 @@ export default function GamePage() {
   // pendente nas Missões), abre já nessa aba em vez da última usada.
   const navigateTo = (panel, opts) => {
     if (opts?.tab && panel === "quests") setQuestsFocusTab(opts.tab);
+    setNavGroup(null);
+    setMapLegendOpen(false);
     setOpenPanel(panel);
+  };
+
+  const openFromNav = (panel) => {
+    setNavGroup(null);
+    setMapLegendOpen(false);
+    setOpenPanel(panel);
+  };
+
+  const toggleNavGroup = (group) => {
+    setMapLegendOpen(false);
+    setNavGroup((current) => (current === group ? null : group));
   };
 
   useEffect(() => {
@@ -219,7 +233,7 @@ export default function GamePage() {
       .map((e) => ({ name: e.name, role_key: e.role_key, spec: e.spec, rank: e.rank }));
   }
 
-  const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || operationId);
+  const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || operationId || navGroup || mapLegendOpen);
 
   return (
     <div
@@ -230,8 +244,16 @@ export default function GamePage() {
         state={mapState}
         serverNow={serverNow}
         selectedOppId={selectedOpp?.id}
-        onSelectOpp={(opp) => setSelectedOpp(opp)}
-        onSelectHQ={() => setOpenPanel("hq")}
+        onSelectOpp={(opp) => {
+          setSelectedOpp(opp);
+          if (!opp) setNavGroup(null);
+          else {
+            setNavGroup(null);
+            setMapLegendOpen(false);
+          }
+        }}
+        onSelectHQ={() => openFromNav("hq")}
+        onSelectProperty={() => openFromNav("properties")}
         baseFilter={baseFilter}
       />
       <div className="lus-vignette" aria-hidden="true" />
@@ -255,7 +277,7 @@ export default function GamePage() {
           type="button"
           data-testid="wanted-stars-hud"
           onClick={() => setOpenPanel("street")}
-          className="lus-optional-hud pointer-events-auto absolute left-2 top-16 z-20 rounded-xl border border-amber-500/25 bg-black/85 px-3 py-2 shadow-xl backdrop-blur"
+          className="lus-optional-hud pointer-events-auto absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
           aria-label={`Nível de procurado: ${wantedStars} de 5 estrelas`}
         >
           <span className="flex gap-0.5">
@@ -266,9 +288,6 @@ export default function GamePage() {
                 className={index < wantedStars ? "fill-amber-400 text-amber-300" : "text-zinc-700"}
               />
             ))}
-          </span>
-          <span className="mt-1 block font-mono text-[8px] font-bold uppercase tracking-wider text-red-300">
-            Polícia em alerta
           </span>
         </button>
       )}
@@ -285,135 +304,124 @@ export default function GamePage() {
           </button>
         </div>
       )}
-      <Tip
-        tip={alerts.total > 0 ? `Central de Inteligência — ${alerts.total} alerta(s) e ações recomendadas, estatísticas e registo de missões.` : "Central de Inteligência — estatísticas, ações recomendadas e registo de missões."}
-        side="bottom"
-        align="end"
-        className="lus-optional-hud pointer-events-auto absolute right-2 top-16 z-20"
-      >
-        <Button
-          data-testid="open-intel-button"
-          variant="outline"
-          onClick={() => setOpenPanel("intel")}
-          className="lus-hud-btn relative h-auto gap-1.5 rounded-full p-2.5 text-white hover:text-white md:px-3"
-        >
-          <BrainCircuit size={16} className="h-[18px] w-[18px] text-primary md:h-4 md:w-4" />
-          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Intel</span>
-          {alerts.total > 0 && (
-            <Badge data-testid="intel-alert-badge" className="rounded-full px-1.5 py-0 font-mono text-[10px] font-bold" style={{ background: NOTIFY_COLOR }}>{alerts.total}</Badge>
-          )}
-        </Button>
-      </Tip>
-      <Tip tip="Definições — conta, interface, automatizações e notificações." side="bottom" align="end" className="lus-optional-hud pointer-events-auto absolute right-2 top-32 z-20">
-        <Button
-          data-testid="open-settings-button"
-          variant="outline"
-          onClick={() => setOpenPanel("settings")}
-          className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white hover:text-white md:px-3"
-        >
-          <Settings size={16} className="h-[18px] w-[18px] text-zinc-400 md:h-4 md:w-4" />
-          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Definições</span>
-        </Button>
-      </Tip>
-      <Tip tip="Centro de Comandos — pesquisa global e ações rápidas (Ctrl K ou /)." side="bottom" align="end" className="pointer-events-auto absolute right-2 top-48 z-20">
-        <Button
-          data-testid="open-command-center"
-          variant="outline"
-          onClick={() => setCommandOpen(true)}
-          className="lus-hud-btn h-auto gap-1.5 rounded-full p-2.5 text-white hover:text-white md:px-3"
-        >
-          <Search size={16} className="h-[18px] w-[18px] text-sky-300 md:h-4 md:w-4" />
-          <span className="hidden font-mono text-[10px] font-bold uppercase tracking-wider md:inline">Comandos</span>
-          <kbd className="hidden rounded border border-white/10 bg-black/40 px-1 font-mono text-[8px] text-zinc-500 lg:inline">Ctrl K</kbd>
-        </Button>
-      </Tip>
       {/* Modo de colocação = modo focado: só o mapa e os controlos de colocação
           ficam visíveis; central, cartões, legenda, filtro e dock saem do
           caminho para nada tapar o Confirmar/Cancelar. */}
-      {!placement && !focusMode && <ActivityFeed onNavigate={navigateTo} suppressed={!!selectedOpp} />}
       {!placement && !focusMode && <ActivityFeedMobile onNavigate={navigateTo} suppressed={!!selectedOpp} />}
       {selectedOpp && !placement && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
 
-      {!placement && !focusMode && <MapLegend />}
-      {!placement && !focusMode && <MapBaseFilter value={baseFilter} onChange={setBaseFilter} />}
+      {!placement && !focusMode && (
+        <MapLegend open={mapLegendOpen} onOpenChange={setMapLegendOpen} hideTrigger />
+      )}
       <PlacementControls />
 
       {!placement && !focusMode && (
-      <div
-        className="pointer-events-auto absolute left-2 z-30 max-w-[calc(100vw-4rem)] md:left-1/2 md:max-w-none md:-translate-x-1/2"
-        style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
-      >
-      <div className="lus-dock flex items-center gap-0.5 overflow-x-auto rounded-2xl border px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-1 md:overflow-visible md:px-1.5">
-        <HudButton
-          testId="open-operations-button" shortcut="1" icon={Crosshair} label="Operações" color="text-sky-400"
-          tip="Lista de todas as oportunidades no mapa — ordena por ETA, recompensa ou risco, filtra e despacha sem procurar pino a pino."
-          active={openPanel === "operations"} onClick={() => setOpenPanel("operations")}
-        />
-        <HudButton
-          testId="open-quests-button" shortcut="2" icon={Target} label="Missões" color="text-rose-400"
-          alert={alerts.claimable > 0}
-          tip={alerts.claimable > 0 ? `${alerts.claimable} recompensa(s) por reclamar — história, diárias e semanais.` : "Missões de história, diárias, semanais e alertas dinâmicos."}
-          active={openPanel === "quests"} onClick={() => setOpenPanel("quests")}
-        />
-        <HudButton
-          testId="open-empire-button" shortcut="3" icon={Building2} label="Império" color="text-red-500"
-          alert={empireAlert}
-          tip={empireAlert ? `Atenção: ${p.heat >= 70 ? `calor a ${Math.round(p.heat)}%` : ""}${p.heat >= 70 && p.dirty_money >= 15000 ? " · " : ""}${p.dirty_money >= 15000 ? `${fmtMoney(p.dirty_money)} sujos por lavar` : ""} — abre o Império para agir.` : "Visão geral da organização, lavagem de dinheiro e suborno à polícia."}
-          active={openPanel === "empire"} onClick={() => setOpenPanel("empire")}
-        />
-        <HudButton
-          testId="open-teams-button" shortcut="4" icon={Users} label="Equipas" color="text-cyan-400"
-          alert={alerts.teams > 0}
-          tip={`${tr.ready} equipa(s) prontas · ${tr.busy} em operação${alerts.teams > 0 ? ` · ${alerts.teams} com problemas (sem membros ou veículo)` : ""}. Coordenação de membros, veículos e despacho rápido.`}
-          active={openPanel === "teams"} onClick={() => setOpenPanel("teams")}
-        />
-        <HudButton
-          testId="open-employees-button" shortcut="5" icon={IdCard} label="Operacionais" color="text-emerald-400"
-          tip={hrAlertCount > 0 ? `Efetivo precisa de atenção: ${hrTipParts.join(" · ")}.` : "Recrutar, treinar, promover e manter o efetivo leal."}
-          active={openPanel === "employees"} onClick={() => setOpenPanel("employees")}
-        />
-        <HudButton
-          testId="open-fleet-button" shortcut="6" icon={Car} label="Frota" color="text-amber-400"
-          tip={fleetAlertCount > 0 ? `Frota precisa de atenção: ${fleetTipParts.join(" · ")}.` : "Abastecer, reparar, comprar e atribuir veículos às equipas."}
-          active={openPanel === "fleet"} onClick={() => setOpenPanel("fleet")}
-        />
-        <HudButton
-          testId="open-properties-button" shortcut="7" icon={Warehouse} label="Imóveis" color="text-purple-300"
-          alert={alerts.raidRisk}
-          tip={alerts.raidRisk ? "Risco de rusga policial aos laboratórios (calor ≥ 70%) — suborna a polícia ou aguenta o risco." : "Propriedades: capacidade, rendimento passivo e lavagem automática."}
-          active={openPanel === "properties"} onClick={() => setOpenPanel("properties")}
-        />
-        <HudButton
-          testId="open-weapons-button" shortcut="8" icon={Swords} label="Armamento" color="text-red-400"
-          alert={weaponsDamaged > 0}
-          tip={
-            weaponsDamaged > 0
-              ? `${weaponsDamaged} arma(s) avariada(s)${weaponsUnequipped > 0 ? ` · ${weaponsUnequipped} por atribuir` : ""}.`
-              : weaponsUnequipped > 0
-              ? `${weaponsUnequipped} arma(s) por atribuir.`
-              : "Compra, repara, atribui e vende equipamento operacional."
-          }
-          active={openPanel === "weapons"} onClick={() => setOpenPanel("weapons")}
-        />
-        <HudButton
-          testId="open-street-button" icon={Radar} label="Cidade" color="text-cyan-300"
-          alert={wantedStars >= 3 || (state.street?.districts || []).some((district) => district.rival_pressure >= 70)}
-          tip="Cidade Viva — nível de procurado, territórios, contactos, corridas, entregas e garagem clandestina."
-          active={openPanel === "street"} onClick={() => setOpenPanel("street")}
-        />
-        <HudButton
-          testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-violet-300"
-          alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3}
-          tip="Mastermind — golpes por fases, preparações, mercado negro, caçadores rivais e caches de sinal."
-          active={openPanel === "mastermind"} onClick={() => setOpenPanel("mastermind")}
-        />
-        <HudButton
-          testId="open-shop-button" shortcut="9" icon={ShoppingBag} label="Loja" color="text-amber-300"
-          tip="Acelerar tempo, cosméticos, VIP e slots extra — tudo pago em dinheiro do jogo."
-          active={openPanel === "shop"} onClick={() => setOpenPanel("shop")}
-        />
-      </div>
-      </div>
+        <div
+          className="pointer-events-auto absolute left-1/2 z-40 -translate-x-1/2"
+          style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+        >
+          {navGroup && (
+            <div className="lus-nav-tray absolute bottom-full left-1/2 mb-2 w-[min(92vw,25rem)] -translate-x-1/2">
+              {navGroup === "operations" && (
+                <div className="grid grid-cols-3 gap-1">
+                  <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
+                  <NavAction testId="open-quests-button" icon={Target} label="Missões" color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
+                  <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-violet-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
+                </div>
+              )}
+
+              {navGroup === "organization" && (
+                <div className="grid grid-cols-4 gap-1">
+                  <NavAction testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400" alert={alerts.teams > 0} onClick={() => openFromNav("teams")} />
+                  <NavAction testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400" alert={hrAlertCount > 0} onClick={() => openFromNav("employees")} />
+                  <NavAction testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400" alert={fleetAlertCount > 0} onClick={() => openFromNav("fleet")} />
+                  <NavAction testId="open-weapons-button" icon={Swords} label="Armamento" color="text-red-400" alert={weaponsDamaged > 0 || weaponsUnequipped > 0} onClick={() => openFromNav("weapons")} />
+                </div>
+              )}
+
+              {navGroup === "empire" && (
+                <div className="grid grid-cols-3 gap-1">
+                  <NavAction testId="open-empire-button" icon={Building2} label="Império" color="text-red-500" alert={empireAlert} onClick={() => openFromNav("empire")} />
+                  <NavAction testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-purple-300" alert={alerts.raidRisk} onClick={() => openFromNav("properties")} />
+                  <NavAction testId="open-hq-button" icon={Landmark} label="QG" color="text-zinc-200" onClick={() => openFromNav("hq")} />
+                </div>
+              )}
+
+              {navGroup === "menu" && (
+                <>
+                  <div className="grid grid-cols-3 gap-1">
+                    <NavAction testId="open-street-button" icon={Radar} label="Cidade" color="text-cyan-300" alert={wantedStars >= 3 || (state.street?.districts || []).some((district) => district.rival_pressure >= 70)} onClick={() => openFromNav("street")} />
+                    <NavAction testId="open-intel-button" icon={BrainCircuit} label="Intel" color="text-red-400" alert={alerts.total > 0} onClick={() => openFromNav("intel")} />
+                    <NavAction testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300" onClick={() => openFromNav("shop")} />
+                    <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
+                    <NavAction testId="map-legend-toggle" icon={MapIcon} label="Legenda" color="text-zinc-300" active={mapLegendOpen} onClick={() => { setNavGroup(null); setMapLegendOpen((value) => !value); }} />
+                    <NavAction testId="open-settings-button" icon={Settings} label="Definições" color="text-zinc-400" onClick={() => openFromNav("settings")} />
+                  </div>
+
+                  {(state.properties || []).length > 0 && (
+                    <label className="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
+                      <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">Base no mapa</span>
+                      <select
+                        data-testid="map-base-filter"
+                        value={baseFilter}
+                        onChange={(event) => {
+                          setBaseFilter(event.target.value);
+                          setNavGroup(null);
+                        }}
+                        className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/60 px-2 py-1.5 font-mono text-[10px] text-zinc-200 outline-none"
+                      >
+                        <option value="all">Todas</option>
+                        <option value="hq">Quartel-General</option>
+                        {(state.properties || []).map((property) => (
+                          <option key={property.id} value={property.id}>{property.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="lus-dock flex items-center gap-3 px-1 py-1">
+            <GroupButton
+              testId="nav-group-operations"
+              icon={Crosshair}
+              label="Operações"
+              color="text-sky-400"
+              alert={alerts.claimable > 0 || state.mastermind?.active_heist?.finale?.status === "ready"}
+              active={navGroup === "operations" || ["operations", "quests", "mastermind"].includes(openPanel)}
+              onClick={() => toggleNavGroup("operations")}
+            />
+            <GroupButton
+              testId="nav-group-organization"
+              icon={Users}
+              label="Organização"
+              color="text-cyan-400"
+              alert={alerts.teams > 0 || hrAlertCount > 0 || fleetAlertCount > 0 || weaponsDamaged > 0}
+              active={navGroup === "organization" || ["teams", "employees", "fleet", "weapons"].includes(openPanel)}
+              onClick={() => toggleNavGroup("organization")}
+            />
+            <GroupButton
+              testId="nav-group-empire"
+              icon={Building2}
+              label="Império"
+              color="text-red-400"
+              alert={empireAlert || alerts.raidRisk}
+              active={navGroup === "empire" || ["empire", "properties", "hq"].includes(openPanel)}
+              onClick={() => toggleNavGroup("empire")}
+            />
+            <GroupButton
+              testId="nav-group-menu"
+              icon={MenuIcon}
+              label="Menu"
+              color="text-zinc-200"
+              alert={alerts.total > 0 || wantedStars >= 3}
+              active={navGroup === "menu" || ["street", "intel", "shop", "settings"].includes(openPanel) || commandOpen || mapLegendOpen}
+              onClick={() => toggleNavGroup("menu")}
+            />
+          </div>
+        </div>
       )}
 
       <StreetPanel open={openPanel === "street"} onOpenChange={(o) => setOpenPanel(o ? "street" : null)} />
@@ -467,31 +475,43 @@ export default function GamePage() {
   );
 }
 
-const HudButton = ({ testId, icon: Icon, label, color, alert, active, tip, shortcut, onClick }) => (
-  <Tip tip={tip} side="top">
+const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick }) => (
+  <Tip tip={label} side="top">
     <Button
       data-testid={testId}
       variant="outline"
       onClick={onClick}
-      className={`lus-hud-btn relative h-auto shrink-0 gap-1.5 rounded-full px-2.5 py-2.5 text-xs font-bold uppercase tracking-wider md:px-3 ${
-        active
-          ? "lus-hud-btn-active text-white hover:text-white"
-          : "text-white hover:text-white"
-      }`}
+      aria-label={label}
+      aria-expanded={active}
+      className={`lus-hud-btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0 ${active ? "lus-hud-btn-active" : ""}`}
     >
-      <Icon size={15} className={`${color} h-[17px] w-[17px] md:h-[15px] md:w-[15px]`} />
-      <span className="hidden 2xl:inline">{label}</span>
+      <Icon size={19} className={color} />
       {alert && (
         <span
-          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full"
-          style={{ background: NOTIFY_COLOR, boxShadow: `0 0 6px ${NOTIFY_COLOR}` }}
+          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full"
+          style={{ background: NOTIFY_COLOR, boxShadow: `0 0 4px ${NOTIFY_COLOR}` }}
         />
-      )}
-      {shortcut && (
-        <kbd className="hidden rounded border border-white/10 bg-black/40 px-1 font-mono text-[8px] text-zinc-600 lg:inline">
-          {shortcut}
-        </kbd>
       )}
     </Button>
   </Tip>
+);
+
+const NavAction = ({ testId, icon: Icon, label, color, alert, active, onClick }) => (
+  <button
+    type="button"
+    data-testid={testId}
+    onClick={onClick}
+    className={`lus-nav-action relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-center ${active ? "is-active" : ""}`}
+  >
+    <Icon size={17} className={color} />
+    <span className="max-w-full truncate font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-300">
+      {label}
+    </span>
+    {alert && (
+      <span
+        className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full"
+        style={{ background: NOTIFY_COLOR }}
+      />
+    )}
+  </button>
 );
