@@ -15,9 +15,9 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import {
-  Users, Car, UserRound, Undo2, X, Fuel, Wrench, BedDouble, Zap, IdCard, CheckCircle2,
+  Users, Car, UserRound, Undo2, X, Fuel, Wrench, Zap, IdCard, CheckCircle2,
   AlertTriangle, Activity, Target, Clock, PartyPopper, Crown, Gauge, Stethoscope, Scale,
-  Brain, Flame, TrendingDown, Link2, FlaskConical, Sparkles,
+  Brain, Flame, TrendingDown, Link2, FlaskConical,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -179,10 +179,9 @@ const VitalsRow = ({ members, meta, testId }) => {
 
 export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
-    state, catalog, serverNow, createTeam, recallTeam, assignEmployee, assignVehicle,
-    refuelVehicle, repairVehicle, restEmployee, dispatchTeam, recommendOpportunityForTeam,
-    recommendRepeatForTeam, favoriteTeamIds, toggleFavoriteTeam, justReturnedTeamIds,
-    optimizeEmployees, optimizeVehicles,
+    state, catalog, serverNow, createTeam, assignEmployee, assignVehicle,
+    dispatchTeam, recommendOpportunityForTeam, recommendRepeatForTeam,
+    favoriteTeamIds, toggleFavoriteTeam, justReturnedTeamIds,
   } = useGame();
   const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
@@ -281,23 +280,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const membersOf = (teamId) => state.employees.filter((e) => e.team_id === teamId);
   const vehicleOf = (team) => state.vehicles.find((v) => v.id === team.vehicle_id);
   const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
-  const enRouteMissionOf = (team) => state.missions.find((m) => m.team_id === team.id && m.phase === "en_route");
   const freeEmployees = state.employees.filter((e) => !e.team_id && e.status === "idle");
   const freeVehicles = state.vehicles.filter((v) => !v.team_id && !v.transfer);
   const nav = (p) => onNavigate && onNavigate(p);
-
-  // QI das equipas — o Otimizar compõe as duas réguas do backend num comando:
-  // preenche as vagas com os operacionais mais aptos (/employees/optimize) e
-  // redistribui os veículos pela melhor adequação (/vehicles/optimize).
-  const idleTeamsList = state.teams.filter((t) => t.status === "idle");
-  const openSlotTeams = idleTeamsList.filter((t) => membersOf(t.id).length < teamMaxMembers).length;
-  const canOptEmployees = freeEmployees.length > 0 && openSlotTeams > 0;
-  const canOptVehicles = state.vehicles.length > 0 && idleTeamsList.length > 0;
-  const canOptimize = canOptEmployees || canOptVehicles;
-  const optimizeTeams = async () => {
-    if (canOptEmployees) await optimizeEmployees();
-    if (canOptVehicles) await optimizeVehicles();
-  };
 
   // Veredicto via helper unificado (mesma definição do OpportunityCard/
   // opportunityReachable — antes divergiam). Preserva a forma { ok, ready,
@@ -350,27 +335,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
         <div className="mt-3">
           <Tip
             block
-            tip={canOptimize
-              ? `Um clique, duas otimizações: ${canOptEmployees ? `coloca os ${freeEmployees.length} operacional(is) livre(s) nas ${openSlotTeams} equipa(s) com vagas, maximizando a aptidão à especialização` : ""}${canOptEmployees && canOptVehicles ? "; " : ""}${canOptVehicles ? `redistribui os veículos pelas ${idleTeamsList.length} equipa(s) disponível(is) pela melhor adequação (best-for, condição, combustível, lugares)` : ""}. Equipas em operação não são tocadas e membros já colocados nunca são movidos entre equipas.`
-              : "Nada para otimizar agora — sem operacionais livres para vagas nem veículos para redistribuir. Equipas em operação não são tocadas."}
-          >
-            <button
-              data-testid="teams-optimize"
-              onClick={() => canOptimize && optimizeTeams()}
-              disabled={!canOptimize}
-              className={cn(
-                "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
-                canOptimize
-                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
-                  : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
-              )}
-            >
-              <Sparkles size={11} /> Otimizar equipas
-            </button>
-          </Tip>
-
-          <Tip
-            block
             tip="Despacho automático: envia cada equipa livre para a melhor oportunidade que o servidor recomendar — só missões cujos requisitos (membros, veículo, combustível, nível) a equipa cumpre mesmo."
           >
             <button
@@ -409,7 +373,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             .map((t) => {
             const members = membersOf(t.id);
             const vehicle = vehicleOf(t);
-            const enRoute = enRouteMissionOf(t);
             const r = readiness(t, members, vehicle);
             const rec = r.ok ? recommendations[t.id] : null;
             const best = rec?.opportunity_id ? state.opportunities.find((o) => o.id === rec.opportunity_id) : null;
@@ -424,15 +387,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               const nextAt = mission.phase === "en_route" ? mission.arrive_at : mission.phase === "operating" ? mission.finish_at : mission.return_at;
               missionEtaS = Math.max(0, (Date.parse(nextAt) - serverNow()) / 1000);
             }
-            let recallLate = false;
-            if (enRoute) {
-              const total = Math.max(1, Date.parse(enRoute.arrive_at) - Date.parse(enRoute.depart_at));
-              const elapsed = Math.max(0, serverNow() - Date.parse(enRoute.depart_at));
-              recallLate = elapsed / total >= (catalog?.recall_penalty_fraction ?? 0.5);
-            }
             const fuelPct = vehicle ? (vehicle.fuel_l / vehicle.tank_l) * 100 : 0;
-            const refuelCost = vehicle ? Math.ceil((vehicle.tank_l - vehicle.fuel_l) * state.fuel_prices[vehicle.fuel_type]) : 0;
-            const repairCost = vehicle ? Math.max(50, Math.round((100 - vehicle.condition) * vehicle.price * 0.002)) : 0;
             const justReturned = justReturnedTeamIds.includes(t.id);
             // QI da equipa (SSS v4): tier, papéis a bordo e química — os mesmos
             // números que o motor usa na chance, viagem, fuga e consequências.
@@ -594,16 +549,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                         {members.map((m) => (
                           <span key={m.id} className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
                             {m.name.split(" ")[0]} <span style={{ color: fatigueColor(m.fatigue) }}>{Math.round(m.fatigue)}%</span>
-                            {m.status === "idle" && m.fatigue >= 60 && (
-                              <button
-                                data-testid={`team-member-rest-${m.id}`}
-                                title="Mandar descansar"
-                                onClick={() => restEmployee(m.id)}
-                                className="text-purple-300 hover:text-purple-200"
-                              >
-                                <BedDouble size={10} />
-                              </button>
-                            )}
                             {m.status === "idle" && (
                               <button
                                 data-testid={`team-member-remove-${m.id}`}
@@ -714,31 +659,11 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                         </div>
                       </Tip>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {fuelPct < 60 && (
-                        <PurchaseButton
-                          testId={`team-refuel-${t.id}`}
-                          icon={Fuel}
-                          label={fmtMoney(refuelCost)}
-                          can={money >= refuelCost}
-                          blockedReasons={["Dinheiro insuficiente."]}
-                          availableTip="Atestar o depósito por completo com dinheiro limpo."
-                          onConfirm={() => refuelVehicle(vehicle.id)}
-                          className="w-auto shrink-0"
-                        />
-                      )}
-                      {vehicle.condition < 60 && (
-                        <PurchaseButton
-                          testId={`team-repair-${t.id}`}
-                          icon={Wrench}
-                          label={fmtMoney(repairCost)}
-                          can={money >= repairCost}
-                          blockedReasons={["Dinheiro insuficiente."]}
-                          availableTip="Reparação completa — devolve o veículo a 100% de condição e velocidade máxima."
-                          onConfirm={() => repairVehicle(vehicle.id)}
-                          className="w-auto shrink-0"
-                        />
-                      )}
+                    {(fuelPct < 60 || vehicle.condition < 60) && (
+                      <p className="font-mono text-[9px] text-amber-400">
+                        Manutenção necessária — gere combustível e reparações na Frota.
+                      </p>
+                    )}
                     </div>
                   </div>
                 )}
@@ -803,32 +728,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   </Tip>
                 )}
 
-                {enRoute && (
-                  <Tip
-                    tip={
-                      recallLate
-                        ? "Cancela a operação — a equipa já vai a mais de metade do caminho: regressa sem recompensa e com uma pequena penalização de calor e fadiga."
-                        : "Cancela a operação — a equipa dá meia-volta e regressa ao QG sem recompensa nem penalização."
-                    }
-                    block
-                  >
-                    <Button
-                      data-testid={`recall-team-${t.id}`}
-                      variant="outline"
-                      onClick={() => recallTeam(enRoute.id)}
-                      className={`relative z-[1] mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
-                        recallLate
-                          ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1 truncate">
-                        <Undo2 size={11} className="shrink-0" /> Chamar de volta
-                      </div>
-                      <span className="text-zinc-500 md:text-inherit">({enRoute.opportunity.name})</span>
-                    </Button>
-                  </Tip>
-                )}
               </Card>
             );
           })}
