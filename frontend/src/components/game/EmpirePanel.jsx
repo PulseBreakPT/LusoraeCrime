@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 const TX_LABELS = {
-  mission_reward: "Recompensa de operação", payroll: "Ciclo salarial", vehicle_buy: "Compra de veículo",
+  mission_reward: "Recompensa de operação", payroll: "Ciclo salarial", weekly_costs: "Fecho semanal", vehicle_buy: "Compra de veículo",
   vehicle_sell: "Venda de veículo", refuel: "Combustível", repair: "Reparação", recruit: "Recrutamento",
   pool_refresh: "Novos contactos", training: "Formação", promote: "Promoção", bonus: "Bónus",
   heal: "Clínica", release: "Advogado", fire: "Indemnização", property_buy: "Compra de imóvel",
@@ -38,19 +38,23 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
   const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
   const hs = heatStatus(p.heat);
   const alerts = orgAlerts(state);
-  const salaryPerH = (state.salary_total || 0) * (60 / (catalog?.payroll_cycle_min || 120));
-  const netPerH = dirtyPerH + launderPerH - salaryPerH;
-  // Autonomia financeira: quanto tempo aguenta a organização ao ritmo atual de
-  // despesas de dinheiro limpo (salários) vs. entradas passivas (lavagem).
-  const cleanNetPerH = launderPerH - salaryPerH;
+  const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
+  const weeklyBreakdown = state.weekly_cost_breakdown || {};
+  const fixedPerH = weeklyFixed / (7 * 24);
+  const netPerH = dirtyPerH + launderPerH - fixedPerH;
+  // Autonomia financeira: converte o fecho fixo semanal para um equivalente
+  // horário apenas para comparar com a lavagem passiva; a cobrança real é
+  // sempre feita à segunda-feira às 20:00.
+  const cleanNetPerH = launderPerH - fixedPerH;
   const runwayHours = cleanNetPerH < 0 ? p.clean_money / Math.abs(cleanNetPerH) : null;
   const payrollS = p.next_payroll_at ? Math.max(0, (Date.parse(p.next_payroll_at) - serverNow()) / 1000) : null;
-  const liquidity = p.clean_money < (state.salary_total || 0) * 0.5
+  const liquidity = weeklyFixed > 0 && p.clean_money < weeklyFixed * 0.5
     ? "red"
-    : p.clean_money < (state.salary_total || 0)
+    : weeklyFixed > 0 && p.clean_money < weeklyFixed
     ? "amber"
     : null;
   const dirtyCap = state.caps?.dirty_money;
+  const baseLaunderRate = catalog?.economy_meta?.launder_base_rate ?? 0.78;
 
   const handleLaunder = async () => {
     const value = parseInt(amount, 10);
@@ -116,8 +120,8 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             <AlertTriangle size={12} className={liquidity === "red" ? "text-red-400" : "text-amber-400"} />
             <AlertDescription className={`font-mono text-[10px] ${liquidity === "red" ? "text-red-400" : "text-amber-400"}`}>
               {liquidity === "red"
-                ? "Reserva crítica: podes não conseguir pagar o próximo ciclo salarial."
-                : "Reserva baixa: o dinheiro limpo está abaixo do ciclo salarial."}
+                ? "Reserva crítica: podes não conseguir pagar o fecho semanal de segunda-feira às 20:00."
+                : "Reserva baixa: o dinheiro limpo está abaixo do próximo fecho semanal."}
             </AlertDescription>
           </Alert>
         )}
@@ -139,14 +143,14 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
                 <p className="mt-0.5 font-mono text-xs font-bold text-emerald-400">+{fmtMoney(launderPerH)}/h</p>
               </div>
             </Tip>
-            <Tip tip={`Ciclo salarial: ${fmtMoney(state.salary_total || 0)} a cada ${fmtDuration((catalog?.payroll_cycle_min || 120) * 60)} (${fmtMoney(salaryPerH)}/h).`} block>
+            <Tip tip={`Fecho semanal ${fmtMoney(weeklyFixed)}: salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)}, TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)}, frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} e imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}. O valor /h abaixo é apenas equivalente analítico.`} block>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Salários</p>
-                <p className="mt-0.5 font-mono text-xs font-bold text-red-400">-{fmtMoney(salaryPerH)}/h</p>
+                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Fixos</p>
+                <p className="mt-0.5 font-mono text-xs font-bold text-red-400">-{fmtMoney(fixedPerH)}/h</p>
               </div>
             </Tip>
           </div>
-          <Tip tip={`Balanço passivo por hora (produção + lavagem - salários). Não inclui recompensas de operações.${heatPerH > 0 ? ` Os laboratórios também geram +${heatPerH.toFixed(1)} calor/h.` : ""}`} block>
+          <Tip tip={`Balanço económico equivalente por hora (produção + lavagem - custos fixos semanais/168h). A cobrança fixa real só acontece à segunda-feira às 20:00 e não inclui combustível, reparações nem recompensas de operações.${heatPerH > 0 ? ` Os laboratórios também geram +${heatPerH.toFixed(1)} calor/h.` : ""}`} block>
             <p className="mt-2 flex items-center gap-1 border-t border-white/10 pt-1.5 font-mono text-[10px]">
               {netPerH >= 0 ? <TrendingUp size={10} className="text-emerald-400" /> : <TrendingDown size={10} className="text-red-400" />}
               <span className="uppercase tracking-wider text-zinc-500">Balanço:</span>
@@ -156,12 +160,12 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             </p>
           </Tip>
           <div className="mt-1.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
-            <Tip tip="Tempo até ao próximo pagamento automático do ciclo salarial.">
+            <Tip tip="Tempo até ao próximo fecho fixo semanal, sempre à segunda-feira às 20:00 (hora de Portugal).">
               <span className="flex items-center gap-1">
-                <Clock size={9} /> Próx. pagamento: <span className="text-zinc-300">{payrollS != null ? fmtDuration(payrollS) : "—"}</span>
+                <Clock size={9} /> Próx. fecho: <span className="text-zinc-300">{payrollS != null ? fmtDuration(payrollS) : "—"}</span>
               </span>
             </Tip>
-            <Tip tip={runwayHours != null ? "Quanto tempo aguentas ao ritmo atual de despesas em dinheiro limpo (salários vs. lavagem passiva), sem contar recompensas de operações." : "As entradas passivas de dinheiro limpo já cobrem os salários — autonomia ilimitada ao ritmo atual."}>
+            <Tip tip={runwayHours != null ? "Autonomia estimada usando o equivalente horário dos custos fixos semanais contra a lavagem passiva, sem contar recompensas de operações." : "A lavagem passiva já cobre o equivalente horário dos custos fixos semanais."}>
               <span className="flex items-center gap-1">
                 Autonomia:{" "}
                 <span className={runwayHours != null && runwayHours < 24 ? "text-red-400" : "text-zinc-300"}>
@@ -184,9 +188,9 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <SectionHeader icon={LayoutGrid} title="Acesso rápido" />
           <div className="grid grid-cols-2 gap-2">
             <QuickNav testId="empire-nav-employees" label="Operacionais"
-              value={`${state.caps.employees.used}/${state.caps.employees.max} · ${fmtMoney(state.salary_total || 0)}/ciclo`}
-              alert={alerts.hr > 0 || alerts.payrollShort} alertText={alerts.payrollShort ? "sem fundos p/ salários!" : alerts.hr > 0 ? `${alerts.hr} a precisar de atenção` : null}
-              tip={alerts.payrollShort ? "Fundos insuficientes para o próximo ciclo salarial — o efetivo vai perder lealdade." : alerts.hr > 0 ? `${alerts.hr} operacional(is) feridos, presos, exaustos ou com risco de traição — abre Operacionais.` : "Efetivo, recrutamento, formações e promoções."}
+              value={`${state.caps.employees.used}/${state.caps.employees.max} · ${fmtMoney(state.salary_total || 0)}/semana`}
+              alert={alerts.hr > 0 || p.clean_money < weeklyFixed} alertText={p.clean_money < weeklyFixed ? "reserva semanal curta!" : alerts.hr > 0 ? `${alerts.hr} a precisar de atenção` : null}
+              tip={p.clean_money < weeklyFixed ? `Faltam ${fmtMoney(Math.max(0, weeklyFixed - p.clean_money))} para o fecho semanal completo.` : alerts.hr > 0 ? `${alerts.hr} operacional(is) feridos, presos, exaustos ou com risco de traição — abre Operacionais.` : "Efetivo, recrutamento, formações e promoções."}
               onClick={() => nav("employees")} />
             <QuickNav testId="empire-nav-fleet" label="Frota"
               value={`${state.caps.vehicles.used}/${state.caps.vehicles.max} veículos`}
@@ -210,7 +214,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
           <SectionHeader icon={Banknote} title="Lavagem de dinheiro" />
           <Card className="lus-card p-3 shadow-none">
             <div className="flex items-baseline justify-between">
-              <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Taxa de 25%.</p>
+              <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Retorno base de 78% (22% de fricção), melhorável até 90%.</p>
               {state.caps?.dirty_money?.max > 0 && (
                 <Tip tip={`Capacidade do cofre de dinheiro sujo: ${fmtMoney(p.dirty_money)} de ${fmtMoney(state.caps.dirty_money.max)}. Produção dos laboratórios acima deste limite é desperdiçada — sobe de nível para aumentar, ou lava regularmente.`} align="end">
                   <span
@@ -267,7 +271,7 @@ export const EmpirePanel = ({ open, onOpenChange, onNavigate }) => {
             </div>
             {amount && parseInt(amount, 10) > 0 && (
               <p className="mt-2 font-mono text-[11px] text-emerald-400">
-                Recebes {fmtMoney(Math.floor(parseInt(amount, 10) * 0.75))} limpos
+                Recebes pelo menos {fmtMoney(Math.floor(parseInt(amount, 10) * baseLaunderRate))} limpos na taxa base
               </p>
             )}
           </Card>
