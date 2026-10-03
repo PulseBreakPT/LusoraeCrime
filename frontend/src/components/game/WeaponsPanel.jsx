@@ -231,7 +231,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
               blockedReasons={["Dinheiro insuficiente."]}
               availableTip={`Repara todo o armamento disponível abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}
               onConfirm={repairAll}
-              className="w-auto shrink-0"
+              className="w-full shrink-0 sm:w-auto"
             />
           )}
         </div>
@@ -276,7 +276,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
               <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
                 {/* Cabeçalho: placa com silhueta + identidade */}
                 <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="lus-weapon-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                  <div className="lus-weapon-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <WeaponGlyph modelKey={w.model_key} accent={tier.color} className="h-[44px] w-[96px]" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -443,7 +443,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 return (
                   <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
                     <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="lus-weapon-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                      <div className="lus-weapon-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <WeaponGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
                       </div>
@@ -510,7 +510,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                       </Tip>
                     )}
 
-                    <div className="relative z-[1] mt-2 flex items-center justify-between gap-2">
+                    <div className="relative z-[1] mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       {owned > 0 ? (
                         <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">no arsenal: <span className="text-zinc-300">{owned}</span></span>
                       ) : <span />}
@@ -525,7 +525,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                         ].filter(Boolean)}
                         availableTip={`Comprar por ${fmtMoney(m.price)} limpos.`}
                         onConfirm={() => buyWeapon(key)}
-                        className="w-auto shrink-0"
+                        className="w-full shrink-0 sm:w-auto"
                       />
                     </div>
                   </Card>
