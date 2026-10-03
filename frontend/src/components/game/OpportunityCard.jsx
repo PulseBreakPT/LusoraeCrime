@@ -18,6 +18,12 @@ import { audio } from "../../lib/audio";
 // Força de segurança competente pela zona (do backend, opp.police_force) — diz
 // ao jogador quem responde ali e como isso mexe no risco real. Escalável: mais
 // uma força = mais uma entrada.
+const safeRiskLevel = (value) => Math.max(0, Math.min(5, Math.round(Number(value) || 0)));
+const safeRiskDots = (value) => {
+  const risk = safeRiskLevel(value);
+  return "●".repeat(risk) + "○".repeat(5 - risk);
+};
+
 const POLICE_FORCE_INFO = {
   PSP: { label: "PSP · urbana", color: "#3B82F6",
     tip: "Zona urbana sob competência da PSP — malha policial densa e resposta rápida: operar aqui é mais arriscado e a fuga é mais difícil." },
@@ -325,7 +331,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         )}
         {opp.min_members > 1 && (
           <Chip icon={Users} value={`Mín. ${opp.min_members}`} color="#71717A"
-            tip={`Esta operação é de risco ${opp.risk}/5 e requer pelo menos ${opp.min_members} membros disponíveis na equipa para poder ser despachada.`} />
+            tip={`Esta operação é de risco ${safeRiskLevel(opp.risk)}/5 e requer pelo menos ${opp.min_members} membros disponíveis na equipa para poder ser despachada.`} />
         )}
         {opp.required_models?.length > 0 && (
           <Chip
@@ -340,8 +346,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       <div className="mt-2 grid grid-cols-3 gap-2">
         <Metric icon={TrendingUp} label={opp.pays === "clean" ? "€ Limpos" : "€ Sujos"} value={fmtMoney(opp.reward)} color="#10B981"
           tip={(opp.pays === "clean" ? "Pago em dinheiro limpo — pronto a gastar, sem lavagem." : "Pago em dinheiro sujo — terás de o lavar (taxa 25%) antes de gastar.") + " Só é creditado quando a equipa regressar ao QG (a polícia pode perseguir)."} />
-        <Metric icon={AlertTriangle} label="Risco" value={"●".repeat(opp.risk) + "○".repeat(5 - opp.risk)} color="#DC2626"
-          tip={`Risco ${opp.risk}/5 — reduz a probabilidade de sucesso e aumenta a chance de ferimentos, detenções e interceção policial.`} />
+        <Metric icon={AlertTriangle} label="Risco" value={safeRiskDots(opp.risk)} color="#DC2626"
+          tip={`Risco ${safeRiskLevel(opp.risk)}/5 — reduz a probabilidade de sucesso e aumenta a chance de ferimentos, detenções e interceção policial.`} />
         <Metric
           icon={Clock}
           label={inProgress && activeMission ? (activeMission.phase === "en_route" ? "Chega em" : activeMission.phase === "operating" ? "Conclui" : "Regressa") : expired ? "Estado" : "Expira"}
