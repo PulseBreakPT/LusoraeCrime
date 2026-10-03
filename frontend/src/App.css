@@ -3976,3 +3976,210 @@ html.lus-focus-mode .lus-optional-hud {
         transition: none;
     }
 }
+
+/* LUSORAE HUD V4 — ICON-ONLY / SOFT SHADOWS */
+.lus-topbar {
+    border: 0 !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.lus-topbar::before,
+.lus-topbar::after {
+    display: none !important;
+}
+
+.lus-minimal-stat,
+.lus-minimal-stat:hover,
+.lus-level-readout {
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.lus-minimal-stat {
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.58),
+        0 2px 7px rgba(0, 0, 0, 0.24);
+}
+
+.lus-minimal-stat:hover {
+    transform: translateY(-1px);
+}
+
+.lus-minimal-stat svg,
+.lus-hud-btn svg,
+[data-testid="map-legend-toggle"] svg,
+[data-testid="wanted-stars-hud"] svg,
+[data-testid="activity-feed-mobile-toggle"] svg {
+    filter:
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.62))
+        drop-shadow(0 2px 5px rgba(0, 0, 0, 0.26)) !important;
+}
+
+.lus-level-readout .border-primary\/30 {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.lus-hud-btn,
+.lus-hud-btn:hover,
+.lus-hud-btn:focus-visible,
+.lus-hud-btn-active,
+.lus-dock .lus-hud-btn,
+.lus-dock .lus-hud-btn:hover,
+.lus-dock .lus-hud-btn-active {
+    border-color: transparent !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.lus-hud-btn {
+    transition:
+        transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 160ms ease,
+        filter 160ms ease !important;
+}
+
+.lus-hud-btn:hover,
+.lus-hud-btn:focus-visible {
+    transform: translateY(-1px) scale(1.04);
+}
+
+.lus-hud-btn:active {
+    transform: scale(0.96);
+}
+
+.lus-hud-btn-active svg {
+    opacity: 1;
+    filter:
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.62))
+        drop-shadow(0 2px 5px rgba(0, 0, 0, 0.26))
+        drop-shadow(0 0 3px rgba(248, 113, 113, 0.24)) !important;
+}
+
+.lus-dock {
+    border: 0 !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+.lus-dock::before,
+.lus-dock::after {
+    display: none !important;
+}
+
+.lus-dock .lus-hud-btn {
+    width: 42px;
+    height: 42px;
+    padding: 0 !important;
+    border-radius: 999px !important;
+}
+
+.lus-dock .lus-hud-btn-active::before {
+    bottom: 2px !important;
+    height: 2px !important;
+    opacity: 0.7;
+    box-shadow: 0 0 4px rgba(248, 113, 113, 0.28) !important;
+}
+
+/* Indicadores permanentes: texto e ícones pousados diretamente no mapa. */
+.lus-fps {
+    padding: 2px 4px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.62),
+        0 2px 6px rgba(0, 0, 0, 0.24);
+}
+
+[data-testid="wanted-stars-hud"],
+[data-testid="connection-banner"],
+[data-testid="map-legend-toggle"],
+[data-testid="activity-feed-mobile-toggle"] {
+    border-color: transparent !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.62),
+        0 2px 6px rgba(0, 0, 0, 0.24);
+}
+
+[data-testid="map-legend-toggle"]:hover,
+[data-testid="activity-feed-mobile-toggle"]:hover {
+    background: transparent !important;
+}
+
+/* O feed fechado fica como uma linha de informação, não como um cartão. */
+[data-testid="activity-feed-mobile-toggle"] {
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
+}
+
+/* Marcadores: mantêm a leitura por cor, sem discos/caixas pesadas. */
+.opp-pin {
+    background: transparent !important;
+    box-shadow:
+        0 2px 7px rgba(0, 0, 0, 0.36),
+        0 0 6px -2px var(--mk, #fff) !important;
+}
+
+.opp-pin:hover,
+.opp-pin-selected {
+    box-shadow:
+        0 3px 9px rgba(0, 0, 0, 0.40),
+        0 0 8px -2px var(--mk, #fff) !important;
+}
+
+.hq-pin {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: #f4f4f5 !important;
+    box-shadow: none !important;
+    filter:
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.68))
+        drop-shadow(0 3px 7px rgba(0, 0, 0, 0.30));
+}
+
+.hq-pin:hover {
+    box-shadow: none !important;
+    filter:
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.72))
+        drop-shadow(0 3px 8px rgba(0, 0, 0, 0.34));
+}
+
+.prop-pin,
+.unit-pin {
+    background: transparent !important;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* Evita que os números e ícones pareçam néon excessivo em ecrãs pequenos. */
+@media (max-width: 639px) {
+    .lus-minimal-stat svg,
+    .lus-hud-btn svg,
+    [data-testid="map-legend-toggle"] svg,
+    [data-testid="activity-feed-mobile-toggle"] svg {
+        filter:
+            drop-shadow(0 1px 1px rgba(0, 0, 0, 0.58))
+            drop-shadow(0 2px 4px rgba(0, 0, 0, 0.22)) !important;
+    }
+
+    .lus-topbar {
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
+    }
+}
