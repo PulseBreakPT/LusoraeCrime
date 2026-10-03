@@ -576,7 +576,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               )}
             </div>
             {phase === "operating" && choreo?.driverInside && (
-              <p className="mt-0.5 text-[9px] text-cyan-500/80">Motorista ao volante — pronto para a fuga</p>
+              <p className="mt-0.5 text-[9px] text-cyan-500/80">{choreo.driverMember?.name ? `${choreo.driverMember.name} · motorista ao volante` : "Motorista ao volante"} — pronto para a fuga</p>
             )}
             {choreo && <p className="mt-1 text-[9px] text-zinc-500">{CHOREO_LABELS[choreo.kind]}</p>}
             <p className="mt-1 text-[9px] text-cyan-400/90">
