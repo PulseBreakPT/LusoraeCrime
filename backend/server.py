@@ -19,6 +19,7 @@ from routes_admin import router as admin_router
 from routes_legal import router as legal_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
+from road_routing import road_router
 
 app = FastAPI(title="Lusorae API")
 
@@ -116,6 +117,8 @@ async def startup():
     await db.missions.create_index([("player_id", 1), ("phase", 1)])
     await db.events.create_index([("player_id", 1), ("ts", -1)])
     await db.quests.create_index([("player_id", 1), ("status", 1)])
+    await db.road_routes.create_index("key", unique=True)
+    await db.road_routes.create_index("expires_at")
     await seed_admin()
     await migrate_v2()
     await migrate_v4()
@@ -123,4 +126,5 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    await road_router.close()
     client.close()
