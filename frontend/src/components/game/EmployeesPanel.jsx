@@ -19,7 +19,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
-  Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle, Warehouse,
+  Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
   Swords, ShieldAlert,
 } from "lucide-react";
