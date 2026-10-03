@@ -857,8 +857,10 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
   const target = tr.to;
   const [route, setRoute] = useState(() => peekRoute(origin, target));
   const markerRef = useRef(null);
-  const routeReadyAtRef = useRef(route ? null : null);
-  const posRef = useRef({ lat: origin.lat, lng: origin.lng });
+  const routeReadyAtRef = useRef(null);
+  // null força o primeiro render a calcular imediatamente a posição atual
+  // quando a rota já está em cache, evitando origem -> posição atual num frame.
+  const posRef = useRef(null);
   const [, setClockTick] = useState(0);
 
   useEffect(() => {
