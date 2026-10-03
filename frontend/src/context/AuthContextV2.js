@@ -2,8 +2,10 @@ import { createContext, useContext, useEffect, useState, useRef, useCallback } f
 import { api } from "../lib/api";
 import { formatApiErrorDetail } from "../lib/game";
 import { useBoot } from "./BootContext";
+import { SocialLogin } from "@capgo/capacitor-social-login";
 
 const AuthContext = createContext(null);
+const GOOGLE_WEB_CLIENT_ID = (process.env.REACT_APP_GOOGLE_WEB_CLIENT_ID || "").trim();
 
 // Disclaimer de ficção ("é apenas um jogo") — mostrado UMA única vez por
 // conta, no primeiro registo/entrada. A fonte de verdade é o servidor
@@ -17,6 +19,7 @@ export function AuthProvider({ children }) {
   const [catalog, setCatalog] = useState(null);
   const { startBoot, resetBoot } = useBoot();
   const bootRef = useRef(false);
+  const googleInitRef = useRef(false);
 
   // Timeout helpers
   const fetchWithTimeout = useCallback(async (url, options = {}, timeoutMs = 8000) => {
@@ -145,6 +148,51 @@ export function AuthProvider({ children }) {
     return { ok: false, error: errorMsg, status, retryAfter, isNetwork };
   }, []);
 
+  const ensureGoogleInitialized = useCallback(async () => {
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      throw new Error("Google Sign-In ainda não está configurado.");
+    }
+    if (googleInitRef.current) return;
+    await SocialLogin.initialize({
+      google: {
+        webClientId: GOOGLE_WEB_CLIENT_ID,
+        mode: "online",
+      },
+    });
+    googleInitRef.current = true;
+  }, []);
+
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      await ensureGoogleInitialized();
+      const googleResult = await SocialLogin.login({
+        provider: "google",
+        options: {
+          scopes: ["profile", "email"],
+          style: "bottom",
+          filterByAuthorizedAccounts: false,
+        },
+      });
+      const idToken = googleResult?.result?.idToken;
+      if (!idToken) throw new Error("A Google não devolveu um ID token válido.");
+
+      const res = await api.post(
+        "/auth/google",
+        { id_token: idToken, accept_terms: true },
+        { timeout: 10000 }
+      );
+
+      if (res.data.access_token) {
+        localStorage.setItem("lusorae_access_token", res.data.access_token);
+        localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
+      }
+      await startBoot(performBoot);
+      return { ok: true };
+    } catch (err) {
+      return buildAuthError(err);
+    }
+  }, [ensureGoogleInitialized, startBoot, performBoot, buildAuthError]);
+
   // Login
   const login = useCallback(
     async (email, password) => {
@@ -208,6 +256,14 @@ export function AuthProvider({ children }) {
     } catch (_err) {
       // Ignora erro de logout, apenas limpa local
     }
+    if (GOOGLE_WEB_CLIENT_ID) {
+      try {
+        await ensureGoogleInitialized();
+        await SocialLogin.logout({ provider: "google" });
+      } catch (_err) {
+        // O logout local continua mesmo que a sessão Google já não exista.
+      }
+    }
     localStorage.removeItem("lusorae_access_token");
     localStorage.removeItem("lusorae_refresh_token");
     // `false` = "sem sessão" → o ProtectedRoute redireciona para /auth.
@@ -217,7 +273,7 @@ export function AuthProvider({ children }) {
     setGameState(null);
     setCatalog(null);
     resetBoot();
-  }, [resetBoot]);
+  }, [resetBoot, ensureGoogleInitialized]);
 
   // Initialize auth on mount
   useEffect(() => {
@@ -274,9 +330,9 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const deleteAccount = useCallback(async (password) => {
+  const deleteAccount = useCallback(async (password = null) => {
     try {
-      await api.post("/auth/delete-account", { password }, { timeout: 5000 });
+      await api.post("/auth/delete-account", { password: password || null }, { timeout: 8000 });
       logout();
       return { ok: true };
     } catch (err) {
@@ -310,6 +366,8 @@ export function AuthProvider({ children }) {
         catalog,
         login,
         register,
+        loginWithGoogle,
+        googleSignInEnabled: Boolean(GOOGLE_WEB_CLIENT_ID),
         checkAvailability,
         logout,
         changePassword,
