@@ -1,206 +1,95 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtMoneyShort, fmtDuration, heatStatus, passiveRates, teamsReadiness, SPEC_LABELS, CATEGORY_COLORS } from "../../lib/game";
-import { Tip, MiniBar, AnimatedNumber, useFlash } from "./hud";
-import { Badge } from "../ui/badge";
-import { Banknote, Coins, Flame, Trophy, Users, Crosshair, HandCoins, WifiOff, TrendingUp } from "lucide-react";
-
-const useTick = () => {
-  const [, setT] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setT((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-};
-
-// Viewports estreitos (abaixo de `sm`): os montantes passam a formato curto
-// ("75k €") para nunca truncarem com reticências na barra de recursos.
-const useNarrow = () => {
-  const [narrow, setNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const onChange = (e) => setNarrow(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return narrow;
-};
-
-// PERF: o relógio e o countdown dos salários vivem em componentes próprios com
-// o seu tick de 1 Hz — antes, a barra inteira (≈10 tooltips, KPIs, minibars)
-// re-renderizava a cada segundo só para atualizar estes dois textos.
-const NetworkClock = ({ serverNow }) => {
-  useTick();
-  return <>{new Date(serverNow()).toLocaleTimeString("pt-PT")}</>;
-};
-
-const PayrollCountdown = ({ targetAt, serverNow }) => {
-  useTick();
-  const s = Math.max(0, (Date.parse(targetAt) - serverNow()) / 1000);
-  return <>em {fmtDuration(s)}</>;
-};
-
-// Selo de desatualização — só aparece quando os dados ficam velhos (poll a
-// falhar / backend em baixo). Tem o seu próprio tick de 1 Hz para atualizar a
-// idade mesmo quando NÃO chegam dados novos (nenhum re-render da barra).
-const SyncBadge = () => {
-  const { lastSyncAt } = useGame();
-  useTick();
-  if (!lastSyncAt) return null;
-  const ageS = (Date.now() - lastSyncAt) / 1000;
-  if (ageS < 15) return null; // fresco → nada
-  return (
-    <Tip tip="Os dados podem estar desatualizados — a tentar restabelecer a ligação ao servidor.">
-      <span className="flex items-center gap-1 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-amber-500">
-        <WifiOff size={9} /> {ageS >= 60 ? "sem ligação" : "a reconectar…"}
-      </span>
-    </Tip>
-  );
-};
+import { fmtMoneyShort, heatStatus } from "../../lib/game";
+import { Tip, AnimatedNumber, useFlash } from "./hud";
+import { Banknote, Coins, Flame, Trophy } from "lucide-react";
 
 export const ResourceBar = () => {
-  const { state, catalog, serverNow } = useGame();
-  const narrow = useNarrow();
-  const money = narrow ? fmtMoneyShort : fmtMoney;
+  const { state } = useGame();
   const prevCleanRef = useRef(null);
-  const moneyIn = state && prevCleanRef.current != null && state.player.clean_money > prevCleanRef.current;
-  const moneyFlash = useFlash(moneyIn ? state.player.clean_money : null);
   const prevDirtyRef = useRef(null);
-  const dirtyIn = state && prevDirtyRef.current != null && state.player.dirty_money > prevDirtyRef.current;
-  const dirtyFlash = useFlash(dirtyIn ? state.player.dirty_money : null);
   const prevRespectRef = useRef(null);
+
+  const moneyIn = state && prevCleanRef.current != null && state.player.clean_money > prevCleanRef.current;
+  const dirtyIn = state && prevDirtyRef.current != null && state.player.dirty_money > prevDirtyRef.current;
   const respectIn = state && prevRespectRef.current != null && state.player.respect > prevRespectRef.current;
+
+  const moneyFlash = useFlash(moneyIn ? state.player.clean_money : null);
+  const dirtyFlash = useFlash(dirtyIn ? state.player.dirty_money : null);
   const respectFlash = useFlash(respectIn ? state.player.respect : null);
+
   useEffect(() => {
     if (!state) return;
     prevCleanRef.current = state.player.clean_money;
     prevDirtyRef.current = state.player.dirty_money;
     prevRespectRef.current = state.player.respect;
   }, [state]);
+
   if (!state) return null;
+
   const p = state.player;
-  const nextRespect = p.next_level_respect;
-  const respPct = nextRespect ? Math.min(100, (p.respect / nextRespect) * 100) : 100;
   const hs = heatStatus(p.heat);
-  const { dirtyPerH, launderPerH } = passiveRates(state, catalog, serverNow());
-  const tr = teamsReadiness(state, serverNow());
-  const activeOps = state.missions.length;
-  const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
-  const weeklyBreakdown = state.weekly_cost_breakdown || {};
-  const payrollShort = weeklyFixed > 0 && p.clean_money < weeklyFixed;
+  const nextRespect = p.next_level_respect;
+  const respectTip = nextRespect
+    ? `Nível ${p.level} · ${p.respect}/${nextRespect} de respeito. Faltam ${Math.max(0, nextRespect - p.respect)} para o nível ${p.level + 1}.`
+    : `Nível ${p.level} · ${p.respect} de respeito · nível máximo.`;
 
   return (
-    <div data-testid="resource-bar" className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down">
-      <div className="lus-topbar mx-auto flex w-fit max-w-full items-center gap-1 rounded-xl border px-1.5 py-1.5 sm:gap-1.5 sm:px-2 sm:py-1.5">
-        <Tip
-          tip={nextRespect ? `Nível ${p.level} — faltam ${nextRespect - p.respect} de respeito para o nível ${p.level + 1}. Sobe de nível para desbloquear oportunidades, veículos e recrutas.` : "Nível máximo alcançado — domínio total de Lisboa."}
-          side="bottom"
-          align="start"
-        >
-          <div className="lus-minimal-stat lus-level-readout flex shrink-0 items-center gap-1.5 px-1.5">
-            <div className="flex flex-col items-center">
-              <Badge variant="outline" className="flex h-7 w-7 items-center justify-center rounded border-primary/30 bg-primary/15 p-0 font-mono text-xs font-bold text-primary">
-                {p.level}
-              </Badge>
-              <MiniBar value={respPct} color="#DC2626" className="mt-0.5 w-7" height="h-0.5" />
-            </div>
-            <div className="hidden sm:block">
-              <p className="max-w-[120px] truncate text-xs font-semibold text-white">{p.org_name}</p>
-              <p className="font-mono text-[10px] text-zinc-500">
-                {nextRespect ? `${p.respect}/${nextRespect} resp.` : "nível máx."}
-              </p>
-            </div>
+    <div
+      data-testid="resource-bar"
+      className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down"
+    >
+      <div className="lus-topbar mx-auto flex w-fit max-w-full items-center gap-2 px-1 py-1 sm:gap-3">
+        <Tip tip={respectTip} side="bottom" align="start">
+          <div className={`lus-minimal-stat lus-level-readout flex shrink-0 items-center gap-1.5 px-1 ${respectFlash ? "lus-flash-blue" : ""}`}>
+            <span className="font-mono text-[13px] font-black leading-none text-red-400 sm:text-sm">
+              LV {p.level}
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[11px] font-bold text-zinc-300">
+              <Trophy size={12} className="text-sky-400" />
+              {p.respect}
+            </span>
           </div>
         </Tip>
 
         <Stat
-          testId="stat-clean-money" icon={Banknote} color="#10B981" label="Limpo"
-          value={<AnimatedNumber value={p.clean_money} format={money} />}
-          sub={launderPerH > 0 ? `+${money(launderPerH)}/h` : null} subColor="#34D399"
-          tip="Dinheiro limpo — paga compras, reparações, fecho semanal e subornos. A lavagem manual devolve 78% na taxa base e pode melhorar até 90% com a organização certa."
-          className={moneyFlash ? "lus-flash rounded" : ""}
+          testId="stat-clean-money"
+          icon={Banknote}
+          color="#10B981"
+          value={<AnimatedNumber value={p.clean_money} format={fmtMoneyShort} />}
+          tip="Dinheiro limpo disponível para compras, salários, reparações e subornos."
+          className={moneyFlash ? "lus-flash" : ""}
         />
-        {(() => {
-          const dirtyCap = state.caps?.dirty_money?.max || 0;
-          const dirtyPct = dirtyCap > 0 ? p.dirty_money / dirtyCap : 0;
-          const nearCap = dirtyPct >= 0.9;
-          return (
-            <Stat
-              testId="stat-dirty-money" icon={Coins} color={nearCap ? "#EF4444" : "#F59E0B"} label="Sujo"
-              value={<AnimatedNumber value={p.dirty_money} format={money} />}
-              sub={nearCap ? "cofre quase cheio!" : dirtyPerH > 0 ? `+${money(dirtyPerH)}/h` : null}
-              subColor={nearCap ? "#EF4444" : "#F59E0B"}
-              className={dirtyFlash ? "lus-flash-amber rounded" : ""}
-              tip={`Dinheiro sujo vindo do crime — lava-o no Império para o poderes gastar. Capacidade do cofre: ${fmtMoney(p.dirty_money)}/${fmtMoney(dirtyCap)}${nearCap ? " — produção dos laboratórios acima do limite é DESPERDIÇADA. Lava dinheiro já!" : ". Produção acima do limite é desperdiçada; montantes altos atraem atenção."}`}
-            />
-          );
-        })()}
+
         <Stat
-          testId="stat-respect" icon={Trophy} color="#0A84FF" label="Respeito" value={<AnimatedNumber value={p.respect} />}
-          tip="Respeito ganho em operações bem-sucedidas — sobe o nível da organização e desbloqueia conteúdo novo."
+          testId="stat-dirty-money"
+          icon={Coins}
+          color="#F59E0B"
+          value={<AnimatedNumber value={p.dirty_money} format={fmtMoneyShort} />}
+          tip="Dinheiro sujo. Lava-o no Império antes de o poderes gastar."
+          className={dirtyFlash ? "lus-flash-amber" : ""}
         />
-        <Tip tip={`Calor policial: ${hs.label}. ${hs.desc} Baixa naturalmente com o tempo ou com subornos no Império.`} side="bottom" className="min-w-0">
-          <div data-testid="stat-heat" className="lus-minimal-stat flex min-w-0 items-center gap-1.5 px-1.5">
+
+        <Tip tip={`Calor policial: ${hs.label}. ${hs.desc}`} side="bottom" align="end">
+          <div data-testid="stat-heat" className="lus-minimal-stat flex shrink-0 items-center gap-1.5 px-1">
             <Flame size={15} className="shrink-0" style={{ color: hs.color }} />
-            <div className="min-w-0">
-              <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">
-                Calor · <span style={{ color: hs.color }}>{hs.label}</span>
-              </p>
-              <p className="truncate font-mono text-[13px] font-bold leading-tight text-white sm:text-sm">{Math.round(p.heat)}%</p>
-              <MiniBar value={p.heat} color={hs.color} className="w-8 sm:w-11" height="h-0.5" />
-            </div>
+            <span className="font-mono text-[13px] font-bold leading-none text-white sm:text-sm">
+              {Math.round(p.heat)}%
+            </span>
           </div>
         </Tip>
-
-        <div className="hidden items-stretch gap-2 border-l border-border pl-2 md:flex">
-          {state.hot_category && (
-            <Stat
-              testId="stat-hot-category" icon={TrendingUp} color={CATEGORY_COLORS[state.hot_category] || "#F59E0B"} label="Em alta"
-              value={SPEC_LABELS[state.hot_category] || state.hot_category} sub="+20% recompensa" subColor="#F59E0B"
-              tip={`Mercado dinâmico: operações de ${SPEC_LABELS[state.hot_category] || state.hot_category} nascem com +20% de recompensa neste momento. A categoria em alta roda a cada 6 horas.`}
-            />
-          )}
-          <Stat
-            testId="stat-teams-ready" icon={Users} color={tr.ready === 0 && tr.total > 0 ? "#EF4444" : "#22D3EE"} label="Prontas" value={`${tr.ready}/${tr.total}`}
-            tip={`Equipas prontas a operar: ${tr.ready} de ${tr.total}${tr.busy > 0 ? ` · ${tr.busy} em operação` : ""}. Uma equipa pronta tem membros disponíveis, veículo com combustível e em condições.`}
-          />
-          <Stat
-            testId="stat-active-ops" icon={Crosshair} color="#EF4444" label="Ops" value={activeOps}
-            tip={activeOps > 0 ? `${activeOps} operação(ões) em curso — acompanha as unidades no mapa.` : "Sem operações em curso — seleciona uma oportunidade no mapa e despacha uma equipa."}
-          />
-          <Stat
-            testId="stat-payroll" icon={HandCoins} color={payrollShort ? "#EF4444" : "#F59E0B"} label="Fecho semanal" value={fmtMoney(weeklyFixed)}
-            sub={payrollShort ? "fundos insuficientes!" : p.next_payroll_at ? <PayrollCountdown targetAt={p.next_payroll_at} serverNow={serverNow} /> : null} subColor={payrollShort ? "#EF4444" : "#F59E0B"} align="end"
-            tip={payrollShort
-              ? `Faltam ${fmtMoney(Math.max(0, weeklyFixed - p.clean_money))} para o fecho de segunda-feira às 20:00. O fecho inclui salários, TSU patronal, custos fixos da frota e imóveis.`
-              : `Segunda-feira às 20:00 · total ${fmtMoney(weeklyFixed)}: salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)} + TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)} + frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} + imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}. Combustível e reparações são variáveis e ficam fora deste fecho.`}
-          />
-          <Tip tip="Hora da rede — sincronizada com o servidor. Lisboa nunca dorme; tu também não devias." side="bottom" align="end" className="hidden lg:inline-flex">
-            <div data-testid="stat-clock" className="flex min-w-0 flex-col items-end justify-center border-l border-border pl-2">
-              <p className="lus-clock font-mono text-xs font-bold text-zinc-200 sm:text-[13px]">
-                {new Date(serverNow()).toLocaleTimeString("pt-PT")}
-              </p>
-              <SyncBadge />
-              <p className="text-[8px] font-medium uppercase tracking-[0.22em] text-zinc-600">Lisboa · 38.72N 9.14W</p>
-            </div>
-          </Tip>
-        </div>
       </div>
     </div>
   );
 };
 
-const Stat = ({ icon: Icon, color, label, value, sub, subColor, tip, align = "center", testId, className = "" }) => (
-  <Tip tip={tip} side="bottom" align={align} className="min-w-0">
-    <div data-testid={testId} className={`lus-minimal-stat flex min-w-0 items-center gap-1.5 px-1.5 ${className}`}>
+const Stat = ({ icon: Icon, color, value, tip, testId, className = "" }) => (
+  <Tip tip={tip} side="bottom" className="min-w-0">
+    <div data-testid={testId} className={`lus-minimal-stat flex min-w-0 items-center gap-1.5 px-1 ${className}`}>
       <Icon size={15} className="shrink-0" style={{ color }} />
-      <div className="min-w-0">
-        <p className="hidden text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 md:block">{label}</p>
-        <p title={typeof value === "string" ? value : undefined} className="truncate font-mono text-[13px] font-bold leading-tight text-white sm:text-sm">{value}</p>
-        {sub && <p title={typeof sub === "string" ? sub : undefined} className="truncate font-mono text-[10px] leading-tight" style={{ color: subColor || "#71717A" }}>{sub}</p>}
-      </div>
+      <span className="truncate font-mono text-[13px] font-bold leading-none text-white sm:text-sm">
+        {value}
+      </span>
     </div>
   </Tip>
 );
