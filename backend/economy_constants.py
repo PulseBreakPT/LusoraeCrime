@@ -8,7 +8,7 @@
 # INITIAL CAPITAL
 # ============================================================================
 
-INITIAL_CLEAN_MONEY = 75000
+INITIAL_CLEAN_MONEY = 100000
 INITIAL_DIRTY_MONEY = 5000
 
 # ============================================================================
@@ -26,6 +26,7 @@ DIRTY_MONEY_HEAT_PER_10K = 0.15
 
 PAYROLL_CYCLE_MIN = 120  # 120 min reais representam 1 semana económica de jogo
 PAYROLL_MORALE_REGEN = 0.4  # morale/loyalty recovered per employee on time payment
+EMPLOYER_SOCIAL_SECURITY_RATE = 0.2375  # TSU patronal normal em Portugal
 POOL_REFRESH_MIN = 5  # minutes between recruitment pool refreshes
 
 # ============================================================================
@@ -37,14 +38,9 @@ BASE_EMPLOYEE_CAP = 4
 BASE_VEHICLE_CAP = 2
 TEAM_MAX_MEMBERS = 4
 
-# Salary scaling (NEW REDESIGN)
-# Formula: payroll_cost = sum(salaries) × (num_employees / 2) ^ 0.5
-# This prevents infinite team growth without scaling costs
-TEAM_COST_SCALING_BASE = 0.5  # exponent for team scaling
-# At 2 employees: (2/2)^0.5 = 1.0x
-# At 4 employees: (4/2)^0.5 = 1.41x
-# At 8 employees: (8/2)^0.5 = 2.0x
-# At 16 employees: (16/2)^0.5 = 2.83x
+# Compatibilidade com versões antigas. A folha salarial deixou de usar
+# escalamento artificial pelo tamanho da equipa: bruto + TSU patronal é linear.
+TEAM_COST_SCALING_BASE = 0.0
 
 # ============================================================================
 # PROPERTY COSTS (REDESIGNED - 50% INCREASE FROM ORIGINAL)
@@ -155,7 +151,7 @@ PROPERTY_TYPES = {
 }
 
 PROPERTY_MAX_LEVEL = 3
-PROPERTY_MAINTENANCE_PCT_PER_DAY = 0.0015
+PROPERTY_MAINTENANCE_PCT_PER_DAY = 0.00008
 PROPERTY_CONDITION_RECOVERY_PER_HOUR = 2.0
 PROPERTY_CONDITION_DECAY_PER_HOUR = 3.0
 PROPERTY_UPGRADE_BASE_S = 90
@@ -208,6 +204,22 @@ FUEL_PRICES = {
     # DGEG, referência Portugal Continental 24-09-2026 (arredondado ao cêntimo).
     'gasolina': 2.12,
     'gasoleo': 2.22,
+}
+
+# Reserva anual de propriedade da frota, excluindo combustível e reparações
+# extraordinárias: seguro, IUC, IPO, pneus e manutenção preventiva.
+VEHICLE_ANNUAL_FIXED_COSTS = {
+    'usado': 1250,
+    'moto': 700,
+    'van': 1800,
+    'desportivo': 2500,
+    'suv_blindado': 3600,
+    'supercarro': 6000,
+    'carrinha_entrega': 1600,
+    'berlina_blindada': 3000,
+    'buggy_todo_terreno': 1200,
+    'limousine': 3600,
+    'carro_furtivo': 2400,
 }
 
 REFUEL_DURATION_BASE_S = 15
@@ -328,6 +340,14 @@ TRAINING_COSTS = {
     'lideranca': 1200,
     'treino_fisico': 500,
 }
+
+# ============================================================================
+# MONEY LAUNDERING
+# ============================================================================
+
+LAUNDER_BASE_RATE = 0.78
+LAUNDER_MAX_RATE = 0.90
+LAUNDER_PASSIVE_RATE = 0.82
 
 # ============================================================================
 # MISSION REWARDS (from reward_engine.py)
