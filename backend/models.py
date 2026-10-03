@@ -183,6 +183,9 @@ class Property(BaseDocument):
     lat: float
     lng: float
     level: int
+    purchase_price: Optional[int] = None
+    market_zone: Optional[str] = None
+    market_multiplier: float = 1.0
     total_dirty_generated: float = 0.0
     total_laundered: float = 0.0
     bought_at: str
