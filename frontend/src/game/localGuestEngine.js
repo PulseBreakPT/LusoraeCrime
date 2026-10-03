@@ -199,6 +199,7 @@ const loadSave = () => {
     save.quests ||= [];
     normalizeSavedRisk(save);
     normalizeSavedEvents(save);
+    normalizeSavedEconomy(save);
     save.version = LOCAL_GUEST_SAVE_VERSION;
     persist(save);
     return save;
@@ -227,6 +228,39 @@ const normalizeSavedEvents = (save) => {
       ? event.text
       : "",
   }));
+  return save;
+};
+
+const normalizeSavedEconomy = (save) => {
+  for (const employee of save.employees || []) {
+    const role = LOCAL_CATALOG.specializations[employee.role_key];
+    if (role?.salary) employee.salary = role.salary;
+  }
+  for (const candidate of save.candidates || []) {
+    const role = LOCAL_CATALOG.specializations[candidate.role_key];
+    if (role?.salary) candidate.salary = role.salary;
+  }
+  for (const vehicle of save.vehicles || []) {
+    const model = LOCAL_CATALOG.vehicle_models[vehicle.model_key];
+    if (!model) continue;
+    vehicle.price = model.price;
+    vehicle.fuel_type = model.fuel_type;
+    vehicle.tank_l = model.tank_l;
+    vehicle.cons = model.cons;
+    vehicle.seats = model.seats;
+    vehicle.discretion = model.discretion;
+    vehicle.fuel_l = clamp(Number(vehicle.fuel_l) || model.tank_l, 0, model.tank_l);
+  }
+  for (const weapon of save.weapons || []) {
+    const model = LOCAL_CATALOG.weapon_models[weapon.model_key];
+    if (!model) continue;
+    weapon.price = model.price;
+    weapon.maintenance_cost = model.maintenance_cost;
+  }
+  for (const property of save.properties || []) {
+    const type = LOCAL_CATALOG.property_types[property.type_key];
+    if (type?.price) property.price = type.price;
+  }
   return save;
 };
 
