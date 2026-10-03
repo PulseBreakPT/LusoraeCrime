@@ -108,7 +108,7 @@ export default function AuthPage() {
               <div className="text-center">
                 <ShieldCheck className="mx-auto h-9 w-9 text-red-500" />
                 <h2 className="mt-4 font-display text-4xl font-black uppercase tracking-tight">
-                  Lusorae
+                  SUBMUNDO
                 </h2>
                 <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-red-400">
                   Escolhe como entrar
