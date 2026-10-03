@@ -112,7 +112,7 @@ export default function HQOnboarding() {
         minZoom={5}
         zoomControl={false}
         attributionControl={true}
-        className="absolute inset-0 z-0 h-full w-full"
+        className="lus-dark-map absolute inset-0 z-0 h-full w-full"
       >
         <MapBaseLayer />
         <ClickPicker onPick={pick} />
