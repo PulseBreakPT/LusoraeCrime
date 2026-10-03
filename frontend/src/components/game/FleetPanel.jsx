@@ -202,7 +202,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3" data-testid="fleet-list">
+        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="fleet-list">
           {state.vehicles.length === 0 && (
             <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens veículos — compra o primeiro no stand abaixo.
@@ -248,7 +248,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             return (
               <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 {/* Cabeçalho: placa com silhueta + identidade */}
-                <div className="relative z-[1] flex items-stretch gap-2.5">
+                <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
                   <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <VehicleGlyph
                       modelKey={v.model_key} accent={tier.color}
@@ -505,7 +505,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <div className="mt-6">
           <SectionHeader icon={ShoppingCart} title="Stand de veículos" meta={catalog ? `${Object.keys(catalog.vehicle_models || {}).length} modelos` : undefined} />
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
             {catalog &&
               Object.entries(catalog.vehicle_models).map(([key, m]) => {
                 const tier = vehicleTier(m);
@@ -513,7 +513,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 const owned = state.vehicles.filter((v) => v.model_key === key).length;
                 return (
                   <Card key={key} data-testid={`stand-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
-                    <div className="relative z-[1] flex items-stretch gap-2.5">
+                    <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
                       <div className="lus-doss-plate relative flex h-[52px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <VehicleGlyph modelKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
