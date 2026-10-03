@@ -108,7 +108,17 @@ const ChangePasswordForm = () => {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  if (user && (!user.has_password || /^guest-[a-f0-9]+@lusorae\.pt$/i.test(user.email || ""))) {
+  if (user?.is_guest) {
+    return (
+      <Card className="border-emerald-500/15 bg-emerald-500/5 p-2 shadow-none">
+        <p className="text-[10px] leading-snug text-emerald-200">
+          Modo convidado local — não existe palavra-passe. O progresso fica guardado neste dispositivo.
+        </p>
+      </Card>
+    );
+  }
+
+  if (user && !user.has_password) {
     return (
       <Card className="border-sky-500/15 bg-sky-500/5 p-2 shadow-none">
         <p className="text-[10px] leading-snug text-sky-200">
@@ -228,7 +238,7 @@ const DeleteAccountForm = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const needsPassword = Boolean(user?.has_password) && !/^guest-[a-f0-9]+@lusorae\.pt$/i.test(user?.email || "");
+  const needsPassword = Boolean(user?.has_password) && !user?.is_guest;
 
   const run = async () => {
     setError("");
@@ -246,7 +256,7 @@ const DeleteAccountForm = () => {
       </p>
       {!needsPassword && (
         <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
-          Em contas Google ou convidado, a confirmação não pede uma palavra-passe visível ao jogador.
+          {user?.is_guest ? "Isto apaga apenas o save local deste dispositivo." : "A conta Google autenticada não precisa de uma palavra-passe Lusorae."}
         </p>
       )}
       {needsPassword && (
