@@ -73,7 +73,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
 export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
     state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
-    transferVehicle, renameVehicle, startPlacement, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles, repairFleetAll,
+    transferVehicle, renameVehicle, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles, repairFleetAll,
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
@@ -591,24 +591,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             return (
               <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none">
                 <p className="font-mono text-[10px] text-amber-400">Garagem cheia</p>
-                {canBuy ? (
-                  <Button
-                    data-testid="fleet-buy-garage-inline"
-                    variant="outline" size="sm"
-                    onClick={() => { startPlacement("garagem"); onOpenChange(false); }}
-                    className="h-auto gap-1 border-purple-500/30 bg-purple-500/10 px-2 py-1 font-mono text-[10px] font-bold text-purple-300 hover:bg-purple-500/20"
-                  >
-                    <Warehouse size={10} /> Comprar garagem · {fmtMoney(garagem.price)}
-                  </Button>
-                ) : (
-                  <button
-                    data-testid="fleet-nav-properties"
-                    onClick={() => onNavigate && onNavigate("properties")}
-                    className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
-                  >
-                    Ver Imóveis
-                  </button>
-                )}
+                <button
+                  data-testid="fleet-nav-properties"
+                  onClick={() => onNavigate && onNavigate("properties")}
+                  className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+                >
+                  {canBuy ? `Abrir Imóveis · garagem desde ${fmtMoney(garagem.price)}` : "Ver Imóveis"}
+                </button>
               </Card>
             );
           })()}
