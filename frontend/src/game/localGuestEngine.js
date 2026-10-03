@@ -164,16 +164,20 @@ const missionRewardForOpportunity = (save, risk, category, distKm, rare, seedInd
   return clamp(rounded, Number(meta.min || 1500), Number(meta.max || 90000));
 };
 
-const makeOpportunities = (save, count = 9) => {
+const makeOpportunities = (save, count = 5) => {
   if (!save.player.hq) return [];
   const districts = save.player.districts || [];
   const now = Date.now();
-  return Array.from({ length: count }, (_, i) => {
-    const [typeKey, cfg] = oppTypes[i % oppTypes.length];
+  const level = Number(save.player.level || 1);
+  const eligibleTypes = oppTypes.filter(([, cfg]) => Number(cfg.min_level || 1) <= level);
+  if (!eligibleTypes.length) return [];
+  const amount = Math.min(5, Math.max(0, count));
+  return Array.from({ length: amount }, (_, i) => {
+    const [typeKey, cfg] = eligibleTypes[i % eligibleTypes.length];
     const district = districts[i % Math.max(1, districts.length)] || save.player.hq;
-    const tier = 1 + (i % 4);
+    const tier = clamp(Number(cfg.risk || 1), 1, 5);
     const distKm = 1 + i * 0.8;
-    const rare = i === count - 1;
+    const rare = i === amount - 1;
     const reward = missionRewardForOpportunity(save, tier, cfg.category, distKm, rare, i);
     return {
       id: uid("opp"), type_key: typeKey, name: cfg.name, category: cfg.category,
@@ -182,7 +186,7 @@ const makeOpportunities = (save, count = 9) => {
       lat: district.lat + ((i % 3) - 1) * 0.003, lng: district.lng + (((i + 1) % 3) - 1) * 0.003,
       risk: tier, reward,
       respect: 25 + tier * 20,
-      pays: i % 5 === 0 ? "clean" : "dirty", min_level: Math.min(6, tier),
+      pays: i % 5 === 0 ? "clean" : "dirty", min_level: Number(cfg.min_level || 1),
       min_members: tier >= 3 ? 2 : 1, status: "active", rare,
       required_models: [], police_force: i % 3 ? "PSP" : "GNR",
       created_at: new Date(now - i * 45000).toISOString(),
@@ -525,9 +529,18 @@ const tick = (save) => {
   }
   if(heist?.finale?.status==="running" && Date.parse(heist.finale.finish_at)<=now) heist.finale.status="ready";
 
-  if(save.player.hq && save.opportunities.filter((o)=>o.status==="active" && Date.parse(o.expires_at)>now).length < 6){
-    save.opportunities=save.opportunities.filter((o)=>o.status==="taken" || Date.parse(o.expires_at)>now);
-    save.opportunities.push(...makeOpportunities(save,4));
+  if(save.player.hq){
+    const level=Number(save.player.level||1);
+    save.opportunities=save.opportunities.filter((o)=>
+      o.status==="taken" || (Date.parse(o.expires_at)>now && Number(o.min_level||1)<=level)
+    );
+    const activeCount=save.opportunities.filter((o)=>o.status==="active").length;
+    if(activeCount<5){
+      save.opportunities.push(...makeOpportunities(save,5-activeCount));
+    }
+    const active=save.opportunities.filter((o)=>o.status==="active").slice(0,5);
+    const taken=save.opportunities.filter((o)=>o.status==="taken");
+    save.opportunities=[...active,...taken];
   }
 
   const passiveHours=elapsed/3600;
@@ -800,7 +813,7 @@ const addStarterWorld=(save,lat,lng)=>{
   save.player.region=lat<34?"Madeira":lng<-20?"Açores":lat>40.7?"Norte":lat<38.0?"Algarve":"Centro";
   save.player.districts=makeDistricts(lat,lng);
   save.street.districts=[];
-  save.opportunities=makeOpportunities(save,9);
+  save.opportunities=makeOpportunities(save,5);
   addEvent(save,"system","Quartel-General estabelecido. A rede local começou a gerar oportunidades.");
 };
 

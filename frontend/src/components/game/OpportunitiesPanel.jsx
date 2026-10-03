@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Target, Search, Clock, TrendingUp, AlertTriangle, Lock, Star, CheckCircle2, MapPin } from "lucide-react";
+import { Target, Search, Clock, TrendingUp, AlertTriangle, Star, CheckCircle2, MapPin } from "lucide-react";
 
 // Força competente (do backend, opp.police_force). Escalável: mais uma força =
 // mais uma entrada.
@@ -45,9 +45,14 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
   const [favOnly, setFavOnly] = useState(false);
   useTick(open); // atualiza contagens de expiração enquanto o painel está aberto
 
-  const opps = state?.opportunities || [];
-  const favTypes = state?.player?.favorite_types || [];
   const level = state?.player?.level || 1;
+  const opps = useMemo(
+    () => (state?.opportunities || [])
+      .filter((opp) => opp.status === "active" && Number(opp.min_level || 1) <= level)
+      .slice(0, 5),
+    [state?.opportunities, level]
+  );
+  const favTypes = state?.player?.favorite_types || [];
 
   // Categorias presentes (para o filtro) — sem hard-code da lista completa.
   const categories = useMemo(
@@ -72,7 +77,6 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
       expiresS: Math.max(0, (Date.parse(opp.expires_at) - now) / 1000),
       eta: bestEta(opp),
       reachable: opportunityReachable(state, opp, now, catalog),
-      locked: level < opp.min_level,
     }));
     if (search) list = list.filter((r) => matchesSearch(search, r.opp.name, r.opp.district, SPEC_LABELS[r.opp.category]));
     if (catFilter !== "all") list = list.filter((r) => r.opp.category === catFilter);
@@ -90,7 +94,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opps, state, catalog, search, sortKey, catFilter, forceFilter, reachableOnly, favOnly]);
 
-  const reachableCount = rows.filter((r) => r.reachable && !r.locked && r.opp.status !== "taken").length;
+  const reachableCount = rows.filter((r) => r.reachable).length;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -180,12 +184,11 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               Nenhuma operação corresponde aos filtros.
             </p>
           )}
-          {rows.map(({ opp, expiresS, eta, reachable, locked }) => {
+          {rows.map(({ opp, expiresS, eta, reachable }) => {
             const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
             const color = CATEGORY_COLORS[opp.category] || "#fff";
             const force = FORCE_INFO[opp.police_force] || FORCE_INFO.GNR;
-            const taken = opp.status === "taken";
-            const urgent = !taken && !locked && expiresS > 0 && expiresS < OPP_URGENT_SECONDS;
+            const urgent = expiresS > 0 && expiresS < OPP_URGENT_SECONDS;
             const isFav = favTypes.includes(opp.type_key);
             return (
               <Card
@@ -216,23 +219,15 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                   </span>
                   <span className="flex items-center gap-1.5 font-mono text-[9px]">
                     <span className="text-red-400">{"●".repeat(opp.risk)}{"○".repeat(5 - opp.risk)}</span>
-                    {taken ? (
-                      <span className="text-cyan-400">em curso</span>
-                    ) : locked ? (
-                      <span className="flex items-center gap-0.5 text-zinc-500"><Lock size={8} /> N{opp.min_level}</span>
-                    ) : (
-                      <Tip tip={reachable ? "Tempo estimado da melhor equipa pronta." : "Nenhuma equipa pronta para esta operação agora."}>
-                        <span className={reachable ? "text-cyan-400" : "text-zinc-600"}>
-                          {reachable && eta !== Infinity ? `ETA ${fmtDuration(eta)}` : "sem equipa"}
-                        </span>
-                      </Tip>
-                    )}
+                    <Tip tip={reachable ? "Tempo estimado da melhor equipa pronta." : "Nenhuma equipa pronta para esta operação agora."}>
+                      <span className={reachable ? "text-cyan-400" : "text-zinc-600"}>
+                        {reachable && eta !== Infinity ? `ETA ${fmtDuration(eta)}` : "sem equipa"}
+                      </span>
+                    </Tip>
                   </span>
-                  {!taken && (
-                    <span className={`flex items-center gap-0.5 font-mono text-[9px] ${urgent ? "text-amber-400" : "text-zinc-500"}`}>
-                      <Clock size={8} /> {fmtDuration(expiresS)}
-                    </span>
-                  )}
+                  <span className={`flex items-center gap-0.5 font-mono text-[9px] ${urgent ? "text-amber-400" : "text-zinc-500"}`}>
+                    <Clock size={8} /> {fmtDuration(expiresS)}
+                  </span>
                 </div>
               </Card>
             );

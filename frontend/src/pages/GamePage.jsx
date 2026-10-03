@@ -160,9 +160,19 @@ export default function GamePage() {
   const weaponsUnequipped = (state.weapons || []).filter((w) => !w.employee_id).length;
   const hrAlertCount = alerts.hr + alerts.nearExhausted + (alerts.payrollShort ? 1 : alerts.payrollDueSoon ? 1 : 0);
   const fleetAlertCount = alerts.fleet + alerts.nearBreakdown;
+  const availableMissions = (state.opportunities || [])
+    .filter((o) => o.status === "active" && Number(o.min_level || 1) <= p.level)
+    .slice(0, 5);
+  const takenOpportunities = (state.opportunities || []).filter((o) => o.status === "taken");
+  const levelSafeState = { ...state, opportunities: [...availableMissions, ...takenOpportunities] };
   const mapState = hideImpossibleMissions
-    ? { ...state, opportunities: state.opportunities.filter((o) => opportunityReachable(state, o, serverNow(), catalog)) }
-    : state;
+    ? {
+        ...levelSafeState,
+        opportunities: levelSafeState.opportunities.filter(
+          (o) => o.status === "taken" || opportunityReachable(levelSafeState, o, serverNow(), catalog)
+        ),
+      }
+    : levelSafeState;
 
   const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || navGroup || mapLegendOpen);
 
@@ -203,6 +213,19 @@ export default function GamePage() {
 
       {!focusMode && <ResourceBar />}
       {!focusMode && showFps && <FpsMeter />}
+      {!focusMode && availableMissions.length > 0 && (
+        <button
+          type="button"
+          data-testid="available-missions-hud"
+          onClick={() => openFromNav("operations")}
+          className="lus-optional-hud lus-available-missions-hud"
+          aria-label={`${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
+          title={`${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
+        >
+          <Target size={21} aria-hidden="true" />
+          <span className="lus-available-missions-count">{availableMissions.length}</span>
+        </button>
+      )}
       {!focusMode && wantedStars > 0 && (
         <button
           type="button"

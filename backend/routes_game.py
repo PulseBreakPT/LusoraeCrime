@@ -527,6 +527,19 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         get_caps(db, pid, player["hq"]["level"]),
         get_org_bonuses(db, pid),
     )
+
+    # Defesa adicional para saves antigos e pedidos skip_advance: nunca enviar
+    # ao cliente oportunidades bloqueadas por nível nem mais de cinco sugestões
+    # ativas. Operações já tomadas continuam no estado porque alimentam o mapa
+    # e o acompanhamento das missões em curso.
+    eligible_active = [
+        o for o in opportunities
+        if o.get("status") == "active" and int(o.get("min_level", 1) or 1) <= player["level"]
+    ]
+    eligible_active.sort(key=lambda o: str(o.get("created_at") or ""), reverse=True)
+    taken_opportunities = [o for o in opportunities if o.get("status") == "taken"]
+    opportunities = eligible_active[:5] + taken_opportunities
+
     caps = caps[0]
     p = Player.from_mongo(player).model_dump()
     p["next_level_respect"] = next_threshold(player["level"])

@@ -51,7 +51,8 @@ describe("offline guest engine", () => {
     expect(state.teams.length).toBeGreaterThanOrEqual(1);
     expect(state.employees.length).toBeGreaterThanOrEqual(2);
     expect(state.vehicles.length).toBeGreaterThanOrEqual(1);
-    expect(state.opportunities.length).toBeGreaterThanOrEqual(6);
+    expect(state.opportunities).toHaveLength(5);
+    expect(state.opportunities.every((opp) => opp.min_level <= state.player.level)).toBe(true);
     expect(state.caps.employees.max).toBeGreaterThanOrEqual(4);
 
     const street = (await localGuestRequest("get", "/game/street/state")).data;

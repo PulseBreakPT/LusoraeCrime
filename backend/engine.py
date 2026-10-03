@@ -603,11 +603,28 @@ def apply_dirty_money_heat(player, hours):
 async def spawn_opportunities(db, player, props, rare_chance=0.0):
     now = now_utc()
     pid = str(player["_id"])
-    active = await db.opportunities.count_documents({
-        "player_id": pid, "status": "active", "expires_at": {"$gt": now.isoformat()},
-    })
     level = player["level"]
-    target = min(5 + level * 2, 14)
+    target = 5
+
+    # A lista de oportunidades é uma escolha real, não um catálogo de conteúdo
+    # bloqueado. Remove oportunidades antigas acima do nível atual e poda saves
+    # legados que ainda tenham mais de cinco sugestões ativas.
+    await db.opportunities.delete_many({
+        "player_id": pid,
+        "status": "active",
+        "min_level": {"$gt": level},
+    })
+    active_docs = await db.opportunities.find({
+        "player_id": pid,
+        "status": "active",
+        "expires_at": {"$gt": now.isoformat()},
+        "min_level": {"$lte": level},
+    }).sort("created_at", -1).to_list(50)
+    if len(active_docs) > target:
+        overflow_ids = [doc["_id"] for doc in active_docs[target:]]
+        await db.opportunities.delete_many({"_id": {"$in": overflow_ids}})
+        active_docs = active_docs[:target]
+    active = len(active_docs)
     cooldowns = player.get("type_cooldowns") or {}
     keys = [
         k for k, v in OPPORTUNITY_TYPES.items()
@@ -721,24 +738,27 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
 
     docs = []
     player_updates = {}
-    # Reação do mundo à série de vitórias: um Golpe de Oportunidade especial —
-    # o tipo mais valioso disponível, rara garantida e recompensa amplificada.
-    if player.get("streak_op_pending"):
+    slots = max(0, target - active)
+    special_added = 0
+    # Reação do mundo à série de vitórias: o especial ocupa uma das cinco
+    # vagas; nunca cria uma sexta oportunidade.
+    if player.get("streak_op_pending") and slots > 0:
         best_key = max(keys, key=lambda k: OPPORTUNITY_TYPES[k]["base_reward"])
         special_doc = _build_doc(best_key, rare=True, extra_mult=STREAK_SPECIAL_REWARD_MULT,
                                  special=True, expires_range=(480, 720))
         docs.append(special_doc)
+        special_added = 1
         player["streak_op_pending"] = False
         player_updates["streak_op_pending"] = False
         await add_event(db, pid, "intel",
                         f"GOLPE DE OPORTUNIDADE: {special_doc['name']} em {special_doc['district']} — recompensa excecional, janela curta.")
     rare_spawned = False
-    for _ in range(max(0, target - active)):
+    n_regular = max(0, slots - special_added)
+    for _ in range(n_regular):
         key = random.choices(keys, weights=weights)[0]
         rare = random.random() < eff_rare_chance
         rare_spawned = rare_spawned or rare
         docs.append(_build_doc(key, rare))
-    n_regular = max(0, target - active)
     if n_regular > 0:
         new_since = 0 if rare_spawned else spawns_since_rare + n_regular
         if new_since != spawns_since_rare:
