@@ -283,7 +283,7 @@ A pipeline:
 ```bash
 cd frontend
 yarn install
-yarn build
+PUBLIC_URL=/ yarn build
 npx cap add android
 npx cap sync android
 node scripts/patch-capacitor-android.mjs
