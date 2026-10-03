@@ -517,12 +517,12 @@ export function GameProvider({ children }) {
     }
 
     const payload = { opportunity_id: opportunityId, team_id: teamId };
-    if (isLocalGuestMode() && roadOutward && roadInward) {
+    if (roadOutward && roadInward && !roadOutward.unavailable && !roadInward.unavailable) {
+      // Envia também os planos já obtidos. Backends novos validam e persistem
+      // a geometria; backends antigos ignoram estes campos sem quebrar.
       payload.route_outward = roadOutward;
       payload.route_inward = roadInward;
     }
-    // Em modo servidor as rotas já ficaram na cache de 7 dias do mapa. Não
-    // enviamos campos extra à API; o primeiro frame consegue lê-las síncronamente.
     return action("dispatch", payload, "Equipa destacada");
   };
   const recallTeam = (missionId) =>
