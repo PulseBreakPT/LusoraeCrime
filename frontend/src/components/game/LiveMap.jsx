@@ -119,12 +119,12 @@ const unitIcon = (phase, chased) => {
 // Ícones cacheados por assinatura visual (mesmo padrão do oppIconCached) e
 // marcadores NÃO interativos — puramente visuais, custo mínimo por frame.
 const opIconCache = new Map();
-const opIconCached = (kind, employeeName) => {
+const opIconCached = (kind, employeeName, showName = true) => {
   const name = employeeName || "Operacional";
-  const key = `${kind}|${name}`;
+  const key = `${kind}|${name}|${showName ? 1 : 0}`;
   let icon = opIconCache.get(key);
   if (!icon) {
-    const nameMarkup = renderToStaticMarkup(<span className="op-name">{name}</span>);
+    const nameMarkup = showName ? renderToStaticMarkup(<span className="op-name">{name}</span>) : "";
     const html = `
       <div class="op-pin op-${kind}">
         ${nameMarkup}
@@ -258,6 +258,17 @@ const MapBackgroundClick = ({ onClick }) => {
   return null;
 };
 
+const ZoomObserver = ({ onZoom }) => {
+  const map = useMap();
+  useEffect(() => {
+    const update = () => onZoom(map.getZoom());
+    update();
+    map.on("zoomend", update);
+    return () => map.off("zoomend", update);
+  }, [map, onZoom]);
+  return null;
+};
+
 const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   <div className="flex items-baseline justify-between gap-3">
     <span className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</span>
@@ -265,7 +276,7 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   </div>
 );
 
-const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, roster }) => {
+const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, roster, showOperatorNames = true }) => {
   const map = useMap();
   const [route, setRoute] = useState(null);
   const cumRef = useRef(null);
@@ -630,7 +641,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
                 key={`${mission.id}-op-${i}`}
                 ref={(el) => { opMarkersRef.current[i] = el; }}
                 position={[st?.lat ?? choreo.park.lat, st?.lng ?? choreo.park.lng]}
-                icon={opIconCached(choreo.kind, op.member?.name || `Operacional ${i + 1}`)}
+                icon={opIconCached(choreo.kind, op.member?.name || `Operacional ${i + 1}`, showOperatorNames)}
                 interactive={false}
                 keyboard={false}
                 zIndexOffset={520}
@@ -769,6 +780,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
 
   // Modo seguir: id da missão cuja unidade a câmara acompanha.
   const [followId, setFollowId] = useState(null);
+  const [zoom, setZoom] = useState(13);
   const followedMission = followId ? state.missions.find((m) => m.id === followId) : null;
 
   // Selecionar uma oportunidade liberta a câmara.
@@ -806,6 +818,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
     >
       <MapBaseLayer />
       <MapBackgroundClick onClick={() => onSelectOpp(null)} />
+      <ZoomObserver onZoom={setZoom} />
       <FollowManager onCancel={() => setFollowId(null)} />
       {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
       {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
@@ -865,6 +878,12 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
         }
         const isFavorite = (state.player.favorite_types || []).includes(opp.type_key);
         const urgent = !taken && !locked && expiresS > 0 && expiresS < OPP_URGENT_SECONDS;
+        const selected = opp.id === selectedOppId;
+        // LOD de UI: quando o jogador afasta o mapa, desaparece o ruído de
+        // oportunidades comuns. Mantêm-se apenas operações ativas, selecionadas,
+        // favoritas ou urgentes.
+        if (zoom < 11.5 && !taken && !selected && !isFavorite && !urgent) return null;
+        const lodOpacity = zoom < 12.5 && !taken && !selected ? 0.62 : 1;
         // Filtro por base: esbate as oportunidades geradas por outra base
         // (mesma semântica das missões — generated_by_property_id ou "hq").
         const dim = baseFilter !== "all" && (opp.generated_by_property_id || "hq") !== baseFilter;
@@ -872,8 +891,8 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
           <Marker
             key={opp.id}
             position={[opp.lat, opp.lng]}
-            icon={oppIconCached(opp, opp.id === selectedOppId, isFavorite, urgent)}
-            opacity={dim ? 0.25 : 1}
+            icon={oppIconCached(opp, selected, isFavorite, urgent)}
+            opacity={dim ? 0.25 : lodOpacity}
             zIndexOffset={isFavorite ? 400 : urgent ? 350 : 0}
             eventHandlers={{ click: () => { setFollowId(null); onSelectOpp(opp); } }}
           >
@@ -925,6 +944,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
               .map((id) => empById[id])
               .filter(Boolean)
               .map((e) => ({ id: e.id, name: e.name, role_key: e.role_key, spec: e.spec, rank: e.rank }))}
+            showOperatorNames={zoom >= 15 || safeMission.id === followId}
           />
         );
       })}
