@@ -1,4 +1,5 @@
 import { LOCAL_CATALOG, LOCAL_GUEST_SAVE_VERSION } from "./localGuestCatalog";
+import { propertyMarketPrice } from "../lib/propertyMarket";
 
 const MODE_KEY = "lusorae_guest_mode_v2";
 const SAVE_KEY = "lusorae_guest_save_v2";
@@ -277,7 +278,14 @@ const normalizeSavedEconomy = (save) => {
   }
   for (const property of save.properties || []) {
     const type = LOCAL_CATALOG.property_types[property.type_key];
-    if (type?.price) property.price = type.price;
+    if (!type?.price) continue;
+    property.price = type.price;
+    if (!property.purchase_price) {
+      const market = propertyMarketPrice(type.price, property.lat, property.lng);
+      property.purchase_price = market.price;
+      property.market_zone = market.zone;
+      property.market_multiplier = market.multiplier;
+    }
   }
   if (
     previousEconomyVersion < 4
@@ -448,7 +456,8 @@ const tick = (save) => {
     const maintenancePct=LOCAL_CATALOG.property_meta?.maintenance_pct_per_day||0.00008;
     const propertyOperating=save.properties.reduce((sum,p)=>{
       const cfg=LOCAL_CATALOG.property_types[p.type_key]||{};
-      return sum+(Number(cfg.price||0)*Number(p.level||1)*maintenancePct/24*passiveHours);
+      const basis=Number(p.purchase_price||cfg.price||0);
+      return sum+(basis*Number(p.level||1)*maintenancePct/24*passiveHours);
     },0);
     if(propertyOperating>0){
       save.player.clean_money=Math.max(0,save.player.clean_money-propertyOperating);
@@ -836,14 +845,27 @@ const mutateGame=(save,path,payload)=>{
   if(path.startsWith("properties/")){
     const pr=save.properties.find(x=>x.id===p.property_id);
     if(!["properties/buy","properties/optimize"].includes(path)&&!pr)fail(404,"Propriedade não encontrada");
-    if(path==="properties/buy"){const cfg=LOCAL_CATALOG.property_types[p.type_key];if(!cfg)fail(400,"Tipo inválido");if(save.player.level<cfg.min_level)fail(400,"Nível insuficiente");chargeClean(save,cfg.price,"Compra de propriedade");const nearest=(save.player.districts||[]).slice().sort((a,b)=>{
-      const da=(a.lat-Number(p.lat))**2+(a.lng-Number(p.lng))**2;
-      const db=(b.lat-Number(p.lat))**2+(b.lng-Number(p.lng))**2;
-      return da-db;
-    })[0];
-    const np={id:uid("prop"),type_key:p.type_key,name:cfg.name,district:nearest?.name||"Zona operacional",lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,condition:100,upgrading_until:null};save.properties.push(np);return {ok:true,property_id:np.id};}
-    if(path==="properties/sell"){const value=Math.round(pr.price*.7*pr.level);save.player.clean_money+=value;save.properties=save.properties.filter(x=>x.id!==pr.id);return {ok:true};}
-    if(path==="properties/upgrade"){if(pr.level>=LOCAL_CATALOG.property_max_level)fail(400,"Nível máximo");const cost=Math.round(pr.price*.6*pr.level);chargeClean(save,cost,"Melhoria de propriedade");pr.upgrading_until=new Date(Date.now()+15000).toISOString();return {ok:true};}
+    if(path==="properties/buy"){
+      const cfg=LOCAL_CATALOG.property_types[p.type_key];if(!cfg)fail(400,"Tipo inválido");
+      if(save.player.level<cfg.min_level)fail(400,"Nível insuficiente");
+      const market=propertyMarketPrice(cfg.price,Number(p.lat),Number(p.lng));
+      chargeClean(save,market.price,`Compra de propriedade — ${market.zone}`);
+      const nearest=(save.player.districts||[]).slice().sort((a,b)=>{
+        const da=(a.lat-Number(p.lat))**2+(a.lng-Number(p.lng))**2;
+        const db=(b.lat-Number(p.lat))**2+(b.lng-Number(p.lng))**2;
+        return da-db;
+      })[0];
+      const np={
+        id:uid("prop"),type_key:p.type_key,name:cfg.name,district:nearest?.name||"Zona operacional",
+        lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,purchase_price:market.price,
+        market_zone:market.zone,market_multiplier:market.multiplier,condition:100,upgrading_until:null
+      };
+      save.properties.push(np);
+      addEvent(save,"property",`${cfg.name} comprado por ${market.price.toLocaleString("pt-PT")} € (${market.zone} ×${market.multiplier.toFixed(2)}).`);
+      return {ok:true,property_id:np.id,price:market.price,market_zone:market.zone,market_multiplier:market.multiplier};
+    }
+    if(path==="properties/sell"){const basis=Number(pr.purchase_price||pr.price);const value=Math.round(basis*.7*pr.level);save.player.clean_money+=value;save.properties=save.properties.filter(x=>x.id!==pr.id);return {ok:true,value};}
+    if(path==="properties/upgrade"){if(pr.level>=LOCAL_CATALOG.property_max_level)fail(400,"Nível máximo");const basis=Number(pr.purchase_price||pr.price);const cost=Math.round(basis*.6*(pr.level+1));chargeClean(save,cost,"Melhoria de propriedade");pr.upgrading_until=new Date(Date.now()+15000).toISOString();return {ok:true,cost};}
     if(path==="properties/rename"){pr.name=String(p.name||pr.name).slice(0,40);return {ok:true};}
     if(path==="properties/optimize")return {ok:true,message:"Portefólio revisto — nenhuma alteração urgente necessária."};
   }
