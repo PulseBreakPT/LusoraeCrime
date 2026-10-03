@@ -704,6 +704,23 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         await db.opportunities.delete_many({"_id": {"$in": overflow_ids}})
         active_docs = active_docs[:target]
     active = len(active_docs)
+
+    # Anti-repetição visual: uma grelha de 5 oportunidades deve parecer uma
+    # seleção nova, não cinco cópias da mesma coisa no mesmo quarteirão.
+    # Guardamos memória curta dos últimos spawns e evitamos, sempre que há
+    # alternativas, repetir tipos e zonas que já estão no mapa.
+    active_type_keys = {doc.get("type_key") for doc in active_docs if doc.get("type_key")}
+    active_districts = {doc.get("district") for doc in active_docs if doc.get("district")}
+    active_points = [
+        (float(doc["lat"]), float(doc["lng"]))
+        for doc in active_docs
+        if doc.get("lat") is not None and doc.get("lng") is not None
+    ]
+    recent_type_memory = list(
+        player.get("recent_spawn_type_keys") or player.get("recent_type_keys") or []
+    )[-12:]
+    recent_district_memory = list(player.get("recent_spawn_districts") or [])[-12:]
+
     cooldowns = player.get("type_cooldowns") or {}
     keys = [
         k for k, v in OPPORTUNITY_TYPES.items()
@@ -723,17 +740,37 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         if sp:
             spec_counts[sp] = spec_counts.get(sp, 0) + 1
     recent_counts = {}
-    for k in (player.get("recent_type_keys") or []):
+    for k in recent_type_memory:
         recent_counts[k] = recent_counts.get(k, 0) + 1
-    weights = []
-    for k in keys:
+
+    def _type_weight(k):
+        """Peso dinâmico de um tipo sem perder aleatoriedade.
+
+        A especialização disponível continua a influenciar o spawn, mas cada
+        aparição recente reduz o peso. A exclusão forte de duplicados é feita
+        no momento da escolha; este peso resolve os desempates e o fallback.
+        """
         w = float(OPPORTUNITY_TYPES[k]["weight"])
         n_spec = spec_counts.get(OPPORTUNITY_TYPES[k]["category"], 0)
         if n_spec:
             w *= 1 + min(SPAWN_DEMAND_BOOST_MAX, SPAWN_DEMAND_SPEC_BOOST * n_spec)
         if recent_counts.get(k):
-            w *= 1 - min(SPAWN_ANTIFARM_PENALTY_MAX, SPAWN_ANTIFARM_PENALTY_PER * recent_counts[k])
-        weights.append(max(0.05, w))
+            w *= 1 - min(
+                SPAWN_ANTIFARM_PENALTY_MAX,
+                SPAWN_ANTIFARM_PENALTY_PER * recent_counts[k],
+            )
+        return max(0.05, w)
+
+    def _choose_type(batch_type_keys):
+        # 1) tipo que não está no mapa nem já saiu neste lote;
+        # 2) se necessário, permite um tipo já ativo mas não repete no lote;
+        # 3) só repete mesmo quando não existe alternativa elegível.
+        pool = [k for k in keys if k not in active_type_keys and k not in batch_type_keys]
+        if not pool:
+            pool = [k for k in keys if k not in batch_type_keys]
+        if not pool:
+            pool = list(keys)
+        return random.choices(pool, weights=[_type_weight(k) for k in pool])[0]
     hq = player["hq"]
     # Centros candidatos: as zonas de operação geradas à volta do QG do
     # jogador (apenas as já batizadas com nomes reais — nunca mostramos nomes
@@ -765,7 +802,60 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         # QG acabado de colocar e nenhuma zona batizada ainda — o batismo em
         # background termina em segundos; sem centros não há onde gerar missões.
         return
-    center_weights = [w for _, w, _ in centers]
+    recent_district_counts = {}
+    for name in recent_district_memory:
+        recent_district_counts[name] = recent_district_counts.get(name, 0) + 1
+
+    batch_districts = set()
+    batch_type_keys = set()
+    reserved_points = list(active_points)
+    min_spawn_separation_m = 500.0
+
+    def _choose_center():
+        # Tal como nos tipos: primeiro uma zona que ainda não esteja visível no
+        # mapa nem tenha sido usada neste lote. Se a geografia disponível for
+        # curta (ilha pequena, poucas zonas já geocodificadas), relaxa de forma
+        # progressiva sem bloquear o spawn.
+        pool = [
+            item for item in centers
+            if item[0]["name"] not in active_districts
+            and item[0]["name"] not in batch_districts
+        ]
+        if not pool:
+            pool = [item for item in centers if item[0]["name"] not in batch_districts]
+        if not pool:
+            pool = list(centers)
+
+        weights = []
+        for spot, base_weight, _ in pool:
+            recent_n = recent_district_counts.get(spot["name"], 0)
+            # Cada repetição recente corta fortemente o peso, mas nunca a zero:
+            # continua possível voltar à zona mais tarde de forma orgânica.
+            novelty_mult = 0.35 ** min(3, recent_n)
+            weights.append(max(0.01, base_weight * novelty_mult))
+        return random.choices(pool, weights=weights)[0]
+
+    def _sample_distinct_point(spot, origin_prop_id):
+        last = (spot["lat"], spot["lng"])
+        for _ in range(24):
+            if origin_prop_id:
+                candidate = _sample_around_property(
+                    spot["lat"], spot["lng"], PROPERTY_INFLUENCE_RADIUS_KM
+                )
+            else:
+                candidate = _sample_on_land(spot)
+            last = candidate
+            if all(
+                haversine_m(candidate[0], candidate[1], old_lat, old_lng)
+                >= min_spawn_separation_m
+                for old_lat, old_lng in reserved_points
+            ):
+                return candidate
+        # Em zonas geograficamente apertadas é preferível gerar a missão a
+        # bloquear o sistema; a rotação de distrito já evita a sobreposição na
+        # maioria dos casos.
+        return last
+
     # Pity de raras (SSS v3): cada spawn sem uma oportunidade rara acumula um
     # pequeno bónus de probabilidade — a sorte nunca seca indefinidamente.
     spawns_since_rare = int(player.get("spawns_since_rare", 0) or 0)
@@ -773,15 +863,15 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
 
     def _build_doc(key, rare, extra_mult=1.0, special=False, expires_range=(240, 600)):
         t = OPPORTUNITY_TYPES[key]
-        spot, _, origin_prop_id = random.choices(centers, weights=center_weights)[0]
+        spot, _, origin_prop_id = _choose_center()
         duration_s = random.randint(*t["duration_s"])
         mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s) * extra_mult
         if rare:
             mult *= 2.0
-        if origin_prop_id:
-            lat, lng = _sample_around_property(spot["lat"], spot["lng"], PROPERTY_INFLUENCE_RADIUS_KM)
-        else:
-            lat, lng = _sample_on_land(spot)
+        lat, lng = _sample_distinct_point(spot, origin_prop_id)
+        batch_districts.add(spot["name"])
+        batch_type_keys.add(key)
+        reserved_points.append((lat, lng))
         # Risco/recompensa por distância continuam medidos a partir do QG —
         # é uma fórmula de equilíbrio já afinada, distinta da distância de
         # despacho (essa sim, resolvida por resolve_mission_origin).
@@ -822,7 +912,18 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
     # Reação do mundo à série de vitórias: o especial ocupa uma das cinco
     # vagas; nunca cria uma sexta oportunidade.
     if player.get("streak_op_pending") and slots > 0:
-        best_key = max(keys, key=lambda k: OPPORTUNITY_TYPES[k]["base_reward"])
+        special_pool = [k for k in keys if k not in active_type_keys]
+        if not special_pool:
+            special_pool = list(keys)
+        top_reward = max(OPPORTUNITY_TYPES[k]["base_reward"] for k in special_pool)
+        high_value_pool = [
+            k for k in special_pool
+            if OPPORTUNITY_TYPES[k]["base_reward"] >= top_reward * 0.75
+        ]
+        best_key = random.choices(
+            high_value_pool,
+            weights=[_type_weight(k) for k in high_value_pool],
+        )[0]
         special_doc = _build_doc(best_key, rare=True, extra_mult=STREAK_SPECIAL_REWARD_MULT,
                                  special=True, expires_range=(480, 720))
         docs.append(special_doc)
@@ -834,7 +935,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
     rare_spawned = False
     n_regular = max(0, slots - special_added)
     for _ in range(n_regular):
-        key = random.choices(keys, weights=weights)[0]
+        key = _choose_type(batch_type_keys)
         rare = random.random() < eff_rare_chance
         rare_spawned = rare_spawned or rare
         docs.append(_build_doc(key, rare))
@@ -843,6 +944,16 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         if new_since != spawns_since_rare:
             player["spawns_since_rare"] = new_since
             player_updates["spawns_since_rare"] = new_since
+    if docs:
+        generated_types = [doc["type_key"] for doc in docs]
+        generated_districts = [doc["district"] for doc in docs]
+        type_memory = (recent_type_memory + generated_types)[-12:]
+        district_memory = (recent_district_memory + generated_districts)[-12:]
+        player["recent_spawn_type_keys"] = type_memory
+        player["recent_spawn_districts"] = district_memory
+        player_updates["recent_spawn_type_keys"] = type_memory
+        player_updates["recent_spawn_districts"] = district_memory
+
     if player_updates:
         await db.players.update_one({"_id": player["_id"]}, {"$set": player_updates})
     if docs:
