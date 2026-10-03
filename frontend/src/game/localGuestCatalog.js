@@ -1,8 +1,8 @@
-export const LOCAL_GUEST_SAVE_VERSION = 4;
+export const LOCAL_GUEST_SAVE_VERSION = 5;
 
 export const LOCAL_CATALOG = {
   team_create_cost: 5000,
-  payroll_cycle_min: 120,
+  payroll_cycle_min: 10080,
   pool_refresh_min: 30,
   team_max_members: 4,
   base_caps: { employees: 4, vehicles: 2 },
@@ -132,8 +132,11 @@ export const LOCAL_CATALOG = {
   fleet_meta:{sell_fraction:.4,repair_cost_pct:.003},
   property_meta:{
     maintenance_pct_per_day:.00008,
-    condition_recovery_per_hour:2,
-    condition_decay_per_hour:3,
+    maintenance_pct_per_week:.00056,
+    condition_recovery_per_hour:0,
+    condition_decay_per_hour:0,
+    condition_recovery_per_week:3,
+    condition_decay_missed_week:8,
     upgrade_base_s:90,
     upgrade_per_level_s:60,
     stack_diminish:[1,.7,.5],
@@ -192,7 +195,8 @@ export const LOCAL_CATALOG = {
   },
   economy_meta:{
     employer_social_security_rate:.2375,
-    economic_week_minutes:120,
+    economic_week_minutes:10080,
+    weekly_settlement:{weekday:0,hour:20,timezone:"Europe/Lisbon"},
     vehicle_annual_fixed_costs:{
       usado:1250,moto:700,van:1800,desportivo:2500,suv_blindado:3600,
       supercarro:6000,carrinha_entrega:1600,berlina_blindada:3000,
