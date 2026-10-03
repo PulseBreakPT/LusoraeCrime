@@ -103,6 +103,8 @@ from economy_constants import (
 from quests import process_quests, make_instance, effective_quest_rewards
 from live_ops import build_return_script, update_memory
 from quests_data import QUEST_DEFS
+from economy_constants import (EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
+                               LAUNDER_PASSIVE_RATE)
 
 logger = logging.getLogger(__name__)
 
@@ -2216,56 +2218,94 @@ async def _maybe_grant_bailout(db, player, employees):
 
 
 async def _process_payroll(db, player, employees, now):
+    """Ciclo económico semanal: salário bruto + TSU patronal + custo fixo da frota."""
     pid = str(player["_id"])
     if not player.get("next_payroll_at"):
         player["next_payroll_at"] = (now + timedelta(minutes=PAYROLL_CYCLE_MIN)).isoformat()
         return
+
     cycles = 0
     while parse_dt(player["next_payroll_at"]) <= now and cycles < 4:
         cycles += 1
-        player["next_payroll_at"] = (parse_dt(player["next_payroll_at"]) + timedelta(minutes=PAYROLL_CYCLE_MIN)).isoformat()
-        base_total = sum(e.get("salary", 0) for e in employees)
-        # Team cost scaling: larger teams pay more per cycle (multiplicative, not linear)
-        # Formula: (num_employees / 2) ^ 0.5
-        # At 2 employees: 1.0x, at 4: 1.41x, at 8: 2.0x, at 16: 2.83x
-        team_scaling = (max(1, len(employees)) / 2) ** TEAM_COST_SCALING_BASE
-        total = int(base_total * team_scaling)
+        player["next_payroll_at"] = (
+            parse_dt(player["next_payroll_at"]) + timedelta(minutes=PAYROLL_CYCLE_MIN)
+        ).isoformat()
+
+        gross_payroll = int(sum(e.get("salary", 0) for e in employees))
+        employer_ss = int(round(gross_payroll * EMPLOYER_SOCIAL_SECURITY_RATE))
+
+        vehicles = await db.vehicles.find({"player_id": pid}).to_list(200)
+        fleet_weekly = int(round(sum(
+            VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
+            for v in vehicles
+        )))
+
+        total = gross_payroll + employer_ss + fleet_weekly
         if total <= 0:
             continue
+
         if player["clean_money"] >= total:
             player["clean_money"] -= total
-            await add_event(db, pid, "system", f"Ciclo salarial pago: -{total:,} €.")
-            await record_tx(db, pid, "payroll", -total, "clean", player["clean_money"], "Ciclo salarial")
-            # Salários em dia recuperam lentamente a moral e a lealdade do efetivo.
+            await add_event(
+                db, pid, "system",
+                f"Custos semanais pagos: -{total:,} € "
+                f"(salários {gross_payroll:,} € + TSU {employer_ss:,} € + frota {fleet_weekly:,} €).",
+            )
+            await record_tx(
+                db, pid, "weekly_costs", -total, "clean", player["clean_money"],
+                "Salários + TSU + custos fixos da frota",
+            )
             idle_ids = [e["_id"] for e in employees if e.get("status") == "idle"]
             if idle_ids:
                 await db.employees.update_many(
                     {"_id": {"$in": idle_ids}, "morale": {"$lt": 100.0}},
                     {"$inc": {"morale": PAYROLL_MORALE_REGEN, "loyalty": PAYROLL_MORALE_REGEN}},
                 )
-                await db.employees.update_many({"_id": {"$in": idle_ids}, "morale": {"$gt": 100.0}}, {"$set": {"morale": 100.0}})
-                await db.employees.update_many({"_id": {"$in": idle_ids}, "loyalty": {"$gt": 100.0}}, {"$set": {"loyalty": 100.0}})
+                await db.employees.update_many(
+                    {"_id": {"$in": idle_ids}, "morale": {"$gt": 100.0}},
+                    {"$set": {"morale": 100.0}},
+                )
+                await db.employees.update_many(
+                    {"_id": {"$in": idle_ids}, "loyalty": {"$gt": 100.0}},
+                    {"$set": {"loyalty": 100.0}},
+                )
         else:
-            await add_event(db, pid, "police", f"Sem fundos para os salários ({total:,} €)! Moral e lealdade em queda.")
+            await add_event(
+                db, pid, "police",
+                f"Sem fundos para os custos semanais ({total:,} €)! "
+                "Moral e lealdade em queda.",
+            )
             for e in employees:
                 e["loyalty"] = max(0.0, e.get("loyalty", 70) - 8)
                 e["morale"] = max(0.0, e.get("morale", 70) - 10)
-            would_leave = [e for e in employees if e["loyalty"] <= 10 and e.get("status") == "idle"]
-            # Nunca deixar a organização ficar sem ninguém só por salários em
-            # atraso — o mais leal dos que sairiam fica (a contragosto) para
-            # não bloquear o jogador sem forma de recuperar.
+
+            would_leave = [
+                e for e in employees
+                if e["loyalty"] <= 10 and e.get("status") == "idle"
+            ]
             spare_id = None
             if would_leave and len(would_leave) == len(employees):
                 spare_id = max(would_leave, key=lambda e: e["loyalty"])["_id"]
+
             survivors = []
             for e in employees:
                 if e in would_leave and e["_id"] != spare_id:
                     await _unlink_employee_weapon(db, e["_id"])
                     await db.employees.delete_one({"_id": e["_id"]})
-                    await add_event(db, pid, "police", f"{e['name']} abandonou a organização por salários em atraso!")
+                    await add_event(
+                        db, pid, "police",
+                        f"{e['name']} abandonou a organização por custos semanais em atraso!",
+                    )
                 else:
-                    note = "Salário em atraso." if e["_id"] != spare_id else "Ficou apesar do atraso — é o último e não abandona a organização sozinho."
-                    await db.employees.update_one({"_id": e["_id"]}, {"$set": {"loyalty": e["loyalty"], "morale": e["morale"]}})
+                    note = (
+                        "Custos salariais em atraso."
+                        if e["_id"] != spare_id
+                        else "Ficou apesar do atraso — é o último e não abandona a organização sozinho."
+                    )
+                    await db.employees.update_one(
+                        {"_id": e["_id"]},
+                        {"$set": {"loyalty": e["loyalty"], "morale": e["morale"]}},
+                    )
                     await push_history(db, e["_id"], note)
                     survivors.append(e)
             employees[:] = survivors
@@ -2618,7 +2658,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
             player["dirty_money"] -= conv
             player.setdefault("stats", default_stats())
             player["stats"]["laundered_total"] = player["stats"].get("laundered_total", 0) + conv
-            fc = player.get("frac_clean", 0.0) + conv * 0.9
+            fc = player.get("frac_clean", 0.0) + conv * LAUNDER_PASSIVE_RATE
             gain = int(fc)
             player["frac_clean"] = fc - gain
             player["clean_money"] += gain
