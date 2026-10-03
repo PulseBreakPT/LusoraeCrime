@@ -388,11 +388,11 @@ const streetSnapshot = (save) => {
     favor:s.contacts[key]||0,remaining_s:Math.max(0,Math.ceil((Date.parse(s.contact_cooldowns[key]||0)-Date.now())/1000)),
   }));
   const gearCatalog=[
-    {key:"vest",name:"Colete Modular",price:2200,description:"Aumenta resistência em atividades de risco."},
-    {key:"jammer",name:"Bloqueador de Sinal",price:3200,description:"Reduz deteção técnica."},
-    {key:"papers",name:"Documentos Frios",price:2800,description:"Reduz atenção policial."},
-    {key:"tires",name:"Pneus Reforçados",price:2600,description:"Melhora fugas e corridas."},
-  ].map(x=>({...x,owned:s.gear[x.key]||0}));
+    {key:"vest",name:"Colete Modular",cost:2200,description:"Aumenta resistência em atividades de risco."},
+    {key:"jammer",name:"Bloqueador de Sinal",cost:3200,description:"Reduz deteção técnica."},
+    {key:"papers",name:"Documentos Frios",cost:2800,description:"Reduz atenção policial."},
+    {key:"tires",name:"Pneus Reforçados",cost:2600,description:"Melhora fugas e corridas."},
+  ].map(x=>({...x,owned:s.gear[x.key]||0,unlocked:true}));
   return {
     server_time:nowIso(),
     wanted:{stars,heat:save.player.heat,search_active:stars>=3,remaining_s:stars>=3?Math.round(stars*120):0},
@@ -405,14 +405,14 @@ const streetSnapshot = (save) => {
       intel_remaining_s:Math.max(0,Math.ceil((Date.parse(s.intel_until||0)-Date.now())/1000))},
     districts:s.districts, contacts,
     wagers:[
-      {key:"cautious",name:"Cautelosa",stake:500,reward_mult:0.9},
-      {key:"standard",name:"Normal",stake:1500,reward_mult:1.2},
-      {key:"high",name:"Alta",stake:3500,reward_mult:1.7},
+      {key:"cautious",name:"Cautelosa",cost:500,reward_mult:0.9,unlocked:true},
+      {key:"standard",name:"Normal",cost:1500,reward_mult:1.2,unlocked:true},
+      {key:"high",name:"Alta",cost:3500,reward_mult:1.7,unlocked:rank.level>=2},
     ],
     activities:[
-      {key:"race",name:"Corrida Clandestina",description:"Velocidade e controlo sob pressão.",duration_s:20,base_reward:3500,unlock_rank:1},
-      {key:"chop_shop",name:"Entrega à Desmontagem",description:"Entrega um veículo sem levantar suspeitas.",duration_s:22,base_reward:4200,unlock_rank:2},
-      {key:"smuggling",name:"Rota Clandestina",description:"Move carga entre zonas controladas.",duration_s:26,base_reward:5500,unlock_rank:2},
+      {key:"race",name:"Corrida Clandestina",description:"Velocidade e controlo sob pressão.",duration_s:20,base_success:.68,reward_min:2500,reward_max:5200,unlock_rank:1,unlocked:true},
+      {key:"chop_shop",name:"Entrega à Desmontagem",description:"Entrega um veículo sem levantar suspeitas.",duration_s:22,base_success:.72,reward_min:3200,reward_max:6200,unlock_rank:2,unlocked:rank.level>=2},
+      {key:"smuggling",name:"Rota Clandestina",description:"Move carga entre zonas controladas.",duration_s:26,base_success:.64,reward_min:4200,reward_max:8200,unlock_rank:2,unlocked:rank.level>=2},
     ],
     approaches:[
       {key:"ghost",name:"Fantasma",description:"Discrição máxima."},
@@ -424,7 +424,15 @@ const streetSnapshot = (save) => {
       {key:"speed",name:"Velocidade",description:"Fuga rápida."},
       {key:"decoy",name:"Isca",description:"Desvia a resposta policial."},
     ],
-    gear_catalog:gearCatalog,plan:s.plan,active_job:s.active_job,
+    gear_catalog:gearCatalog,plan:s.plan,active_job:s.active_job ? {
+      ...clone(s.active_job),
+      remaining_s:Math.max(0,(Date.parse(s.active_job.finish_at)-Date.now())/1000),
+      progress_pct:clamp(
+        ((Date.now()-Date.parse(s.active_job.started_at)) /
+          Math.max(1,Date.parse(s.active_job.finish_at)-Date.parse(s.active_job.started_at))) * 100,
+        0,100
+      ),
+    } : null,
     vehicle_meta:save.vehicles.map(v=>({vehicle_id:v.id,notoriety:v.notoriety||0,cold_plates:!!v.cold_plates,insured:!!v.insured,impounded:false})),
     balances:{clean_money:save.player.clean_money,dirty_money:save.player.dirty_money,heat:save.player.heat},
   };
@@ -743,8 +751,47 @@ const mutateGame=(save,path,payload)=>{
   if(path==="street/gear/buy"){const prices={vest:2200,jammer:3200,papers:2800,tires:2600};const cost=(prices[p.gear_key]||2500)*(p.quantity||1);chargeClean(save,cost,"Equipamento de rua");save.street.gear[p.gear_key]=(save.street.gear[p.gear_key]||0)+(p.quantity||1);return {ok:true};}
   if(path==="street/territory"){const d=save.street.districts.find(x=>x.key===p.district_key);if(!d)fail(404,"Zona não encontrada");if(p.action==="claim"){if(d.influence<100)fail(400,"Influência insuficiente");chargeClean(save,5000,"Tomada territorial");d.controlled=true;d.tier=1;d.income_per_h=450;}else if(p.action==="reinforce"){d.tier=Math.min(3,d.tier+1);d.income_per_h=450*d.tier;}else if(p.action==="defend"){d.rival_pressure=Math.max(0,d.rival_pressure-35);}return {ok:true};}
   if(path==="street/contacts/call"){const key=p.contact_key;save.street.contacts[key]=(save.street.contacts[key]||0)+1;save.street.contact_cooldowns[key]=new Date(Date.now()+5*60000).toISOString();if(key==="fixer"||key==="lawyer")save.player.heat=Math.max(0,save.player.heat-(key==="lawyer"?14:9));if(key==="mechanic"){const v=save.vehicles.find(x=>x.id===p.vehicle_id);if(v){v.condition=Math.min(100,v.condition+25);v.notoriety=Math.max(0,(v.notoriety||0)-20);}}if(key==="informant")save.street.intel_until=new Date(Date.now()+15*60000).toISOString();return {ok:true};}
-  if(path==="street/activities/start"){if(save.street.active_job)fail(409,"Já existe uma atividade em curso");const defs={race:["Corrida Clandestina",3500,20],chop_shop:["Entrega à Desmontagem",4200,22],smuggling:["Rota Clandestina",5500,26]};const d=defs[p.job_key];if(!d)fail(400,"Atividade inválida");const stake=p.job_key==="race"?({cautious:500,standard:1500,high:3500}[p.wager_key]||1500):0;if(stake)chargeClean(save,stake,"Aposta virtual");save.street.active_job={id:uid("street"),job_key:p.job_key,name:d[0],district_key:p.district_key,vehicle_id:p.vehicle_id,status:"running",started_at:nowIso(),finish_at:new Date(Date.now()+d[2]*1000).toISOString(),reward:d[1]+stake};return {ok:true};}
-  if(path==="street/activities/claim"){const job=save.street.active_job;if(!job||job.id!==p.job_id)fail(404,"Atividade não encontrada");if(job.status!=="ready")fail(400,"Atividade ainda em curso");save.player.dirty_money+=job.reward;save.street.rep+=35;const d=save.street.districts.find(x=>x.key===job.district_key);if(d)d.influence=Math.min(150,d.influence+28);save.player.heat=clamp(save.player.heat+6,0,100);save.street.active_job=null;return {ok:true,reward:job.reward};}
+  if(path==="street/activities/start"){
+    if(save.street.active_job)fail(409,"Já existe uma atividade em curso");
+    const defs={
+      race:{name:"Corrida Clandestina",reward:3500,duration:20,chance:.68},
+      chop_shop:{name:"Entrega à Desmontagem",reward:4200,duration:22,chance:.72},
+      smuggling:{name:"Rota Clandestina",reward:5500,duration:26,chance:.64},
+    };
+    const d=defs[p.job_key];if(!d)fail(400,"Atividade inválida");
+    const rank=streetRank(save.street.rep||0);
+    if(["chop_shop","smuggling"].includes(p.job_key)&&rank.level<2)fail(400,"Esta atividade requer nível de rua 2");
+    const vehicle=save.vehicles.find(v=>v.id===p.vehicle_id);if(!vehicle)fail(400,"Seleciona um veículo");
+    const district=save.street.districts.find(x=>x.key===p.district_key);if(!district)fail(400,"Seleciona uma zona");
+    const stake=p.job_key==="race"?({cautious:500,standard:1500,high:3500}[p.wager_key]||1500):0;
+    if(stake)chargeClean(save,stake,"Aposta virtual");
+    const mult=p.wager_key==="high"?1.7:p.wager_key==="cautious"?.9:1.2;
+    const approach=save.street.plan?.approach_key||"balanced";
+    const chance=clamp(d.chance+(approach==="ghost"?.06:approach==="impact"?-.06:0)-save.player.heat*.001,0.2,.95);
+    save.street.active_job={
+      id:uid("street"),job_key:p.job_key,name:d.name,district_key:p.district_key,district_name:district.name,
+      vehicle_id:p.vehicle_id,vehicle_name:vehicle.name,status:"running",started_at:nowIso(),
+      finish_at:new Date(Date.now()+d.duration*1000).toISOString(),
+      reward:Math.round((d.reward+stake)*mult),chance,approach_key:approach,wager_key:p.wager_key||null,
+    };
+    return {ok:true};
+  }
+  if(path==="street/activities/claim"){
+    const job=save.street.active_job;if(!job||job.id!==p.job_id)fail(404,"Atividade não encontrada");
+    if(job.status!=="ready")fail(400,"Atividade ainda em curso");
+    const success=rollFrom(job.id)<=job.chance;
+    const d=save.street.districts.find(x=>x.key===job.district_key);
+    if(success){
+      save.player.dirty_money+=job.reward;save.street.rep+=35;
+      if(d)d.influence=Math.min(150,d.influence+28);
+      save.player.heat=clamp(save.player.heat+6,0,100);
+    }else{
+      save.street.rep+=8;save.player.heat=clamp(save.player.heat+12,0,100);
+      if(d)d.rival_pressure=clamp((d.rival_pressure||0)+10,0,100);
+    }
+    save.street.active_job=null;
+    return {ok:true,success,reward:success?job.reward:0};
+  }
   if(path==="street/garage"){const v=save.vehicles.find(x=>x.id===p.vehicle_id);if(!v)fail(404,"Veículo não encontrado");if(p.action==="plates"){chargeClean(save,1800,"Matrículas frias");v.cold_plates=true;v.notoriety=Math.max(0,(v.notoriety||0)-30);}else if(p.action==="insure"){chargeClean(save,2200,"Seguro clandestino");v.insured=true;}else if(p.action==="recover"){chargeClean(save,3200,"Recuperação do veículo");v.impounded_until=null;}return {ok:true};}
 
   if(path==="mastermind/heists/intel"){const target=MM_TARGETS.find(x=>x.key===p.target_key);if(!target)fail(404,"Alvo não encontrado");const cost=1500*target.unlock_rank;chargeClean(save,cost,"Dossiê Mastermind");save.mastermind.intel[target.key]={scouted_at:nowIso(),expires_at:new Date(Date.now()+30*60000).toISOString(),recommended_approach:"silent",recommended_name:"Silencioso",reward_min:Math.round(target.base_reward*.72),reward_max:Math.round(target.base_reward*1.34),risk_note:"Rotas sob vigilância"};return {ok:true};}
