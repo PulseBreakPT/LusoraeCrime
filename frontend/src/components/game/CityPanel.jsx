@@ -233,7 +233,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       {city.boss?.sentence_until && <p className="mt-1 font-mono text-[10px] text-red-300">Detido até {new Date(city.boss.sentence_until).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" })}</p>}
                       {city.boss?.hospital_until && <p className="mt-1 font-mono text-[10px] text-amber-300">Hospital até {new Date(city.boss.hospital_until).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" })}</p>}
                     </div>
-                    {(city.boss?.hospital_until || city.boss?.sentence_until || Number(city.boss?.health || 100) < 100) && (
+                    {(city.boss?.hospital_until || city.boss?.sentence_until || Number(city.boss?.health || 100) < 100 || Number(city.boss?.stress || 0) >= 35) && (
                       <ActionButton
                         tone="good"
                         disabled={!!busy}
