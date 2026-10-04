@@ -177,6 +177,381 @@ const VitalsRow = ({ members, meta, testId }) => {
   );
 };
 
+
+const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
+  const [spec, setSpec] = useState("");
+  const [memberIds, setMemberIds] = useState([]);
+  const [vehicleId, setVehicleId] = useState("__none__");
+
+  const maxMembers = catalog?.team_max_members || 4;
+  const meta = catalog?.team_meta || {};
+  const freeEmployees = (state.employees || []).filter((employee) => !employee.team_id && employee.status === "idle");
+  const freeVehicles = (state.vehicles || []).filter((vehicle) => !vehicle.team_id && !vehicle.transfer);
+  const atCap = !!state.caps?.teams && state.caps.teams.used >= state.caps.teams.max;
+  const lackMoney = state.player.clean_money < (catalog?.team_create_cost || 0);
+
+  const employeeFit = (employee, targetSpec = spec) => {
+    if (!targetSpec) return 0;
+    const attrs = meta.category_attrs?.[targetSpec] || [];
+    const attrScore = attrs.length
+      ? attrs.reduce((sum, key) => sum + Number(employee.attrs?.[key] || 0), 0) / attrs.length
+      : 5;
+    const roleSpec = catalog.specializations?.[employee.role_key]?.spec;
+    const matchBonus = employee.spec === targetSpec || roleSpec === targetSpec ? 18 : 0;
+    const fatiguePenalty = Math.min(14, Number(employee.fatigue || 0) * 0.14);
+    return Math.max(0, Math.min(100, Math.round(attrScore * 8.2 + matchBonus - fatiguePenalty)));
+  };
+
+  const vehicleSeats = (vehicle) => Number(catalog.vehicle_models?.[vehicle?.model_key]?.seats || 0);
+  const vehicleFit = (vehicle, targetSpec = spec, memberCount = memberIds.length) => {
+    const model = catalog.vehicle_models?.[vehicle.model_key] || {};
+    const seats = Number(model.seats || 0);
+    if (memberCount > 0 && seats > 0 && seats < memberCount) return -1000;
+    const ideal = model.best_for?.includes(targetSpec) ? 45 : 0;
+    const condition = Number(vehicle.condition || 0) * 0.35;
+    const fuel = vehicle.tank_l ? (Number(vehicle.fuel_l || 0) / Number(vehicle.tank_l)) * 20 : 0;
+    const spareSeats = Math.max(0, seats - memberCount);
+    return ideal + condition + fuel - spareSeats * 0.8;
+  };
+
+  const suggestedMembers = (targetSpec = spec) =>
+    [...freeEmployees]
+      .sort((a, b) => employeeFit(b, targetSpec) - employeeFit(a, targetSpec))
+      .slice(0, maxMembers);
+
+  const suggestedVehicle = (targetSpec = spec, count = memberIds.length) =>
+    [...freeVehicles]
+      .filter((vehicle) => count === 0 || vehicleSeats(vehicle) >= count)
+      .sort((a, b) => vehicleFit(b, targetSpec, count) - vehicleFit(a, targetSpec, count))[0] || null;
+
+  const applyRecommendation = (targetSpec = spec) => {
+    if (!targetSpec) return;
+    const members = suggestedMembers(targetSpec);
+    setMemberIds(members.map((employee) => employee.id));
+    setVehicleId(suggestedVehicle(targetSpec, members.length)?.id || "__none__");
+  };
+
+  const chooseSpec = (nextSpec) => {
+    setSpec(nextSpec);
+    const members = suggestedMembers(nextSpec);
+    setMemberIds(members.map((employee) => employee.id));
+    setVehicleId(suggestedVehicle(nextSpec, members.length)?.id || "__none__");
+  };
+
+  const toggleMember = (employeeId) => {
+    setMemberIds((current) => {
+      const selected = current.includes(employeeId);
+      const next = selected
+        ? current.filter((id) => id !== employeeId)
+        : current.length < maxMembers
+        ? [...current, employeeId]
+        : current;
+
+      const currentVehicle = freeVehicles.find((vehicle) => vehicle.id === vehicleId);
+      if (currentVehicle && next.length > vehicleSeats(currentVehicle)) {
+        setVehicleId(suggestedVehicle(spec, next.length)?.id || "__none__");
+      }
+      return next;
+    });
+  };
+
+  const selectedMembers = memberIds
+    .map((id) => freeEmployees.find((employee) => employee.id === id))
+    .filter(Boolean);
+  const selectedVehicle = vehicleId === "__none__" ? null : freeVehicles.find((vehicle) => vehicle.id === vehicleId);
+  const seats = selectedVehicle ? vehicleSeats(selectedVehicle) : 0;
+  const seatMismatch = !!selectedVehicle && selectedMembers.length > seats;
+  const roles = teamRoles(selectedMembers, meta, catalog.ranks || []);
+  const synergy = spec && selectedMembers.length >= 2 ? teamSynergy(selectedMembers, spec, meta) : null;
+  const readyStructure = selectedMembers.length > 0 && !!selectedVehicle && !seatMismatch;
+
+  const blockers = [
+    !spec ? "Escolhe a especialização da equipa." : null,
+    selectedMembers.length === 0 ? "Escolhe pelo menos um operacional." : null,
+    atCap ? `Limite de equipas atingido para o nível ${state.player.level}.` : null,
+    lackMoney ? "Dinheiro limpo insuficiente." : null,
+    seatMismatch ? `O veículo escolhido só tem ${seats} lugares.` : null,
+  ].filter(Boolean);
+
+  const createConfiguredTeam = async () => {
+    const result = await createTeam(spec, memberIds, selectedVehicle?.id || null);
+    if (!result.ok) return;
+    setSpec("");
+    setMemberIds([]);
+    setVehicleId("__none__");
+  };
+
+  return (
+    <div className="mt-6" data-testid="team-builder">
+      <SectionHeader
+        icon={Users}
+        title="Formar nova equipa"
+        meta={state.caps?.teams ? (
+          <Tip tip="Equipas atuais face ao limite desbloqueado pelo teu nível.">
+            <span className={atCap ? "text-amber-400" : "text-zinc-500"}>
+              {state.caps.teams.used}/{state.caps.teams.max}
+            </span>
+          </Tip>
+        ) : null}
+      />
+
+      <Card className="sub-card overflow-hidden p-0 shadow-none">
+        <div className="border-b border-white/[0.07] p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300">1 · Especialização</p>
+              <p className="mt-0.5 text-[10px] text-zinc-600">Define que tipo de operações esta equipa deve dominar.</p>
+            </div>
+            {spec && (
+              <button
+                type="button"
+                onClick={() => applyRecommendation(spec)}
+                className="flex min-h-9 shrink-0 items-center gap-1 rounded-md border border-cyan-500/20 bg-cyan-500/[0.06] px-2 font-mono text-[10px] text-cyan-300"
+              >
+                <Brain size={11} /> Recomendar
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-1.5 min-[430px]:grid-cols-2">
+            {Object.entries(catalog.team_specs || {}).map(([key, cfg]) => {
+              const selected = spec === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  data-testid={`team-builder-spec-${key}`}
+                  aria-pressed={selected}
+                  onClick={() => chooseSpec(key)}
+                  className={cn(
+                    "min-h-[70px] rounded-lg border p-2.5 text-left transition-colors",
+                    selected
+                      ? "border-red-500/45 bg-red-500/[0.09]"
+                      : "border-white/[0.07] bg-black/20 hover:border-white/15 hover:bg-white/[0.025]"
+                  )}
+                >
+                  <span className={cn("block text-xs font-bold", selected ? "text-white" : "text-zinc-300")}>
+                    {SPEC_LABELS[key] || cfg.name}
+                  </span>
+                  <span className="mt-1 block text-[10px] leading-relaxed text-zinc-500">{cfg.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className={cn("border-b border-white/[0.07] p-3", !spec && "opacity-45")}>
+          <div className="mb-2 flex items-end justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300">2 · Plantel</p>
+              <p className="mt-0.5 text-[10px] text-zinc-600">Escolhe até {maxMembers} operacionais livres. A recomendação prioriza aptidão e fadiga.</p>
+            </div>
+            <span className="shrink-0 font-mono text-[10px] text-zinc-500">{selectedMembers.length}/{maxMembers}</span>
+          </div>
+
+          {!spec ? (
+            <p className="font-mono text-[10px] text-zinc-600">Escolhe primeiro uma especialização.</p>
+          ) : freeEmployees.length === 0 ? (
+            <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-2.5">
+              <p className="font-mono text-[10px] text-amber-300">Não tens operacionais livres para formar uma nova equipa.</p>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("employees")}
+                className="mt-1 font-mono text-[10px] text-cyan-300"
+              >
+                Abrir Operacionais
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {[...freeEmployees]
+                .sort((a, b) => employeeFit(b) - employeeFit(a))
+                .map((employee) => {
+                  const selected = memberIds.includes(employee.id);
+                  const score = employeeFit(employee);
+                  const specialization = catalog.specializations?.[employee.role_key]?.name || employee.role_key;
+                  return (
+                    <button
+                      key={employee.id}
+                      type="button"
+                      data-testid={`team-builder-member-${employee.id}`}
+                      aria-pressed={selected}
+                      disabled={!selected && memberIds.length >= maxMembers}
+                      onClick={() => toggleMember(employee.id)}
+                      className={cn(
+                        "flex min-h-12 w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors disabled:opacity-35",
+                        selected
+                          ? "border-emerald-500/30 bg-emerald-500/[0.06]"
+                          : "border-white/[0.06] bg-black/20 hover:border-white/15"
+                      )}
+                    >
+                      <span className={cn(
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border font-mono text-[10px]",
+                        selected ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 text-zinc-600"
+                      )}>
+                        {selected ? "✓" : "+"}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-semibold text-white">{employee.name}</span>
+                        <span className="block truncate font-mono text-[10px] text-zinc-500">
+                          {specialization} · fadiga {Math.round(employee.fatigue || 0)}%
+                        </span>
+                      </span>
+                      <span className={cn(
+                        "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold",
+                        score >= 75 ? "bg-emerald-500/10 text-emerald-400" : score >= 55 ? "bg-cyan-500/10 text-cyan-300" : "bg-white/[0.04] text-zinc-500"
+                      )}>
+                        {score}%
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
+          {selectedMembers.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              <RoleChip icon={Crown} label="Líder" on={roles.leader.present} tip={roles.leader.present ? "A equipa já tem liderança adequada." : "Sem líder com patente suficiente."} />
+              <RoleChip icon={Gauge} label="Condutor" on={roles.driver.active} tip={roles.driver.active ? "Há um condutor acima do limiar de condução." : "Sem condutor forte — viagens e fugas ficam piores."} tone="#22D3EE" />
+              <RoleChip icon={Brain} label="Estratega" on={roles.strategist.present} tip={roles.strategist.present ? "A equipa tem inteligência suficiente para apoio estratégico." : "Sem estratega forte."} tone="#60A5FA" />
+              <RoleChip icon={Stethoscope} label="Médico" on={roles.medic.present} tip={roles.medic.present ? "Médico presente." : "Sem médico clandestino."} tone="#34D399" />
+              {synergy && (
+                <span className={cn(
+                  "rounded-sm border px-1.5 py-0.5 font-mono text-[10px] font-bold",
+                  synergy.pct >= 0 ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400" : "border-amber-500/20 bg-amber-500/[0.06] text-amber-300"
+                )}>
+                  Sinergia {synergy.pct >= 0 ? "+" : ""}{(synergy.pct * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className={cn("border-b border-white/[0.07] p-3", !spec && "opacity-45")}>
+          <div className="mb-2">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300">3 · Veículo</p>
+            <p className="mt-0.5 text-[10px] text-zinc-600">Escolhe transporte com lugares suficientes para o plantel.</p>
+          </div>
+
+          {!spec ? (
+            <p className="font-mono text-[10px] text-zinc-600">Escolhe primeiro uma especialização.</p>
+          ) : freeVehicles.length === 0 ? (
+            <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-2.5">
+              <p className="font-mono text-[10px] text-amber-300">Não tens veículos livres.</p>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("fleet")}
+                className="mt-1 font-mono text-[10px] text-cyan-300"
+              >
+                Abrir Frota
+              </button>
+            </div>
+          ) : (
+            <Select value={vehicleId} onValueChange={setVehicleId}>
+              <SelectTrigger data-testid="team-builder-vehicle" className="min-h-11 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__" className="font-mono text-xs">Sem veículo por agora</SelectItem>
+                {[...freeVehicles]
+                  .sort((a, b) => vehicleFit(b) - vehicleFit(a))
+                  .map((vehicle) => {
+                    const model = catalog.vehicle_models?.[vehicle.model_key] || {};
+                    const capacity = Number(model.seats || 0);
+                    const ideal = model.best_for?.includes(spec);
+                    const tooSmall = selectedMembers.length > 0 && capacity < selectedMembers.length;
+                    return (
+                      <SelectItem key={vehicle.id} value={vehicle.id} disabled={tooSmall} className="font-mono text-xs">
+                        {ideal ? "★ " : ""}{vehicle.name} · {capacity} lugares · {Math.round(vehicle.condition || 0)}%
+                      </SelectItem>
+                    );
+                  })}
+              </SelectContent>
+            </Select>
+          )}
+
+          {selectedVehicle && (
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <div className="rounded-md border border-white/[0.06] bg-black/20 p-2 text-center">
+                <p className="text-[10px] uppercase text-zinc-600">Lugares</p>
+                <p className={cn("font-mono text-xs font-bold", seatMismatch ? "text-red-400" : "text-white")}>{selectedMembers.length}/{seats}</p>
+              </div>
+              <div className="rounded-md border border-white/[0.06] bg-black/20 p-2 text-center">
+                <p className="text-[10px] uppercase text-zinc-600">Condição</p>
+                <p className="font-mono text-xs font-bold text-white">{Math.round(selectedVehicle.condition || 0)}%</p>
+              </div>
+              <div className="rounded-md border border-white/[0.06] bg-black/20 p-2 text-center">
+                <p className="text-[10px] uppercase text-zinc-600">Combustível</p>
+                <p className="font-mono text-xs font-bold text-white">
+                  {Math.round((Number(selectedVehicle.fuel_l || 0) / Math.max(1, Number(selectedVehicle.tank_l || 1))) * 100)}%
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300">4 · Revisão</p>
+              <p className="mt-0.5 text-[10px] text-zinc-600">Confirma a estrutura antes de pagar.</p>
+            </div>
+            <span className={cn(
+              "rounded-full px-2 py-1 font-mono text-[10px] font-bold uppercase",
+              readyStructure ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-300"
+            )}>
+              {readyStructure ? "Estrutura completa" : "Configuração incompleta"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 min-[430px]:grid-cols-4">
+            <div className="rounded-md border border-white/[0.06] bg-black/20 p-2">
+              <p className="text-[10px] uppercase text-zinc-600">Tipo</p>
+              <p className="mt-0.5 truncate font-mono text-[10px] font-bold text-white">{spec ? SPEC_LABELS[spec] : "—"}</p>
+            </div>
+            <div className="rounded-md border border-white/[0.06] bg-black/20 p-2">
+              <p className="text-[10px] uppercase text-zinc-600">Plantel</p>
+              <p className="mt-0.5 font-mono text-[10px] font-bold text-white">{selectedMembers.length}/{maxMembers}</p>
+            </div>
+            <div className="rounded-md border border-white/[0.06] bg-black/20 p-2">
+              <p className="text-[10px] uppercase text-zinc-600">Veículo</p>
+              <p className="mt-0.5 truncate font-mono text-[10px] font-bold text-white">{selectedVehicle?.name || "Nenhum"}</p>
+            </div>
+            <div className="rounded-md border border-white/[0.06] bg-black/20 p-2">
+              <p className="text-[10px] uppercase text-zinc-600">Custo</p>
+              <p className="mt-0.5 font-mono text-[10px] font-bold text-emerald-400">{fmtMoney(catalog.team_create_cost)}</p>
+            </div>
+          </div>
+
+          {!selectedVehicle && spec && selectedMembers.length > 0 && (
+            <p className="mt-2 flex items-center gap-1 font-mono text-[10px] text-amber-400">
+              <AlertTriangle size={10} /> Podes formar a equipa, mas precisará de um veículo antes de sair para operações.
+            </p>
+          )}
+          {seatMismatch && (
+            <p className="mt-2 flex items-center gap-1 font-mono text-[10px] text-red-400">
+              <AlertTriangle size={10} /> O veículo não tem lugares para todos os membros selecionados.
+            </p>
+          )}
+
+          <PurchaseButton
+            testId="team-builder-create"
+            icon={Users}
+            label={`Formar equipa · ${fmtMoney(catalog.team_create_cost)}`}
+            confirmLabel="Confirmar formação?"
+            requireConfirm
+            can={blockers.length === 0}
+            blockedReasons={blockers}
+            availableTip={selectedVehicle ? "Cria a equipa já com o plantel e veículo selecionados." : "Cria a equipa com o plantel selecionado; o veículo pode ser atribuído depois."}
+            onConfirm={createConfiguredTeam}
+            className="mt-3 w-full"
+          />
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
     state, catalog, serverNow, createTeam, assignEmployee, assignVehicle,
@@ -724,49 +1099,12 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           })}
         </div>
 
-        <div className="mt-6">
-          <SectionHeader
-            icon={Users}
-            title={`Formar nova equipa · ${catalog ? fmtMoney(catalog.team_create_cost) : "—"}`}
-            meta={state.caps?.teams ? (
-              <Tip tip="Nº de equipas vs. o limite atual — sobe de nível da organização para desbloquear mais.">
-                <span className={state.caps.teams.used >= state.caps.teams.max ? "text-amber-400" : "text-zinc-500"}>
-                  {state.caps.teams.used}/{state.caps.teams.max}
-                </span>
-              </Tip>
-            ) : null}
-          />
-          {state.caps?.teams && state.caps.teams.used >= state.caps.teams.max && (
-            <p className="mb-2 font-mono text-[10px] text-amber-400">
-              Limite de equipas atingido para o nível {state.player.level} — sobe de nível para desbloquear mais.
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            {catalog &&
-              Object.entries(catalog.team_specs).map(([key, ts]) => {
-                const atCap = state.caps?.teams && state.caps.teams.used >= state.caps.teams.max;
-                const lackMoney = state.player.clean_money < catalog.team_create_cost;
-                return (
-                  <PurchaseButton
-                    key={key}
-                    testId={`create-team-${key}`}
-                    can={!atCap && !lackMoney}
-                    blockedReasons={[
-                      atCap ? `Limite de equipas atingido para o nível ${state.player.level}.` : null,
-                      !atCap && lackMoney ? "Dinheiro insuficiente." : null,
-                    ].filter(Boolean)}
-                    availableTip={`${ts.desc} Bónus de sucesso em operações da categoria ${SPEC_LABELS[key]}. Custo: ${fmtMoney(catalog.team_create_cost)} limpos.`}
-                    onConfirm={() => createTeam(key)}
-                    layout="card"
-                    className="h-full"
-                  >
-                    <span className="w-full text-left text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
-                    <span className="whitespace-normal text-[10px] font-normal normal-case leading-tight text-zinc-500">{ts.desc}</span>
-                  </PurchaseButton>
-                );
-              })}
-          </div>
-        </div>
+        <TeamBuilder
+          state={state}
+          catalog={catalog}
+          createTeam={createTeam}
+          onNavigate={onNavigate}
+        />
       </SheetContent>
     </Sheet>
   );
