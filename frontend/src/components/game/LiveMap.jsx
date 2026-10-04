@@ -990,7 +990,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
     if (followId && !state.missions.some((m) => m.id === followId)) setFollowId(null);
   }, [state.missions, followId]);
 
-  // O dock "Operação em Direto" pode pedir para a câmara seguir uma unidade.
+  // O painel de operações pode pedir para a câmara seguir uma unidade.
   useEffect(() => {
     const onFollow = (ev) => setFollowId(ev.detail?.id || null);
     window.addEventListener("sub:follow-mission", onFollow);
