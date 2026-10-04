@@ -88,6 +88,7 @@ export function GameProvider({ children }) {
   const prevLevelRef = useRef(null);
   const prevChaseIdsRef = useRef(new Set());
   const returnedTimersRef = useRef(new Set());  // timeouts pendentes de justReturnedTeamIds
+  const pendingActionsRef = useRef(new Set());   // dedupe de duplo toque enquanto a mutação está em curso
 
   // Cancela quaisquer timeouts pendentes ao desmontar (evita setState-após-unmount).
   useEffect(() => () => {
@@ -411,6 +412,9 @@ export function GameProvider({ children }) {
 
   const action = useCallback(
     async (path, payload, successMsg) => {
+      const actionKey = `${path}:${JSON.stringify(payload || {})}`;
+      if (pendingActionsRef.current.has(actionKey)) return { ok: false, duplicate: true };
+      pendingActionsRef.current.add(actionKey);
       try {
         const requestId = typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
@@ -435,6 +439,8 @@ export function GameProvider({ children }) {
         haptics.error();
         audio.sfx.error();
         return { ok: false };
+      } finally {
+        pendingActionsRef.current.delete(actionKey);
       }
     },
     [refresh]
