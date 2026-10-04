@@ -279,7 +279,7 @@ export default function GamePage() {
                 <div className="grid grid-cols-3 gap-1">
                   <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
                   <NavAction testId="open-quests-button" icon={Target} label="Objetivos" color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
-                  <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-violet-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
+                  <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-sky-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
                 </div>
               )}
 
@@ -300,7 +300,7 @@ export default function GamePage() {
               {navGroup === "empire" && (
                 <div className="grid grid-cols-3 gap-1">
                   <NavAction testId="open-empire-button" icon={Building2} label="Império" color="text-red-500" alert={empireAlert} onClick={() => openFromNav("empire")} />
-                  <NavAction testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-purple-300" alert={alerts.raidRisk} onClick={() => openFromNav("properties")} />
+                  <NavAction testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-amber-300" alert={alerts.raidRisk} onClick={() => openFromNav("properties")} />
                   <NavAction testId="open-hq-button" icon={Landmark} label="QG" color="text-zinc-200" onClick={() => openFromNav("hq")} />
                 </div>
               )}
@@ -326,7 +326,7 @@ export default function GamePage() {
                           setBaseFilter(event.target.value);
                           setNavGroup(null);
                         }}
-                        className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/60 px-2 py-1.5 font-mono text-[10px] text-zinc-200 outline-none"
+                        className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/60 px-2 py-2 font-mono text-base text-zinc-200 outline-none sm:text-[10px]"
                       >
                         <option value="all">Todas</option>
                         <option value="hq">Quartel-General</option>
@@ -457,6 +457,8 @@ const NavAction = ({ testId, icon: Icon, label, color, alert, active, onClick })
     type="button"
     data-testid={testId}
     onClick={onClick}
+    aria-label={label}
+    aria-pressed={active || undefined}
     className={`sub-nav-action relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center ${active ? "is-active" : ""}`}
   >
     <Icon size={17} className={color} />
