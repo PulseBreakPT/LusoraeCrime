@@ -27,7 +27,7 @@ from organization_systems import (
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
     PRESTIGE_CATALOG, protection_cost, fixed_cost_multiplier, territory_weekly_cost,
-    logistics_cost_multiplier, rival_profile,
+    logistics_cost_multiplier, supply_cost_multiplier, rival_profile,
 )
 
 router = APIRouter(prefix="/api/game/org", tags=["organization"])
@@ -384,7 +384,7 @@ async def buy_supply(body: SupplyTradeInput, user: dict = Depends(get_current_us
     capacity = inventory_capacity(player, props)
     if inventory_used(projected) > capacity:
         raise HTTPException(status_code=400, detail="Armazenamento insuficiente — melhora Armazéns/Logística")
-    cost = max(1, int(cfg["price"] * body.packs * logistics_cost_multiplier(player)))
+    cost = max(1, int(cfg["price"] * body.packs * supply_cost_multiplier(player)))
     await _debit(player, cost, stat="supply_purchases")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {f"inventory.{body.item_key}": units}})
     await record_tx(db, str(player["_id"]), "supply_buy", -cost, "clean", player["clean_money"], f"{cfg['name']} ×{units}")
