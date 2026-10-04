@@ -77,6 +77,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Run SUBMUNDO static UI audit
+        run: |
+          node scripts/ui-quality-audit.mjs > ../ui-quality-audit.json
+          cat ../ui-quality-audit.json
+
+      - name: Upload SUBMUNDO UI audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: submundo-ui-audit
+          path: ui-quality-audit.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Run frontend regression tests
         env:
           CI: "true"
