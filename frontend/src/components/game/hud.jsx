@@ -202,6 +202,8 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           className="h-auto w-full min-w-0 border-input bg-black/60 px-1.5 py-0.5 font-mono text-xs text-white"
         />
         <button
+          type="button"
+          aria-label="Guardar nome"
           data-testid={testId && `${testId}-save`}
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={save}
@@ -210,6 +212,8 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           <Check size={14} />
         </button>
         <button
+          type="button"
+          aria-label="Cancelar edição"
           data-testid={testId && `${testId}-cancel`}
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={() => setEditing(false)}
@@ -226,6 +230,8 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
       <span className={`truncate ${textClassName}`}>{value}</span>
       <Tip tip="Renomear">
         <button
+          type="button"
+          aria-label="Renomear"
           data-testid={testId && `${testId}-edit`}
           onClick={() => { setDraft(value); setEditing(true); }}
           className="shrink-0 text-zinc-600 transition-colors hover:text-white"
@@ -242,6 +248,9 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
 export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
   <Tip tip={active ? "Remover dos favoritos" : "Marcar como favorito — fica sempre no topo da lista"}>
     <button
+      type="button"
+      aria-label={active ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+      aria-pressed={active}
       data-testid={testId}
       onClick={(ev) => { ev.stopPropagation(); onToggle(); }}
       className={`shrink-0 rounded p-0.5 transition-colors ${active ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-white"}`}
