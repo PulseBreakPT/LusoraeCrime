@@ -94,7 +94,7 @@ from organization_systems import (
     territory_income_per_hour, territory_reward_bonus, fixed_cost_multiplier,
     doctrine_effect, loadout_effect, default_team_policies, ensure_employee_profile,
     apply_weapon_upgrades, weapon_ammo_status, prestige_effects, department_level,
-    logistics_cost_multiplier,
+    logistics_cost_multiplier, PRESTIGE_CATALOG, protection_cost,
 )
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
@@ -613,6 +613,7 @@ async def catalog():
             "territory_tiers": TERRITORY_TIERS,
             "property_modules": PROPERTY_MODULES,
             "vehicle_lifecycle": VEHICLE_LIFECYCLE,
+            "prestige": PRESTIGE_CATALOG,
         },
         "shop": {
             "speedup_cost_per_min": SPEEDUP_COST_PER_MIN,
@@ -776,6 +777,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
             "prestige_items": player.get("prestige_items") or [],
             "prestige_effects": prestige_effects(player),
             "governance": player.get("governance") or {},
+            "protection_cost": protection_cost(player, len(employees), len(properties)),
         },
         "fuel_prices": FUEL_PRICES,
         "hot_category": hot_category(now_utc()),
