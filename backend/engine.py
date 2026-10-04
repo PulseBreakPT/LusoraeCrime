@@ -2368,15 +2368,37 @@ async def _crew_returns(db, player, m, outcome):
             if has_medic:
                 p *= MEDIC_INJURY_MULT
             p *= float(m.get("loadout_injury_mult", 1.0))
+            policies = m.get("team_policies") or {}
+            protect_injured = bool(m.get("protect_injured", policies.get("protect_injured", True)))
+            auto_medical = bool(m.get("auto_use_medical", policies.get("auto_use_medical", True)))
+            auto_armor = bool(m.get("auto_use_armor", policies.get("auto_use_armor", True)))
+            if protect_injured:
+                p *= 0.84
             if random.random() < p:
-                severity = random.choices(["ligeiro", "moderado", "grave"], weights=[60, 30, 10], k=1)[0]
+                weights = [60, 30, 10]
+                if protect_injured:
+                    weights = [70, 25, 5]
+                if auto_armor and (m.get("loadout") or {}).get("body_armor"):
+                    weights = [76, 21, 3]
+                severity = random.choices(["ligeiro", "moderado", "grave"], weights=weights, k=1)[0]
                 base_duration = INJURY_SEVERITIES[severity]["recovery_s"]
                 duration = base_duration * (1 - bonuses["heal"]) * (MEDIC_RECOVERY_MULT if has_medic else 1.0)
+                if auto_medical and (m.get("loadout") or {}).get("medical_kit"):
+                    duration *= 0.82
                 until = (now_utc() + timedelta(seconds=duration)).isoformat()
                 injury = {"severity": severity, "source": t["name"], "started_at": now_utc().isoformat(), "recovery_until": until}
                 await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "injured", "status_until": until, "injury": injury}})
                 await push_history(db, victim["_id"], f"Ferido em operação ({severity}).")
-                suffix = " O médico da equipa estabilizou-o — recupera mais depressa." if has_medic else ""
+                notes = []
+                if has_medic:
+                    notes.append("o médico estabilizou-o")
+                if protect_injured:
+                    notes.append("a crew executou o protocolo de proteção")
+                if auto_medical and (m.get("loadout") or {}).get("medical_kit"):
+                    notes.append("foi usado um kit médico")
+                if auto_armor and (m.get("loadout") or {}).get("body_armor"):
+                    notes.append("a proteção balística reduziu a gravidade")
+                suffix = (" " + "; ".join(notes).capitalize() + ".") if notes else ""
                 await add_event(db, pid, "police", f"{victim['name']} ficou ferido durante {t['name']}!{suffix}")
         elif outcome == "police" and random.random() < 0.3:
             victim = random.choice(members)
@@ -3287,11 +3309,38 @@ async def advance(db, player):
         player["frac_territory"] = ft - territory_gain
         player["clean_money"] += territory_gain
         territories = dict(player.get("territories") or {})
-        for district, info in territories.items():
+        investigation_level = department_level(player, "investigacao")
+        lost = []
+        downgraded = []
+        for district, info in list(territories.items()):
             data = dict(info or {})
-            data["pressure"] = min(100.0, float(data.get("pressure", 0) or 0) + minutes * 0.025)
-            data["defense"] = max(0.0, float(data.get("defense", 100) or 0) - minutes * 0.018)
+            tier = max(1, int(data.get("tier", 1) or 1))
+            pressure = float(data.get("pressure", 0) or 0)
+            defense = float(data.get("defense", 100) or 0)
+            pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
+            pressure_gain *= 1.0 + max(0.0, 55.0 - defense) / 140.0
+            defense_loss = minutes * 0.018 * (1.0 + pressure / 140.0)
+            pressure = min(100.0, pressure + pressure_gain)
+            defense = max(0.0, defense - defense_loss)
+            if pressure >= 96 and defense <= 8:
+                if tier > 1:
+                    data["tier"] = tier - 1
+                    data["pressure"] = 62.0
+                    data["defense"] = 38.0
+                    data["last_rival_breach_at"] = now.isoformat()
+                    downgraded.append((district, tier - 1))
+                else:
+                    lost.append(district)
+                    continue
+            else:
+                data["pressure"] = pressure
+                data["defense"] = defense
             territories[district] = data
+        for district in lost:
+            territories.pop(district, None)
+            await add_event(db, pid, "police", f"Perdeste o controlo de {district}: pressão rival esmagou a defesa local.")
+        for district, tier in downgraded:
+            await add_event(db, pid, "team", f"{district} recuou para nível {tier} após uma ofensiva rival.")
         player["territories"] = territories
 
     # Notoriedade da frota arrefece fora de operações.
