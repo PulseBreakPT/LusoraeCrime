@@ -4969,3 +4969,244 @@ html[data-sub-panel-origin="menu"] .sub-sheet-panel::after {
         transition: none !important;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO CONTEXT UI V3 — compact anchored menus
+   A interface nasce do dock, preserva o mapa e evita o aspeto
+   de dashboard: menos altura, menos cartões, mais hierarquia.
+   ============================================================ */
+
+.sub-sheet-panel {
+    --panel-origin-x: 50%;
+    width: min(42rem, calc(100vw - 2rem)) !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: min(70dvh, 42rem) !important;
+    bottom: calc(4.7rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: 0.85rem !important;
+    border-radius: 18px !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: #09090c !important;
+    box-shadow:
+        0 22px 60px rgba(0, 0, 0, 0.52),
+        0 0 0 1px rgba(255, 255, 255, 0.014) inset !important;
+    transform-origin: var(--panel-origin-x) 100%;
+}
+
+.sub-sheet-scroll {
+    max-height: min(70dvh, 42rem) !important;
+    scrollbar-gutter: auto !important;
+}
+
+/* Conector explícito ao botão que abriu o painel. */
+.sub-sheet-panel::before {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    left: var(--panel-origin-x) !important;
+    bottom: -17px !important;
+    width: 1px !important;
+    height: 12px !important;
+    transform: translateX(-50%) !important;
+    background: rgba(239, 68, 68, 0.52) !important;
+    border: 0 !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+}
+
+.sub-sheet-panel::after {
+    left: var(--panel-origin-x) !important;
+    bottom: -6px !important;
+    width: 11px !important;
+    height: 11px !important;
+    border-right-color: rgba(255, 255, 255, 0.08) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+    background: #09090c !important;
+}
+
+html[data-sub-panel-origin="operations"] .sub-sheet-panel { --panel-origin-x: calc(50% - 88px); }
+html[data-sub-panel-origin="crew"] .sub-sheet-panel { --panel-origin-x: calc(50% - 44px); }
+html[data-sub-panel-origin="equipment"] .sub-sheet-panel { --panel-origin-x: 50%; }
+html[data-sub-panel-origin="empire"] .sub-sheet-panel { --panel-origin-x: calc(50% + 44px); }
+html[data-sub-panel-origin="menu"] .sub-sheet-panel { --panel-origin-x: calc(50% + 88px); }
+
+/* Cabeçalho leve: título + contexto, sem bloco visual pesado. */
+.sub-sheet-panel .sub-sheet-title {
+    font-size: 17px !important;
+    letter-spacing: 0.035em !important;
+}
+
+.sub-sheet-panel .sub-sheet-close {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #71717a !important;
+}
+
+.sub-sheet-panel .sub-sheet-close:hover,
+.sub-sheet-panel .sub-sheet-close:focus-visible {
+    border: 0 !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    box-shadow: none !important;
+    color: #f4f4f5 !important;
+}
+
+.sub-sheet-panel .sub-sheet-close svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* Resumos deixam de ser mosaicos de cartões: uma única superfície segmentada. */
+.sub-sheet-panel .sub-summary-strip {
+    gap: 1px !important;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.sub-sheet-panel .sub-summary-strip .sub-kpi {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #0e0e12 !important;
+    box-shadow: none !important;
+    padding: 0.65rem 0.7rem !important;
+}
+
+.sub-sheet-panel .sub-summary-strip .sub-kpi:hover {
+    background: #111116 !important;
+}
+
+.sub-sheet-panel .sub-kpi-grid {
+    gap: 1px !important;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.sub-sheet-panel .sub-kpi-cell {
+    background: #0e0e12 !important;
+    box-shadow: none !important;
+    padding: 0.7rem 0.75rem !important;
+}
+
+.sub-sheet-panel .sub-kpi-cell:hover {
+    background: #111116 !important;
+}
+
+/* Recomendações como lista funcional, não como cartões independentes. */
+.sub-sheet-panel .sub-action-list {
+    background: #0d0d11;
+}
+
+.sub-sheet-panel .sub-action-row {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.sub-sheet-panel .sub-action-row + .sub-action-row {
+    border-top: 1px solid rgba(255, 255, 255, 0.055) !important;
+}
+
+.sub-sheet-panel .sub-action-row:hover {
+    background: rgba(255, 255, 255, 0.025) !important;
+}
+
+/* Cartões de entidades continuam separados, mas mais calmos. */
+.sub-sheet-panel .sub-doss-card {
+    border-radius: 12px !important;
+    background: #0d0d11 !important;
+    box-shadow: none !important;
+}
+
+/* Barra superior: um HUD, não quatro cartões. */
+.sub-resource-grid {
+    grid-template-columns: 0.72fr 0.9fr 1.28fr 1.1fr !important;
+}
+
+.sub-topbar {
+    border-radius: 11px !important;
+    background: rgba(8, 8, 11, 0.94) !important;
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+
+.sub-resource-icon {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+.sub-minimal-stat {
+    min-height: 42px !important;
+    gap: 0.3rem !important;
+    padding: 0.42rem 0.5rem !important;
+}
+
+.sub-minimal-stat svg {
+    width: 13px !important;
+    height: 13px !important;
+}
+
+.sub-resource-label {
+    font-size: 7px !important;
+    letter-spacing: 0.07em !important;
+}
+
+@media (max-width: 639px) {
+    .sub-sheet-panel {
+        left: 0.65rem !important;
+        right: 0.65rem !important;
+        bottom: calc(4.7rem + env(safe-area-inset-bottom, 0px)) !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: 64dvh !important;
+        padding-left: 0.85rem !important;
+        padding-right: 0.85rem !important;
+        padding-bottom: 0.75rem !important;
+        border-radius: 17px !important;
+    }
+
+    .sub-sheet-scroll {
+        max-height: 64dvh !important;
+    }
+
+    .sub-sheet-description {
+        display: none !important;
+    }
+
+    .sub-sheet-panel .sub-sheet-title {
+        font-size: 16px !important;
+    }
+
+    html[data-sub-panel-origin="operations"] .sub-sheet-panel { --panel-origin-x: calc(50% - 82px); }
+    html[data-sub-panel-origin="crew"] .sub-sheet-panel { --panel-origin-x: calc(50% - 41px); }
+    html[data-sub-panel-origin="equipment"] .sub-sheet-panel { --panel-origin-x: 50%; }
+    html[data-sub-panel-origin="empire"] .sub-sheet-panel { --panel-origin-x: calc(50% + 41px); }
+    html[data-sub-panel-origin="menu"] .sub-sheet-panel { --panel-origin-x: calc(50% + 82px); }
+
+    .sub-sheet-panel .sub-summary-strip .sub-kpi,
+    .sub-sheet-panel .sub-kpi-cell {
+        padding: 0.58rem 0.62rem !important;
+    }
+
+    .sub-resource-grid {
+        grid-template-columns: 0.68fr 0.88fr 1.3fr 1.14fr !important;
+    }
+
+    .sub-minimal-stat {
+        padding-inline: 0.38rem !important;
+    }
+}
+
+@media (max-width: 370px) {
+    .sub-resource-icon {
+        display: none !important;
+    }
+
+    .sub-minimal-stat {
+        justify-content: center;
+        padding-inline: 0.32rem !important;
+    }
+}
