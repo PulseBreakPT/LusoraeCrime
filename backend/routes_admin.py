@@ -242,7 +242,25 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
         await coll.delete_many({"player_id": pid})
     await db.city_pvp_challenges.delete_many({"$or": [{"attacker_id": pid}, {"defender_id": pid}]})
     await db.city_chat_reports.delete_many({"$or": [{"reporter_id": pid}, {"target_player_id": pid}]})
-    await db.city_alliances.update_many({"member_ids": pid}, {"$pull": {"member_ids": pid}})
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    if alliance:
+        remaining = [member_id for member_id in (alliance.get("member_ids") or []) if member_id != pid]
+        if not remaining:
+            await db.city_alliances.delete_one({"_id": alliance["_id"]})
+        elif alliance.get("leader_id") == pid:
+            await db.city_alliances.update_one(
+                {"_id": alliance["_id"]},
+                {"$set": {
+                    "member_ids": remaining,
+                    "leader_id": remaining[0],
+                    "leadership_changed_at": now,
+                }},
+            )
+        else:
+            await db.city_alliances.update_one(
+                {"_id": alliance["_id"]},
+                {"$set": {"member_ids": remaining}},
+            )
     await db.action_receipts.delete_many({"key": {"$regex": f"^{str(user_oid)}:"}})
 
     # Recriar player com estado inicial
