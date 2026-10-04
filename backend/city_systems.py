@@ -4,8 +4,6 @@ import random
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
-from bson import ObjectId
-
 from city_data import (
     WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES,
     SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO,
@@ -254,8 +252,13 @@ async def _leaderboard(db, season_id, player):
     player_ids = [r["player_id"] for r in rows]
     players = {}
     if player_ids:
-        async for doc in db.players.find({"_id": {"$in": [ObjectId(x) for x in player_ids if ObjectId.is_valid(x)]}}):
-            players[str(doc["_id"])] = doc.get("org_name", "Organização")
+        # bson pertence ao runtime Mongo; o import fica aqui para o motor
+        # matemático da Cidade Viva continuar testável sem dependências de BD.
+        from bson import ObjectId
+        object_ids = [ObjectId(x) for x in player_ids if ObjectId.is_valid(x)]
+        if object_ids:
+            async for doc in db.players.find({"_id": {"$in": object_ids}}):
+                players[str(doc["_id"])] = doc.get("org_name", "Organização")
     board = [
         {
             "rank": idx + 1,
