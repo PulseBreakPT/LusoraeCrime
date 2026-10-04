@@ -204,6 +204,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
                 data-testid="launder-amount-input"
                 type="number"
                 min="1"
+                aria-label="Montante a lavar"
                 placeholder="Montante"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -286,7 +287,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
         </div>
 
         <div className="mt-6 pb-2">
-          <button
+          <button type="button"
             data-testid="ledger-toggle"
             onClick={() => setShowLedger(!showLedger)}
             className="flex w-full items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:text-white"
