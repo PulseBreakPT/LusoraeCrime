@@ -303,35 +303,6 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTar
           </SheetDescription>
         </SheetHeader>
 
-        <SummaryStrip cols={3} testId="quests-summary" className="mt-3">
-          <Kpi
-            icon={Flame}
-            label="Série diária"
-            value={`${streak.count || 0} ${(streak.count || 0) === 1 ? "dia" : "dias"}`}
-            sub={`melhor ${streak.best || 0}d · +${streakBonusPct}%`}
-            color={(streak.count || 0) > 0 ? "#F59E0B" : "#A1A1AA"}
-            tip="Reclama pelo menos uma diária por dia para manter a série. Cada dia soma +4% às recompensas de diárias e semanais (máx. +40%). Falhar um dia reinicia a série."
-          />
-          <Kpi
-            icon={Gauge}
-            label="Tier de contratos"
-            value={QUEST_TIER_LABELS[tier]}
-            sub={`momentum ${momentum}/100`}
-            color={QUEST_TIER_COLORS[tier]}
-            bar={momentum}
-            barColor={QUEST_TIER_COLORS[tier]}
-            tip="O momentum sobe ao reclamar contratos e desce quando expiram. Tiers altos pagam +8% por tier, trazem contratos mais exigentes, desbloqueiam uma 4.ª diária (Veterano) e uma 3.ª semanal (Lenda)."
-          />
-          <Kpi
-            icon={Zap}
-            label="Multiplicador"
-            value={`até ×${bestMult.toFixed(2)}`}
-            sub={`nível ×${(1 + 0.15 * Math.max(0, (state.player.level || 1) - 1)).toFixed(2)} base`}
-            color={bestMult > 1.01 ? "#F59E0B" : "#A1A1AA"}
-            tip="Cada contrato mostra o multiplicador real aplicado às recompensas: nível × dificuldade × tier × série × execução rápida (concluir na 1.ª metade do prazo dá +10%). Máximo ×4."
-          />
-        </SummaryStrip>
-
         {featured && (
           <div className="mt-3" data-testid="quest-featured">
             <QuestCard q={featured} featured onClose={close} onNavigate={onNavigate} />
@@ -360,6 +331,35 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTar
             ))}
           </TabsList>
         </Tabs>
+
+        <SummaryStrip cols={3} testId="quests-summary" className="mt-3">
+          <Kpi
+            icon={Flame}
+            label="Série diária"
+            value={`${streak.count || 0} ${(streak.count || 0) === 1 ? "dia" : "dias"}`}
+            sub={`melhor ${streak.best || 0}d · +${streakBonusPct}%`}
+            color={(streak.count || 0) > 0 ? "#F59E0B" : "#A1A1AA"}
+            tip="Reclama pelo menos uma diária por dia para manter a série. Cada dia soma +4% às recompensas de diárias e semanais (máx. +40%). Falhar um dia reinicia a série."
+          />
+          <Kpi
+            icon={Gauge}
+            label="Tier de contratos"
+            value={QUEST_TIER_LABELS[tier]}
+            sub={`momentum ${momentum}/100`}
+            color={QUEST_TIER_COLORS[tier]}
+            bar={momentum}
+            barColor={QUEST_TIER_COLORS[tier]}
+            tip="O momentum sobe ao reclamar contratos e desce quando expiram. Tiers altos pagam +8% por tier, trazem contratos mais exigentes, desbloqueiam uma 4.ª diária (Veterano) e uma 3.ª semanal (Lenda)."
+          />
+          <Kpi
+            icon={Zap}
+            label="Multiplicador"
+            value={`até ×${bestMult.toFixed(2)}`}
+            sub={`nível ×${(1 + 0.15 * Math.max(0, (state.player.level || 1) - 1)).toFixed(2)} base`}
+            color={bestMult > 1.01 ? "#F59E0B" : "#A1A1AA"}
+            tip="Cada contrato mostra o multiplicador real aplicado às recompensas: nível × dificuldade × tier × série × execução rápida (concluir na 1.ª metade do prazo dá +10%). Máximo ×4."
+          />
+        </SummaryStrip>
 
         {tab === "historia" && (
           <div className="mt-3 space-y-4" data-testid="quests-historia">

@@ -298,7 +298,6 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           <SheetDescription className="text-zinc-500">Alertas acionáveis, resumo essencial e histórico da organização.</SheetDescription>
         </SheetHeader>
 
-        <RetentionRoadmap onNavigate={onNavigate} />
         <RecommendedActions onNavigate={onNavigate} />
 
         <Section title="Resumo de operações" testId="intel-operations">
@@ -366,6 +365,9 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         
 
+        <RetentionRoadmap onNavigate={onNavigate} />
+        <OrganizationRecords />
+
         <Section title="Histórico" testId="intel-history">
           {state.history.length === 0 && (
             <EmptyState
@@ -416,7 +418,6 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             })}
           </div>
         </Section>
-        <OrganizationRecords />
 
       </SheetContent>
     </Sheet>

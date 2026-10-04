@@ -19,10 +19,10 @@ import {
 
 const TABS = [
   { key: "centro", label: "Centro", icon: Network },
-  { key: "stock", label: "Stock", icon: PackageOpen },
   { key: "crew", label: "Crew", icon: Users },
   { key: "frota", label: "Frota", icon: Car },
   { key: "arsenal", label: "Arsenal", icon: Swords },
+  { key: "stock", label: "Stock", icon: PackageOpen },
   { key: "imoveis", label: "Imóveis", icon: Warehouse },
   { key: "territorios", label: "Territ.", icon: MapPinned },
 ];

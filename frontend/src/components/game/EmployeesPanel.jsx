@@ -278,6 +278,46 @@ const EmployeeCard = ({ e, onNavigate }) => {
       {manage && (
         <div className="mt-3 space-y-4 border-t border-white/10 pt-3">
           <div>
+            <SectionHeader icon={Sparkles} title="Ações" />
+            <ActionGrid count={4}>
+              <ActionBtn
+                testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar"
+                onClick={() => restEmployee(e.id)} disabled={!idle || e.fatigue < 15}
+                title="Recupera 50 de fadiga e +5 moral."
+                blockedReasons={[!idle ? "Operacional indisponível." : null, idle && e.fatigue < 15 ? "Fadiga já baixa." : null].filter(Boolean)}
+                density="dense"
+              />
+              <ActionBtn
+                testId={`emp-promote-${e.id}`} icon={ChevronUp}
+                label={isTopRank ? "Patente máxima" : `Promover ${fmtMoney(promoteCost)}`}
+                onClick={() => promoteEmployee(e.id)}
+                disabled={isTopRank || e.status === "on_mission" || e.level < nextRankReq || money < promoteCost}
+                title={isTopRank ? "Já atingiu a patente máxima." : `Requer nível ${nextRankReq}.`}
+                blockedReasons={[
+                  isTopRank ? "Patente máxima." : null,
+                  !isTopRank && e.status === "on_mission" ? "Operacional em missão." : null,
+                  !isTopRank && e.level < nextRankReq ? `Requer nível ${nextRankReq}.` : null,
+                  !isTopRank && e.level >= nextRankReq && money < promoteCost ? "Dinheiro insuficiente." : null,
+                ].filter(Boolean)}
+                density="dense"
+              />
+              <ActionBtn
+                testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`}
+                onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
+                title="+15 moral e +10 lealdade." blockedReasons={money < bonusCost ? ["Dinheiro insuficiente."] : []}
+                density="dense"
+              />
+              <ConfirmButton
+                testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?"
+                color="text-red-400" onConfirm={() => fireEmployee(e.id)}
+                disabled={e.status === "on_mission" || money < fireCost}
+                tip={e.status === "on_mission" ? "Operacional em missão." : money < fireCost ? "Dinheiro insuficiente." : "Indemnização de 3 salários. Ação irreversível."}
+                density="dense"
+              />
+            </ActionGrid>
+          </div>
+
+          <div>
             <SectionHeader icon={UserCheck} title="Alocação" />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Select
@@ -343,6 +383,36 @@ const EmployeeCard = ({ e, onNavigate }) => {
           </div>
 
           <div>
+            <SectionHeader icon={GraduationCap} title="Desenvolvimento" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Select value={course} onValueChange={setCourse}>
+                <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="h-8 min-h-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                  <SelectValue placeholder="Escolher formação..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(catalog.training_courses).map(([key, training]) => (
+                    <SelectItem key={key} value={key} className="font-mono text-xs">
+                      {training.name} · {fmtMoney(training.cost)}{training.spec === e.spec ? " ★" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ActionBtn
+                testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar"
+                onClick={() => { trainEmployee(e.id, course); setCourse(""); }}
+                disabled={!idle || !course || money < (catalog.training_courses[course]?.cost || Infinity)}
+                title="Envia o operacional para a formação escolhida."
+                blockedReasons={[
+                  !idle ? "Operacional indisponível." : null,
+                  idle && !course ? "Escolhe uma formação." : null,
+                  idle && course && money < (catalog.training_courses[course]?.cost || Infinity) ? "Dinheiro insuficiente." : null,
+                ].filter(Boolean)}
+                density="compact"
+              />
+            </div>
+          </div>
+
+          <div>
             <SectionHeader icon={IdCard} title="Perfil operacional" />
             <div className="grid grid-cols-3 gap-1">
               {Object.entries(e.attrs || {}).map(([key, value]) => (
@@ -398,76 +468,6 @@ const EmployeeCard = ({ e, onNavigate }) => {
                 <p className="mt-2 font-mono text-[10px] text-cyan-300">Destacado numa instalação da organização</p>
               )}
             </div>
-          </div>
-
-          <div>
-            <SectionHeader icon={GraduationCap} title="Desenvolvimento" />
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <Select value={course} onValueChange={setCourse}>
-                <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="h-8 min-h-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
-                  <SelectValue placeholder="Escolher formação..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(catalog.training_courses).map(([key, training]) => (
-                    <SelectItem key={key} value={key} className="font-mono text-xs">
-                      {training.name} · {fmtMoney(training.cost)}{training.spec === e.spec ? " ★" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <ActionBtn
-                testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar"
-                onClick={() => { trainEmployee(e.id, course); setCourse(""); }}
-                disabled={!idle || !course || money < (catalog.training_courses[course]?.cost || Infinity)}
-                title="Envia o operacional para a formação escolhida."
-                blockedReasons={[
-                  !idle ? "Operacional indisponível." : null,
-                  idle && !course ? "Escolhe uma formação." : null,
-                  idle && course && money < (catalog.training_courses[course]?.cost || Infinity) ? "Dinheiro insuficiente." : null,
-                ].filter(Boolean)}
-                density="compact"
-              />
-            </div>
-          </div>
-
-          <div>
-            <SectionHeader icon={Sparkles} title="Ações" />
-            <ActionGrid count={4}>
-              <ActionBtn
-                testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar"
-                onClick={() => restEmployee(e.id)} disabled={!idle || e.fatigue < 15}
-                title="Recupera 50 de fadiga e +5 moral."
-                blockedReasons={[!idle ? "Operacional indisponível." : null, idle && e.fatigue < 15 ? "Fadiga já baixa." : null].filter(Boolean)}
-                density="dense"
-              />
-              <ActionBtn
-                testId={`emp-promote-${e.id}`} icon={ChevronUp}
-                label={isTopRank ? "Patente máxima" : `Promover ${fmtMoney(promoteCost)}`}
-                onClick={() => promoteEmployee(e.id)}
-                disabled={isTopRank || e.status === "on_mission" || e.level < nextRankReq || money < promoteCost}
-                title={isTopRank ? "Já atingiu a patente máxima." : `Requer nível ${nextRankReq}.`}
-                blockedReasons={[
-                  isTopRank ? "Patente máxima." : null,
-                  !isTopRank && e.status === "on_mission" ? "Operacional em missão." : null,
-                  !isTopRank && e.level < nextRankReq ? `Requer nível ${nextRankReq}.` : null,
-                  !isTopRank && e.level >= nextRankReq && money < promoteCost ? "Dinheiro insuficiente." : null,
-                ].filter(Boolean)}
-                density="dense"
-              />
-              <ActionBtn
-                testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`}
-                onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
-                title="+15 moral e +10 lealdade." blockedReasons={money < bonusCost ? ["Dinheiro insuficiente."] : []}
-                density="dense"
-              />
-              <ConfirmButton
-                testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?"
-                color="text-red-400" onConfirm={() => fireEmployee(e.id)}
-                disabled={e.status === "on_mission" || money < fireCost}
-                tip={e.status === "on_mission" ? "Operacional em missão." : money < fireCost ? "Dinheiro insuficiente." : "Indemnização de 3 salários. Ação irreversível."}
-                density="dense"
-              />
-            </ActionGrid>
           </div>
 
           {(e.history || []).length > 0 && (
@@ -754,12 +754,12 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
           return (
             <>
               <SummaryStrip cols={3} className="mt-2" testId="hr-summary">
+                <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
+                  tip="Fadiga média. Aos 90% um operacional fica indisponível — manda-o descansar (recupera 50)." />
                 <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
                   tip="Moral média do efetivo. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
                 <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
                   tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
-                <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
-                  tip="Fadiga média. Aos 90% um operacional fica indisponível — manda-o descansar (recupera 50)." />
               </SummaryStrip>
               {Object.keys(statusCounts).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">

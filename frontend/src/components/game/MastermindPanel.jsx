@@ -197,8 +197,6 @@ const BoardTab = ({
   const active = mastermind.active_heist;
   return (
     <div className="mt-4 space-y-3">
-      <RankCard rank={mastermind.rank} />
-
       {!active ? (
         <>
           <SectionHeader icon={BriefcaseBusiness} title="Configuração do plano" />
@@ -295,6 +293,8 @@ const BoardTab = ({
           onAbort={onAbort}
         />
       )}
+
+      <RankCard rank={mastermind.rank} />
     </div>
   );
 };
@@ -476,6 +476,17 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
 const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
   <div className="mt-4 space-y-3">
     <SectionHeader icon={Coins} title="Mercado negro dinâmico" />
+    {market.raid_log?.[0] && (
+      <Card className="border-red-500/20 bg-red-500/5 p-3">
+        <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-red-300">
+          <AlertTriangle size={11} /> Última rusga ao armazém
+        </p>
+        <p className="mt-1 text-[10px] text-zinc-500">
+          Perdas: {Object.entries(market.raid_log[0].losses).map(([key, value]) => `${key} ×${value}`).join(" · ")}
+        </p>
+      </Card>
+    )}
+
     <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -499,17 +510,6 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
         />
       </label>
     </Card>
-
-    {market.raid_log?.[0] && (
-      <Card className="border-red-500/20 bg-red-500/5 p-3">
-        <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-red-300">
-          <AlertTriangle size={11} /> Última rusga ao armazém
-        </p>
-        <p className="mt-1 text-[10px] text-zinc-500">
-          Perdas: {Object.entries(market.raid_log[0].losses).map(([key, value]) => `${key} ×${value}`).join(" · ")}
-        </p>
-      </Card>
-    )}
 
     {market.goods.map((good) => {
       const TrendIcon = good.trend === "up" ? TrendingUp : good.trend === "down" ? TrendingDown : Gauge;
