@@ -476,13 +476,14 @@ O núcleo urbano está integrado no estado do jogador e influencia diretamente o
 - **10 tipos de negócios urbanos** com compra, níveis, condição, segurança, rendimento limpo/sujo e calor;
 - bónus sistémicos da rede empresarial aplicados às categorias de operação relevantes;
 - **5 organizações rivais NPC** persistentes com poder, hostilidade, inteligência e pressão territorial;
+- rivais autónomos em janelas de 3 horas: podem sabotar negócios, aumentar calor, pressionar território ou ajudar quando aliados;
 - reconhecimento, sabotagem, pressão, tréguas e acordos com rivais, com custos e cooldowns;
-- temporadas de **30 dias** e leaderboard de pontos;
+- temporadas de **30 dias**, leaderboard e prémios automáticos de pódio com claim atómico;
 - PvP **opt-in**, desafios com consentimento e consequências persistentes;
 - alianças entre jogadores por código de convite;
 - chat/frequência da cidade com limitação de spam;
 - casino clandestino com roleta e blackjack, usando exclusivamente moeda do jogo;
-- saúde/stress do chefe e consequências como hospitalização;
+- saúde/stress do chefe, hospitalização e detenção com impacto real e visível na liderança das operações;
 - modo convidado local com uma simulação equivalente de Cidade Viva para o GitHub Pages.
 
 A Cidade Viva não substitui a preparação das equipas: os seus multiplicadores são deliberadamente limitados e ficam visíveis no preview do despacho.
