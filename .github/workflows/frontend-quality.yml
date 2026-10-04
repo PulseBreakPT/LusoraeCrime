@@ -71,8 +71,8 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           cat ../impeccable-findings.json
-          if [[ "$code" -eq 1 ]]; then
-            exit 1
+          if [[ "$code" -ne 0 ]]; then
+            exit "$code"
           fi
 
       - name: Upload Impeccable findings
@@ -86,8 +86,11 @@ jobs:
 
       - name: Run SUBMUNDO static UI audit
         run: |
+          set +e
           node scripts/ui-quality-audit.mjs > ../ui-quality-audit.json
+          code=$?
           cat ../ui-quality-audit.json
+          exit "$code"
 
       - name: Upload SUBMUNDO UI audit
         if: always()
