@@ -220,7 +220,7 @@ export const advanceLocalCity = (save) => {
 
   if(save.city.boss.hospital_until&&Date.parse(save.city.boss.hospital_until)<=Date.now()) save.city.boss.hospital_until=null;
   if(save.city.boss.sentence_until&&Date.parse(save.city.boss.sentence_until)<=Date.now()) save.city.boss.sentence_until=null;
-  save.city.boss.health=clamp(Number(save.city.boss.health||100),0,100);
+  save.city.boss.health=clamp(Number(save.city.boss.health??100),0,100);
   save.city.boss.stress=clamp(Number(save.city.boss.stress||0),0,100);
   return save;
 };
@@ -242,7 +242,7 @@ export const localBossLeadership = (save) => {
     delta-=Math.min(.025,(Number(boss.stress)-35)/65*.025);
     reasons.push(`stress ${Math.round(Number(boss.stress))}%`);
   }
-  if(Number(boss.health||100)<70){
+  if(Number(boss.health??100)<70){
     delta-=Math.min(.015,(70-Number(boss.health))/70*.015);
     reasons.push(`saúde ${Math.round(Number(boss.health))}%`);
   }
@@ -376,6 +376,6 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
   if(verb==="post"&&path==="/game/city/social/alliance/create"){if(save.city.social.alliance)fail(409,"Já pertences a uma aliança");const name=String(payload.name||"").trim();if(name.length<3)fail(400,"Nome demasiado curto");save.city.social.alliance={id:uid("alliance"),name,code:"LOCAL"+String(Math.floor(Math.random()*900)+100),leader_id:save.player.id,member_ids:[save.player.id],season_points:0,created_at:nowIso()};return {handled:true,data:{ok:true,code:save.city.social.alliance.code}};}
   if(verb==="post"&&path==="/game/city/social/alliance/join")fail(409,"Entrar numa aliança de outros jogadores requer uma conta online");
   if(verb==="post"&&path==="/game/city/social/alliance/leave"){save.city.social.alliance=null;return {handled:true,data:{ok:true}};}
-  if(verb==="post"&&path==="/game/city/boss/recover"){const b=save.city.boss;if(!b.hospital_until&&!b.sentence_until&&b.health>=100)fail(400,"Não há nenhuma consequência ativa para tratar");const cost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0);if(cost)spend(save,cost,"Recuperação do chefe","city_boss_recovery");Object.assign(b,{health:100,stress:Math.max(0,b.stress-30),hospital_until:null,sentence_until:null});pushEvent(save,"system","O chefe regressou à atividade.");return {handled:true,data:{ok:true,cost}};}
+  if(verb==="post"&&path==="/game/city/boss/recover"){const b=save.city.boss;const stress=Number(b.stress||0),health=Number(b.health??100);if(!b.hospital_until&&!b.sentence_until&&health>=100&&stress<35)fail(400,"Não há nenhuma consequência ativa para tratar");const cost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0)+(!b.hospital_until&&!b.sentence_until&&stress>=35?1000:0);if(cost)spend(save,cost,"Recuperação do chefe","city_boss_recovery");Object.assign(b,{health:100,stress:Math.max(0,stress-30),hospital_until:null,sentence_until:null});pushEvent(save,"system","O chefe regressou à atividade.");return {handled:true,data:{ok:true,cost}};}
   return {handled:false};
 };
