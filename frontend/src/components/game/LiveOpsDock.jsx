@@ -250,7 +250,7 @@ export function LiveOpsPanel({ state, serverNow }) {
             ))}
           </div>
         </div>
-        <div className="w-16 shrink-0 text-right" title="Chance ao vivo — a base do plano mais as complicações reveladas. É este o valor que decide o desfecho.">
+        <div className="w-16 shrink-0 text-right" title="Probabilidade atual de sucesso.">
           <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-zinc-500">Chance</p>
           <p
             className={`font-mono text-lg font-bold leading-none tabular-nums ${recentComp ? "sub-lo-chance-pulse" : ""}`}
