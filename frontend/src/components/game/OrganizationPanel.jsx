@@ -35,8 +35,13 @@ const LOADOUT_KEYS = [
 const pct = (v) => Math.max(0, Math.min(100, Number(v || 0)));
 const daysLeft = (iso, now) => iso ? Math.max(0, Math.ceil((Date.parse(iso) - now) / 86400000)) : 0;
 
-const SmallAction = ({ children, ...props }) => (
-  <Button variant="outline" size="sm" className="h-8 border-white/10 bg-white/[0.03] px-2 font-mono text-[10px]" {...props}>
+const SmallAction = ({ children, dense = false, className = "", ...props }) => (
+  <Button
+    variant="outline"
+    size="sm"
+    className={`${dense ? "h-7 min-h-0 px-1.5" : "h-8 min-h-0 px-2"} border-white/10 bg-white/[0.03] font-mono text-[10px] ${className}`}
+    {...props}
+  >
     {children}
   </Button>
 );
@@ -411,10 +416,10 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                    <SmallAction disabled={seized} onClick={() => serviceVehicle(v.id)}><Wrench size={11} /> Revisão</SmallAction>
-                    <SmallAction disabled={seized} onClick={() => replaceVehicleTires(v.id)}><Gauge size={11} /> Pneus</SmallAction>
-                    <SmallAction onClick={() => insureVehicle(v.id)}><Shield size={11} /> Seguro</SmallAction>
-                    <SmallAction disabled={seized} onClick={() => inspectVehicle(v.id)}><ClipboardCheck size={11} /> IPO</SmallAction>
+                    <SmallAction dense disabled={seized} onClick={() => serviceVehicle(v.id)}><Wrench size={10} /> Revisão</SmallAction>
+                    <SmallAction dense disabled={seized} onClick={() => replaceVehicleTires(v.id)}><Gauge size={10} /> Pneus</SmallAction>
+                    <SmallAction dense onClick={() => insureVehicle(v.id)}><Shield size={10} /> Seguro</SmallAction>
+                    <SmallAction dense disabled={seized} onClick={() => inspectVehicle(v.id)}><ClipboardCheck size={10} /> IPO</SmallAction>
                   </div>
                 </Card>
               );
@@ -496,7 +501,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                           variant="outline"
                           disabled={maxed}
                           onClick={() => upgradePropertyModule(p.id, key)}
-                          className="h-auto min-h-12 flex-col border-white/10 bg-white/[0.03] px-1 py-2"
+                          className="h-auto min-h-10 flex-col border-white/10 bg-white/[0.03] px-1 py-1.5"
                         >
                           <span className="text-[10px] text-zinc-300">{mod.name}</span>
                           <span className="font-mono text-[10px] text-zinc-600">N{level}/{mod.max_level}</span>
