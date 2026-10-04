@@ -1,20 +1,10 @@
-import { useMemo } from "react";
-
 /**
  * Chrome partilhado do arranque SSS — usado por BootScreen, LoadingScreen
  * e pela pré-visualização /dev/loading. Puramente visual: toda a lógica
  * de estado permanece nos ecrãs que o consomem.
  */
 
-function makeSessionCode() {
-  const chars = "0123456789ABCDEF";
-  let s = "";
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return `${s.slice(0, 4)}-${s.slice(4)}`;
-}
-
 export function LoadingBackdrop({ children }) {
-  const session = useMemo(makeSessionCode, []);
   return (
     <div className="sub-boot-bg fixed inset-0 z-50 overflow-hidden">
       <div className="sub-boot-sweep" aria-hidden="true" />
@@ -25,19 +15,7 @@ export function LoadingBackdrop({ children }) {
       <div className="sub-boot-vignette" aria-hidden="true" />
 
       <div className="sub-boot-hud sub-boot-hud-top" aria-hidden="true">
-        <span>SUBMUNDO OS // Noir-2.6</span>
-        <span className="sub-boot-ruler" />
-        <span className="hidden sm:inline">Lisboa · 38.7223° N · 9.1393° O</span>
-        <span className="sm:hidden">Lisboa</span>
-      </div>
-      <div className="sub-boot-hud sub-boot-hud-bottom" aria-hidden="true">
-        <span className="sub-boot-rec">
-          <span className="sub-boot-rec-dot" />
-          <span className="hidden sm:inline">Canal cifrado · AES-256</span>
-          <span className="sm:hidden">Cifrado</span>
-        </span>
-        <span className="sub-boot-ruler" />
-        <span>Sessão {session}</span>
+        <span>SUBMUNDO</span>
       </div>
 
       <div className="absolute inset-0 overflow-y-auto">
@@ -49,7 +27,7 @@ export function LoadingBackdrop({ children }) {
   );
 }
 
-export function TacticalFrame({ header = "Ligação segura", status = "Em direto", tone = "ok", children }) {
+export function TacticalFrame({ header = "A iniciar", status = "", tone = "ok", children }) {
   return (
     <div className="sub-frame mx-4 w-full max-w-md animate-slide-up">
       <span className="sub-frame-topline" aria-hidden="true" />
@@ -59,10 +37,12 @@ export function TacticalFrame({ header = "Ligação segura", status = "Em direto
       <span className="sub-frame-ticks sub-frame-ticks-r" aria-hidden="true" />
       <div className="sub-frame-header">
         <span>{header}</span>
-        <span className={tone === "error" ? "sub-frame-status sub-frame-status-error" : "sub-frame-status"}>
-          <span className="sub-frame-status-dot" aria-hidden="true" />
-          {status}
-        </span>
+        {status ? (
+          <span className={tone === "error" ? "sub-frame-status sub-frame-status-error" : "sub-frame-status"}>
+            <span className="sub-frame-status-dot" aria-hidden="true" />
+            {status}
+          </span>
+        ) : null}
       </div>
       {children}
     </div>
@@ -91,11 +71,6 @@ export function TacticalRadar() {
 export function BootWordmark({ statusText }) {
   return (
     <div className="text-center">
-      <p className="sub-eyebrow font-mono text-[10px] uppercase tracking-[0.45em] text-primary/90">
-        <span className="sub-eyebrow-line" aria-hidden="true" />
-        <span>Lisboa · Rede Criminosa</span>
-        <span className="sub-eyebrow-line sub-eyebrow-line-r" aria-hidden="true" />
-      </p>
       <h1 className="sub-boot-logo mt-1.5 font-display text-6xl font-bold uppercase leading-none tracking-tight">
         SUBMUNDO
       </h1>
@@ -104,7 +79,7 @@ export function BootWordmark({ statusText }) {
   );
 }
 
-export function UplinkProgress({ progress, label = "A ligar à organização", meta }) {
+export function UplinkProgress({ progress, label = "A carregar", meta }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress || 0)));
   return (
     <div>
@@ -135,7 +110,7 @@ const STATUS_META = {
   pending: { chip: "—", chipClass: "sub-term-wait", rowClass: "" },
 };
 
-export function TerminalLog({ title = "Registo de sistema", rows }) {
+export function TerminalLog({ title = "Progresso", rows }) {
   return (
     <div className="sub-term">
       <div className="sub-term-head">
