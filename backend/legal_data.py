@@ -601,11 +601,11 @@ CHANGELOG = [
     {
         "version": "0.6.0",
         "date": "2026-07-08",
-        "title": "Autenticação AAA e Transparência Legal",
+        "title": "Conta e documentos legais",
         "tag": "atual",
         "sections": {
             "novidades": [
-                "Experiência de login e registo totalmente redesenhada, com validação em tempo real.",
+                "Login e registo revistos, com validação imediata.",
                 "Indicador de força da palavra-passe com requisitos visíveis antes de submeter.",
                 "Verificação instantânea de disponibilidade do email e do nome da organização.",
                 "Páginas dedicadas: Termos de Serviço, Política de Privacidade, RGPD e Changelog.",
@@ -622,7 +622,7 @@ CHANGELOG = [
                 "Eliminados estados de loading infinito em falhas de rede.",
             ],
             "interface": [
-                "Novo ecrã de autenticação premium com painel de identidade do SUBMUNDO.",
+                "Novo ecrã de autenticação.",
                 "Estados de foco, erro e loading consistentes e acessíveis em todos os campos.",
             ],
         },
@@ -630,21 +630,21 @@ CHANGELOG = [
     {
         "version": "0.5.0",
         "date": "2026-07-07",
-        "title": "Polimento SSS — Cockpit Cinemático",
+        "title": "Melhorias visuais",
         "sections": {
             "novidades": [
-                "Radar tático animado a emanar do QG no mapa e relógio da rede na barra superior.",
+                "Melhorias visuais no mapa e na barra superior.",
                 "Carimbo de celebração 'EQUIPA DESTACADA' ao despachar equipas.",
-                "Ecrãs de arranque com radar, moldura HUD e frases de ambiente noir.",
+                "Ecrãs de arranque revistos.",
             ],
             "melhorias": [
-                "Física de interação nos botões: press-down, brilho e orla metálica.",
-                "Toasts redesenhados como transmissões táticas com barra lateral por tipo.",
-                "Headers de todos os painéis com micro-etiquetas, marcas de água e títulos metálicos.",
+                "Feedback visual melhorado nos botões.",
+                "Notificações visuais mais claras.",
+                "Cabeçalhos dos painéis revistos.",
             ],
             "interface": [
-                "Primitivos globais refinados: cartões glass, badges, selects, switches e barras de progresso.",
-                "Animações de entrada do HUD, pins com bounce e cascata dos cartões.",
+                "Cartões, seletores, interruptores e barras de progresso revistos.",
+                "Animações da interface e marcadores ajustadas.",
                 "Suporte completo a prefers-reduced-motion em todas as animações.",
             ],
         },
@@ -652,16 +652,16 @@ CHANGELOG = [
     {
         "version": "0.4.0",
         "date": "2026-07-03",
-        "title": "Centro de Comando",
+        "title": "Interface e informação",
         "sections": {
             "novidades": [
                 "Barra de recursos com fluxos passivos €/h, estado do calor e countdown de salários.",
                 "Legenda do mapa colapsável e tooltips em todos os marcadores.",
-                "Painel Intel com fortuna total, valor da frota e alertas da organização.",
+                "Relatórios com fortuna total, valor da frota e alertas da organização.",
             ],
             "melhorias": [
-                "Badges inteligentes nos botões do HUD (avarias, missões por reclamar, alertas de RH).",
-                "Summary strips em todos os painéis: Equipas, RH, Frota e Imóveis.",
+                "Indicadores nos botões do HUD para avarias, missões por reclamar e alertas de RH.",
+                "Resumos nos painéis de Equipas, RH, Frota e Imóveis.",
                 "Autonomia em km visível por veículo e impacto salarial ao contratar.",
             ],
             "interface": [
@@ -673,7 +673,7 @@ CHANGELOG = [
     {
         "version": "0.3.0",
         "date": "2026-07-02",
-        "title": "O Coração da Organização — Funcionários",
+        "title": "Efetivo",
         "sections": {
             "novidades": [
                 "14 especializações de funcionários, 6 delas com passivos de organização.",
