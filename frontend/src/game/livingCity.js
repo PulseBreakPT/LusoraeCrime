@@ -152,6 +152,8 @@ export const ensureLocalCity = (save) => {
   ];
   save.city.social.pvp_challenges ||= [];
   save.city.social.pvp_history ||= {};
+  save.city.social.blocked_player_ids ||= [];
+  save.city.social.chat_reports ||= [];
   save.city.boss ||= {health:100,stress:0,hospital_until:null,sentence_until:null};
   return save;
 };
@@ -295,7 +297,10 @@ export const localCitySnapshot = (save) => {
     rival_actions:clone(ACTIONS),
     social:{
       alliance:clone(save.city.social.alliance),
-      chat:clone(save.city.social.chat||[]).slice(0,20),
+      chat:clone(save.city.social.chat||[])
+        .filter((row)=>!save.city.social.blocked_player_ids.includes(String(row.player_id||"")))
+        .slice(0,20),
+      blocked_player_ids:clone(save.city.social.blocked_player_ids),
       pvp_opt_in:!!save.city.social.pvp_opt_in,
       pvp_players:save.city.rivals.map((r)=>({player_id:r.id,org_name:r.name,level:Math.max(1,Math.round(r.power/12)),respect:r.power*180,heat:r.hostility/2})),
       pvp_challenges:clone(save.city.social.pvp_challenges||[]),
@@ -397,7 +402,19 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
   }
   if(verb==="post"&&path==="/game/city/social/pvp/accept")fail(404,"Sem desafios PvP recebidos no modo convidado");
   if(verb==="post"&&path==="/game/city/social/pvp/decline")fail(404,"Sem desafios PvP recebidos no modo convidado");
-  if(verb==="post"&&path==="/game/city/social/chat"){const message=String(payload.message||"").trim();if(!message||message.length>280)fail(400,"Mensagem inválida");save.city.social.chat.unshift({id:uid("chat"),org_name:save.player.org_name,message,ts:nowIso()});save.city.social.chat=save.city.social.chat.slice(0,20);return {handled:true,data:{ok:true}};}
+  if(verb==="post"&&path==="/game/city/social/chat"){const message=String(payload.message||"").trim();if(!message||message.length>280)fail(400,"Mensagem inválida");save.city.social.chat.unshift({id:uid("chat"),player_id:save.player.id,org_name:save.player.org_name,message,ts:nowIso()});save.city.social.chat=save.city.social.chat.slice(0,20);return {handled:true,data:{ok:true}};}
+  if(verb==="post"&&path==="/game/city/social/chat/report"){
+    const row=(save.city.social.chat||[]).find((m)=>m.id===payload.message_id);if(!row)fail(404,"Mensagem não encontrada");
+    if(String(row.player_id||"")===String(save.player.id||""))fail(400,"Não podes denunciar a tua própria mensagem");
+    save.city.social.chat_reports.push({id:uid("report"),message_id:row.id,target_player_id:row.player_id||null,reason:String(payload.reason||"").slice(0,160),created_at:nowIso()});
+    return {handled:true,data:{ok:true}};
+  }
+  if(verb==="post"&&path==="/game/city/social/chat/block"){
+    const id=String(payload.player_id||"");if(!id)fail(400,"Jogador inválido");
+    if(payload.blocked===false)save.city.social.blocked_player_ids=save.city.social.blocked_player_ids.filter((value)=>String(value)!==id);
+    else if(!save.city.social.blocked_player_ids.includes(id))save.city.social.blocked_player_ids.push(id);
+    return {handled:true,data:{ok:true,player_id:id,blocked:payload.blocked!==false}};
+  }
   if(verb==="post"&&path==="/game/city/social/alliance/create"){if(save.city.social.alliance)fail(409,"Já pertences a uma aliança");const name=String(payload.name||"").trim();if(name.length<3)fail(400,"Nome demasiado curto");save.city.social.alliance={id:uid("alliance"),name,code:"LOCAL"+String(Math.floor(Math.random()*900)+100),leader_id:save.player.id,member_ids:[save.player.id],season_points:0,created_at:nowIso()};return {handled:true,data:{ok:true,code:save.city.social.alliance.code}};}
   if(verb==="post"&&path==="/game/city/social/alliance/join")fail(409,"Entrar numa aliança de outros jogadores requer uma conta online");
   if(verb==="post"&&path==="/game/city/social/alliance/leave"){save.city.social.alliance=null;return {handled:true,data:{ok:true}};}
