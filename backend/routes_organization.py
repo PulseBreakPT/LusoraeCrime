@@ -822,18 +822,33 @@ async def service_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
     )
     cost = max(60, base_cost - int(material_credit * 0.70))
     await _debit(player, cost, stat="vehicle_services")
-    inventory_inc = {}
+    consumed = {}
+    material_query = {"_id": player["_id"]}
+    material_inc = {}
     if use_fluids:
-        inventory_inc["inventory.service_fluids"] = -1
+        material_query["inventory.service_fluids"] = {"$gte": 1}
+        material_inc["inventory.service_fluids"] = -1
+        consumed["service_fluids"] = 1
     if use_parts:
-        inventory_inc["inventory.vehicle_parts"] = -1
-    if inventory_inc:
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": inventory_inc})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
-        "condition": min(100.0, float(vehicle.get("condition", 100)) + 18),
-        "last_service_km": float(vehicle.get("km_total", 0) or 0),
-        "missions_since_repair": 0,
-    }, "$inc": {"repair_spent_total": cost}})
+        material_query["inventory.vehicle_parts"] = {"$gte": 1}
+        material_inc["inventory.vehicle_parts"] = -1
+        consumed["vehicle_parts"] = 1
+    if material_inc:
+        material_result = await db.players.update_one(material_query, {"$inc": material_inc})
+        if material_result.matched_count != 1:
+            await _refund_debit(player, cost, stat="vehicle_services")
+            raise HTTPException(status_code=409, detail="O stock de oficina mudou antes da revisão")
+    service_result = await db.vehicles.update_one(
+        {"_id": vehicle["_id"], "player_id": pid, "condition": vehicle.get("condition", 100)},
+        {"$set": {
+            "condition": min(100.0, float(vehicle.get("condition", 100)) + 18),
+            "last_service_km": float(vehicle.get("km_total", 0) or 0),
+            "missions_since_repair": 0,
+        }, "$inc": {"repair_spent_total": cost}},
+    )
+    if service_result.matched_count != 1:
+        await _refund_debit(player, cost, stat="vehicle_services", restore_inventory=consumed)
+        raise HTTPException(status_code=409, detail="O veículo mudou antes da revisão; nada foi cobrado")
     materials = [name for flag, name in ((use_fluids, "consumíveis"), (use_parts, "peças")) if flag]
     note = f"Revisão de {vehicle.get('name','veículo')}"
     if materials:
