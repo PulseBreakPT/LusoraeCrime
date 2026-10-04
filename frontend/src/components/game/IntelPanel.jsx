@@ -73,6 +73,7 @@ const OrganizationRecords = () => {
 
   const valueOf = (record) => {
     if (record.key === "best_mission") return fmtMoney(record.value);
+    if (record.key === "clutch_success") return `${Number(record.value || 0).toLocaleString("pt-PT")}%`;
     if (record.key === "road_car") return `${Number(record.value || 0).toLocaleString("pt-PT")} km`;
     return Number(record.value || 0).toLocaleString("pt-PT");
   };
