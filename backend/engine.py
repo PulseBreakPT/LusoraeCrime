@@ -2120,9 +2120,15 @@ async def _resolve_chase(db, player, m):
         # Advogado na equipa (SSS v4): trata da papelada mal chegam à esquadra.
         lawyer_mult = LAWYER_ARREST_MULT if m.get("has_lawyer") else 1.0
         until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]) * lawyer_mult)).isoformat()
+        sentence = {
+            "reason": m.get("opportunity", {}).get("name", "perseguição policial"),
+            "started_at": now_utc().isoformat(),
+            "release_at": until,
+            "heat_at_arrest": player.get("heat", 0),
+        }
         await db.employees.update_one(
             {"_id": ObjectId(victim_id)},
-            {"$set": {"status": "arrested", "status_until": until}},
+            {"$set": {"status": "arrested", "status_until": until, "sentence": sentence}},
         )
         emp = await db.employees.find_one({"_id": ObjectId(victim_id)})
         if emp:
