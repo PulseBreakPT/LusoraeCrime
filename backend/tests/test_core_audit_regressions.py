@@ -1,7 +1,7 @@
 """Regression checks for the SSS gameplay audit fixes."""
 from datetime import datetime, timezone
 
-from engine import hour_allowed
+from time_rules import portugal_hour_allowed
 from game_data import operation_profile_of
 from reward_engine import calculate_money_reward
 from travel_metrics import road_mission_metrics
@@ -10,9 +10,9 @@ from travel_metrics import road_mission_metrics
 def test_operation_hours_follow_portugal_local_time():
     # 1 July 2026: Lisbon is UTC+1. 21:30 UTC is 22:30 local and the
     # 22:00-05:00 VIP window must already be open.
-    assert hour_allowed("operacao_vip", datetime(2026, 7, 1, 21, 30, tzinfo=timezone.utc))
+    assert portugal_hour_allowed((22, 5), datetime(2026, 7, 1, 21, 30, tzinfo=timezone.utc))
     # 20:30 UTC is 21:30 local: still closed.
-    assert not hour_allowed("operacao_vip", datetime(2026, 7, 1, 20, 30, tzinfo=timezone.utc))
+    assert not portugal_hour_allowed((22, 5), datetime(2026, 7, 1, 20, 30, tzinfo=timezone.utc))
 
 
 def test_road_metrics_use_real_out_and_return_distances():

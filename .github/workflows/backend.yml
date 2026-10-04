@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate Python syntax
-        run: python -m py_compile backend/engine.py backend/routes_game.py backend/routes_organization.py backend/organization_systems.py backend/models.py backend/retention_engine.py backend/road_routing.py backend/travel_metrics.py backend/auth.py backend/reward_engine.py backend/server.py
+        run: python -m py_compile backend/engine.py backend/routes_game.py backend/routes_organization.py backend/organization_systems.py backend/models.py backend/retention_engine.py backend/road_routing.py backend/travel_metrics.py backend/time_rules.py backend/auth.py backend/reward_engine.py backend/server.py
 
       - name: Test Portugal economy
         run: python backend/tests/test_economy_portugal_2026.py

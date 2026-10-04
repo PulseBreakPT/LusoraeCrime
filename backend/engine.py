@@ -3,7 +3,6 @@ import logging
 import math
 import random
 from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
 from bson import ObjectId
 
 from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LEVEL_XP,
@@ -112,8 +111,7 @@ from economy_constants import (
 )
 from economy_calendar import next_weekly_settlement, is_weekly_settlement
 from game_data import operation_profile_of
-
-PORTUGAL_TZ = ZoneInfo("Europe/Lisbon")
+from time_rules import portugal_hour_allowed
 
 from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
@@ -762,17 +760,7 @@ def duration_reward_mult(duration_s):
 
 def hour_allowed(type_key, now):
     """Algumas oportunidades só aparecem nas horas locais configuradas para Portugal."""
-    hours = OPPORTUNITY_TYPES[type_key].get("hours")
-    if not hours:
-        return True
-    start, end = hours
-    # O resto da economia já trabalha em Europe/Lisbon. Usar UTC aqui fazia
-    # operações noturnas abrir uma hora errada durante o horário de verão.
-    local_now = now.astimezone(PORTUGAL_TZ) if now.tzinfo else now.replace(tzinfo=timezone.utc).astimezone(PORTUGAL_TZ)
-    h = local_now.hour
-    if start <= end:
-        return start <= h < end
-    return h >= start or h < end  # intervalo que atravessa a meia-noite
+    return portugal_hour_allowed(OPPORTUNITY_TYPES[type_key].get("hours"), now)
 
 
 def age_decay_mult(age_s):
