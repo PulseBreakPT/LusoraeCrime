@@ -147,11 +147,6 @@ class Vehicle(BaseDocument):
     property_id: Optional[str] = None
     transfer: Optional[dict] = None
     paint_key: Optional[str] = None
-    # Cidade Viva — notoriedade afeta perseguições; seguro reduz o tempo/custo
-    # de recuperação e a apreensão bloqueia qualquer novo despacho.
-    street_notoriety: float = 0.0
-    insured: bool = False
-    impounded_until: Optional[str] = None
 
 
 class Weapon(BaseDocument):
