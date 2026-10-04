@@ -82,6 +82,7 @@ from economy_constants import (
     VEHICLE_REPAIR_BASE_MULTIPLIER, PROPERTY_MAINTENANCE_PCT_PER_WEEK,
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
+from retention_engine import build_retention_snapshot, mission_decision, world_pulse
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
                                DRIVER_TRAVEL_REDUCTION_MAX,
@@ -211,6 +212,11 @@ class VehicleRenameInput(BaseModel):
 
 class MissionIdInput(BaseModel):
     mission_id: str
+
+
+class MissionDecisionInput(BaseModel):
+    mission_id: str
+    option_id: str
 
 
 class VehicleAssignInput(BaseModel):
