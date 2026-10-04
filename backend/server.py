@@ -157,6 +157,8 @@ async def startup():
     await db.missions.create_index([("player_id", 1), ("phase", 1)])
     await db.events.create_index([("player_id", 1), ("ts", -1)])
     await db.transactions.create_index([("player_id", 1), ("ts", -1)])
+    await db.action_receipts.create_index("key", unique=True)
+    await db.action_receipts.create_index("expires_at", expireAfterSeconds=0)
     await db.quests.create_index([("player_id", 1), ("status", 1)])
     await db.road_routes.create_index("key", unique=True)
     await db.road_routes.create_index("expires_at")
