@@ -22,7 +22,7 @@ from organization_systems import (
     inventory_capacity,
     inventory_used,
     normalize_inventory,
-    protection_cost,
+    protection_cost, logistics_cost_multiplier,
 )
 
 DEFAULT_ORG_POLICY = {
@@ -426,7 +426,7 @@ def quote_action(
         if not cfg:
             reasons.append("Consumível inválido.")
         else:
-            cost = int(cfg["price"]) * packs
+            cost = max(1, int(int(cfg["price"]) * packs * logistics_cost_multiplier(player)))
             effect = f"+{int(cfg['pack']) * packs} {cfg['name']}"
             if int(player.get("level", 1) or 1) < int(cfg.get("min_level", 1) or 1):
                 reasons.append(f"Requer nível {cfg['min_level']}.")
