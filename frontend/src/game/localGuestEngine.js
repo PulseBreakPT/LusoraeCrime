@@ -264,7 +264,7 @@ const makeOpportunities = (save, count = 5) => {
 
     generated.push({
       id: uid("opp"), type_key: typeKey, name: cfg.name, category: cfg.category,
-      description: "Oportunidade local detetada pela rede de inteligência da organização.",
+      description: "Oportunidade disponível nesta zona.",
       district: district.name || "Zona operacional", district_key: districtKey,
       lat: point.lat, lng: point.lng,
       risk: tier, reward,
@@ -1000,7 +1000,7 @@ const addStarterWorld=(save,lat,lng)=>{
   save.player.districts=makeDistricts(lat,lng);
   save.street.districts=[];
   save.opportunities=makeOpportunities(save,5);
-  addEvent(save,"system","Quartel-General estabelecido. A rede local começou a gerar oportunidades.");
+  addEvent(save,"system","Quartel-General estabelecido. Já há oportunidades disponíveis na zona.");
 };
 
 const refreshCandidates=(save)=>{
