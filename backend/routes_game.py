@@ -1052,6 +1052,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         heat=player.get("heat", 0), has_leader=prep.get("has_leader", False),
         vehicle_name=vehicle_name, memory=player.get("phrase_memory"),
     )
+    decision = mission_decision(opp["category"], opp["risk"], arrive, finish)
 
     mission = {
         "player_id": pid, "team_id": str(team["_id"]), "team_name": team["name"],
@@ -1102,6 +1103,9 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
         "finish_at": finish.isoformat(), "return_at": ret.isoformat(),
         "live_log": live_log, "live_chance_delta": live_delta,
+        "decision": decision,
+        "decision_reward_mult": 1.0,
+        "world_pulse": prep.get("world_pulse"),
     }
     result = await db.missions.insert_one(mission)
     await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
