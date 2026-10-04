@@ -4,6 +4,7 @@ from datetime import timedelta
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from pymongo import ReturnDocument
 
 from auth import get_current_user
 from db import db
@@ -40,7 +41,7 @@ async def _debit(player: dict, amount: int, *, stat: str | None = None) -> dict:
     fresh = await db.players.find_one_and_update(
         {"_id": player["_id"], "clean_money": {"$gte": int(amount)}},
         {"$inc": inc},
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
     if not fresh:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
@@ -145,7 +146,7 @@ async def sell_supply(body: SupplyTradeInput, user: dict = Depends(get_current_u
     fresh = await db.players.find_one_and_update(
         {"_id": player["_id"], path: {"$gte": units}},
         {"$inc": {path: -units, "clean_money": int(cfg["price"] * body.packs * 0.45)}},
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
     if not fresh:
         raise HTTPException(status_code=400, detail="Stock insuficiente")
