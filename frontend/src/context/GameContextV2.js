@@ -817,6 +817,34 @@ export function GameProvider({ children }) {
       return { ok: false };
     }
   }, []);
+  const fetchOrganizationIntelligence = useCallback(async () => {
+    try {
+      const { data } = await api.get("/game/org/intelligence");
+      return { ok: true, data };
+    } catch (_e) {
+      return { ok: false };
+    }
+  }, []);
+  const fetchOrganizationAudit = useCallback(async (limit = 50) => {
+    try {
+      const { data } = await api.get(`/game/org/audit?limit=${limit}`);
+      return { ok: true, data };
+    } catch (_e) {
+      return { ok: false };
+    }
+  }, []);
+  const quoteOrganizationAction = useCallback(async (organizationAction, payload = {}) => {
+    try {
+      const { data } = await api.post("/game/org/quote", { action: organizationAction, payload });
+      return { ok: true, data };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  }, []);
+  const setOrganizationPolicy = (policy) =>
+    action("org/policy", policy, "Política da organização atualizada");
+  const runOrganizationAutomation = () =>
+    action("org/automation/run", {}, "Automação da organização executada");
 
   // Mastermind — grandes golpes, mercado negro, caçadores rivais e caches.
   const scoutMastermindTarget = (payload) => action("mastermind/heists/intel", payload, "Dossiê atualizado");
@@ -1015,6 +1043,11 @@ export function GameProvider({ children }) {
         buyPrestige,
         buyProtection,
         fetchFinanceSummary,
+        fetchOrganizationIntelligence,
+        fetchOrganizationAudit,
+        quoteOrganizationAction,
+        setOrganizationPolicy,
+        runOrganizationAutomation,
         scoutMastermindTarget,
         createMastermindHeist,
         startHeistPrep,
