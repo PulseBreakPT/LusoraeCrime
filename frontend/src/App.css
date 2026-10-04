@@ -5212,3 +5212,161 @@ html[data-sub-panel-origin="menu"] .sub-sheet-panel { --panel-origin-x: calc(50%
         padding-inline: 0.32rem !important;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO MODAL SYSTEM V4 — one modal language everywhere
+   Todos os menus partilham a mesma janela central, sem caudas,
+   âncoras, balões ou dimensões específicas por módulo.
+   ============================================================ */
+
+.sub-sheet-panel {
+    --panel-origin-x: 50% !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: min(46rem, calc(100vw - 1.5rem)) !important;
+    min-width: 0 !important;
+    max-width: min(46rem, calc(100vw - 1.5rem)) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: min(82dvh, 48rem) !important;
+    transform: translate(-50%, -50%) !important;
+    transform-origin: center center !important;
+    border: 1px solid rgba(255, 255, 255, 0.085) !important;
+    border-radius: 18px !important;
+    background: #0a0a0d !important;
+    background-image: none !important;
+    box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(255, 255, 255, 0.015) inset !important;
+    overflow: visible !important;
+}
+
+.sub-sheet-panel::before,
+.sub-sheet-panel::after {
+    content: none !important;
+    display: none !important;
+}
+
+.sub-sheet-scroll {
+    width: 100% !important;
+    max-height: min(78dvh, 45rem) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    border-radius: 17px !important;
+    scrollbar-gutter: stable;
+}
+
+.sub-sheet-panel .sub-sheet-scroll > [class*="sticky"][class*="top-0"] {
+    border-top-left-radius: 17px !important;
+    border-top-right-radius: 17px !important;
+}
+
+/* Cabeçalho idêntico em todos os módulos. */
+.sub-sheet-panel .sub-sheet-title {
+    min-height: 1.5rem;
+    font-size: 17px !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.035em !important;
+}
+
+.sub-sheet-panel .sub-sheet-description {
+    max-width: 36rem !important;
+    color: #71717a !important;
+}
+
+.sub-sheet-panel .sub-sheet-close {
+    top: 0.8rem !important;
+    right: 0.8rem !important;
+    width: 2rem !important;
+    height: 2rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #71717a !important;
+}
+
+.sub-sheet-panel .sub-sheet-close:hover,
+.sub-sheet-panel .sub-sheet-close:focus-visible {
+    border-color: rgba(255, 255, 255, 0.07) !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: #f4f4f5 !important;
+    box-shadow: none !important;
+}
+
+/* Neutraliza larguras específicas antigas dos módulos. */
+.sub-sheet-panel[class*="sm:!w-"],
+.sub-sheet-panel[class*="lg:!w-"],
+.sub-sheet-panel[class*="max-w-"] {
+    width: min(46rem, calc(100vw - 1.5rem)) !important;
+    max-width: min(46rem, calc(100vw - 1.5rem)) !important;
+}
+
+/* Conteúdo: mesma cadência vertical em todos os menus. */
+.sub-sheet-panel .sub-summary-strip,
+.sub-sheet-panel .sub-kpi-grid,
+.sub-sheet-panel .sub-action-list {
+    border-radius: 12px !important;
+}
+
+.sub-sheet-panel .sub-doss-card,
+.sub-sheet-panel .sub-card {
+    box-shadow: none !important;
+}
+
+/* Mobile continua a ser modal central, nunca bottom-sheet. */
+@media (max-width: 639px) {
+    .sub-sheet-panel {
+        top: 50% !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: calc(100vw - 1rem) !important;
+        max-width: calc(100vw - 1rem) !important;
+        max-height: 86dvh !important;
+        transform: translate(-50%, -50%) !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-bottom: 0.9rem !important;
+        border-radius: 17px !important;
+    }
+
+    .sub-sheet-scroll {
+        max-height: 82dvh !important;
+        border-radius: 16px !important;
+        scrollbar-gutter: auto;
+    }
+
+    .sub-sheet-panel .sub-sheet-title {
+        font-size: 16px !important;
+    }
+
+    .sub-sheet-panel .sub-sheet-description {
+        display: block !important;
+        max-width: calc(100% - 2rem) !important;
+        font-size: 10px !important;
+        line-height: 1.45 !important;
+    }
+}
+
+/* Ecrãs muito baixos: preserva sempre margem acima e abaixo. */
+@media (max-height: 640px) {
+    .sub-sheet-panel {
+        max-height: calc(100dvh - 1rem) !important;
+    }
+
+    .sub-sheet-scroll {
+        max-height: calc(100dvh - 3rem) !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sub-sheet-panel {
+        transition: none !important;
+    }
+}
