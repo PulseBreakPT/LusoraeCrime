@@ -3408,6 +3408,15 @@ async def advance(db, player):
                 cooled[k] = nv
         player["district_attention"] = cooled
     apply_dirty_money_heat(player, minutes / 60)
+
+    # Governance é uma relação viva: confiança degrada lentamente sem contacto;
+    # exposição arrefece mais depressa quando a rede não é usada.
+    if minutes > 0:
+        governance = dict(player.get("governance") or {})
+        governance["trust"] = round(max(0.0, float(governance.get("trust", 0) or 0) - (minutes / 60.0) * 0.03), 3)
+        governance["exposure"] = round(max(0.0, float(governance.get("exposure", 0) or 0) - (minutes / 60.0) * 0.10), 3)
+        player["governance"] = governance
+
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
 
@@ -3437,6 +3446,7 @@ async def advance(db, player):
         "frac_territory": player.get("frac_territory", 0.0),
         "organization_event": player.get("organization_event"),
         "next_organization_event_at": player.get("next_organization_event_at"),
+        "governance": player.get("governance", {}),
     }})
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player
