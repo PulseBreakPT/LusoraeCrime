@@ -8,6 +8,11 @@ sys.path.insert(0, str(BACKEND))
 
 from economy_constants import (
     INITIAL_CLEAN_MONEY,
+    MAX_ORG_LEVEL,
+    LEGACY_LEVEL_THRESHOLDS,
+    LEVEL_THRESHOLDS,
+    HQ_MAX_LEVEL,
+    HQ_LEVEL_BENEFITS,
     EMPLOYER_SOCIAL_SECURITY_RATE,
     PROPERTY_MAINTENANCE_PCT_PER_DAY,
     PROPERTY_MAINTENANCE_PCT_PER_WEEK,
@@ -31,6 +36,12 @@ from economy_calendar import next_weekly_settlement, is_weekly_settlement, PORTU
 
 def run():
     assert INITIAL_CLEAN_MONEY == 100000
+    assert MAX_ORG_LEVEL == 100
+    assert len(LEVEL_THRESHOLDS) == 100
+    assert LEVEL_THRESHOLDS[:10] == LEGACY_LEVEL_THRESHOLDS
+    assert all(a < b for a, b in zip(LEVEL_THRESHOLDS, LEVEL_THRESHOLDS[1:]))
+    assert HQ_MAX_LEVEL == 10
+    assert HQ_LEVEL_BENEFITS[-1]["min_org_level"] == 100
     assert EMPLOYER_SOCIAL_SECURITY_RATE == 0.2375
     assert FUEL_PRICES == {"gasolina": 2.12, "gasoleo": 2.22}
     assert 0 < PROPERTY_MAINTENANCE_PCT_PER_DAY < 0.0002
