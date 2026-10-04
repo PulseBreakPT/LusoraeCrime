@@ -2742,43 +2742,6 @@ html:has(.sub-page-bg) {
     border-left-color: color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 85%, transparent);
 }
 
-/* Placa do emblema: fundo blindado com grelha diagonal + halo do tier. */
-.sub-team-plate {
-    background:
-        radial-gradient(58px 30px at 50% 52%, color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 16%, transparent), transparent 78%),
-        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
-        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
-}
-
-/* Varrimento de luz sobre a placa quando o cartão recebe hover. */
-.sub-team-plate::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
-    background-size: 240% 100%;
-    background-position: 130% 0;
-    pointer-events: none;
-}
-
-.sub-team-card:hover .sub-team-plate::after {
-    background-position: -80% 0;
-    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.sub-team-glyph {
-    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .sub-team-card:hover .sub-team-plate::after {
-        transition: none;
-        background-position: 130% 0;
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
     .sub-weapon-card:hover .sub-weapon-plate::after {
         transition: none;
@@ -3507,42 +3470,6 @@ html:has(.sub-page-bg) {
 .sub-doss-card:hover {
     border-left-color: color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 85%, transparent);
 }
-
-.sub-doss-plate {
-    background:
-        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 15%, transparent), transparent 76%),
-        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
-        linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
-}
-
-.sub-doss-plate::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 58%, transparent 68%);
-    background-size: 240% 100%;
-    background-position: 130% 0;
-    pointer-events: none;
-}
-
-.sub-doss-card:hover .sub-doss-plate::after {
-    background-position: -80% 0;
-    transition: background-position 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.sub-doss-glyph {
-    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65));
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .sub-doss-card:hover .sub-doss-plate::after {
-        transition: none;
-        background-position: 130% 0;
-    }
-}
-
 
 /* ============================================================
    General Improvements Pack — accessibility and HUD profiles
