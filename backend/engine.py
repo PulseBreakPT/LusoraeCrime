@@ -1848,6 +1848,29 @@ def _record_terminal_mission_stats(player, m, outcome):
     """Regista exatamente um resultado terminal por operação."""
     stats = ensure_stats(player)
     stats["missions_total"] = stats.get("missions_total", 0) + 1
+    records = player.setdefault("records", {})
+    if outcome in ("success", "partial"):
+        reward = int(m.get("pending_reward", 0) or 0)
+        best = records.get("best_mission") or {}
+        if reward > int(best.get("value", 0) or 0):
+            records["best_mission"] = {
+                "value": reward,
+                "team_name": m.get("team_name", "Equipa"),
+                "operation": (m.get("opportunity") or {}).get("name", "Operação"),
+                "district": (m.get("opportunity") or {}).get("district"),
+                "chance": round(float(m.get("final_chance", m.get("success_chance", 0)) or 0), 3),
+                "at": now_utc().isoformat(),
+            }
+        chance = float(m.get("final_chance", m.get("success_chance", 1)) or 1)
+        clutch = records.get("lowest_chance_success") or {}
+        if outcome == "success" and chance < float(clutch.get("chance", 1.01) or 1.01):
+            records["lowest_chance_success"] = {
+                "chance": round(chance, 3),
+                "team_name": m.get("team_name", "Equipa"),
+                "operation": (m.get("opportunity") or {}).get("name", "Operação"),
+                "reward": reward,
+                "at": now_utc().isoformat(),
+            }
     cat = m["opportunity"].get("category")
     if cat:
         stats["by_category"][cat] = stats["by_category"].get(cat, 0) + 1
