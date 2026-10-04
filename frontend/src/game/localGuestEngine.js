@@ -1711,6 +1711,16 @@ const mutateGame=(save,path,payload)=>{
       }
       team.loadout=next; return {ok:true};
     }
+    if(path==="org/teams/preset"){
+      if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
+      const preset=org.team_presets?.[p.preset_key];if(!preset)fail(400,"Preset inválido");
+      const loadout={},skipped=[];
+      (preset.loadout||[]).forEach((key)=>{if(Number(inventory[key]||0)>0)loadout[key]=1;else skipped.push(key);});
+      team.doctrine=preset.doctrine||"balanced";
+      team.policies={abort_below_pct:0,protect_injured:true,auto_use_medical:true,auto_use_armor:true,...(preset.policies||{})};
+      team.loadout=loadout;
+      return {ok:true,preset_key:p.preset_key,preset_name:preset.name,doctrine:team.doctrine,policies:{...team.policies},loadout:{...loadout},skipped_out_of_stock:skipped};
+    }
     if(path==="org/teams/dissolve"){
       if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
       save.employees.forEach((e)=>{if(e.team_id===team.id)e.team_id=null;});
