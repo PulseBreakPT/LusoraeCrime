@@ -16,7 +16,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-180",
+      "fixed inset-0 z-50 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
       className
     )}
     {...props}
@@ -28,7 +28,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 // full-width em mobile, 27rem em tablet, 30rem em desktop — os painéis
 // não devem sobrepor larguras próprias (organização > improviso).
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-4 pt-0 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-260 data-[state=closed]:duration-180 sm:p-6 sm:pt-0",
+  "fixed z-50 gap-4 bg-background p-4 pt-0 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-300 data-[state=closed]:duration-200 sm:p-6 sm:pt-0",
   {
     variants: {
       side: {
