@@ -239,7 +239,9 @@ const missionRewardForOpportunity = (save, risk, category, distKm, rare, seedInd
   const variation = 0.92 + ((seedIndex * 7) % 17) / 100;
   const raw = base * levelMult * categoryMult * distanceMult * rareMult * variation;
   const rounded = Math.round(raw / 100) * 100;
-  return clamp(rounded, Number(meta.min || 1500), Number(meta.max || 90000));
+  const lateLevels = Math.max(0, Math.min(100, orgLevel) - 10);
+  const rewardCap = Number(meta.max || 90000) + lateLevels * Number(meta.max_late_per_level || 2500);
+  return clamp(rounded, Number(meta.min || 1500), rewardCap);
 };
 
 const makeOpportunities = (save, count = 5) => {
