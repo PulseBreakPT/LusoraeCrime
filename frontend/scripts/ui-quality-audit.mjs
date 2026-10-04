@@ -42,7 +42,7 @@ function scanSharedHudImports(file, source) {
   const normalized = file.replaceAll("\\", "/");
   if (!normalized.includes("/components/game/") || normalized.endsWith("/components/game/hud.jsx")) return;
 
-  const importMatch = source.match(/import\s*\{([\s\S]*?)\}\s*from\s*["']\.\/hud["'];?/);
+  const importMatch = source.match(/import\s*\{([^}]*)\}\s*from\s*["']\.\/hud["'];?/);
   const imported = new Set(
     (importMatch?.[1] || "")
       .split(",")
