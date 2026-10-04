@@ -183,20 +183,10 @@ async def advance_rival_world(db, player, rivals, businesses, now=None):
     """
     now = now or _utc_now()
     slot = int(now.timestamp() // (3 * 3600))
-    lock = await db.players.update_one(
-        {
-            "_id": player["_id"],
-            "$or": [
-                {"city_rival_slot": {"$exists": False}},
-                {"city_rival_slot": {"$lt": slot}},
-            ],
-        },
-        {"$set": {"city_rival_slot": slot}},
-    )
-    if lock.modified_count != 1 or not rivals:
-        return None
-
     pid = str(player["_id"])
+
+    # Primeira sincronização apenas fixa o relógio rival. Não dispara uma
+    # agressão imediatamente após a funcionalidade ser criada/ativada.
     if player.get("city_rival_slot") is None:
         grace = await db.players.update_one(
             {"_id": player["_id"], "city_rival_slot": {"$exists": False}},
@@ -205,6 +195,14 @@ async def advance_rival_world(db, player, rivals, businesses, now=None):
         if grace.modified_count == 1:
             player["city_rival_slot"] = slot
             return {"kind": "grace", "rival": None, "message": None}
+
+    lock = await db.players.update_one(
+        {"_id": player["_id"], "city_rival_slot": {"$lt": slot}},
+        {"$set": {"city_rival_slot": slot}},
+    )
+    if lock.modified_count != 1 or not rivals:
+        return None
+    player["city_rival_slot"] = slot
 
     rng = random.Random(_seed_int(pid, slot, "rival-auto"))
     rival = rivals[rng.randrange(len(rivals))]
