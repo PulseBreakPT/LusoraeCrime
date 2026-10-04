@@ -12,7 +12,7 @@ import {
 } from "../components/loading/LoadingChrome";
 
 /**
- * Pré-visualização de desenvolvimento do ecrã de loading SSS.
+ * Pré-visualização de desenvolvimento do ecrã de loading.
  * Rota: /dev/loading (estado normal) e /dev/loading?state=error (falha).
  * Simula a progressão das etapas em loop — não toca em contextos reais.
  */
@@ -42,7 +42,7 @@ export default function DevLoadingPreview() {
   if (isError) {
     return (
       <LoadingBackdrop>
-        <TacticalFrame header="Falha de uplink" status="Interrompido" tone="error">
+        <TacticalFrame header="Erro de ligação" status="Interrompido" tone="error">
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <span className="sub-alert-icon">
@@ -83,7 +83,7 @@ export default function DevLoadingPreview() {
           <UplinkProgress
             progress={progress}
             label="A ligar à organização"
-            meta={`${String(doneCount).padStart(2, "0")}/${String(STAGES.length).padStart(2, "0")} módulos`}
+            meta={`${String(doneCount).padStart(2, "0")}/${String(STAGES.length).padStart(2, "0")} etapas`}
           />
           <TerminalLog rows={rows} />
           <FlavorRotator />
