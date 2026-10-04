@@ -94,7 +94,7 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <Card data-testid={testId} className="h-full rounded-lg sub-card p-2.5 shadow-none">
+    <Card data-testid={testId} className="sub-kpi h-full rounded-lg sub-card p-2.5 shadow-none">
       <p className="flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
         {Icon && <Icon size={10} style={{ color }} />} <span className="truncate">{label}</span>
       </p>
@@ -118,7 +118,7 @@ const STRIP_COLS = {
 export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => (
   <div
     data-testid={testId}
-    className={`grid gap-1.5 ${STRIP_COLS[cols] || ""} ${className}`}
+    className={`sub-summary-strip grid gap-1.5 ${STRIP_COLS[cols] || ""} ${className}`}
     style={STRIP_COLS[cols] ? undefined : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
   >
     {children}
