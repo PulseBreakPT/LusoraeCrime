@@ -89,7 +89,8 @@ from organization_systems import (
     normalize_inventory, inventory_capacity, inventory_used, territory_weekly_cost,
     territory_income_per_hour, territory_reward_bonus, fixed_cost_multiplier,
     doctrine_effect, loadout_effect, default_team_policies, ensure_employee_profile,
-    apply_weapon_upgrades, weapon_ammo_status,
+    apply_weapon_upgrades, weapon_ammo_status, prestige_effects, department_level,
+    logistics_cost_multiplier,
 )
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
@@ -613,7 +614,10 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         "employees": {"used": len(employees), "max": caps["employees"]},
         "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
         "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
-        "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
+        "dirty_money": {
+            "used": round(player["dirty_money"]),
+            "max": dirty_money_cap(player["level"]) + prestige_effects(player)["dirty_cap_increase"],
+        },
     }
     retention = build_retention_snapshot(
         now=now_utc(),
@@ -663,6 +667,9 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
             "departments": player.get("departments") or {},
             "territories": player.get("territories") or {},
             "territory_income_h": territory_income_per_hour(player),
+            "prestige_items": player.get("prestige_items") or [],
+            "prestige_effects": prestige_effects(player),
+            "governance": player.get("governance") or {},
         },
         "fuel_prices": FUEL_PRICES,
         "hot_category": hot_category(now_utc()),
@@ -692,6 +699,9 @@ async def _prepare_dispatch(player, opp, team):
     vehicle = await db.vehicles.find_one({"_id": ObjectId(team["vehicle_id"]), "player_id": pid})
     if not vehicle:
         raise HTTPException(status_code=400, detail="Veículo não encontrado")
+    if vehicle.get("seized_until") and parse_dt(vehicle["seized_until"]) > now:
+        remaining = round((parse_dt(vehicle["seized_until"]) - now).total_seconds())
+        raise HTTPException(status_code=400, detail=f"Veículo apreendido — disponível em {remaining}s")
     if vehicle["condition"] < 30:
         raise HTTPException(status_code=400, detail="O veículo precisa de reparação")
     if vehicle.get("refueling_until") and parse_dt(vehicle["refueling_until"]) > now_utc():
@@ -839,19 +849,30 @@ async def _prepare_dispatch(player, opp, team):
         wm = WEAPON_MODELS.get(w.get("model_key"))
         if not wm:
             continue
-        weapon_powers.append(wm.get("power", 0))
+        wm = apply_weapon_upgrades(wm, w)
+        ammo = weapon_ammo_status(w.get("model_key", ""), wm, w)
+        weapon_powers.append(wm.get("power", 0) * (1.0 if ammo["ammo_key"] is None else ammo["fraction"]))
         jr = weapon_jam_risk(wm, w.get("condition", 100))
         if jr > 0:
             emp = emp_by_id.get(eid)
             weapon_jam_profile.append({
                 "weapon_id": str(w["_id"]), "weapon_name": w.get("name", wm["name"]),
                 "emp_name": (emp or {}).get("name", "?"), "jam_risk": round(jr, 3),
+                "ammo_loaded": ammo["loaded"], "ammo_capacity": ammo["capacity"],
             })
     weapon_power_avg = round(sum(weapon_powers) / len(members), 1) if weapon_powers else 0.0
     weapon_alerts = [
         f"{wj['weapon_name']} de {wj['emp_name']}: risco de encravar ≈ {round(wj['jam_risk'] * 100)}%"
         for wj in weapon_jam_profile if wj["jam_risk"] >= WEAPON_JAM_WARN_RISK
     ]
+    for eid, w in weapons_by_employee_id.items():
+        wm = apply_weapon_upgrades(WEAPON_MODELS.get(w.get("model_key"), {}), w)
+        ammo = weapon_ammo_status(w.get("model_key", ""), wm, w)
+        if ammo["ammo_key"] is not None and ammo["fraction"] < 0.35:
+            emp = emp_by_id.get(eid)
+            weapon_alerts.append(
+                f"{w.get('name', wm.get('name', 'Arma'))} de {(emp or {}).get('name', '?')}: munição baixa ({ammo['loaded']}/{ammo['capacity']})"
+            )
 
     # Novo sistema de recompensas dinâmicas — calcula baseado em dificuldade real
     # opp["duration_s"] é sempre um único int (gerado em spawn_opportunities), não um intervalo.
@@ -886,9 +907,13 @@ async def _prepare_dispatch(player, opp, team):
     # Aplicar multiplicadores existentes uma única vez. Antes, "mult" entrava
     # no reward_engine e voltava a ser multiplicado aqui, inflacionando o saque.
     territory_bonus = territory_reward_bonus(player, opp.get("district"))
+    prestige = prestige_effects(player)
+    prestige_reward = float(prestige.get("mission_bonus", 0.0))
+    if spec_match:
+        prestige_reward += float(prestige.get("spec_bonus", 0.0))
     reward = int(
         reward_data["money"] * mult * pulse_reward_mult * age_mult * split_mult
-        * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus)
+        * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward)
     )
     reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
 
@@ -902,7 +927,9 @@ async def _prepare_dispatch(player, opp, team):
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
-        "reward": reward, "reward_mult": mult * pulse_reward_mult, "age_mult": age_mult, "split_mult": split_mult,
+        "reward": reward,
+        "reward_mult": mult * pulse_reward_mult * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward),
+        "age_mult": age_mult, "split_mult": split_mult,
         "world_pulse": mission_pulse,
         "reward_difficulty_score": reward_data["difficulty_score"],
         "reward_xp": reward_data["xp"],
@@ -927,6 +954,7 @@ async def _prepare_dispatch(player, opp, team):
         "loadout": loadout,
         "loadout_injury_mult": float(loadout_fx.get("injury", 1.0)),
         "territory_bonus": territory_bonus,
+        "prestige_reward_bonus": prestige_reward,
     }
 
 
@@ -1628,22 +1656,23 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=404, detail="Candidato já não está disponível")
     if player["respect"] < cand["min_respect"]:
         raise HTTPException(status_code=400, detail=f"Requer {cand['min_respect']:,} respeito para recrutar {RARITIES[cand['rarity']]['name']}")
-    if player["clean_money"] < cand["cost"]:
+    recruit_cost = max(0, int(cand["cost"] * (1.0 - 0.05 * department_level(player, "rh"))))
+    if player["clean_money"] < recruit_cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     caps, _ = await get_caps(db, pid, player["hq"]["level"])
     used = await db.employees.count_documents({"player_id": pid})
     if used >= caps["employees"]:
         raise HTTPException(status_code=400, detail="Sem capacidade. Compra ou melhora um esconderijo.")
     doc = employee_from_candidate(cand, now_utc().isoformat())
-    inc = {"clean_money": -cand["cost"], "stats.recruits_hired": 1}
+    inc = {"clean_money": -recruit_cost, "stats.recruits_hired": 1}
     if cand["role_key"] == "informador":
         inc["stats.recruits_informador"] = 1
     await db.players.update_one({"_id": player["_id"]}, {"$inc": inc})
     await db.employees.insert_one(doc)
     await db.candidates.delete_one({"_id": cand["_id"]})
     role_name = SPECIALIZATIONS[cand["role_key"]]["name"]
-    await add_event(db, pid, "team", f"{cand['name']} ({role_name}, {RARITIES[cand['rarity']]['name']}) recrutado por {cand['cost']:,} €.")
-    await record_tx(db, pid, "recruit", -cand["cost"], "clean", player["clean_money"] - cand["cost"], f"Recrutamento de {cand['name']}")
+    await add_event(db, pid, "team", f"{cand['name']} ({role_name}, {RARITIES[cand['rarity']]['name']}) recrutado por {recruit_cost:,} €.")
+    await record_tx(db, pid, "recruit", -recruit_cost, "clean", player["clean_money"] - recruit_cost, f"Recrutamento de {cand['name']}")
     return {"ok": True}
 
 
@@ -1692,7 +1721,7 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
     affected_ids = {tid for tid in (old_team_id, body.team_id) if tid}
     if affected_ids:
         now_iso = now_utc().isoformat()
-        reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
+        reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S * max(0.6, 1.0 - 0.10 * department_level(player, "comunicacoes")))).isoformat()
         await db.teams.update_many(
             {"_id": {"$in": [ObjectId(tid) for tid in affected_ids]}, "player_id": pid},
             {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until, "roster_missions": 0}},
@@ -1710,16 +1739,17 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
     emp = await _get_employee(pid, body.employee_id)
     if emp["status"] != "idle":
         raise HTTPException(status_code=400, detail="Operacional está ocupado")
-    if player["clean_money"] < course["cost"]:
+    training_cost = max(0, int(course["cost"] * (1.0 - 0.06 * department_level(player, "rh"))))
+    if player["clean_money"] < training_cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    ends = now_utc() + timedelta(seconds=course["duration_s"])
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -course["cost"]}})
+    ends = now_utc() + timedelta(seconds=course["duration_s"] * max(0.72, 1.0 - 0.08 * department_level(player, "rh")))
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -training_cost}})
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
         "status": "training",
         "training": {"course_key": body.course_key, "ends_at": ends.isoformat()},
     }})
     await add_event(db, pid, "team", f"{emp['name']} iniciou a formação {course['name']}.")
-    await record_tx(db, pid, "training", -course["cost"], "clean", player["clean_money"] - course["cost"], f"Formação {course['name']} de {emp['name']}")
+    await record_tx(db, pid, "training", -training_cost, "clean", player["clean_money"] - training_cost, f"Formação {course['name']} de {emp['name']}")
     return {"ok": True}
 
 
@@ -1803,7 +1833,7 @@ async def heal_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "idle", "status_until": None}})
+    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "idle", "status_until": None, "injury": None, "stress": max(0.0, float(emp.get("stress", 10) or 0) - 12)}})
     await push_history(db, emp["_id"], "Tratado na clínica clandestina.")
     await add_event(db, pid, "team", f"{emp['name']} tratado na clínica clandestina por {cost:,} €.")
     await record_tx(db, pid, "heal", -cost, "clean", player["clean_money"] - cost, f"Clínica para {emp['name']}")
@@ -1823,7 +1853,7 @@ async def release_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
-        "status": "idle", "status_until": None,
+        "status": "idle", "status_until": None, "sentence": None,
         "loyalty": min(100.0, emp.get("loyalty", 70) + 8),
     }})
     await push_history(db, emp["_id"], "Libertado com ajuda do advogado.")
@@ -1937,7 +1967,7 @@ async def optimize_employees(user: dict = Depends(get_current_user)):
         changes.append({"employee": emp_by_id[eid].get("name", "?"), "to": team_by_id[tid].get("name", "?")})
     # Mudar o plantel quebra a coordenação — mesmo efeito do assign manual.
     now_iso = now_utc().isoformat()
-    reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S)).isoformat()
+    reorg_until = (now_utc() + timedelta(seconds=REORG_AFTER_ROSTER_CHANGE_S * max(0.6, 1.0 - 0.10 * department_level(player, "comunicacoes")))).isoformat()
     await db.teams.update_many(
         {"_id": {"$in": [ObjectId(tid) for tid in affected]}, "player_id": pid},
         {"$set": {"roster_stable_since": now_iso, "available_at": reorg_until, "roster_missions": 0}},
@@ -2017,7 +2047,7 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     missing = vehicle["tank_l"] - vehicle["fuel_l"]
     if missing <= 0.1:
         raise HTTPException(status_code=400, detail="Depósito já está cheio")
-    cost = math.ceil(missing * FUEL_PRICES[vehicle["fuel_type"]])
+    cost = math.ceil(missing * FUEL_PRICES[vehicle["fuel_type"]] * logistics_cost_multiplier(player))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     duration_s = REFUEL_DURATION_BASE_S + REFUEL_DURATION_PER_L_S * missing
@@ -2113,7 +2143,7 @@ async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_
     origin = await resolve_mission_origin(db, player, vehicle)
     to_lat, to_lng = (to_prop["lat"], to_prop["lng"]) if to_prop else (player["hq"]["lat"], player["hq"]["lng"])
     dist_km = haversine_m(origin["lat"], origin["lng"], to_lat, to_lng) / 1000
-    cost = max(VEHICLE_TRANSFER_COST_MIN, round(dist_km * VEHICLE_TRANSFER_COST_PER_KM))
+    cost = max(VEHICLE_TRANSFER_COST_MIN, round(dist_km * VEHICLE_TRANSFER_COST_PER_KM * logistics_cost_multiplier(player)))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     duration_s = VEHICLE_TRANSFER_DURATION_BASE_S + VEHICLE_TRANSFER_DURATION_PER_KM_S * dist_km
