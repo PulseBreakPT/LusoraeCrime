@@ -4373,3 +4373,336 @@ html.sub-focus-mode .sub-optional-hud {
         font-size: 8px;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO MENU SYSTEM V2 — SOLID SURFACES
+   Menus e notificações sem gradientes decorativos. A hierarquia
+   passa a depender de contraste, espaçamento, bordas e estado.
+   ============================================================ */
+
+.sub-panel {
+    background: #0a0a0d !important;
+    background-image: none !important;
+    border-color: rgba(255, 255, 255, 0.085) !important;
+    backdrop-filter: blur(10px) saturate(1.05);
+    -webkit-backdrop-filter: blur(10px) saturate(1.05);
+    box-shadow:
+        -18px 0 54px rgba(0, 0, 0, 0.46),
+        0 22px 70px rgba(0, 0, 0, 0.55) !important;
+}
+
+.sub-panel::before {
+    display: none !important;
+}
+
+.sub-panel .sub-card {
+    background: #101014 !important;
+    background-image: none !important;
+    border-color: rgba(255, 255, 255, 0.07) !important;
+    box-shadow: none !important;
+}
+
+.sub-panel .sub-card:hover {
+    background: #121217 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.sub-sheet-title {
+    background: none !important;
+    -webkit-background-clip: border-box !important;
+    background-clip: border-box !important;
+    color: #f4f4f5 !important;
+    text-shadow: none !important;
+}
+
+.sub-watermark {
+    display: none !important;
+}
+
+.sub-empty {
+    background: #0f0f13 !important;
+    background-image: none !important;
+    border-style: solid !important;
+    border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.sub-empty-icon {
+    background: #17171b !important;
+    border-color: rgba(239, 68, 68, 0.24) !important;
+    box-shadow: none !important;
+}
+
+/* Navegação principal: menos "HUD", mais interface de produto. */
+.sub-dock {
+    background: #0b0b0e !important;
+    background-image: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 14px;
+    box-shadow:
+        0 16px 42px rgba(0, 0, 0, 0.46),
+        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+}
+
+.sub-dock::before,
+.sub-dock::after {
+    display: none !important;
+}
+
+.sub-hud-btn {
+    background: #111115 !important;
+    background-image: none !important;
+    border-color: rgba(255, 255, 255, 0.075) !important;
+    box-shadow: none !important;
+    transition:
+        background-color 140ms ease,
+        border-color 140ms ease,
+        color 140ms ease,
+        transform 140ms ease !important;
+}
+
+.sub-hud-btn:hover {
+    transform: none !important;
+    background: #17171c !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    box-shadow: none !important;
+}
+
+.sub-hud-btn-active {
+    background: rgba(220, 38, 38, 0.14) !important;
+    background-image: none !important;
+    border-color: rgba(239, 68, 68, 0.34) !important;
+    box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.86) !important;
+}
+
+.sub-dock .sub-hud-btn {
+    border-radius: 10px !important;
+    background: transparent !important;
+}
+
+.sub-dock .sub-hud-btn:hover {
+    background: rgba(255, 255, 255, 0.045) !important;
+}
+
+.sub-dock .sub-hud-btn-active {
+    background: rgba(220, 38, 38, 0.13) !important;
+    border-color: rgba(239, 68, 68, 0.26) !important;
+    box-shadow: inset 0 -2px 0 #dc2626 !important;
+}
+
+.sub-nav-tray {
+    padding: 7px !important;
+    border: 1px solid rgba(255, 255, 255, 0.085) !important;
+    border-radius: 14px !important;
+    background: #0c0c0f !important;
+    box-shadow:
+        0 18px 48px rgba(0, 0, 0, 0.52),
+        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.sub-nav-action {
+    min-height: 54px !important;
+    border: 1px solid transparent !important;
+    background: rgba(255, 255, 255, 0.018) !important;
+    transition:
+        background-color 130ms ease,
+        border-color 130ms ease,
+        color 130ms ease !important;
+}
+
+.sub-nav-action:hover {
+    background: rgba(255, 255, 255, 0.055) !important;
+    border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.sub-nav-action.is-active {
+    background: rgba(220, 38, 38, 0.11) !important;
+    border-color: rgba(239, 68, 68, 0.22) !important;
+    box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.78);
+}
+
+/* Definições: grupos planos, com separadores claros e menos caixas. */
+.sub-settings-section {
+    background: #0f0f13 !important;
+}
+
+.sub-settings-section > .sub-settings-row + .sub-settings-row {
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.sub-settings-row {
+    transition: background-color 120ms ease;
+}
+
+.sub-settings-row:hover {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.sub-settings-advanced {
+    box-shadow: none !important;
+}
+
+/* Notificações: superfície dedicada, densa mas legível. */
+.sub-notification-panel {
+    background: #0b0b0e !important;
+    background-image: none !important;
+    border-color: rgba(255, 255, 255, 0.09) !important;
+    box-shadow:
+        0 22px 60px rgba(0, 0, 0, 0.58),
+        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+}
+
+.sub-notify-head {
+    background: #0f0f13;
+}
+
+.sub-notify-tabs button {
+    position: relative;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.sub-notify-tabs button[aria-selected="true"] {
+    color: #fafafa !important;
+    box-shadow: inset 0 -2px 0 #dc2626 !important;
+}
+
+.sub-notify-tabs .sub-lo-rec {
+    width: 5px;
+    height: 5px;
+    animation: none !important;
+    box-shadow: none !important;
+}
+
+.sub-notify-filters {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.sub-feed-chip {
+    padding: 4px 8px !important;
+    border-radius: 7px !important;
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.075) !important;
+    color: #71717a !important;
+    letter-spacing: 0.04em !important;
+    text-transform: none !important;
+}
+
+.sub-feed-chip:hover {
+    background: rgba(255, 255, 255, 0.035) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: #d4d4d8 !important;
+}
+
+.sub-feed-chip.is-active {
+    background: rgba(220, 38, 38, 0.12) !important;
+    background-image: none !important;
+    border-color: rgba(239, 68, 68, 0.26) !important;
+    color: #fecaca !important;
+    box-shadow: none !important;
+}
+
+.sub-feed-row {
+    border-radius: 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+    background: transparent !important;
+}
+
+.sub-feed-row:last-child {
+    border-bottom: 0;
+}
+
+.sub-feed-row:hover {
+    background: rgba(255, 255, 255, 0.028) !important;
+}
+
+.sub-feed-row::before {
+    top: 9px !important;
+    bottom: 9px !important;
+    left: 0 !important;
+    width: 2px !important;
+}
+
+.sub-feed-row[data-sev="crit"] {
+    background: rgba(239, 68, 68, 0.025) !important;
+}
+
+.sub-feed-row[data-sev="crit"]:hover {
+    background: rgba(239, 68, 68, 0.055) !important;
+}
+
+.sub-feed-ico {
+    width: 27px !important;
+    height: 27px !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+.sub-feed-sep {
+    margin: 8px 2px 4px !important;
+    color: #52525b !important;
+    letter-spacing: 0.12em !important;
+}
+
+.sub-feed-sep::after {
+    background: rgba(255, 255, 255, 0.055) !important;
+}
+
+.sub-feed-unread {
+    border: 0 !important;
+    background: #dc2626 !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+
+.sub-notification-trigger {
+    background: #101014 !important;
+    border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.sub-activity-ticker {
+    padding: 7px 9px !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 10px !important;
+    background: rgba(10, 10, 13, 0.92) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.36) !important;
+    text-shadow: none !important;
+}
+
+/* Painel de operação dentro das notificações: remove scan/glow decorativo. */
+.sub-notification-panel .sub-lo {
+    background: #0d0d11 !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.sub-notification-panel .sub-lo::before,
+.sub-notification-panel .sub-lo-scan,
+.sub-notification-panel .sub-lo-caret {
+    display: none !important;
+}
+
+@media (max-width: 640px) {
+    .sub-notification-panel {
+        border-radius: 16px !important;
+    }
+
+    .sub-nav-tray {
+        border-radius: 13px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sub-nav-action,
+    .sub-settings-row,
+    .sub-hud-btn {
+        transition: none !important;
+    }
+}
