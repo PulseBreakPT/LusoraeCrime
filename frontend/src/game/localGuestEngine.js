@@ -384,10 +384,85 @@ const createInitialSave = () => {
   };
 };
 
+const ensureOrganizationSave = (save) => {
+  const org = LOCAL_CATALOG.organization || {};
+  save.player.inventory ||= {};
+  Object.keys(org.supplies || {}).forEach((key) => {
+    save.player.inventory[key] = Math.max(0, Number(save.player.inventory[key] || 0));
+  });
+  save.player.departments ||= {};
+  save.player.territories ||= {};
+  save.player.prestige_items ||= [];
+  save.player.governance ||= {};
+  (save.teams || []).forEach((team) => {
+    team.doctrine ||= "balanced";
+    team.policies ||= { abort_below_pct:0, protect_injured:true, auto_use_medical:true, auto_use_armor:true };
+    team.loadout ||= {};
+  });
+  (save.vehicles || []).forEach((vehicle) => {
+    vehicle.km_total = Number(vehicle.km_total ?? vehicle.km ?? 0);
+    vehicle.last_service_km = Number(vehicle.last_service_km || 0);
+    vehicle.tires_pct = Number(vehicle.tires_pct ?? 100);
+    vehicle.insurance_until ||= null;
+    vehicle.inspection_due_at ||= null;
+    vehicle.notoriety = Number(vehicle.notoriety || 0);
+    vehicle.seized_until ||= null;
+  });
+  (save.weapons || []).forEach((weapon) => {
+    weapon.loaded_rounds = Number(weapon.loaded_rounds || 0);
+    weapon.upgrades ||= {};
+  });
+  (save.properties || []).forEach((property) => {
+    property.security_level = Number(property.security_level || 0);
+    property.storage_level = Number(property.storage_level || 0);
+    property.operations_level = Number(property.operations_level || 0);
+    property.staff_employee_ids ||= [];
+  });
+  (save.employees || []).forEach((employee) => {
+    employee.stationed_property_id ||= null;
+  });
+  return save;
+};
+
+const orgInventoryCapacity = (save) => {
+  const org = LOCAL_CATALOG.organization || {};
+  const hqLevel = Number(save.player.hq?.level || 1);
+  let cap = 60 + hqLevel * 20 + Number(save.player.departments?.logistica || 0) * 40;
+  for (const property of save.properties || []) {
+    const level = Math.max(1, Number(property.level || 1));
+    if (property.type_key === "armazem") cap += 90 * level;
+    else if (property.type_key === "centro_logistico") cap += 140 * level;
+    else if (property.type_key === "arsenal") cap += 45 * level;
+    else if (["garagem","esconderijo"].includes(property.type_key)) cap += 20 * level;
+    cap += Number(property.storage_level || 0) * 45;
+  }
+  return Math.max(0, Math.round(cap));
+};
+
+const orgInventoryUsed = (save) => {
+  const supplies = LOCAL_CATALOG.organization?.supplies || {};
+  return Object.entries(supplies).reduce(
+    (sum,[key,cfg]) => sum + Number(cfg.space || 0) * Number(save.player.inventory?.[key] || 0),
+    0
+  );
+};
+
+const orgTerritoryIncome = (save) => {
+  const tiers = LOCAL_CATALOG.organization?.territory_tiers || {};
+  return Object.values(save.player.territories || {}).reduce((sum,info) => {
+    const cfg = tiers[Number(info?.tier || 0)] || {};
+    const pressure = clamp(Number(info?.pressure || 0),0,100);
+    return sum + Math.trunc(Number(cfg.income_h || 0) * (1 - pressure / 160));
+  },0);
+};
+
+const orgProtectionCost = (save) =>
+  save.player.level < 5 ? 0 : 25000 + (save.employees?.length || 0) * 1000 + (save.properties?.length || 0) * 2000;
+
 const loadSave = () => {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return createInitialSave();
+    if (!raw) return ensureOrganizationSave(createInitialSave());
     const save = JSON.parse(raw);
     if (!save || typeof save !== "object") return createInitialSave();
     if (!save.version) save.version = 1;
@@ -400,6 +475,7 @@ const loadSave = () => {
     normalizeSavedEvents(save);
     normalizeSavedStats(save);
     normalizeSavedEconomy(save);
+    ensureOrganizationSave(save);
     save.version = LOCAL_GUEST_SAVE_VERSION;
     persist(save);
     return save;
@@ -1048,6 +1124,7 @@ const localRetention=(save,caps)=>{
 };
 
 const publicState=(save)=>{
+  ensureOrganizationSave(save);
   if(!save.player.hq){
     return {hq_pending:true,server_time:nowIso(),player:{
       id:save.player.id,org_name:save.player.org_name,clean_money:save.player.clean_money,
@@ -1087,6 +1164,18 @@ const publicState=(save)=>{
       };
     })(),
     fuel_prices:clone(LOCAL_CATALOG.fuel_prices),
+    organization:{
+      inventory:clone(save.player.inventory),
+      inventory_used:Number(orgInventoryUsed(save).toFixed(2)),
+      inventory_capacity:orgInventoryCapacity(save),
+      departments:clone(save.player.departments),
+      territories:clone(save.player.territories),
+      territory_income_h:orgTerritoryIncome(save),
+      prestige_items:clone(save.player.prestige_items),
+      prestige_effects:{},
+      governance:clone(save.player.governance),
+      protection_cost:orgProtectionCost(save),
+    },
     hot_category:"assalto",
   };
 };
@@ -1362,6 +1451,183 @@ const mutateGame=(save,path,payload)=>{
     if(path==="properties/rename"){pr.name=String(p.name||pr.name).slice(0,40);return {ok:true};}
     if(path==="properties/optimize")return {ok:true,message:"Portefólio revisto — nenhuma alteração urgente necessária."};
   }
+  if(path.startsWith("org/")){
+    ensureOrganizationSave(save);
+    const org = LOCAL_CATALOG.organization || {};
+    const inventory = save.player.inventory;
+
+    if(path==="org/inventory/buy"){
+      const cfg=org.supplies?.[p.item_key]; const packs=Math.max(1,Math.min(25,Number(p.packs||1)));
+      if(!cfg)fail(400,"Item inválido");
+      if(save.player.level<Number(cfg.min_level||1))fail(400,"Nível insuficiente");
+      const quantity=Number(cfg.pack||1)*packs;
+      const needed=Number(cfg.space||0)*quantity;
+      if(orgInventoryUsed(save)+needed>orgInventoryCapacity(save)+1e-9)fail(400,"Armazenamento insuficiente");
+      const cost=Number(cfg.price||0)*packs;
+      chargeClean(save,cost,`Abastecimento — ${cfg.name}`);
+      inventory[p.item_key]=Number(inventory[p.item_key]||0)+quantity;
+      return {ok:true,cost,quantity};
+    }
+    if(path==="org/inventory/sell"){
+      const cfg=org.supplies?.[p.item_key]; const packs=Math.max(1,Math.min(25,Number(p.packs||1)));
+      if(!cfg)fail(400,"Item inválido");
+      const quantity=Number(cfg.pack||1)*packs;
+      if(Number(inventory[p.item_key]||0)<quantity)fail(400,"Stock insuficiente");
+      const value=Math.trunc(Number(cfg.price||0)*packs*.45);
+      inventory[p.item_key]-=quantity; save.player.clean_money+=value;
+      tx(save,"sale",value,"clean",`Venda de stock — ${cfg.name}`);
+      return {ok:true,value,quantity};
+    }
+
+    const team=save.teams.find((x)=>x.id===p.id);
+    if(path==="org/teams/rename"){
+      if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
+      team.name=String(p.name||team.name).trim().slice(0,40)||team.name; return {ok:true};
+    }
+    if(path==="org/teams/doctrine"){
+      if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
+      if(!org.team_doctrines?.[p.doctrine])fail(400,"Doutrina inválida");
+      team.doctrine=p.doctrine; return {ok:true};
+    }
+    if(path==="org/teams/policies"){
+      if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
+      const next={...(team.policies||{})};
+      for(const [key,cfg] of Object.entries(org.team_policies||{})){
+        if(!(key in (p.policies||{})))continue;
+        if(key==="abort_below_pct") next[key]=clamp(Number(p.policies[key]||0),Number(cfg.min||0),Number(cfg.max||60));
+        else next[key]=!!p.policies[key];
+      }
+      team.policies=next; return {ok:true};
+    }
+    if(path==="org/teams/loadout"){
+      if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
+      const next={};
+      for(const [key,qtyRaw] of Object.entries(p.loadout||{})){
+        if(!org.supplies?.[key])continue;
+        const qty=Math.max(0,Math.min(4,Number(qtyRaw||0)));
+        if(qty>Number(inventory[key]||0))fail(400,`Stock insuficiente: ${org.supplies[key].name}`);
+        if(qty>0)next[key]=qty;
+      }
+      team.loadout=next; return {ok:true};
+    }
+    if(path==="org/teams/dissolve"){
+      if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
+      save.employees.forEach((e)=>{if(e.team_id===team.id)e.team_id=null;});
+      save.vehicles.forEach((v)=>{if(v.team_id===team.id)v.team_id=null;});
+      save.teams=save.teams.filter((x)=>x.id!==team.id); return {ok:true};
+    }
+
+    const weapon=save.weapons.find((x)=>x.id===(p.id||p.weapon_id));
+    if(path==="org/weapons/reload"){
+      if(!weapon)fail(404,"Arma não encontrada");
+      const model=LOCAL_CATALOG.weapon_models?.[weapon.model_key]||{};
+      const ammoKey=org.weapon_ammo?.[weapon.model_key];
+      if(!ammoKey)fail(400,"Esta arma não usa munições");
+      const cap=Number(model.magazine_capacity||0), loaded=Number(weapon.loaded_rounds||0);
+      const need=Math.max(0,cap-loaded), available=Number(inventory[ammoKey]||0), used=Math.min(need,available);
+      if(used<=0)fail(400,need<=0?"Carregador cheio":"Sem munições no stock");
+      inventory[ammoKey]-=used; weapon.loaded_rounds=loaded+used; return {ok:true,used};
+    }
+    if(path==="org/weapons/upgrade"){
+      if(!weapon)fail(404,"Arma não encontrada");
+      const cfg=org.weapon_upgrades?.[p.upgrade_key]; if(!cfg)fail(400,"Upgrade inválido");
+      if(save.player.level<Number(cfg.min_level||1))fail(400,"Nível insuficiente");
+      weapon.upgrades ||= {}; const rank=Number(weapon.upgrades[p.upgrade_key]||0);
+      if(rank>=Number(cfg.max_rank||0))fail(400,"Upgrade no nível máximo");
+      const cost=Math.trunc(Number(cfg.cost||0)*(1+rank*.65)); chargeClean(save,cost,`Upgrade de arma — ${cfg.name}`);
+      weapon.upgrades[p.upgrade_key]=rank+1; return {ok:true,cost,rank:rank+1};
+    }
+
+    const vehicle=save.vehicles.find((x)=>x.id===p.id);
+    if(path==="org/vehicles/service"){
+      if(!vehicle)fail(404,"Veículo não encontrado");
+      const assigned=vehicle.team_id?save.teams.find((t)=>t.id===vehicle.team_id):null;
+      if(assigned&&assigned.status!=="idle")fail(400,"Veículo em operação");
+      const lc=org.vehicle_lifecycle||{}, missing=Math.max(0,100-Number(vehicle.condition||0));
+      const cost=Math.max(120,Math.trunc(Number(vehicle.price||LOCAL_CATALOG.vehicle_models?.[vehicle.model_key]?.price||0)*Number(lc.service_base_pct||.018)+missing*8));
+      chargeClean(save,cost,"Revisão de veículo"); vehicle.condition=100; vehicle.last_service_km=Number(vehicle.km_total??vehicle.km??0);
+      vehicle.notoriety=Math.max(0,Number(vehicle.notoriety||0)-10); return {ok:true,cost};
+    }
+    if(path==="org/vehicles/tires"){
+      if(!vehicle)fail(404,"Veículo não encontrado");
+      const tire=org.supplies?.tire_set||{}; let cost=0;
+      if(Number(inventory.tire_set||0)>0)inventory.tire_set-=1;
+      else{cost=Number(tire.price||520);chargeClean(save,cost,"Jogo de pneus");}
+      vehicle.tires_pct=100; return {ok:true,cost};
+    }
+    if(path==="org/vehicles/insurance"){
+      if(!vehicle)fail(404,"Veículo não encontrado");
+      const lc=org.vehicle_lifecycle||{}, value=Number(vehicle.price||LOCAL_CATALOG.vehicle_models?.[vehicle.model_key]?.price||0);
+      const cost=Math.max(80,Math.trunc(value*Number(lc.insurance_week_pct||.0012)*4));
+      chargeClean(save,cost,"Seguro da frota"); vehicle.insurance_until=new Date(Date.now()+Number(lc.insurance_days||28)*86400000).toISOString();
+      return {ok:true,cost};
+    }
+    if(path==="org/vehicles/inspection"){
+      if(!vehicle)fail(404,"Veículo não encontrado");
+      if(Number(vehicle.condition||0)<55||Number(vehicle.tires_pct??100)<35)fail(400,"Condição ou pneus insuficientes para IPO");
+      const lc=org.vehicle_lifecycle||{}, cost=Number(lc.inspection_base||85); chargeClean(save,cost,"Inspeção periódica");
+      vehicle.inspection_due_at=new Date(Date.now()+Number(lc.inspection_days||365)*86400000).toISOString(); return {ok:true,cost};
+    }
+
+    const property=save.properties.find((x)=>x.id===p.property_id);
+    if(path==="org/properties/module"){
+      if(!property)fail(404,"Propriedade não encontrada");
+      const cfg=org.property_modules?.[p.module_key]; if(!cfg)fail(400,"Módulo inválido");
+      const field=`${p.module_key}_level`, level=Number(property[field]||0);
+      if(level>=Number(cfg.max_level||0))fail(400,"Módulo no nível máximo");
+      const cost=Math.trunc(Number(cfg.base_cost||0)*(1+level*.75)*Number(property.market_multiplier||1));
+      chargeClean(save,cost,`Módulo — ${cfg.name}`); property[field]=level+1; return {ok:true,cost,level:level+1};
+    }
+    if(path==="org/properties/staff"){
+      if(!property)fail(404,"Propriedade não encontrada");
+      const ids=[...new Set(p.employee_ids||[])].slice(0,4);
+      const selected=ids.map((id)=>save.employees.find((e)=>e.id===id));
+      if(selected.some((e)=>!e))fail(404,"Operacional não encontrado");
+      if(selected.some((e)=>e.status!=="idle"||e.team_id||(e.stationed_property_id&&e.stationed_property_id!==property.id)))fail(400,"Operacional indisponível");
+      save.employees.forEach((e)=>{if(e.stationed_property_id===property.id&&!ids.includes(e.id))e.stationed_property_id=null;});
+      selected.forEach((e)=>{e.stationed_property_id=property.id;}); property.staff_employee_ids=ids; return {ok:true};
+    }
+
+    if(path==="org/departments/upgrade"){
+      const cfg=org.departments?.[p.department_key]; if(!cfg)fail(400,"Departamento inválido");
+      const hq=Number(save.player.hq?.level||1), level=Number(save.player.departments[p.department_key]||0);
+      if(hq<Number(cfg.unlock_hq||1))fail(400,`Requer QG nível ${cfg.unlock_hq}`);
+      if(level>=Number(cfg.max_level||0))fail(400,"Departamento no nível máximo");
+      const cost=Math.trunc(Number(cfg.base_cost||0)*(1+level*.75)); chargeClean(save,cost,`Departamento — ${cfg.name}`);
+      save.player.departments[p.department_key]=level+1; return {ok:true,cost,level:level+1};
+    }
+
+    const tiers=org.territory_tiers||{};
+    if(path==="org/territories/claim"){
+      if(save.player.level<5)fail(400,"Requer nível 5");
+      if(save.player.territories[p.district])fail(400,"Território já controlado");
+      const cost=Number(tiers[1]?.cost||55000); chargeClean(save,cost,`Expansão territorial — ${p.district}`);
+      save.player.territories[p.district]={tier:1,defense:55,pressure:10,claimed_at:nowIso()}; return {ok:true,cost};
+    }
+    if(path==="org/territories/consolidate"){
+      const info=save.player.territories[p.district]; if(!info)fail(404,"Território não controlado");
+      const next=tiers[Number(info.tier||1)+1]; if(!next)fail(400,"Território no nível máximo");
+      const cost=Number(next.cost||0); chargeClean(save,cost,`Consolidação territorial — ${p.district}`);
+      info.tier=Number(info.tier||1)+1; info.defense=Math.min(100,Number(info.defense||0)+18); info.pressure=Math.max(0,Number(info.pressure||0)-12); return {ok:true,cost};
+    }
+    if(path==="org/territories/defend"){
+      const info=save.player.territories[p.district]; if(!info)fail(404,"Território não controlado");
+      const cfg=tiers[Number(info.tier||1)]||{}; const cost=Math.max(500,Math.trunc(Number(cfg.defense_weekly||0)*1.5));
+      chargeClean(save,cost,`Defesa territorial — ${p.district}`); info.defense=Math.min(100,Number(info.defense||0)+28); info.pressure=Math.max(0,Number(info.pressure||0)-18); return {ok:true,cost};
+    }
+    if(path==="org/prestige/buy"){
+      const cfg=org.prestige?.[p.item_key]; if(!cfg)fail(400,"Investimento inválido");
+      if(save.player.level<Number(cfg.unlock_level||1))fail(400,"Nível insuficiente");
+      if(save.player.prestige_items.includes(p.item_key))fail(400,"Investimento já adquirido");
+      chargeClean(save,Number(cfg.cost||0),`Prestígio — ${cfg.name}`); save.player.prestige_items.push(p.item_key); return {ok:true,cost:Number(cfg.cost||0)};
+    }
+    if(path==="org/governance/protection"){
+      const cost=orgProtectionCost(save); if(cost<=0)fail(400,"Requer nível 5");
+      chargeClean(save,cost,"Proteção institucional"); save.player.governance.protection_until=new Date(Date.now()+30*86400000).toISOString(); save.player.governance.last_cost=cost;
+      return {ok:true,cost};
+    }
+  }
+
   if(path==="hq/upgrade"){const level=save.player.hq?.level||1;const next=LOCAL_CATALOG.hq_level_benefits[level];if(!next)fail(400,"Quartel-General no nível máximo");chargeClean(save,next.upgrade_cost,"Melhoria do QG");save.player.hq.upgrading_until=new Date(Date.now()+20000).toISOString();return {ok:true};}
   if(path==="hq/priority"){save.player.priorities.active=p.priority||"equilibrio";return {ok:true};}
   if(path==="hq/equip_skin"){save.player.hq_skin_key=p.skin_key||null;return {ok:true};}
@@ -1460,6 +1726,17 @@ export async function localGuestRequest(method,url,payload){
   if(verb==="get"&&path==="/game/state"){persist(save);return {data:publicState(save),status:200};}
   if(verb==="get"&&path==="/game/mastermind/state"){const data=mastermindSnapshot(save);persist(save);return {data,status:200};}
   if(verb==="get"&&path==="/game/transactions") return {data:{transactions:clone(save.transactions)},status:200};
+  if(verb==="get"&&path==="/game/org/finance/summary"){
+    ensureOrganizationSave(save);
+    const cutoff=Date.now()-30*86400000;
+    const recent=(save.transactions||[]).filter((entry)=>Date.parse(entry.ts||0)>=cutoff);
+    const income=recent.reduce((sum,entry)=>sum+Math.max(0,Number(entry.amount||0)),0);
+    const expenses=recent.reduce((sum,entry)=>sum+Math.abs(Math.min(0,Number(entry.amount||0))),0);
+    const propertyValue=(save.properties||[]).reduce((sum,p)=>sum+Number(p.purchase_price||p.price||0)*Number(p.level||1),0);
+    const fleetValue=(save.vehicles||[]).reduce((sum,v)=>sum+Number(v.price||LOCAL_CATALOG.vehicle_models?.[v.model_key]?.price||0),0);
+    const weaponValue=(save.weapons||[]).reduce((sum,w)=>sum+Number(w.price||LOCAL_CATALOG.weapon_models?.[w.model_key]?.price||0),0);
+    return {data:{income,expenses,net:income-expenses,asset_value:propertyValue+fleetValue+weaponValue,property_value:propertyValue,fleet_value:fleetValue,weapon_value:weaponValue},status:200};
+  }
 
   if(verb==="post"&&path.startsWith("/game/")){
     const actionPath=path.slice("/game/".length);
