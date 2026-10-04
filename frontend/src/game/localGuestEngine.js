@@ -880,7 +880,7 @@ const calcCaps = (save) => {
     teams:{used:save.teams.length,max:save.player.level<=10
       ? Math.max(1,Math.min(6,1 + Math.floor(save.player.level / 2)))
       : Math.min(15,6 + Math.floor((save.player.level-10)/10))},
-    dirty_money:{used:money(save.player.dirty_money),max:50000 + save.player.level * 20000},
+    dirty_money:{used:money(save.player.dirty_money),max:80000 + Math.max(0,Math.min(save.player.level,10)-1)*8000 + Math.max(0,save.player.level-10)*12000},
   };
 };
 
