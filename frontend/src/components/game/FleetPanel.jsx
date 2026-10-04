@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import {
   fmtMoney, fmtDuration, STATUS_LABELS, effectiveSpeed, vehicleRangeKm, conditionBand, matchesSearch,
   LARGE_PURCHASE_THRESHOLD, vehicleTier, vehicleAdequacy, vehicleSpeedFactor, vehicleMissionScore, SPEC_LABELS,
@@ -68,7 +69,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
   );
 };
 
-export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
+export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
     state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
     transferVehicle, renameVehicle, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles, repairFleetAll,
@@ -76,6 +77,10 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
   useTick(open);
+  usePanelFocus(open, focusTarget);
+  useEffect(() => {
+    if (open && focusTarget?.testId?.startsWith("vehicle-card-")) setQuery("");
+  }, [open, focusTarget?.token, focusTarget?.testId]);
   if (!state) return null;
   const caps = state.caps.vehicles;
   const fleetMeta = catalog?.fleet_meta || {};
