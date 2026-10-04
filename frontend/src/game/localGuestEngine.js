@@ -645,7 +645,8 @@ const finalizeMission = (save, mission) => {
   const team = save.teams.find((t)=>t.id===mission.team_id);
   const vehicle = save.vehicles.find((v)=>v.id===mission.vehicle_id);
   const members = save.employees.filter((e)=>mission.member_ids.includes(e.id));
-  const success = rollFrom(mission.id) <= mission.chance;
+  const effectiveChance=clamp(Number(mission.success_chance??mission.chance??.5)+Number(mission.live_chance_delta||0),.02,.98);
+  const success = rollFrom(mission.id) <= effectiveChance;
   if (team) {
     team.status="idle"; team.available_at=null; team.missions_done=(team.missions_done||0)+1;
     team.streak = success ? Math.max(0,(team.streak||0))+1 : Math.min(0,(team.streak||0))-1;
@@ -667,12 +668,13 @@ const finalizeMission = (save, mission) => {
   stats.by_category ||= {};
   stats.by_category[mission.category]=(stats.by_category[mission.category]||0)+1;
   if(success){
-    const reward=money(mission.reward);
+    const reward=money(Number(mission.reward||0)*Number(mission.decision_reward_mult||1));
     if(mission.pays==="clean") save.player.clean_money += reward;
     else save.player.dirty_money += reward;
     const risk = normalizeRisk(mission.risk);
     save.player.respect += Math.max(20, risk * 24);
-    save.player.heat=clamp(save.player.heat + risk * 2.2,0,100);
+    const pulseHeat=Number(mission.world_pulse?.applied_heat_mult||1);
+    save.player.heat=clamp(save.player.heat + risk * 2.2 * pulseHeat,0,100);
     stats.missions_success=(stats.missions_success||0)+1;
     stats.success_by_category ||= {};
     stats.success_by_category[mission.category]=(stats.success_by_category[mission.category]||0)+1;
@@ -685,7 +687,8 @@ const finalizeMission = (save, mission) => {
     addEvent(save,"success",`${team?.name||"Equipa"} concluiu ${mission.opportunity?.name||"a operação"} com sucesso.`);
   } else {
     const risk = normalizeRisk(mission.risk);
-    save.player.heat=clamp(save.player.heat + risk * 4.5,0,100);
+    const pulseHeat=Number(mission.world_pulse?.applied_heat_mult||1);
+    save.player.heat=clamp(save.player.heat + risk * 4.5 * pulseHeat,0,100);
     stats.missions_failure=(stats.missions_failure||0)+1;
     stats.missions_failed=stats.missions_failure;
     mission.pending_reward=0; mission.pending_pays=mission.pays;
@@ -723,7 +726,10 @@ const tick = (save) => {
   for(const mission of [...save.missions]){
     const t=now;
     if(t < Date.parse(mission.arrive_at)) mission.phase="en_route";
-    else if(t < Date.parse(mission.finish_at)) mission.phase="operating";
+    else if(t < Date.parse(mission.finish_at)){
+      mission.phase="operating";
+      if(mission.decision?.status==="pending"&&t>Date.parse(mission.decision.expires_at))mission.decision.status="expired";
+    }
     else if(t < Date.parse(mission.return_at)) mission.phase="returning";
     else {
       finalizeMission(save,mission);
