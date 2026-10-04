@@ -1,102 +1,109 @@
 {
   "project_name": "SUBMUNDO",
-  "theme_archetype": {
-    "primary": "Archetype 2 (The Performance Pro)",
-    "description": "Dark-first, tactical command-center HUD. Designed for high-stakes criminal strategy. Minimalist chrome, high data density, vivid kinetic triggers over an OLED black/dark grey base."
+  "methodology": {
+    "reference": "https://github.com/pbakaus/impeccable",
+    "mode": "Operate",
+    "rule": "Fix shared causes before local symptoms; preserve product identity and game logic."
   },
+  "product_principles": [
+    "Map is the hero and primary gameplay surface.",
+    "Persistent HUD must stay minimal and readable.",
+    "All primary management modules use one uniform centered modal shell.",
+    "Color and motion communicate state, not decoration.",
+    "Mobile touch ergonomics are a release requirement."
+  ],
   "colors": {
     "background": {
-      "base": "#050505",
-      "panel_matte": "#121212",
-      "panel_glass": "rgba(18, 18, 18, 0.75)"
+      "canvas": "#050506",
+      "modal": "#0A0A0D",
+      "raised": "#101014",
+      "hover": "#141419"
     },
     "text": {
-      "primary": "#FFFFFF",
-      "secondary": "#8E8E93",
-      "muted": "#52525B"
+      "primary": "#F4F4F5",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A"
     },
-    "accents": {
-      "primary_action": "#FFFFFF",
-      "clean_money": "#10B981",
-      "dirty_money": "#F59E0B",
-      "heat_respect": "#DC2626",
-      "system_cyan": "#0A84FF",
-      "warning": "#FF9F0A"
+    "semantic": {
+      "heat_danger": "#DC2626",
+      "clean_money_success": "#10B981",
+      "dirty_money_warning": "#F59E0B",
+      "system_route_info": "#22D3EE"
     },
     "borders": {
-      "subtle": "rgba(255, 255, 255, 0.1)",
-      "active": "rgba(255, 255, 255, 0.3)",
-      "tactical_glow": "rgba(220, 38, 38, 0.5)"
+      "subtle": "rgba(255,255,255,0.08)",
+      "strong": "rgba(255,255,255,0.16)"
     }
   },
   "typography": {
-    "headings": {
-      "family": "IBM Plex Sans, sans-serif",
-      "weights": ["600", "700"],
-      "tracking": "tracking-tight"
-    },
-    "data_metrics": {
-      "family": "JetBrains Mono, monospace",
-      "weights": ["400", "700"],
-      "usage": "Use for all resource counts, timers, distances, and levels to give a hacker/software feel"
-    },
     "body": {
       "family": "Inter, sans-serif",
-      "weights": ["400", "500"]
-    }
-  },
-  "layout_and_spacing": {
-    "strategy": "Map is Hero. All UI elements float above the map.",
-    "map_container": "absolute inset-0 z-0 w-full h-full",
-    "hud_panels": "absolute z-10 floating-panel",
-    "spacing_scale": "Dense and tactical. Use p-2, p-4. Avoid excessive empty space in data cards.",
-    "mobile_first": "Use bottom drawers (Sheet component from Shadcn) for main menus and team lists on mobile. Floating compact cards on desktop."
-  },
-  "surface_strategies": {
-    "panels": {
-      "type": "Glassmorphism (Tactical)",
-      "classes": "bg-black/75 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl"
+      "ordinary_floor": "14px in dense game UI; 16px for prose"
     },
-    "buttons": {
-      "primary": "bg-white text-black hover:bg-gray-200 font-bold uppercase tracking-wider text-sm",
-      "danger_dispatch": "bg-red-600 text-white hover:bg-red-700 shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all duration-300"
-    }
+    "display": {
+      "family": "Rajdhani, IBM Plex Sans, sans-serif",
+      "usage": "modal and section titles"
+    },
+    "data": {
+      "family": "JetBrains Mono, monospace",
+      "usage": "money, timers, metrics, levels"
+    },
+    "compact_label_floor": "9px only for non-critical auxiliary HUD labels"
   },
-  "components": {
-    "auth_screen": "Fullscreen cinematic background image with a centered dark glass panel. Dramatic lighting.",
-    "resource_bar": "Top floating pill or bar. JetBrains Mono for numbers. Distinct colors for clean/dirty money.",
-    "opportunity_card": "Compact bento-style card. Clear risk/reward metrics. Urgent dispatch button.",
-    "teams_panel": "Side or bottom drawer. Status indicators (Idle=Gray, En-Route=Cyan, Operating=Red).",
-    "activity_feed": "Scrolling terminal-like log. Small text, high density."
+  "modal_contract": {
+    "desktop_width": "min(46rem, calc(100vw - 1.5rem))",
+    "height": "min(82dvh, 48rem)",
+    "mobile_width": "calc(100vw - 1rem)",
+    "mobile_height": "82dvh",
+    "radius": "18px desktop / 17px mobile",
+    "placement": "centered viewport",
+    "scroll": "internal body scroll with stable header",
+    "touch_target_minimum": "44x44px",
+    "forbidden": [
+      "bottom-sheet main modules",
+      "dock connector tails",
+      "speech-bubble treatment",
+      "per-module shell sizing"
+    ]
   },
-  "motion_and_interactions": {
-    "panel_entrance": "Framer motion slide-in from edges (y: 20, opacity: 0).",
-    "map_markers": "Smooth CSS transitions for vehicle movement.",
-    "hover_states": "Hover states must lift cards slightly (-translate-y-1) and increase border opacity to white/30."
+  "surfaces": {
+    "default": "solid dark surfaces with subtle borders",
+    "cards": "use only when an entity/action needs separation",
+    "forbidden_default_effects": [
+      "decorative gradients",
+      "permanent glow",
+      "heavy glass blur",
+      "nested cards for decoration"
+    ]
+  },
+  "navigation": {
+    "dock": "high-level navigation only; inactive items visually quiet",
+    "resource_bar": "one continuous status strip, not four independent cards"
+  },
+  "motion": {
+    "duration": "120-220ms for local feedback",
+    "modal": "subtle fade + small zoom",
+    "easing": "restrained ease-out",
+    "forbidden": [
+      "bounce",
+      "elastic",
+      "large decorative translations"
+    ],
+    "reduced_motion": "must preserve usable state changes"
   },
   "icons": {
-    "library": "@phosphor-icons/react",
-    "style": "weight='bold' or weight='duotone' for tactical feel",
-    "installation": "yarn add @phosphor-icons/react"
+    "library": "lucide-react",
+    "rule": "one icon family; consistent stroke and optical size"
   },
-  "media": {
-    "auth_background": {
-      "url": "https://images.unsplash.com/photo-1731234361187-4702894e725a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwzfHxsaXNib24lMjBuaWdodCUyMGFlcmlhbHxlbnwwfHx8fDE3ODMwMjgyODd8MA&ixlib=rb-4.1.0&q=85",
-      "description": "Aerial view of Lisbon at night, used for Login/Register background"
-    },
-    "texture_overlay": {
-      "url": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwxfHx1bmRlcmdyb3VuZCUyMGRhcmslMjBjcmltZSUyMHRleHR1cmV8ZW58MHx8fGJsYWNrfDE3ODMwMjgyODd8MA&ixlib=rb-4.1.0&q=85",
-      "description": "Dark grime texture, use with low opacity (mix-blend-overlay) over flat dark panels if needed"
-    }
+  "accessibility": {
+    "contrast": "WCAG AA for essential content",
+    "keyboard": "visible focus and logical order",
+    "touch_targets": "44x44px minimum for primary controls",
+    "testids": "preserve existing data-testid attributes; add to new important interactive controls"
   },
-  "accessibility_and_testing": {
-    "data_testid_requirement": "ALL interactive elements MUST have data-testid attributes (e.g., data-testid='dispatch-team-button', data-testid='login-submit')",
-    "contrast": "Ensure pure white text over the dark map or glass panels passes WCAG AA."
-  },
-  "map_configuration": {
+  "map": {
     "library": "react-leaflet",
-    "tile_layer": "CartoDB Dark Matter (https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png)",
-    "center": "[38.7223, -9.1393]",
-    "zoom": "13"
+    "role": "primary gameplay canvas",
+    "ui_rule": "overlays must not obscure essential map interaction"
   }
 }
