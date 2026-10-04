@@ -69,7 +69,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
       {cells.map((c) => (
         <Tip
           key={c.category}
-          tip={`${c.label}: adequação ${Math.round(c.score * 100)}%${c.best ? " — categoria ideal desta arma (bónus ×1.3 no motor)" : ""}. A mesma ponderação que a chance de missão usa.`}
+          tip={`${c.label}: adequação ${Math.round(c.score * 100)}%${c.best ? " — categoria ideal para esta arma." : "."}`}
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
@@ -101,7 +101,7 @@ const JamChip = ({ model, condition, meta, testId }) => {
   const critical = jam >= 0.25;
   const warned = jam >= warn;
   return (
-    <Tip tip={`Risco de encravar por missão: ${pct}%. Fórmula do motor: falta de fiabilidade (${100 - (model.reliability ?? 100)}%) × ${Math.round((meta.jam_reliability_weight ?? 0.4) * 100)}% + défice de condição abaixo de ${meta.jam_condition_threshold ?? 60}%. Uma arma encravada perde ${Math.round((meta.jam_chance_penalty ?? 0.04) * 100)}% de chance e sofre +${meta.jam_extra_wear ?? 6} de desgaste.`}>
+    <Tip tip={`Risco de encravar por missão: ${pct}%. Aumenta com baixa fiabilidade e mau estado. Um encravamento reduz a probabilidade de sucesso e aumenta o desgaste.`}>
     <span
       data-testid={testId}
       className={cn(
@@ -185,7 +185,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
           <Kpi icon={CheckCircle2} label="Equipadas" value={`${equippedCount}/${weapons.length}`} color={equippedCount === weapons.length && weapons.length > 0 ? "#34D399" : "#F59E0B"}
             tip="Armas atualmente atribuídas a um funcionário vs. total no inventário." />
           <Kpi icon={Wrench} label="Condição" value={`${avgCondition}%`} color={avgCondition < 50 ? "#EF4444" : "#34D399"} bar={avgCondition} barColor={avgCondition < 50 ? "#EF4444" : "#34D399"}
-            tip="Condição média do armamento — desgasta-se a cada missão e abaixo de 40% a eficácia cai a pique (curva não-linear do motor)." />
+            tip="Condição média do armamento. Abaixo de 40% a eficácia cai rapidamente." />
           <Kpi icon={AlertTriangle} label="Encravar" value={`${Math.round(maxJam * 100)}%`} color={maxJam >= 0.25 ? "#EF4444" : maxJam >= jamWarn ? "#F59E0B" : "#34D399"}
             tip="Pior risco de encravamento do arsenal — sobe com a falta de fiabilidade do modelo e com a condição abaixo do limiar de manutenção." />
           <Kpi icon={Banknote} label="Revenda" value={fmtMoney(arsenalValue)} color="#22D3EE"
@@ -204,7 +204,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             />
           </div>
           <Tip tip={canOptimize
-            ? `Redistribui todo o arsenal pelos ${idleCount} operacionais disponíveis, maximizando o score efetivo global — a mesma régua da chance de missão (adequação, requisitos, habilidade, proficiência e condição).`
+            ? `Distribui o arsenal pelos ${idleCount} operacionais disponíveis, procurando a melhor combinação para cada um.`
             : weapons.length === 0 ? "Sem armas no arsenal." : "Nenhum operacional disponível para equipar."}>
             <button
               data-testid="weapons-optimize"
