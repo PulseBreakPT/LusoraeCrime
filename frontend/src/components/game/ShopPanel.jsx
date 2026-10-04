@@ -22,9 +22,9 @@ const useTick = (active) => {
 
 const TABS = [
   { key: "acelerar", label: "Acelerar", icon: Zap },
-  { key: "cosmeticos", label: "Cosméticos", icon: Palette },
-  { key: "vip", label: "VIP", icon: Crown },
   { key: "slots", label: "Slots", icon: PlusSquare },
+  { key: "vip", label: "VIP", icon: Crown },
+  { key: "cosmeticos", label: "Cosméticos", icon: Palette },
 ];
 
 // Espelho EXATO de _speedup_cost (backend/routes_game.py) — a mesma fórmula
