@@ -7,7 +7,7 @@ import {
   chanceColor, goodBarColor, teamsReadiness, teamReadiness, vehicleRangeKm,
   teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -301,7 +301,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sub-panel">
         <SheetHeader>
-          <PanelWatermark icon={Users} />
           <SheetTitle className="flex items-center gap-2 text-white">
             <Users size={18} className="text-primary" /> Equipas
           </SheetTitle>
