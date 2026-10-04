@@ -5,7 +5,7 @@ import {
   LARGE_PURCHASE_THRESHOLD, vehicleTier, vehicleAdequacy, vehicleSpeedFactor, vehicleMissionScore, SPEC_LABELS,
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -131,7 +131,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Car} />
-          <PanelKicker>Logística · Garagem</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Car size={18} className="text-primary" /> Frota
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="vehicle-caps">{caps.used}/{caps.max}</span>
