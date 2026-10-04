@@ -113,11 +113,6 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           </SheetDescription>
         </SheetHeader>
 
-        <SummaryStrip cols={2} className="mt-3" testId="opportunities-summary">
-          <Kpi icon={Target} label="No mapa" value={`${opps.length}`} color="#38BDF8" />
-          <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
-        </SummaryStrip>
-
         {pulse && (
           <Card
             data-testid="world-pulse-card"
@@ -151,6 +146,11 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
             </div>
           </Card>
         )}
+
+        <SummaryStrip cols={2} className="mt-3" testId="opportunities-summary">
+          <Kpi icon={Target} label="No mapa" value={`${opps.length}`} color="#38BDF8" />
+          <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
+        </SummaryStrip>
 
         {/* Procura + ordenação */}
         <div className="mt-3 space-y-2">
