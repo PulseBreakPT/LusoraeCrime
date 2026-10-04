@@ -70,11 +70,31 @@ TEAM_POLICIES = {
 }
 
 DEPARTMENTS = {
-    "financeiro": {"name": "Gabinete Financeiro", "unlock_hq": 3, "base_cost": 18000, "max_level": 3, "desc": "Reduz custos fixos não salariais e melhora análise financeira."},
-    "rh": {"name": "Recursos Humanos", "unlock_hq": 4, "base_cost": 22000, "max_level": 3, "desc": "Melhora recrutamento, treino e estabilidade humana."},
-    "logistica": {"name": "Logística", "unlock_hq": 5, "base_cost": 28000, "max_level": 3, "desc": "Reduz custos de abastecimento/transferência e aumenta armazenamento."},
-    "investigacao": {"name": "Investigação", "unlock_hq": 7, "base_cost": 38000, "max_level": 3, "desc": "Reduz exposição a rusgas e melhora inteligência territorial."},
-    "comunicacoes": {"name": "Comunicações", "unlock_hq": 8, "base_cost": 45000, "max_level": 3, "desc": "Melhora reorganização e coordenação da organização."},
+    "financeiro": {
+        "name": "Gabinete Financeiro", "unlock_hq": 3, "base_cost": 18000, "max_level": 5,
+        "desc": "Controlo de custos, tesouraria e disciplina de capital.",
+        "levels": ["Contabilidade central", "Negociação de contratos", "Tesouraria preventiva", "Controlo de risco", "Planeamento estratégico"],
+    },
+    "rh": {
+        "name": "Recursos Humanos", "unlock_hq": 4, "base_cost": 22000, "max_level": 5,
+        "desc": "Recrutamento, formação, retenção e recuperação do efetivo.",
+        "levels": ["Triagem profissional", "Formação acelerada", "Retenção", "Planos de carreira", "Academia interna"],
+    },
+    "logistica": {
+        "name": "Logística", "unlock_hq": 5, "base_cost": 28000, "max_level": 5,
+        "desc": "Compras, transferências, capacidade e prontidão material.",
+        "levels": ["Compras centralizadas", "Rotas otimizadas", "Stock de segurança", "Manutenção preventiva", "Cadeia integrada"],
+    },
+    "investigacao": {
+        "name": "Investigação", "unlock_hq": 7, "base_cost": 38000, "max_level": 5,
+        "desc": "Contrainteligência, exposição e leitura territorial.",
+        "levels": ["Reconhecimento", "Contra-vigilância", "Análise de padrões", "Célula de risco", "Inteligência estratégica"],
+    },
+    "comunicacoes": {
+        "name": "Comunicações", "unlock_hq": 8, "base_cost": 45000, "max_level": 5,
+        "desc": "Coordenação, reorganização e continuidade operacional.",
+        "levels": ["Procedimentos comuns", "Despacho coordenado", "Rede redundante", "Comando distribuído", "Centro de operações"],
+    },
 }
 
 TERRITORY_TIERS = {
@@ -230,22 +250,23 @@ def ensure_employee_profile(emp: dict) -> dict:
 
 
 def fixed_cost_multiplier(player: dict) -> float:
-    """Gabinete Financeiro: reduz apenas custos fixos operacionais, nunca salários/TSU."""
-    return max(0.88, 1.0 - department_level(player, "financeiro") * 0.04)
+    """Financeiro: reduz custos operacionais; salários e TSU continuam intactos."""
+    return max(0.80, 1.0 - department_level(player, "financeiro") * 0.04)
 
 
 def logistics_cost_multiplier(player: dict) -> float:
-    return max(0.82, 1.0 - department_level(player, "logistica") * 0.06)
+    return max(0.70, 1.0 - department_level(player, "logistica") * 0.06)
 
 
 def raid_risk_multiplier(player: dict, properties: list[dict]) -> float:
-    investigation = max(0.70, 1.0 - department_level(player, "investigacao") * 0.10)
+    investigation = max(0.50, 1.0 - department_level(player, "investigacao") * 0.10)
     protection = 0.72 if protection_active(player) else 1.0
     return investigation * property_security_factor(properties) * protection
 
 
-def loadout_effect(loadout: dict, category: str) -> dict:
+def loadout_effect(loadout: dict, category: str, policies: dict | None = None) -> dict:
     loadout = loadout or {}
+    policies = {**default_team_policies(), **(policies or {})}
     chance = 0.0
     heat = 1.0
     injury = 1.0
@@ -262,12 +283,24 @@ def loadout_effect(loadout: dict, category: str) -> dict:
         heat *= 0.95
     if loadout.get("evidence_cleanup"):
         heat *= 0.86
-    if loadout.get("medical_kit"):
+    if loadout.get("medical_kit") and policies.get("auto_use_medical", True):
         injury *= 0.72
-    if loadout.get("body_armor"):
+    if loadout.get("body_armor") and policies.get("auto_use_armor", True):
         injury *= 0.78
         heat *= 1.02
-    return {"chance": min(0.08, chance), "heat": max(0.65, heat), "injury": max(0.45, injury)}
+    if policies.get("protect_injured", True):
+        injury *= 0.90
+        # Resgatar e proteger feridos preserva pessoas, mas torna a retirada
+        # ligeiramente mais lenta/exposta.
+        heat *= 1.015
+    return {
+        "chance": min(0.08, chance),
+        "heat": max(0.65, heat),
+        "injury": max(0.40, injury),
+        "protect_injured": bool(policies.get("protect_injured", True)),
+        "auto_use_medical": bool(policies.get("auto_use_medical", True)),
+        "auto_use_armor": bool(policies.get("auto_use_armor", True)),
+    }
 
 
 def apply_weapon_upgrades(model: dict, weapon: dict | None) -> dict:
@@ -332,4 +365,8 @@ def protection_cost(player: dict, employee_count: int, property_count: int) -> i
 def property_operations_factor(prop: dict) -> float:
     module = max(0, int(prop.get("operations_level", 0) or 0))
     staff = min(4, len(prop.get("staff_employee_ids") or []))
-    return 1.0 + module * 0.05 + staff * 0.02
+    effectiveness = max(0.0, min(1.0, float(prop.get("staff_effectiveness", 0.0) or 0.0)))
+    # Staff deixa de ser apenas "quantidade". Quatro pessoas mal escolhidas
+    # rendem menos do que uma equipa pequena com atributos adequados.
+    staff_bonus = staff * 0.01 + effectiveness * 0.08
+    return 1.0 + module * 0.05 + staff_bonus
