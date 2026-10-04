@@ -7,7 +7,6 @@ import {
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
 import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
-import { PropertyGlyph } from "./PropertyGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -185,12 +184,9 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const paybackH = !maxed ? propertyUpgradePaybackH(pt, condition, upgradeCost) : null;
             return (
               <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
-                {/* Cabeçalho: placa com emblema + identidade */}
-                <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="sub-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                    <PropertyGlyph typeKey={p.type_key} accent={tier.color} className="h-[44px] w-[96px]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                {/* Cabeçalho: identidade do imóvel sem ilustração decorativa */}
+                <div className="relative z-[1]">
+                  <div className="min-w-0">
                     <div className="flex items-start justify-between gap-1.5">
                       <InlineRename
                         testId={`property-rename-${p.id}`} value={p.name} onSave={(name) => renameProperty(p.id, name)}
@@ -322,12 +318,8 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     }`;
                 return (
                   <Card key={key} data-testid={`market-card-${key}`} className={cn("h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
-                    <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="sub-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                        <PropertyGlyph typeKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
-                        {locked && <Lock size={13} className="absolute text-zinc-400" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
+                    <div className="relative z-[1]">
+                      <div className="min-w-0">
                         <div className="flex items-start justify-between gap-1.5">
                           <p className="truncate text-sm font-semibold text-white">{pt.name}</p>
                           <TierChip tier={tier} />

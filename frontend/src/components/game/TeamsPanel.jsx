@@ -8,7 +8,6 @@ import {
   teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES,
 } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
-import { TeamGlyph } from "./TeamGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -401,16 +400,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                 className={`sub-card sub-team-card p-2.5 shadow-none ${justReturned ? "sub-flash" : ""}`}
                 style={{ "--ttier": tier.color }}
               >
-                {/* Cabeçalho dossier: placa com emblema + identidade da unidade */}
-                <div className="relative z-[1] flex items-stretch gap-2.5">
-                  <div className="sub-team-plate relative flex h-[54px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
-                    <TeamGlyph
-                      spec={t.spec} accent={tier.color}
-                      emblemColor={catalog?.shop?.team_emblems?.[t.emblem_key]?.color}
-                      className="h-[44px] w-[82px]"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                {/* Cabeçalho: identidade da unidade sem ilustração decorativa */}
+                <div className="relative z-[1]">
+                  <div className="min-w-0">
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="flex min-w-0 items-center gap-1">
                         <FavoriteStar testId={`team-favorite-${t.id}`} active={favoriteTeamIds.includes(t.id)} onToggle={() => toggleFavoriteTeam(t.id)} />
@@ -767,10 +759,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     layout="card"
                     className="h-full"
                   >
-                    <div className="flex w-full items-center gap-2">
-                      <TeamGlyph spec={key} accent="#A1A1AA" className="h-6 w-[52px] shrink-0 opacity-90" />
-                      <span className="text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
-                    </div>
+                    <span className="w-full text-left text-xs font-bold text-white">{SPEC_LABELS[key]}</span>
                     <span className="whitespace-normal text-[10px] font-normal normal-case leading-tight text-zinc-500">{ts.desc}</span>
                   </PurchaseButton>
                 );
