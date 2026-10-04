@@ -203,6 +203,13 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
       stock_targets: { ...(prev?.stock_targets || intelligence?.policy?.stock_targets || {}), [key]: Math.max(0, Number(value || 0)) },
     }));
   };
+  const patchBudget = (key, value) => {
+    setPolicyDirty(true);
+    setPolicyDraft((prev) => ({
+      ...(prev || intelligence?.policy || {}),
+      weekly_budgets: { ...(prev?.weekly_budgets || intelligence?.policy?.weekly_budgets || {}), [key]: Math.max(0, Number(value || 0)) },
+    }));
+  };
   const savePolicy = async () => {
     if (!policyDraft) return;
     const result = await setOrganizationPolicy(policyDraft);
@@ -380,6 +387,38 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   />
                 </label>
               </div>
+              <div className="mt-3">
+                <p className="mb-1.5 font-mono text-[10px] uppercase text-zinc-500">Orçamento semanal · 0 = sem limite</p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {[
+                    ["supplies", "Stock"],
+                    ["fleet", "Frota"],
+                    ["infrastructure", "Infraestrutura"],
+                    ["territory", "Território"],
+                    ["people", "Pessoal"],
+                  ].map(([key, label]) => {
+                    const live = (intelligence?.finance?.budgets || []).find((row) => row.key === key);
+                    return (
+                      <label key={key} className="rounded border border-white/[0.08] p-2">
+                        <span className="font-mono text-[10px] text-zinc-500">{label}</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={policyDraft?.weekly_budgets?.[key] ?? 0}
+                          onChange={(e) => patchBudget(key, e.target.value)}
+                          className="mt-1 h-8 bg-black/50 text-[10px]"
+                        />
+                        {live && live.limit > 0 && (
+                          <span className={`mt-1 block font-mono text-[10px] ${live.status === "over" ? "text-red-300" : live.status === "warning" ? "text-amber-300" : "text-zinc-600"}`}>
+                            {fmtMoney(live.spent)} / {fmtMoney(live.limit)}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {[
                   ["enabled", "Automação ativa"],
