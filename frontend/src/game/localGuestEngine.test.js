@@ -249,6 +249,57 @@ describe("offline guest engine", () => {
     expect(finance.weapon_value).toBeGreaterThan(0);
   });
 
+  test("runs organization intelligence policy automation and audit end-to-end in guest mode", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    await localGuestRequest("post", "/game/org/policy", {
+      reserve_cash: 20000,
+      max_single_spend_pct: 0.4,
+      stock_targets: { medical_kit: 3 },
+      automation: {
+        enabled: true,
+        auto_restock: true,
+        renew_insurance: false,
+        preventive_service: false,
+      },
+    });
+
+    let intelligence = (await localGuestRequest("get", "/game/org/intelligence")).data;
+    expect(intelligence.health.score).toBeGreaterThanOrEqual(0);
+    expect(intelligence.health.score).toBeLessThanOrEqual(100);
+    expect(intelligence.finance.runway_weeks).toBeGreaterThan(0);
+    expect(intelligence.policy.reserve_cash).toBe(20000);
+    expect(intelligence.stock.find((row) => row.key === "medical_kit").target).toBe(3);
+
+    const moneyBefore = (await localGuestRequest("get", "/game/state")).data.player.clean_money;
+    const automation = await localGuestRequest("post", "/game/org/automation/run", {});
+    expect(automation.data.ok).toBe(true);
+    expect(automation.data.actions.some((item) => item.type === "restock" && item.item_key === "medical_kit")).toBe(true);
+
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.organization.inventory.medical_kit).toBeGreaterThanOrEqual(3);
+    expect(state.player.clean_money).toBeLessThan(moneyBefore);
+    expect(state.player.clean_money).toBeGreaterThanOrEqual(20000);
+
+    intelligence = (await localGuestRequest("get", "/game/org/intelligence")).data;
+    expect(intelligence.stock.find((row) => row.key === "medical_kit").status).toBe("ok");
+
+    const quote = await localGuestRequest("post", "/game/org/quote", {
+      action: "supply_buy",
+      payload: { item_key: "medical_kit", packs: 1 },
+    });
+    expect(quote.data.cost).toBeGreaterThan(0);
+    expect(quote.data.cash_after).toBe(state.player.clean_money - quote.data.cost);
+
+    const audit = (await localGuestRequest("get", "/game/org/audit?limit=20")).data;
+    expect(audit.items.some((item) => item.action === "policy")).toBe(true);
+    expect(audit.items.some((item) => item.action === "automation.run")).toBe(true);
+  });
+
   test("migrates legacy risk values so rendering can never request a negative repeat count", async () => {
     enableLocalGuestMode();
     await localGuestRequest("post", "/game/hq/place", {
