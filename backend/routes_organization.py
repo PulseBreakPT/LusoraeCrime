@@ -22,6 +22,7 @@ from organization_intelligence import (
 )
 from organization_automation import run_organization_automation
 from organization_events import parse_dt as parse_org_event_dt
+from city_systems import ensure_rivals
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES, TEAM_PRESETS,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
@@ -51,6 +52,27 @@ def _oid(value: str, label: str):
 
 def _property_staff_profile(employees: list[dict]) -> tuple[dict[str, str], float]:
     return property_staff_profile(employees)
+
+
+def _territory_rival(district: str, city_rivals: list[dict]) -> dict:
+    """Liga território à mesma organização rival persistente usada na Cidade."""
+    fallback = rival_profile(district)
+    if not city_rivals:
+        return fallback
+    seed = sum((index + 1) * ord(ch) for index, ch in enumerate(str(district or "zona")))
+    city = city_rivals[seed % len(city_rivals)]
+    power = float(city.get("power", fallback.get("strength", 50)) or 50)
+    hostility = float(city.get("hostility", 40) or 40)
+    strength = max(20, min(100, round(power * 0.72 + hostility * 0.28)))
+    return {
+        **fallback,
+        "key": city.get("key") or fallback["key"],
+        "city_key": city.get("key"),
+        "name": city.get("name") or fallback["name"],
+        "style": city.get("style") or fallback["style"],
+        "strength": strength,
+        "relation": city.get("relation", "neutral"),
+    }
 
 
 async def _debit(player: dict, amount: int, *, stat: str | None = None) -> dict:
@@ -1052,11 +1074,18 @@ async def claim_territory(body: TerritoryInput, user: dict = Depends(get_current
     if body.district in (player.get("territories") or {}):
         raise HTTPException(status_code=400, detail="Já tens presença nesta zona")
     cfg = TERRITORY_TIERS[1]
-    rival = rival_profile(body.district)
+    city_rivals = await ensure_rivals(db, player)
+    rival = _territory_rival(body.district, city_rivals)
     info = {
         "tier": 1, "pressure": 10.0, "defense": 70.0,
         "claimed_at": now_utc().isoformat(),
-        "rival": {"key": rival["key"], "name": rival["name"], "style": rival["style"], "strength": rival["strength"]},
+        "rival": {
+            "key": rival["key"], "city_key": rival.get("city_key"),
+            "name": rival["name"], "style": rival["style"], "strength": rival["strength"],
+            "relation": rival.get("relation", "neutral"),
+            "pressure_mult": rival.get("pressure_mult", 1.0),
+            "defense_mult": rival.get("defense_mult", 1.0),
+        },
     }
     territory_path = f"territories.{body.district}"
     fresh = await db.players.find_one_and_update(
