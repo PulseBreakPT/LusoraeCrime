@@ -10,6 +10,7 @@ from auth import get_current_user
 from db import db
 from engine import add_event, dirty_money_cap, now_utc, parse_dt, record_tx
 from game_data import VEHICLE_MODELS
+from routes_game import MutationInput, idempotent
 from mastermind_data import (
     COMPLICATIONS,
     FENCES,
@@ -28,11 +29,11 @@ from mastermind_data import (
 router = APIRouter(prefix="/api/game/mastermind", tags=["mastermind"])
 
 
-class TargetInput(BaseModel):
+class TargetInput(MutationInput):
     target_key: str
 
 
-class HeistCreateInput(BaseModel):
+class HeistCreateInput(MutationInput):
     target_key: str
     team_id: str
     vehicle_id: str
@@ -41,7 +42,7 @@ class HeistCreateInput(BaseModel):
     crew_cut_pct: int = Field(default=20, ge=10, le=35)
 
 
-class HeistIdInput(BaseModel):
+class HeistIdInput(MutationInput):
     heist_id: str
 
 
@@ -49,18 +50,18 @@ class PrepInput(HeistIdInput):
     prep_key: str
 
 
-class MarketTradeInput(BaseModel):
+class MarketTradeInput(MutationInput):
     good_key: str
     action: str
     quantity: int = Field(default=1, ge=1, le=20)
 
 
-class BountyInput(BaseModel):
+class BountyInput(MutationInput):
     action: str
     team_id: str | None = None
 
 
-class CacheInput(BaseModel):
+class CacheInput(MutationInput):
     district_key: str
 
 
@@ -184,6 +185,8 @@ APPROACH_ATTRS = {
     "silent": ("discricao", "hack", "sangue_frio"),
     "social": ("negociacao", "inteligencia", "discricao"),
     "assault": ("tiro", "forca", "resistencia"),
+    "ghost": ("discricao", "hack", "inteligencia"),
+    "distributed": ("inteligencia", "sangue_frio", "negociacao"),
 }
 
 
@@ -449,6 +452,7 @@ async def mastermind_state(user: dict = Depends(get_current_user)):
 
 
 @router.post("/heists/intel")
+@idempotent("mastermind_intel")
 async def scout_target(body: TargetInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -456,7 +460,9 @@ async def scout_target(body: TargetInput, user: dict = Depends(get_current_user)
     cfg = HEIST_TARGETS.get(body.target_key)
     rank = mastermind_rank(state.get("xp", 0))
     if not cfg or rank["level"] < cfg["unlock_rank"]:
-        raise HTTPException(status_code=400, detail="Alvo ainda bloqueado")
+        raise HTTPException(status_code=400, detail="Alvo ainda bloqueado pelo rank Mastermind")
+    if int(player.get("level", 1)) < int(cfg.get("min_org_level", 1)):
+        raise HTTPException(status_code=400, detail=f"Alvo desbloqueia no nível {cfg.get('min_org_level')} da organização")
     current = (state.get("intel") or {}).get(body.target_key)
     if current and _future(current.get("expires_at"), now):
         raise HTTPException(status_code=400, detail="O dossiê deste alvo ainda está atualizado")
@@ -517,6 +523,7 @@ async def scout_target(body: TargetInput, user: dict = Depends(get_current_user)
 
 
 @router.post("/heists/create")
+@idempotent("mastermind_create")
 async def create_heist(body: HeistCreateInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -528,7 +535,9 @@ async def create_heist(body: HeistCreateInput, user: dict = Depends(get_current_
     fence = FENCES.get(body.fence_key)
     rank = mastermind_rank(state.get("xp", 0))
     if not target or rank["level"] < target["unlock_rank"]:
-        raise HTTPException(status_code=400, detail="Alvo ainda bloqueado")
+        raise HTTPException(status_code=400, detail="Alvo ainda bloqueado pelo rank Mastermind")
+    if int(player.get("level", 1)) < int(target.get("min_org_level", 1)):
+        raise HTTPException(status_code=400, detail=f"Alvo desbloqueia no nível {target.get('min_org_level')} da organização")
     if _future((state.get("target_cooldowns") or {}).get(body.target_key), now):
         raise HTTPException(status_code=400, detail="Este alvo ainda está em alerta")
     if not approach or rank["level"] < approach["unlock_rank"]:
@@ -583,6 +592,7 @@ async def create_heist(body: HeistCreateInput, user: dict = Depends(get_current_
 
 
 @router.post("/heists/prep/start")
+@idempotent("mastermind_prep_start")
 async def start_prep(body: PrepInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -663,6 +673,7 @@ async def start_prep(body: PrepInput, user: dict = Depends(get_current_user)):
 
 
 @router.post("/heists/prep/claim")
+@idempotent("mastermind_prep_claim")
 async def claim_prep(body: PrepInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -715,6 +726,7 @@ async def claim_prep(body: PrepInput, user: dict = Depends(get_current_user)):
 
 
 @router.post("/heists/launch")
+@idempotent("mastermind_launch")
 async def launch_heist(body: HeistIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -989,6 +1001,7 @@ async def _release_heist_team(player, heist, now, *, success=None):
 
 
 @router.post("/heists/claim")
+@idempotent("mastermind_claim")
 async def claim_heist(body: HeistIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -1127,6 +1140,7 @@ async def claim_heist(body: HeistIdInput, user: dict = Depends(get_current_user)
 
 
 @router.post("/heists/abort")
+@idempotent("mastermind_abort")
 async def abort_heist(body: HeistIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -1157,6 +1171,7 @@ async def abort_heist(body: HeistIdInput, user: dict = Depends(get_current_user)
 
 
 @router.post("/market/trade")
+@idempotent("mastermind_market_trade")
 async def trade_market(body: MarketTradeInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -1233,6 +1248,7 @@ async def trade_market(body: MarketTradeInput, user: dict = Depends(get_current_
 
 
 @router.post("/bounty")
+@idempotent("mastermind_bounty")
 async def resolve_bounty(body: BountyInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
@@ -1378,6 +1394,7 @@ async def resolve_bounty(body: BountyInput, user: dict = Depends(get_current_use
 
 
 @router.post("/cache/scan")
+@idempotent("mastermind_cache_scan")
 async def scan_cache(body: CacheInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     now = now_utc()
