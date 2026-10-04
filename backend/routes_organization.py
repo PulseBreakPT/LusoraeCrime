@@ -219,6 +219,7 @@ class OrganizationPolicyInput(MutationInput):
     reserve_cash: int = Field(default=25000, ge=0, le=100_000_000)
     max_single_spend_pct: float = Field(default=0.35, ge=0.05, le=1.0)
     stock_targets: dict[str, int] = Field(default_factory=dict)
+    weekly_budgets: dict[str, int] = Field(default_factory=dict)
     automation: dict[str, bool] = Field(default_factory=dict)
 
 
@@ -334,10 +335,17 @@ async def set_organization_policy(body: OrganizationPolicyInput, user: dict = De
     }
     allowed_auto = {"enabled", "auto_restock", "renew_insurance", "preventive_service"}
     automation = {key: bool(value) for key, value in body.automation.items() if key in allowed_auto}
+    allowed_budgets = {"supplies", "fleet", "infrastructure", "territory", "people"}
+    budgets = {
+        key: max(0, min(100_000_000, int(value or 0)))
+        for key, value in body.weekly_budgets.items()
+        if key in allowed_budgets
+    }
     policy = {
         "reserve_cash": int(body.reserve_cash),
         "max_single_spend_pct": float(body.max_single_spend_pct),
         "stock_targets": targets,
+        "weekly_budgets": budgets,
         "automation": automation,
     }
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"organization_policy": policy}})
