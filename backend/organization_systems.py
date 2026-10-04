@@ -293,7 +293,7 @@ def supply_cost_multiplier(player: dict, now: datetime | None = None) -> float:
 
 def raid_risk_multiplier(player: dict, properties: list[dict]) -> float:
     investigation = max(0.50, 1.0 - department_level(player, "investigacao") * 0.10)
-    protection = 0.72 if protection_active(player) else 1.0
+    protection = protection_risk_multiplier(player)
     return investigation * property_security_factor(properties) * protection
 
 
@@ -396,11 +396,26 @@ def protection_active(player: dict, now: datetime | None = None) -> bool:
 def protection_cost(player: dict, employee_count: int, property_count: int) -> int:
     if int(player.get("level", 1) or 1) < GOVERNMENT_CORRUPTION_UNLOCK_LEVEL:
         return 0
-    return int(
+    base = (
         GOVERNMENT_CORRUPTION_BASE
         + max(0, employee_count) * GOVERNMENT_CORRUPTION_PER_EMPLOYEE
         + max(0, property_count) * GOVERNMENT_CORRUPTION_PER_PROPERTY
     )
+    governance = player.get("governance") or {}
+    trust = max(0.0, min(100.0, float(governance.get("trust", 0) or 0)))
+    exposure = max(0.0, min(100.0, float(governance.get("exposure", 0) or 0)))
+    # Relações maduras ajudam a negociar; abuso da rede torna-a mais cara.
+    mult = max(0.85, min(1.35, 1.0 - trust / 500.0 + exposure / 250.0))
+    return int(round(base * mult))
+
+
+def protection_risk_multiplier(player: dict, now: datetime | None = None) -> float:
+    governance = player.get("governance") or {}
+    if not protection_active(player, now):
+        return 1.0
+    trust = max(0.0, min(100.0, float(governance.get("trust", 0) or 0)))
+    exposure = max(0.0, min(100.0, float(governance.get("exposure", 0) or 0)))
+    return max(0.50, min(0.92, 0.78 - trust * 0.0018 + exposure * 0.0015))
 
 
 def property_operations_factor(prop: dict) -> float:
