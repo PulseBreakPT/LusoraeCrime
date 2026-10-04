@@ -92,6 +92,17 @@ async def _debit(player: dict, amount: int, *, stat: str | None = None) -> dict:
     return fresh
 
 
+async def _refund_debit(player: dict, amount: int, *, stat: str | None = None, restore_inventory: dict[str, int] | None = None):
+    inc = {"clean_money": max(0, int(amount))}
+    if stat:
+        inc[f"stats.{stat}"] = -1
+    for key, qty in (restore_inventory or {}).items():
+        if qty:
+            inc[f"inventory.{key}"] = int(qty)
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": inc})
+    player["clean_money"] = int(player.get("clean_money", 0) or 0) + max(0, int(amount))
+
+
 class MutationInput(BaseModel):
     request_id: str | None = Field(default=None, max_length=80)
 
