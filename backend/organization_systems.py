@@ -69,6 +69,44 @@ TEAM_POLICIES = {
     "auto_use_armor": {"name": "Usar proteção", "default": True},
 }
 
+TEAM_PRESETS = {
+    "balanced": {
+        "name": "Equilíbrio",
+        "doctrine": "balanced",
+        "policies": {"abort_below_pct": 25, "protect_injured": True, "auto_use_medical": True, "auto_use_armor": True},
+        "loadout": ["medical_kit", "burner_phones", "surveillance_kit"],
+        "desc": "Configuração versátil para missões sem perfil dominante.",
+    },
+    "assault": {
+        "name": "Impacto",
+        "doctrine": "aggressive",
+        "policies": {"abort_below_pct": 18, "protect_injured": True, "auto_use_medical": True, "auto_use_armor": True},
+        "loadout": ["body_armor", "medical_kit", "entry_tools", "burner_phones"],
+        "desc": "Maximiza capacidade de confronto e aceita exposição superior.",
+    },
+    "stealth": {
+        "name": "Furtivo",
+        "doctrine": "stealth",
+        "policies": {"abort_below_pct": 35, "protect_injured": True, "auto_use_medical": True, "auto_use_armor": False},
+        "loadout": ["disguise_kit", "surveillance_kit", "burner_phones", "fake_docs", "evidence_cleanup"],
+        "desc": "Prioriza discrição, cobertura e controlo de calor.",
+    },
+    "technical": {
+        "name": "Técnico",
+        "doctrine": "cautious",
+        "policies": {"abort_below_pct": 32, "protect_injured": True, "auto_use_medical": True, "auto_use_armor": False},
+        "loadout": ["electronics_kit", "signal_kit", "surveillance_kit", "burner_phones"],
+        "desc": "Preparação eletrónica e inteligência para operações técnicas.",
+    },
+    "logistics": {
+        "name": "Logístico",
+        "doctrine": "balanced",
+        "policies": {"abort_below_pct": 28, "protect_injured": True, "auto_use_medical": True, "auto_use_armor": False},
+        "loadout": ["fake_docs", "signal_kit", "burner_phones", "medical_kit"],
+        "desc": "Mobilidade, documentação e continuidade operacional.",
+    },
+}
+
 DEPARTMENTS = {
     "financeiro": {
         "name": "Gabinete Financeiro", "unlock_hq": 3, "base_cost": 18000, "max_level": 5,
