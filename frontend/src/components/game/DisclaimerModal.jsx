@@ -147,7 +147,7 @@ export function DisclaimerModal() {
         {stage === "notice" ? (
           <div className="p-6 md:p-7">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.35em] text-red-500/90">
-              Protocolo de entrada · Aviso ao operador
+              Aviso importante
             </p>
             <div className="mt-4 flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-[0_0_18px_rgba(220,38,38,0.25)]">
@@ -157,7 +157,7 @@ export function DisclaimerModal() {
                 <h2 id="disclaimer-title" className="font-display text-xl font-bold uppercase tracking-wide text-white md:text-2xl">
                   Isto é apenas um jogo
                 </h2>
-                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">Ficção interativa · SUBMUNDO</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">SUBMUNDO</p>
               </div>
             </div>
 
@@ -194,7 +194,7 @@ export function DisclaimerModal() {
                     />
                   </div>
                   <p className="mt-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-                    Tempo de leitura em curso — lê com calma
+                    Lê o aviso antes de continuar
                   </p>
                 </div>
               )}
@@ -221,7 +221,7 @@ export function DisclaimerModal() {
                 {locked ? (
                   <>
                     <Hourglass className="mr-1.5 h-4 w-4 animate-pulse" />
-                    {`Lê o aviso com atenção · ${remaining}s`}
+                    {`Lê o aviso com atenção (${remaining}s)`}
                   </>
                 ) : (
                   <>
@@ -233,7 +233,7 @@ export function DisclaimerModal() {
             </div>
 
             <p className="mt-4 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-600">
-              Compromisso registado com data e hora ·{" "}
+              Aceite em{" "}
               <a href="/termos" target="_blank" rel="noreferrer" className="text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline">
                 Termos de Utilização
               </a>
@@ -242,7 +242,7 @@ export function DisclaimerModal() {
         ) : (
           <div className="p-6 md:p-7" data-testid="disclaimer-declined-view">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.35em] text-amber-500/90">
-              Protocolo de entrada · Acesso suspenso
+              Acesso suspenso
             </p>
             <div className="mt-4 flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 shadow-[0_0_18px_rgba(245,158,11,0.2)]">
@@ -258,7 +258,7 @@ export function DisclaimerModal() {
 
             <div className="mt-5 space-y-3 text-sm leading-relaxed text-zinc-300">
               <p>
-                {"O acesso à rede SUBMUNDO depende deste compromisso — é uma "}
+                {"Para continuar no SUBMUNDO, este compromisso é uma "}
                 <span className="font-semibold text-white">condição de utilização</span>
                 {". Sem ele, não podemos deixar-te continuar."}
               </p>
