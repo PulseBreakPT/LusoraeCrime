@@ -6,7 +6,7 @@ import { Radio, Crosshair, Siren, X } from "lucide-react";
  * Operações — painel embutível com a atividade das operações.
  * Revela o guião da missão (live_log do backend) linha a linha, seguindo o
  * relógio do servidor: rádio da equipa, marcos da operação e COMPLICAÇÕES com
- * efeito real na chance (o pct de cada complicação soma à "chance ao vivo",
+ * efeito real na probabilidade (cada complicação altera o valor atual,
  * que é exatamente o valor usado pelo servidor no desfecho).
  *
  * Este painel já não se posiciona sozinho sobre o mapa: vive dentro da
