@@ -98,7 +98,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel">
+      <SheetContent side="right" className="sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
           <SheetTitle className="flex items-center gap-2 text-white">
