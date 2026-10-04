@@ -113,6 +113,7 @@ from economy_calendar import next_weekly_settlement, is_weekly_settlement
 from game_data import operation_profile_of
 from time_rules import portugal_hour_allowed
 
+from organization_automation import run_organization_automation
 from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
@@ -3313,6 +3314,13 @@ async def advance(db, player):
                                       "vehicles": vehicles, "minutes": minutes,
                                       "dirty_cap": dirty_money_cap(player["level"])})
     await process_automations(db, player, employees, vehicles, props, bonuses, now)
+    try:
+        await run_organization_automation(
+            db, player, now=now, add_event=add_event, record_tx=record_tx, force=False,
+        )
+    except Exception:
+        # Automação é uma conveniência: nunca pode derrubar o tick principal.
+        logger.exception("Falha na automação da organização (player %s)", pid)
 
     # Territórios: rendimento passivo com pressão rival crescente e defesa que
     # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
