@@ -86,7 +86,10 @@ from economy_constants import (
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from retention_engine import build_retention_snapshot, mission_decision, world_pulse
-from city_systems import operation_world_modifier, business_network_effect
+from city_systems import (
+    operation_world_modifier, business_network_effect, boss_leadership_modifier,
+    ensure_rivals, advance_rival_world,
+)
 from game_data import operation_profile_of, OPERATION_PROFILE_LABELS
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
@@ -653,6 +656,11 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
     ensure_naming_scheduled(db, player)
     if not skip_advance:
         player = await advance(db, player)
+        # A cidade avança mesmo sem o painel Cidade aberto. O slot atómico do
+        # motor rival garante que refreshes concorrentes não duplicam ações.
+        city_rivals = await ensure_rivals(db, player)
+        city_businesses_for_tick = await db.city_businesses.find({"player_id": str(player["_id"])}).to_list(100)
+        await advance_rival_world(db, player, city_rivals, city_businesses_for_tick, now_utc())
     pid = str(player["_id"])
     now_iso = now_utc().isoformat()
 
@@ -837,6 +845,7 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     city_businesses = await db.city_businesses.find({"player_id": pid}).to_list(100)
     city_fx = operation_world_modifier(opp["category"], now, player.get("region") or "Portugal")
     business_chance = business_network_effect(city_businesses, opp["category"])
+    boss_fx = boss_leadership_modifier(player, now)
 
     speed = effective_speed(vehicle)
     travel_s = max(20, straight_dist / speed)
@@ -990,7 +999,14 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
             "label": "Rede empresarial ativa",
             "pct": business_chance,
         })
-    chance = max(0.02, min(0.97, chance + city_delta + business_chance))
+    boss_delta = float(boss_fx.get("chance_delta", 0.0))
+    if boss_delta:
+        breakdown.append({
+            "key": "chefia",
+            "label": f"Chefia: {boss_fx['label']}",
+            "pct": boss_delta,
+        })
+    chance = max(0.02, min(0.97, chance + city_delta + business_chance + boss_delta))
 
     profile_delta, profile_label = _operation_profile_effect(
         operation_profile, members, vehicle, weapons_by_employee_id
@@ -1111,6 +1127,7 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
         "city_world": city_fx["context"],
         "city_heat_mult": float(city_fx["heat_mult"]),
         "business_chance_bonus": business_chance,
+        "boss_leadership": boss_fx,
         "reward_difficulty_score": reward_data["difficulty_score"],
         "reward_xp": reward_data["xp"],
         "reward_reputation": reward_data["reputation"],
@@ -1199,6 +1216,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "world_pulse": prep.get("world_pulse"),
         "city_world": prep.get("city_world"),
         "business_chance_bonus": prep.get("business_chance_bonus", 0.0),
+        "boss_leadership": prep.get("boss_leadership"),
         "doctrine": prep.get("doctrine", "balanced"),
         "doctrine_heat_mult": prep.get("doctrine_heat_mult", 1.0),
         "doctrine_fatigue_mult": prep.get("doctrine_fatigue_mult", 1.0),
