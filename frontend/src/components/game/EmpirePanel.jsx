@@ -160,30 +160,6 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
           </div>
         </Card>
 
-        <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : "Nível máximo alcançado — domínio total de Lisboa."} block>
-          <Card className="mt-2 sub-card p-3 shadow-none" data-testid="empire-level-card">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-                Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
-              </p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-                Respeito <span className="ml-1 font-mono text-sm font-bold text-white">{p.respect}</span>
-                {p.next_level_respect && <span className="text-zinc-600">/{p.next_level_respect}</span>}
-              </p>
-            </div>
-            <MiniBar value={p.next_level_respect ? (p.respect / p.next_level_respect) * 100 : 100} color="#DC2626" className="mt-2" height="h-1.5" />
-          </Card>
-        </Tip>
-
-        <div className="mt-6">
-          <SectionHeader icon={MapPin} title="Quartel-general" />
-          <Card className="sub-card p-3 shadow-none">
-            <p className="text-sm font-semibold text-white">{p.hq.name}</p>
-            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
-          </Card>
-        </div>
-
-
         <div className="mt-6">
           <SectionHeader icon={Banknote} title="Lavagem de dinheiro" />
           <Card className="sub-card p-3 shadow-none">
@@ -274,6 +250,30 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
             </Tip>
           </Card>
         </div>
+
+        <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : "Nível máximo alcançado — domínio total de Lisboa."} block>
+          <Card className="mt-2 sub-card p-3 shadow-none" data-testid="empire-level-card">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+                Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+                Respeito <span className="ml-1 font-mono text-sm font-bold text-white">{p.respect}</span>
+                {p.next_level_respect && <span className="text-zinc-600">/{p.next_level_respect}</span>}
+              </p>
+            </div>
+            <MiniBar value={p.next_level_respect ? (p.respect / p.next_level_respect) * 100 : 100} color="#DC2626" className="mt-2" height="h-1.5" />
+          </Card>
+        </Tip>
+
+        <div className="mt-6">
+          <SectionHeader icon={MapPin} title="Quartel-general" />
+          <Card className="sub-card p-3 shadow-none">
+            <p className="text-sm font-semibold text-white">{p.hq.name}</p>
+            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
+          </Card>
+        </div>
+
 
         <div className="mt-6 pb-2">
           <button type="button"
