@@ -1855,6 +1855,7 @@ async def _get_employee(pid, employee_id):
 
 
 @router.post("/employees/recruit")
+@idempotent("employees.recruit")
 async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -1871,39 +1872,64 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
     if used >= caps["employees"]:
         raise HTTPException(status_code=400, detail="Sem capacidade. Compra ou melhora um esconderijo.")
     doc = employee_from_candidate(cand, now_utc().isoformat())
-    inc = {"clean_money": -recruit_cost, "stats.recruits_hired": 1}
+    stat_inc = {"stats.recruits_hired": 1}
     if cand["role_key"] == "informador":
-        inc["stats.recruits_informador"] = 1
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": inc})
-    await db.employees.insert_one(doc)
-    await db.candidates.delete_one({"_id": cand["_id"]})
+        stat_inc["stats.recruits_informador"] = 1
+
+    reserved = await db.candidates.find_one_and_delete({"_id": cand["_id"], "player_id": pid})
+    if not reserved:
+        raise HTTPException(status_code=409, detail="O candidato acabou de ser recrutado noutra sessão")
+    try:
+        fresh_player = await _debit_clean_atomic(player, recruit_cost, stat_inc)
+    except Exception:
+        await db.candidates.insert_one(reserved)
+        raise
+    try:
+        await db.employees.insert_one(doc)
+    except Exception:
+        refund = {"clean_money": recruit_cost, "stats.recruits_hired": -1}
+        if cand["role_key"] == "informador":
+            refund["stats.recruits_informador"] = -1
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": refund})
+        await db.candidates.insert_one(reserved)
+        raise
     role_name = SPECIALIZATIONS[cand["role_key"]]["name"]
     await add_event(db, pid, "team", f"{cand['name']} ({role_name}, {RARITIES[cand['rarity']]['name']}) recrutado por {recruit_cost:,} €.")
-    await record_tx(db, pid, "recruit", -recruit_cost, "clean", player["clean_money"] - recruit_cost, f"Recrutamento de {cand['name']}")
+    await record_tx(db, pid, "recruit", -recruit_cost, "clean", fresh_player["clean_money"], f"Recrutamento de {cand['name']}")
     return {"ok": True}
 
 
 @router.post("/recruitment/refresh")
-async def refresh_recruitment(user: dict = Depends(get_current_user)):
+@idempotent("recruitment.refresh")
+async def refresh_recruitment(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
     if player["clean_money"] < POOL_REFRESH_COST:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     now = now_utc()
-    await db.candidates.delete_many({"player_id": pid})
+    old_docs = await db.candidates.find({"player_id": pid}).to_list(100)
+    fresh_player = await _debit_clean_atomic(player, POOL_REFRESH_COST)
     docs = []
     for key, src in RECRUIT_SOURCES.items():
         if player["level"] >= src["min_level"]:
             for _ in range(2):
                 docs.append(gen_candidate(pid, key, now.isoformat()))
-    if docs:
-        await db.candidates.insert_many(docs)
-    await db.players.update_one({"_id": player["_id"]}, {
-        "$inc": {"clean_money": -POOL_REFRESH_COST},
-        "$set": {"pool_refresh_at": (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()},
-    })
+    try:
+        await db.candidates.delete_many({"player_id": pid})
+        if docs:
+            await db.candidates.insert_many(docs)
+        await db.players.update_one(
+            {"_id": player["_id"]},
+            {"$set": {"pool_refresh_at": (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()}},
+        )
+    except Exception:
+        await db.candidates.delete_many({"player_id": pid})
+        if old_docs:
+            await db.candidates.insert_many(old_docs)
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": POOL_REFRESH_COST}})
+        raise
     await add_event(db, pid, "team", f"Contactos de recrutamento atualizados por {POOL_REFRESH_COST:,} €.")
-    await record_tx(db, pid, "pool_refresh", -POOL_REFRESH_COST, "clean", player["clean_money"] - POOL_REFRESH_COST, "Atualização de contactos")
+    await record_tx(db, pid, "pool_refresh", -POOL_REFRESH_COST, "clean", fresh_player["clean_money"], "Atualização de contactos")
     return {"ok": True}
 
 
@@ -1946,6 +1972,7 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
 
 
 @router.post("/employees/train")
+@idempotent("employees.train")
 async def train_employee(body: TrainInput, user: dict = Depends(get_current_user)):
     if body.course_key not in TRAINING_COURSES:
         raise HTTPException(status_code=400, detail="Formação inválida")
@@ -1959,13 +1986,19 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
     if player["clean_money"] < training_cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     ends = now_utc() + timedelta(seconds=course["duration_s"] * max(0.72, 1.0 - 0.08 * department_level(player, "rh")))
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -training_cost}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
-        "status": "training",
-        "training": {"course_key": body.course_key, "ends_at": ends.isoformat()},
-    }})
+    fresh_player = await _debit_clean_atomic(player, training_cost)
+    changed = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "status": "idle"},
+        {"$set": {
+            "status": "training",
+            "training": {"course_key": body.course_key, "ends_at": ends.isoformat()},
+        }},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": training_cost}})
+        raise HTTPException(status_code=409, detail="O estado do operacional mudou antes da formação")
     await add_event(db, pid, "team", f"{emp['name']} iniciou a formação {course['name']}.")
-    await record_tx(db, pid, "training", -training_cost, "clean", player["clean_money"] - training_cost, f"Formação {course['name']} de {emp['name']}")
+    await record_tx(db, pid, "training", -training_cost, "clean", fresh_player["clean_money"], f"Formação {course['name']} de {emp['name']}")
     return {"ok": True}
 
 
@@ -1986,6 +2019,7 @@ async def rest_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/employees/promote")
+@idempotent("employees.promote")
 async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2005,20 +2039,27 @@ async def promote_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     new_rank = RANKS[new_idx]
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.employees_promoted": 1}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
-        "rank": new_rank, "salary": int(emp.get("salary", 0) * 1.1),
-        "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
-        "morale": min(100.0, emp.get("morale", 70) + 8),
-        "fatigue": 0.0,
-    }})
+    fresh_player = await _debit_clean_atomic(player, cost, {"stats.employees_promoted": 1})
+    changed = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "rank": emp.get("rank", "recruta"), "level": {"$gte": RANK_REQ_LEVEL[new_idx]}},
+        {"$set": {
+            "rank": new_rank, "salary": int(emp.get("salary", 0) * 1.1),
+            "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
+            "morale": min(100.0, emp.get("morale", 70) + 8),
+            "fatigue": 0.0,
+        }},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost, "stats.employees_promoted": -1}})
+        raise HTTPException(status_code=409, detail="O posto do operacional mudou antes da promoção")
     await push_history(db, emp["_id"], f"Promovido a {new_rank.replace('_', ' ')}.")
     await add_event(db, pid, "team", f"{emp['name']} promovido a {new_rank.replace('_', ' ')} por {cost:,} €.")
-    await record_tx(db, pid, "promote", -cost, "clean", player["clean_money"] - cost, f"Promoção de {emp['name']}")
+    await record_tx(db, pid, "promote", -cost, "clean", fresh_player["clean_money"], f"Promoção de {emp['name']}")
     return {"ok": True}
 
 
 @router.post("/employees/bonus")
+@idempotent("employees.bonus")
 async def bonus_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2026,18 +2067,19 @@ async def bonus_employee(body: EmployeeIdInput, user: dict = Depends(get_current
     cost = max(100, emp.get("salary", 100))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.bonuses_paid": 1}})
+    fresh_player = await _debit_clean_atomic(player, cost, {"stats.bonuses_paid": 1})
     await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
         "morale": min(100.0, emp.get("morale", 70) + 15),
         "loyalty": min(100.0, emp.get("loyalty", 70) + 10),
     }})
     await push_history(db, emp["_id"], f"Recebeu um bónus de {cost:,} €.")
     await add_event(db, pid, "team", f"Bónus de {cost:,} € pago a {emp['name']}. Moral e lealdade subiram.")
-    await record_tx(db, pid, "bonus", -cost, "clean", player["clean_money"] - cost, f"Bónus para {emp['name']}")
+    await record_tx(db, pid, "bonus", -cost, "clean", fresh_player["clean_money"], f"Bónus para {emp['name']}")
     return {"cost": cost}
 
 
 @router.post("/employees/heal")
+@idempotent("employees.heal")
 async def heal_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2048,15 +2090,22 @@ async def heal_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     cost = max(200, int(HEAL_BASE_COST * (1 - bonuses["heal"])))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"status": "idle", "status_until": None, "injury": None, "stress": max(0.0, float(emp.get("stress", 10) or 0) - 12)}})
+    fresh_player = await _debit_clean_atomic(player, cost)
+    changed = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "status": "injured"},
+        {"$set": {"status": "idle", "status_until": None, "injury": None, "stress": max(0.0, float(emp.get("stress", 10) or 0) - 12)}},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost}})
+        raise HTTPException(status_code=409, detail="O estado clínico mudou antes do tratamento")
     await push_history(db, emp["_id"], "Tratado na clínica clandestina.")
     await add_event(db, pid, "team", f"{emp['name']} tratado na clínica clandestina por {cost:,} €.")
-    await record_tx(db, pid, "heal", -cost, "clean", player["clean_money"] - cost, f"Clínica para {emp['name']}")
+    await record_tx(db, pid, "heal", -cost, "clean", fresh_player["clean_money"], f"Clínica para {emp['name']}")
     return {"cost": cost}
 
 
 @router.post("/employees/release")
+@idempotent("employees.release")
 async def release_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2067,18 +2116,25 @@ async def release_employee(body: EmployeeIdInput, user: dict = Depends(get_curre
     cost = max(300, int((RELEASE_BASE_COST + player["heat"] * 30) * (1 - bonuses["legal"]) * (1 - bonuses["bribe_discount"])))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {
-        "status": "idle", "status_until": None, "sentence": None,
-        "loyalty": min(100.0, emp.get("loyalty", 70) + 8),
-    }})
+    fresh_player = await _debit_clean_atomic(player, cost)
+    changed = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "status": "arrested"},
+        {"$set": {
+            "status": "idle", "status_until": None, "sentence": None,
+            "loyalty": min(100.0, emp.get("loyalty", 70) + 8),
+        }},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost}})
+        raise HTTPException(status_code=409, detail="O estado prisional mudou antes da libertação")
     await push_history(db, emp["_id"], "Libertado com ajuda do advogado.")
     await add_event(db, pid, "team", f"{emp['name']} libertado da prisão por {cost:,} € (advogados e subornos).")
-    await record_tx(db, pid, "release", -cost, "clean", player["clean_money"] - cost, f"Advogado para {emp['name']}")
+    await record_tx(db, pid, "release", -cost, "clean", fresh_player["clean_money"], f"Advogado para {emp['name']}")
     return {"cost": cost}
 
 
 @router.post("/employees/fire")
+@idempotent("employees.fire")
 async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2088,18 +2144,21 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
     severance = emp.get("salary", 100) * 3
     if player["clean_money"] < severance:
         raise HTTPException(status_code=400, detail=f"Indemnização de {severance:,} € — dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -severance}})
+    fresh_player = await _debit_clean_atomic(player, severance)
+    deleted = await db.employees.delete_one({"_id": emp["_id"], "player_id": pid, "status": {"$ne": "on_mission"}})
+    if deleted.deleted_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": severance}})
+        raise HTTPException(status_code=409, detail="O estado do operacional mudou antes do despedimento")
     await _unlink_employee_weapon(db, emp["_id"])
     if emp.get("stationed_property_id"):
         await db.properties.update_one(
             {"_id": ObjectId(emp["stationed_property_id"]), "player_id": pid},
             {"$pull": {"staff_employee_ids": body.employee_id}},
         )
-    await db.employees.delete_one({"_id": emp["_id"]})
     await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": -3}})
     await db.employees.update_many({"player_id": pid, "morale": {"$lt": 0}}, {"$set": {"morale": 0.0}})
     await add_event(db, pid, "team", f"{emp['name']} despedido (indemnização de {severance:,} €). A moral da equipa ressentiu-se.")
-    await record_tx(db, pid, "fire", -severance, "clean", player["clean_money"] - severance, f"Indemnização de {emp['name']}")
+    await record_tx(db, pid, "fire", -severance, "clean", fresh_player["clean_money"], f"Indemnização de {emp['name']}")
     return {"severance": severance}
 
 

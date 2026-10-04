@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from engine import hour_allowed
 from game_data import operation_profile_of
 from reward_engine import calculate_money_reward
-from routes_game import _road_mission_metrics
+from travel_metrics import road_mission_metrics
 
 
 def test_operation_hours_follow_portugal_local_time():
@@ -16,7 +16,7 @@ def test_operation_hours_follow_portugal_local_time():
 
 
 def test_road_metrics_use_real_out_and_return_distances():
-    metrics = _road_mission_metrics(
+    metrics = road_mission_metrics(
         {"distance": 12_000},
         {"distance": 14_000},
         {"cons": 8.0},
