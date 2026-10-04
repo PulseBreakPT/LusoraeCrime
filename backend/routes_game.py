@@ -77,6 +77,7 @@ from reward_engine import calculate_full_reward
 from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX, REPEAT_PENALTY_MULTIPLIER
 from property_market import property_market_price
 from road_routing import road_router
+from travel_metrics import road_mission_metrics
 from economy_calendar import WEEKLY_SETTLEMENT_WEEKDAY, WEEKLY_SETTLEMENT_HOUR
 from economy_constants import (
     EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
@@ -211,25 +212,6 @@ async def _debit_clean_atomic(player: dict, amount: int, extra_inc: Optional[dic
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     player["clean_money"] = fresh["clean_money"]
     return fresh
-
-
-def _road_mission_metrics(outward: dict, inward: dict, vehicle: dict, speed: float):
-    """Métricas autoritativas da viagem a partir da estrada real, não haversine."""
-    out_m = max(0.0, float((outward or {}).get("distance") or 0))
-    in_m = max(0.0, float((inward or {}).get("distance") or 0))
-    if out_m <= 0 or in_m <= 0:
-        raise HTTPException(status_code=422, detail="Percurso rodoviário sem distância válida")
-    round_km = (out_m + in_m) / 1000.0
-    fuel_needed = round_km * float(vehicle.get("cons", 0) or 0) / 100.0
-    effective = max(1.0, float(speed or 1))
-    return {
-        "out_m": out_m,
-        "in_m": in_m,
-        "round_km": round_km,
-        "fuel_needed": fuel_needed,
-        "travel_s": max(20.0, out_m / effective),
-        "return_travel_s": max(20.0, in_m / effective),
-    }
 
 
 def _operation_profile_effect(profile: str, members: list, vehicle: dict, weapons_by_employee_id: dict):
@@ -800,7 +782,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
     }
 
 
-async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_outward=None, route_inward=None):
+async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     pid = str(player["_id"])
     if team["status"] != "idle":
         raise HTTPException(status_code=400, detail="Equipa está ocupada")
@@ -857,14 +839,13 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_ou
     road_inward = None
     if resolve_routes:
         target_point = {"lat": float(opp["lat"]), "lng": float(opp["lng"])}
-        road_outward = _validated_client_road_plan(route_outward, origin, target_point)
-        road_inward = _validated_client_road_plan(route_inward, target_point, origin)
-        if not road_outward or not road_inward:
-            road_outward, road_inward = await asyncio.gather(
-                road_router.get(origin, target_point),
-                road_router.get(target_point, origin),
-            )
-        metrics = _road_mission_metrics(road_outward, road_inward, vehicle, speed)
+        # Distância, duração e combustível são sempre derivados da rota
+        # autoritativa/cache do servidor. O cliente nunca dita métricas económicas.
+        road_outward, road_inward = await asyncio.gather(
+            road_router.get(origin, target_point),
+            road_router.get(target_point, origin),
+        )
+        metrics = road_mission_metrics(road_outward, road_inward, vehicle, speed)
         dist = metrics["out_m"]
         round_km = metrics["round_km"]
         travel_s = metrics["travel_s"]
@@ -1119,67 +1100,6 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_ou
     }
 
 
-def _validated_client_road_plan(plan, origin, target):
-    """Aceita apenas geometria OSRM-like razoável enviada pelo cliente.
-
-    A rota é validada pelo backend e alimenta distância, combustível e duração;
-    por isso limitamos tamanho, coordenadas,
-    tempos e distância dos extremos para não persistir lixo arbitrário.
-    """
-    if not isinstance(plan, dict) or plan.get("unavailable"):
-        return None
-    latlngs = plan.get("latlngs")
-    times = plan.get("times")
-    if not isinstance(latlngs, list) or not (2 <= len(latlngs) <= 5000):
-        return None
-    if not isinstance(times, list) or len(times) != len(latlngs):
-        return None
-
-    clean_points = []
-    clean_times = []
-    previous = -1.0
-    for point, second in zip(latlngs, times):
-        if not isinstance(point, (list, tuple)) or len(point) < 2:
-            return None
-        try:
-            lat, lng, t = float(point[0]), float(point[1]), float(second)
-        except (TypeError, ValueError):
-            return None
-        if not all(math.isfinite(value) for value in (lat, lng, t)) or t < previous or t < 0:
-            return None
-        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-            return None
-        clean_points.append([lat, lng])
-        clean_times.append(t)
-        previous = t
-
-    # OSRM pode fazer snap alguns quilómetros em zonas rurais, mas nunca deve
-    # começar/terminar noutro distrito ou atravessar o mapa por um payload falso.
-    if haversine_m(origin["lat"], origin["lng"], clean_points[0][0], clean_points[0][1]) > 5000:
-        return None
-    if haversine_m(target["lat"], target["lng"], clean_points[-1][0], clean_points[-1][1]) > 5000:
-        return None
-
-    try:
-        distance = max(0.0, float(plan.get("distance") or 0))
-        duration = max(0.0, float(plan.get("duration") or clean_times[-1]))
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(distance) or not math.isfinite(duration) or distance > 2_000_000:
-        return None
-
-    return {
-        "latlngs": clean_points,
-        "times": clean_times,
-        "distance": distance,
-        "duration": duration,
-        "source": str(plan.get("source") or "OSRM / OpenStreetMap")[:80],
-        "estimated": True,
-        "liveTraffic": False,
-        "unavailable": False,
-    }
-
-
 async def _validate_dispatch_inputs(body: DispatchInput, user: dict):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -1211,10 +1131,7 @@ async def road_route(body: RoadRouteInput, user: dict = Depends(get_current_user
 @router.post("/dispatch/preview")
 async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current_user)):
     player, opp, team = await _validate_dispatch_inputs(body, user)
-    prep = await _prepare_dispatch(
-        player, opp, team, resolve_routes=True,
-        route_outward=body.route_outward, route_inward=body.route_inward,
-    )
+    prep = await _prepare_dispatch(player, opp, team, resolve_routes=True)
     return {
         "chance": round(prep["chance"], 3),
         "breakdown": prep["breakdown"],
@@ -1252,10 +1169,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     player, opp, team = await _validate_dispatch_inputs(body, user)
     pid = str(player["_id"])
     now = now_utc()
-    prep = await _prepare_dispatch(
-        player, opp, team, resolve_routes=True,
-        route_outward=body.route_outward, route_inward=body.route_inward,
-    )
+    prep = await _prepare_dispatch(player, opp, team, resolve_routes=True)
     if len(prep["members"]) < prep["min_members"]:
         raise HTTPException(
             status_code=400,
