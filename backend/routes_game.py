@@ -833,15 +833,30 @@ async def _prepare_dispatch(player, opp, team):
         specialization_match=spec_match,
     )
 
+    # Pulso do mundo: uma janela global de quatro horas muda o valor relativo
+    # de uma categoria. É a mesma para todos os jogadores e aparece no preview,
+    # por isso não existe multiplicador escondido.
+    pulse = world_pulse(now)
+    pulse_active = opp["category"] == pulse["category"]
+    pulse_reward_mult = pulse["reward_mult"] if pulse_active else 1.0
+
     # Aplicar multiplicadores existentes uma única vez. Antes, "mult" entrava
     # no reward_engine e voltava a ser multiplicado aqui, inflacionando o saque.
-    reward = int(reward_data["money"] * mult * age_mult * split_mult)
+    reward = int(reward_data["money"] * mult * pulse_reward_mult * age_mult * split_mult)
     reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
+
+    mission_pulse = {
+        **pulse,
+        "active_for_mission": pulse_active,
+        "applied_reward_mult": pulse_reward_mult,
+        "applied_heat_mult": pulse["heat_mult"] if pulse_active else 1.0,
+    }
 
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
-        "reward": reward, "reward_mult": mult, "age_mult": age_mult, "split_mult": split_mult,
+        "reward": reward, "reward_mult": mult * pulse_reward_mult, "age_mult": age_mult, "split_mult": split_mult,
+        "world_pulse": mission_pulse,
         "reward_difficulty_score": reward_data["difficulty_score"],
         "reward_xp": reward_data["xp"],
         "reward_reputation": reward_data["reputation"],
@@ -972,6 +987,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "min_members": prep["min_members"],
         "min_members_met": len(prep["members"]) >= prep["min_members"],
         "weapon_alerts": prep.get("weapon_alerts", []),
+        "world_pulse": prep.get("world_pulse"),
     }
 
 
