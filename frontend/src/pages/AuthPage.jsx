@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContextV2";
 import { Button } from "../components/ui/button";
 import {
   Loader2,
-  ShieldCheck,
+
   Gamepad2,
   LogIn,
   MapPinned,
@@ -69,11 +69,6 @@ export default function AuthPage() {
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-10 sm:px-6">
         <div className="grid w-full gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <section className="hidden lg:block">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-red-300">
-              <ShieldCheck size={13} />
-              Rede operacional ativa
-            </div>
-
             <h1 className="max-w-2xl font-display text-6xl font-black uppercase leading-[0.9] tracking-tight xl:text-7xl">
               Constrói o teu
               <span className="block text-red-500">império.</span>
@@ -149,8 +144,7 @@ export default function AuthPage() {
 
               {!googleSignInEnabled && (
                 <p className="mt-3 text-center text-[11px] text-zinc-500">
-                  Google Login fica disponível assim que o OAuth da app for
-                  configurado. O modo convidado funciona sem servidor.
+                  O início de sessão com Google está temporariamente indisponível. Podes jogar como convidado.
                 </p>
               )}
 
@@ -165,8 +159,8 @@ export default function AuthPage() {
 
               <div className="mt-6 border-t border-white/8 pt-5 text-center text-[11px] leading-relaxed text-zinc-500">
                 <p>
-                  O modo convidado funciona totalmente neste dispositivo, mesmo sem backend.
-                  Para cloud save e sincronização entre dispositivos, usa a Conta Google.
+                  No modo convidado, o progresso fica guardado apenas neste dispositivo.
+                  Para o manter entre dispositivos, usa a Conta Google.
                 </p>
                 <p className="mt-3">
                   Ao continuar, aceitas os{" "}
@@ -181,9 +175,6 @@ export default function AuthPage() {
               </div>
             </div>
 
-            <p className="mt-4 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-700">
-              Sem login por email · sem registo manual
-            </p>
           </section>
         </div>
       </div>
