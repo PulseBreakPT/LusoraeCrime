@@ -235,11 +235,11 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
     pushEvent(save,ok?"system":"warning",msg);return {handled:true,data:{ok:true,success:ok,message:msg}};
   }
   if(verb==="post"&&path==="/game/city/casino/play"){
-    const bet=Number(payload.bet||0);if(bet<100||bet>5000)fail(400,"A aposta tem de ficar entre 100 € e 5 000 €");spend(save,bet,`Aposta: ${payload.game}`,"city_casino_bet");
+    const game=String(payload.game||"");if(!["roulette","blackjack"].includes(game))fail(400,"Jogo de casino inválido");
+    const bet=Number(payload.bet||0);if(bet<100||bet>5000)fail(400,"A aposta tem de ficar entre 100 € e 5 000 €");spend(save,bet,`Aposta: ${game}`,"city_casino_bet");
     let payout=0,detail={};
     if(payload.game==="roulette"){const choice=String(payload.choice||"red").toLowerCase();if(!["red","black","green"].includes(choice))fail(400,"Escolha inválida para a roleta");const number=Math.floor(Math.random()*37),reds=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]),color=number===0?"green":reds.has(number)?"red":"black";if(color===choice)payout=bet*(choice==="green"?36:2);detail={number,color,choice};}
     else if(payload.game==="blackjack"){detail=blackjack();if(detail.outcome==="push")payout=bet;else if(detail.outcome==="win")payout=Math.floor(bet*(detail.natural?2.5:2));}
-    else fail(400,"Jogo de casino inválido");
     if(payout){save.player.clean_money+=payout;pushTx(save,"city_casino_payout",payout,"clean",`Prémio: ${payload.game}`);}const net=payout-bet;pushEvent(save,"system",`Casino: ${payload.game} terminou com resultado líquido de ${net>=0?"+":""}${net.toLocaleString("pt-PT")} €.`);
     return {handled:true,data:{ok:true,payout,net,...detail}};
   }
