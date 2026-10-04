@@ -88,7 +88,7 @@ export default function LegalPage() {
             <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.3em] text-red-500">
               <FileText size={13} aria-hidden="true" /> {config.kicker}
             </div>
-            <h1 data-testid="legal-title" className="sub-title mt-3 font-display text-4xl font-bold uppercase tracking-tight text-white sm:text-5xl">
+            <h1 data-testid="legal-title" className="sub-title mt-3 font-display text-3xl font-bold uppercase tracking-tight text-white sm:text-5xl">
               {doc.title}
             </h1>
             <div className="mt-3 h-0.5 w-20 bg-gradient-to-r from-red-600 via-red-600/60 to-transparent" />

@@ -94,12 +94,12 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <Card data-testid={testId} className="sub-kpi sub-card flex h-full flex-col items-center rounded-lg p-2.5 text-center shadow-none">
-      <p className="flex w-full items-center justify-center gap-1 text-center text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-        {Icon && <Icon size={10} className="shrink-0" style={{ color }} />} <span className="truncate">{label}</span>
+    <Card data-testid={testId} className="sub-kpi sub-card flex h-full min-w-0 flex-col items-center justify-center rounded-lg p-2.5 text-center shadow-none">
+      <p className="flex min-h-5 w-full min-w-0 items-center justify-center gap-1 text-center text-[10px] uppercase leading-tight tracking-[0.12em] text-zinc-500">
+        {Icon && <Icon size={10} className="shrink-0" style={{ color }} />} <span className="min-w-0 break-words">{label}</span>
       </p>
-      <p className="mt-1 w-full truncate text-center font-mono text-sm font-bold leading-tight" style={{ color }}>{value}</p>
-      {sub != null && <p className="mt-0.5 w-full truncate text-center font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
+      <p className="mt-1 w-full min-w-0 break-words text-center font-mono text-sm font-bold leading-tight tabular-nums" style={{ color }}>{value}</p>
+      {sub != null && <p className="mt-0.5 w-full min-w-0 break-words text-center font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
       {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1.5 w-full" height="h-0.5" />}
     </Card>
   </Tip>
@@ -109,10 +109,10 @@ export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor
 // rótulos truncavam ("LEALD…", "DISPO…") — abaixo de `sm` passam a grelha 2×N.
 const STRIP_COLS = {
   2: "grid-cols-2",
-  3: "grid-cols-3",
+  3: "grid-cols-1 min-[390px]:grid-cols-3",
   4: "grid-cols-2 sm:grid-cols-4",
-  5: "grid-cols-2 sm:grid-cols-5",
-  6: "grid-cols-3 sm:grid-cols-6",
+  5: "grid-cols-2 sm:grid-cols-3 md:grid-cols-5",
+  6: "grid-cols-2 sm:grid-cols-3 md:grid-cols-6",
 };
 
 export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => (
@@ -129,16 +129,16 @@ export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => 
 // traço divisor que se estende até à margem (hierarquia + organização),
 // meta opcional à direita (contagens, totais) e slot de ação.
 export const SectionHeader = ({ icon: Icon, title, meta, action, tip, className = "", testId }) => (
-  <div data-testid={testId} className={`mb-2.5 flex items-center gap-2 ${className}`}>
+  <div data-testid={testId} className={`sub-section-header mb-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${className}`}>
     <Tip tip={tip}>
-      <h3 className="flex min-w-0 shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
+      <h3 className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold uppercase leading-tight tracking-[0.12em] text-zinc-300">
         {Icon && <Icon size={12} className="shrink-0 text-red-500/90" />}
-        <span className="truncate">{title}</span>
+        <span className="min-w-0 break-words">{title}</span>
       </h3>
     </Tip>
-    <span className="h-px min-w-3 flex-1 bg-white/[0.08]" aria-hidden="true" />
+    <span className="h-px min-w-6 flex-1 bg-white/[0.08]" aria-hidden="true" />
     {meta != null && <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">{meta}</span>}
-    {action}
+    {action && <span className="sub-section-action shrink-0">{action}</span>}
   </div>
 );
 

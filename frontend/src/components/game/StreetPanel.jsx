@@ -119,7 +119,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
           </Card>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
+            <div className="mt-4 grid grid-cols-1 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 min-[390px]:grid-cols-3">
               {TABS.map(([key, label, Icon]) => (
                 <button
                   key={key}
@@ -256,21 +256,21 @@ const RadarTab = ({ street, now }) => {
         </p>
       </Card>
 
-      <SectionHeader icon={Sparkles} label="Evento urbano" />
+      <SectionHeader icon={Sparkles} title="Evento urbano" />
       <Card className="sub-card p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="font-bold text-white">{street.event.name}</p>
           <span className="font-mono text-[10px] text-zinc-500">{fmtDuration(eventRemaining)}</span>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{street.event.description}</p>
-        <div className="mt-3 grid grid-cols-3 gap-1 text-center font-mono text-[10px]">
+        <div className="mt-3 grid grid-cols-1 gap-1 text-center font-mono text-[10px] min-[390px]:grid-cols-3">
           <Modifier label="Sucesso" value={street.event.success} pct />
           <Modifier label="Pagamento" value={street.event.reward_mult - 1} pct />
           <Modifier label="Calor" value={street.event.heat_mult - 1} pct inverse />
         </div>
       </Card>
 
-      <SectionHeader icon={RadioTower} label="Scanner policial" />
+      <SectionHeader icon={RadioTower} title="Scanner policial" />
       <Card className="sub-card p-4">
         <div className="grid grid-cols-2 gap-2">
           <Info label="Força na zona" value={street.scanner.force} />
@@ -289,7 +289,7 @@ const RadarTab = ({ street, now }) => {
 
 const TerritoriesTab = ({ districts, onAction }) => (
   <div className="mt-4 space-y-3">
-    <SectionHeader icon={MapPinned} label="Influência territorial" />
+    <SectionHeader icon={MapPinned} title="Influência territorial" />
     <p className="text-[10px] leading-relaxed text-zinc-500">
       Trabalhos bem-sucedidos aumentam influência. Aos 100 pontos podes assumir a zona; níveis superiores geram rendimento e melhoram atividades locais.
     </p>
@@ -353,7 +353,7 @@ const TerritoriesTab = ({ districts, onAction }) => (
 
 const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
   <div className="mt-4 space-y-3">
-    <SectionHeader icon={Contact} label="Contactos" />
+    <SectionHeader icon={Contact} title="Contactos" />
     <p className="text-[10px] leading-relaxed text-zinc-500">
       Cada favor aumenta a relação. Os contactos têm recarga própria e produzem efeitos imediatos no mundo.
     </p>
@@ -406,7 +406,7 @@ const ActivitiesTab = ({
     const ready = activeJob.status === "ready";
     return (
       <div className="mt-4 space-y-3">
-        <SectionHeader icon={Activity} label="Atividade em curso" />
+        <SectionHeader icon={Activity} title="Atividade em curso" />
         <Card className="sub-card p-4" data-testid="street-active-job">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -420,7 +420,7 @@ const ActivitiesTab = ({
             </Badge>
           </div>
           <MiniBar value={activeJob.progress_pct} color={ready ? "#34D399" : "#22D3EE"} className="mt-4" height="h-2" />
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="mt-3 grid grid-cols-1 gap-2 text-center min-[390px]:grid-cols-3">
             <Info label="Chance" value={`${Math.round(activeJob.chance * 100)}%`} />
             <Info label="Recompensa" value={fmtMoney(activeJob.reward)} />
             <Info label="Plano" value={activeJob.approach_key} />
@@ -435,7 +435,7 @@ const ActivitiesTab = ({
 
   return (
     <div className="mt-4 space-y-3">
-      <SectionHeader icon={Gauge} label="Preparar atividade" />
+      <SectionHeader icon={Gauge} title="Preparar atividade" />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className="font-mono text-[10px] uppercase text-zinc-500">
           Zona
@@ -496,7 +496,7 @@ const ActivitiesTab = ({
 
 const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
   <div className="mt-4 space-y-3">
-    <SectionHeader icon={Car} label="Garagem clandestina" />
+    <SectionHeader icon={Car} title="Garagem clandestina" />
     <p className="text-[10px] leading-relaxed text-zinc-500">
       A notoriedade aumenta em atividades e operações normais, elevando o risco de perseguição. Matrículas frias limpam o histórico visual.
     </p>
@@ -524,7 +524,7 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
               <Siren size={10} /> Apreendido durante {fmtDuration(meta.impound_remaining_s)}
             </p>
           )}
-          <div className="mt-3 grid grid-cols-3 gap-1">
+          <div className="mt-3 grid grid-cols-1 gap-1 min-[390px]:grid-cols-3">
             <Button size="sm" variant="outline" className="h-8 px-1 text-[10px]" disabled={!meta.notoriety} onClick={() => onAction(vehicle.id, "plates")}>
               Matrículas
             </Button>
@@ -544,7 +544,7 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
 const PlanningTab = ({ street, draft, setDraft, toggleGear, onBuy, onSave }) => (
   <div className="mt-4 space-y-4">
     <div>
-      <SectionHeader icon={Target} label="Abordagem" />
+      <SectionHeader icon={Target} title="Abordagem" />
       <div className="mt-2 grid grid-cols-1 gap-2">
         {street.approaches.map((item) => (
           <ChoiceCard
@@ -558,7 +558,7 @@ const PlanningTab = ({ street, draft, setDraft, toggleGear, onBuy, onSave }) => 
     </div>
 
     <div>
-      <SectionHeader icon={Zap} label="Plano de fuga" />
+      <SectionHeader icon={Zap} title="Plano de fuga" />
       <div className="mt-2 grid grid-cols-1 gap-2">
         {street.escape_plans.map((item) => (
           <ChoiceCard
@@ -572,7 +572,7 @@ const PlanningTab = ({ street, draft, setDraft, toggleGear, onBuy, onSave }) => 
     </div>
 
     <div>
-      <SectionHeader icon={ShoppingBag} label="Equipamento consumível" />
+      <SectionHeader icon={ShoppingBag} title="Equipamento consumível" />
       <p className="mt-1 text-[10px] text-zinc-500">Compra unidades e prepara até dois itens. Só são consumidos ao iniciar uma atividade compatível.</p>
       <div className="mt-2 space-y-2">
         {street.gear_catalog.map((item) => {

@@ -118,7 +118,7 @@ export const PropertiesPanel = ({ open, onOpenChange, focusTarget }) => {
           );
         })()}
 
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="sub-route-toolbar mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
             <Input

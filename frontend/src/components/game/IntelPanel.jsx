@@ -282,7 +282,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
                   title={`Abrir ${m.team_name} e destacar a equipa deste relatório`}
                   className="block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
                 >
-                  <Card className="flex items-center justify-between sub-card px-2.5 py-1.5 shadow-none transition-colors hover:border-white/20 hover:bg-white/[0.035]">
+                  <Card className="flex flex-col items-stretch gap-2 sub-card px-2.5 py-2 shadow-none transition-colors hover:border-white/20 hover:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-xs font-semibold text-white">
                         {m.opportunity.name} <span className="font-mono text-[10px] text-zinc-500">{m.opportunity.district}</span>
@@ -292,7 +292,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
                         {m.success_chance != null && <> · prob. {Math.round(m.success_chance * 100)}%</>}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-right">
+                    <div className="flex items-center justify-between gap-2 text-left sm:justify-end sm:text-right">
                       <div>
                         <p className="font-mono text-[10px] font-bold uppercase" style={{ color: OUTCOME_COLORS[outcome] || "#8E8E93" }}>
                           {OUTCOME_LABELS[outcome] || outcome}

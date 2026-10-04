@@ -108,7 +108,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-4 bg-black/40">
+          <TabsList className="grid w-full grid-cols-2 gap-1 bg-black/40 sm:grid-cols-4">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t.key}
@@ -168,7 +168,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                   <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                     <meta.icon size={11} /> {meta.label}
                   </p>
-                  <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
                     {Object.entries(items).map(([key, item]) => {
                       const owns = isOwned(cat, key);
                       const can = money >= item.cost;
@@ -197,7 +197,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, vehicleId] = selection.split(":");
                                 equipPaint(vehicleId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-32/g border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-36 border-white/10 bg-black/60 font-mono text-[10px] text-white">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -220,7 +220,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, teamId] = selection.split(":");
                                 equipEmblem(teamId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-32/g border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-36 border-white/10 bg-black/60 font-mono text-[10px] text-white">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -276,7 +276,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                 </p>
               );
             })()}
-            <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
               {Object.entries(shop.vip_plans || {}).map(([key, plan]) => {
                 const can = money >= plan.cost;
                 return (
@@ -305,7 +305,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
 
         {/* ---------------- Slots ---------------- */}
         {tab === "slots" && (
-          <div className="mt-3 grid grid-cols-2 gap-2" data-testid="shop-tab-slots-content">
+          <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2" data-testid="shop-tab-slots-content">
             {[
               { kind: "vehicle", label: "Veículos", icon: Car, used: state.caps?.vehicles?.used ?? (state.vehicles || []).length, cap: state.caps?.vehicles?.max || 0, base: shop.slot_cost_vehicle_base, n: state.player.extra_vehicle_slots || 0 },
               { kind: "employee", label: "Funcionários", icon: Users, used: state.caps?.employees?.used ?? (state.employees || []).length, cap: state.caps?.employees?.max || 0, base: shop.slot_cost_employee_base, n: state.player.extra_employee_slots || 0 },

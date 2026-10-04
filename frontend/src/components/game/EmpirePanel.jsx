@@ -74,7 +74,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
           <SheetDescription className="text-zinc-500">O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe.</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
           <StatBox label="€ Limpo" value={fmtMoney(p.clean_money)} accent="#10B981" tip="Pronto a gastar: compras, salários, reparações e subornos." />
           <StatBox label="€ Sujo" value={fmtMoney(p.dirty_money)} accent="#F59E0B" tip="Precisa de ser lavado antes de poder ser gasto. Lava abaixo ou usa empresas de fachada." />
         </div>
@@ -129,7 +129,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <TrendingUp size={11} className="text-emerald-400" /> Fluxo de caixa passivo
           </p>
-          <div className="mt-2.5 grid grid-cols-3 gap-2">
+          <div className="mt-2.5 grid grid-cols-1 gap-2 min-[390px]:grid-cols-3">
             <Tip tip="Dinheiro sujo gerado por hora pelos laboratórios." block>
               <div>
                 <p className="text-[10px] uppercase tracking-[0.12em] text-zinc-600">Produção</p>
@@ -201,7 +201,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
                 </Tip>
               )}
             </div>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex flex-col gap-2 min-[420px]:flex-row">
               <Input
                 data-testid="launder-amount-input"
                 type="number"

@@ -5108,3 +5108,80 @@ html.sub-focus-mode .sub-optional-hud {
             0 0 18px rgba(239, 68, 68, 0.30) !important;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO ROUTE SYSTEM V6 — RESPONSIVE HIERARCHY
+   Shared rules for every modal route after the Impeccable pass.
+   ============================================================ */
+.sub-sheet-scroll {
+    scroll-padding-top: 5.5rem;
+    scroll-padding-bottom: 1rem;
+}
+
+.sub-sheet-panel .sub-summary-strip .sub-kpi {
+    min-height: 4.65rem;
+}
+
+.sub-sheet-panel .sub-section-header {
+    min-width: 0;
+}
+
+.sub-sheet-panel .sub-section-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+}
+
+.sub-route-toolbar {
+    min-width: 0;
+}
+
+.sub-sheet-panel .sub-action-row {
+    min-width: 0;
+}
+
+@media (max-width: 639px) {
+    .sub-sheet-scroll {
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+        scroll-padding-top: 5.25rem;
+    }
+
+    .sub-sheet-panel .sub-summary-strip .sub-kpi {
+        min-height: 4.9rem;
+    }
+
+    .sub-route-toolbar > * {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .sub-route-toolbar button,
+    .sub-route-toolbar [role="button"],
+    .sub-sheet-panel [role="tab"] {
+        min-height: 44px;
+    }
+
+    .sub-sheet-panel input:not([type="range"]),
+    .sub-sheet-panel textarea,
+    .sub-sheet-panel select {
+        font-size: 16px !important;
+    }
+
+    .sub-sheet-panel .sub-action-row {
+        align-items: flex-start !important;
+        flex-wrap: wrap;
+    }
+
+    .sub-sheet-panel .sub-section-action {
+        flex-basis: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 379px) {
+    .sub-sheet-panel .sub-kpi-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}

@@ -810,7 +810,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                   {locked ? (
                     <p className="font-mono text-[10px] text-zinc-600">Sobe de nível para desbloquear esta fonte de recrutamento.</p>
                   ) : (
-                    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                       {cands.map((c) => (
                         <CandidateCard key={c.id} c={c} />
                       ))}

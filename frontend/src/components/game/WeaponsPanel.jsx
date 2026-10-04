@@ -198,7 +198,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
             tip={`Valor de revenda do arsenal inteiro (${Math.round(sellFrac * 100)}% do preço × condição de cada arma).`} />
         </SummaryStrip>
 
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="sub-route-toolbar mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
             <Input
@@ -241,7 +241,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="weapons-list">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="weapons-list">
           {weapons.length === 0 && (
             <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens armas — compra a primeira no arsenal abaixo.
@@ -431,7 +431,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
 
         <div className="mt-6">
           <SectionHeader icon={Swords} title="Arsenal" meta={catalog ? `${Object.keys(catalog.weapon_models || {}).length} modelos` : undefined} />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {catalog &&
               Object.entries(catalog.weapon_models).map(([key, m]) => {
                 const tier = weaponTier(m);
