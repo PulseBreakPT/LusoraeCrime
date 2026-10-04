@@ -76,7 +76,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel sm:max-w-xl" data-testid="mastermind-panel">
+      <SheetContent side="right" className="sub-panel" data-testid="mastermind-panel">
         <SheetHeader>
           <PanelWatermark icon={Vault} />
           <SheetTitle className="flex items-center gap-2 text-white">
