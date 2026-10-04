@@ -1119,8 +1119,10 @@ export function classifyEvent(kind, message) {
       return { panel: "teams", color: "#EF4444" };
     }
     case "success":
-      if (/despistou/i.test(msg)) return { panel: "teams", color: "#34D399" };
+      if (/despistou|concluiu|operação/i.test(msg)) return { panel: "teams", color: "#34D399" };
       return { panel: "quests", color: "#FBBF24" };
+    case "failure":
+      return { panel: "teams", color: "#F59E0B" };
     case "system": {
       if (/ciclo salarial pago/i.test(msg)) return { panel: "employees", color: "#F59E0B" };
       if (/sem pessoal e sem fundos/i.test(msg)) return { panel: "employees", color: "#34D399" };
@@ -1194,6 +1196,16 @@ export function resolveEventNavigation(state, event) {
 
   const msg = event.message || "";
   let item = null;
+
+  // Mission lifecycle notifications often use generic success/failure/police
+  // kinds. If the message names a current team, the team is the concrete source
+  // and wins over a broad destination such as Objectives or Reports.
+  if (["dispatch", "success", "failure", "police"].includes(event.kind)) {
+    const namedTeam = longestNamedMatch(msg, state.teams, (team) => [team.name]);
+    if (namedTeam && !/RUSGA/i.test(msg)) {
+      return { ...base, panel: "teams", focusTestId: `team-card-${namedTeam.id}` };
+    }
+  }
 
   if (base.panel === "employees") {
     item = longestNamedMatch(msg, state.employees, (e) => [e.name]);
