@@ -176,6 +176,19 @@ export default function GamePage() {
 
   const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || navGroup || mapLegendOpen);
 
+  useEffect(() => {
+    const group =
+      ["operations", "quests", "mastermind"].includes(openPanel) ? "operations" :
+      ["teams", "employees"].includes(openPanel) ? "crew" :
+      ["fleet", "weapons"].includes(openPanel) ? "equipment" :
+      ["empire", "properties", "hq"].includes(openPanel) ? "empire" :
+      ["street", "intel", "shop", "settings"].includes(openPanel) ? "menu" :
+      "";
+    if (group) document.documentElement.dataset.subPanelOrigin = group;
+    else delete document.documentElement.dataset.subPanelOrigin;
+    return () => { delete document.documentElement.dataset.subPanelOrigin; };
+  }, [openPanel]);
+
   return (
     <div
       data-testid="game-page"
