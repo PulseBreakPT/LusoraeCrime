@@ -186,16 +186,11 @@ describe("offline guest engine", () => {
       target_key: "auction",
     })).rejects.toThrow("Requer organização nível 10");
 
-    const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
-    raw.player.respect = 42000;
-    localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
-
-    await localGuestRequest("post", "/game/mastermind/heists/intel", {
-      target_key: "auction",
-    });
     const mastermind = (await localGuestRequest("get", "/game/mastermind/state")).data;
-    expect(mastermind.targets.find((target) => target.key === "auction").intel).toBeTruthy();
-    expect(mastermind.targets.find((target) => target.key === "auction").org_unlocked).toBe(true);
+    const auction = mastermind.targets.find((target) => target.key === "auction");
+    expect(auction.unlocked).toBe(false);
+    expect(auction.org_unlocked).toBe(false);
+    expect(auction.min_org_level).toBe(10);
 
     await localGuestRequest("post", "/game/shop/cosmetic", {
       category: "team_emblem",
