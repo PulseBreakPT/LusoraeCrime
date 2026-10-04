@@ -214,6 +214,8 @@ class Property(BaseDocument):
     storage_level: int = 0
     operations_level: int = 0
     staff_employee_ids: List[str] = []
+    staff_roles: dict = {}
+    staff_effectiveness: float = 0.0
 
 
 class Opportunity(BaseDocument):
