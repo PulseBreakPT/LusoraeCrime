@@ -22,7 +22,7 @@ import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
-  Swords, ShieldAlert, Loader2, UserPlus, ArrowUpDown, WalletCards,
+  Swords, ShieldAlert, Loader2, UserPlus, ArrowUpDown,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -528,7 +528,7 @@ const CandidateCard = ({ c, assessment, sourceName }) => {
       <div className="mt-2.5 flex flex-wrap gap-1">
         {assessment.vacancies > 0 ? (
           <span className="rounded bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-emerald-400">
-            <UserCheck size={9} className="mr-1 inline" />{assessment.vacancies} vaga{assessment.vacancies === 1 ? "" : "s"} compatível{assessment.vacancies === 1 ? "" : "eis"}
+            <UserCheck size={9} className="mr-1 inline" />{assessment.vacancies} {assessment.vacancies === 1 ? "vaga compatível" : "vagas compatíveis"}
           </span>
         ) : (
           <span className="rounded bg-white/[0.035] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">Sem vaga prioritária</span>
