@@ -5370,3 +5370,58 @@ html[data-sub-panel-origin="menu"] .sub-sheet-panel { --panel-origin-x: calc(50%
         transition: none !important;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO SEARCH MODAL — same shell as every menu
+   ============================================================ */
+
+.sub-menu-modal {
+    width: min(46rem, calc(100vw - 1.5rem)) !important;
+    max-width: min(46rem, calc(100vw - 1.5rem)) !important;
+    max-height: min(82dvh, 48rem) !important;
+    border: 1px solid rgba(255, 255, 255, 0.085) !important;
+    border-radius: 18px !important;
+    background: #0a0a0d !important;
+    background-image: none !important;
+    box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(255, 255, 255, 0.015) inset !important;
+}
+
+.sub-menu-modal-header {
+    background: #0b0b0e;
+}
+
+.sub-menu-modal > button {
+    top: 0.8rem !important;
+    right: 0.8rem !important;
+    display: flex !important;
+    width: 2rem !important;
+    height: 2rem !important;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    opacity: 1 !important;
+    color: #71717a !important;
+    box-shadow: none !important;
+}
+
+.sub-menu-modal > button:hover,
+.sub-menu-modal > button:focus-visible {
+    border-color: rgba(255, 255, 255, 0.07) !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: #f4f4f5 !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 639px) {
+    .sub-menu-modal {
+        width: calc(100vw - 1rem) !important;
+        max-width: calc(100vw - 1rem) !important;
+        max-height: 86dvh !important;
+        border-radius: 17px !important;
+    }
+}
