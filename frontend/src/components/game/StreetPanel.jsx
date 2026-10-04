@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtDuration, fmtMoney } from "../../lib/game";
-import { MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { MiniBar, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -102,9 +102,8 @@ export const StreetPanel = ({ open, onOpenChange }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:max-w-xl" data-testid="street-panel">
         <SheetHeader>
           <PanelWatermark icon={Radar} />
-          <PanelKicker>Cidade Viva · Rede de Rua</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Radar size={18} className="text-cyan-300" /> Central Urbana
+            <Radar size={18} className="text-cyan-300" /> Rua
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
             Território, contactos, atividades clandestinas e veículos sob vigilância.
@@ -115,7 +114,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
           <Card className="mt-5 sub-card p-5 text-center">
             <Activity className="mx-auto animate-pulse text-cyan-300" size={22} />
             <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-              A sincronizar a rede urbana…
+              A carregar…
             </p>
           </Card>
         ) : (
@@ -609,7 +608,7 @@ const PlanningTab = ({ street, draft, setDraft, toggleGear, onBuy, onSave }) => 
     </div>
 
     <Button className="w-full" onClick={onSave}>
-      <BriefcaseBusiness size={14} /> Guardar plano operacional
+      <BriefcaseBusiness size={14} /> Guardar plano
     </Button>
   </div>
 );
