@@ -610,20 +610,20 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
 
 const CachesTab = ({ caches, onScan }) => (
   <div className="mt-4 space-y-3">
-    <SectionHeader icon={RadioTower} title="Rede de sinais" meta={`${caches.collected}/${caches.total}`} />
+    <SectionHeader icon={RadioTower} title="Sinais" meta={`${caches.collected}/${caches.total}`} />
     <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="font-mono text-[9px] uppercase text-zinc-500">Cifragem territorial</p>
           <p className="mt-1 text-xs font-bold text-white">
-            {caches.completion_claimed ? "Rede Lenda do Sinal completa" : "Localiza as caches de cada zona"}
+            {caches.completion_claimed ? "Todos os sinais encontrados" : "Localiza as caches de cada zona"}
           </p>
         </div>
         <RadioTower size={20} className={caches.completion_claimed ? "text-emerald-300" : "text-violet-300"} />
       </div>
       <MiniBar value={(caches.collected / Math.max(1, caches.total)) * 100} color="#A78BFA" className="mt-3" height="h-1.5" />
       <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
-        Cada assinatura pode ser recolhida uma vez. Completar a rede concede um pagamento e XP adicionais.
+        Cada assinatura pode ser recolhida uma vez. Encontrar todas dá dinheiro e XP adicionais.
       </p>
     </Card>
 
