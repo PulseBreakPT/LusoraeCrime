@@ -85,17 +85,20 @@ export const ResourceBar = () => {
 
 const Stat = ({ icon: Icon, color, label, value, tip, testId, className = "" }) => (
   <Tip tip={tip} side="bottom" className="min-w-0">
-    <div data-testid={testId} className={`sub-minimal-stat flex min-w-0 items-center gap-2 px-2.5 py-2 ${className}`}>
-      <span className="sub-resource-icon flex h-6 w-6 shrink-0 items-center justify-center">
-        <Icon size={14} style={{ color }} />
-      </span>
-      <span className="min-w-0">
-        <span className="sub-resource-label block truncate text-[10px] font-semibold uppercase leading-none tracking-[0.11em] text-zinc-600">
+    <div
+      data-testid={testId}
+      className={`sub-minimal-stat flex min-w-0 flex-col items-center justify-center gap-1 px-1.5 py-2 text-center ${className}`}
+    >
+      <span className="sub-resource-heading flex min-w-0 items-center justify-center gap-1">
+        <span className="sub-resource-icon flex h-5 w-5 shrink-0 items-center justify-center">
+          <Icon size={13} style={{ color }} />
+        </span>
+        <span className="sub-resource-label block whitespace-nowrap text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-zinc-600">
           {label}
         </span>
-        <span className="mt-1 block whitespace-nowrap font-mono text-[11px] font-bold leading-none tabular-nums text-zinc-100 sm:text-[13px]">
-          {value}
-        </span>
+      </span>
+      <span className="sub-resource-value block w-full min-w-0 whitespace-nowrap text-center font-mono text-[11px] font-bold leading-tight tabular-nums text-zinc-100 sm:text-[13px]">
+        {value}
       </span>
     </div>
   </Tip>
