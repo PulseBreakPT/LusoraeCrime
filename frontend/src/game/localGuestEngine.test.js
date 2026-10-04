@@ -202,6 +202,53 @@ describe("offline guest engine", () => {
     expect(state.properties.length).toBe(1);
   });
 
+  test("keeps the organization panel functional and authoritative in guest mode", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    const catalog = (await localGuestRequest("get", "/game/catalog")).data;
+    expect(Object.keys(catalog.organization.supplies)).toHaveLength(18);
+    expect(Object.keys(catalog.organization.prestige).length).toBeGreaterThan(0);
+
+    let state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.organization.inventory_capacity).toBeGreaterThan(0);
+    expect(state.organization.protection_cost).toBe(0);
+
+    const moneyBefore = state.player.clean_money;
+    await localGuestRequest("post", "/game/org/inventory/buy", {
+      item_key: "ammo_sidearm",
+      packs: 1,
+    });
+    state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.organization.inventory.ammo_sidearm).toBe(30);
+    expect(state.player.clean_money).toBe(moneyBefore - 90);
+
+    const weapon = await localGuestRequest("post", "/game/weapons/buy", {
+      model_key: "pistola",
+    });
+    await localGuestRequest("post", "/game/org/weapons/reload", {
+      id: weapon.data.weapon_id,
+    });
+    state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.weapons[0].loaded_rounds).toBe(15);
+    expect(state.organization.inventory.ammo_sidearm).toBe(15);
+
+    await localGuestRequest("post", "/game/org/teams/doctrine", {
+      id: state.teams[0].id,
+      doctrine: "cautious",
+    });
+    state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.teams[0].doctrine).toBe("cautious");
+
+    const finance = (await localGuestRequest("get", "/game/org/finance/summary")).data;
+    expect(finance.expenses).toBeGreaterThan(0);
+    expect(finance.fleet_value).toBeGreaterThan(0);
+    expect(finance.weapon_value).toBeGreaterThan(0);
+  });
+
   test("migrates legacy risk values so rendering can never request a negative repeat count", async () => {
     enableLocalGuestMode();
     await localGuestRequest("post", "/game/hq/place", {
