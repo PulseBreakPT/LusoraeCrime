@@ -109,10 +109,10 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <SummaryStrip cols={2} className="mt-3" testId="opportunities-summary">
           <Kpi icon={Target} label="No mapa" value={`${opps.length}`} color="#38BDF8" />
           <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
-        </div>
+        </SummaryStrip>
 
         {/* Procura + ordenação */}
         <div className="mt-3 space-y-2">
@@ -126,9 +126,9 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               className="h-8 border-white/10 bg-black/60 pl-7 font-mono text-xs text-white"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5 min-[430px]:grid-cols-3">
             <Select value={sortKey} onValueChange={setSortKey}>
-              <SelectTrigger className="h-7 w-auto gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -138,7 +138,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
             <Select value={catFilter} onValueChange={setCatFilter}>
-              <SelectTrigger className="h-7 w-auto gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>
@@ -149,7 +149,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
             <Select value={forceFilter} onValueChange={setForceFilter}>
-              <SelectTrigger className="h-7 w-auto gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
                 <SelectValue placeholder="Força" />
               </SelectTrigger>
               <SelectContent>
@@ -159,18 +159,18 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             <Button
               variant="outline" size="sm"
               onClick={() => setReachableOnly((v) => !v)}
-              className={`h-7 gap-1 border-white/15 px-2 font-mono text-[10px] ${reachableOnly ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-400"}`}
+              className={`min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${reachableOnly ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-400"}`}
             >
               <CheckCircle2 size={11} /> Só alcançáveis
             </Button>
             <Button
               variant="outline" size="sm"
               onClick={() => setFavOnly((v) => !v)}
-              className={`h-7 gap-1 border-white/15 px-2 font-mono text-[10px] ${favOnly ? "bg-amber-500/15 text-amber-300" : "text-zinc-400"}`}
+              className={`min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${favOnly ? "bg-amber-500/15 text-amber-300" : "text-zinc-400"}`}
             >
               <Star size={11} /> Favoritas
             </Button>
