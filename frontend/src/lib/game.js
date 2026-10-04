@@ -1119,7 +1119,7 @@ export function classifyEvent(kind, message) {
       return { panel: "teams", color: "#EF4444" };
     }
     case "success":
-      if (/despistou|concluiu|operação/i.test(msg)) return { panel: "teams", color: "#34D399" };
+      if (/despistou/i.test(msg)) return { panel: "teams", color: "#34D399" };
       return { panel: "quests", color: "#FBBF24" };
     case "failure":
       return { panel: "teams", color: "#F59E0B" };
