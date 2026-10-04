@@ -5185,3 +5185,88 @@ html.sub-focus-mode .sub-optional-hud {
         grid-template-columns: minmax(0, 1fr) !important;
     }
 }
+
+
+/* ============================================================
+   RESOURCE BAR V6 — CENTERED / FULLY LEGIBLE
+   Four equal columns; icon, label and value share one centered axis.
+   ============================================================ */
+.sub-resource-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.sub-resource-grid > * {
+    min-width: 0;
+}
+
+.sub-resource-grid .sub-minimal-stat {
+    min-height: 48px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.22rem !important;
+    padding: 0.42rem 0.28rem !important;
+    text-align: center !important;
+}
+
+.sub-resource-grid .sub-resource-heading {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+}
+
+.sub-resource-grid .sub-resource-label {
+    display: block !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    line-height: 1.15 !important;
+    letter-spacing: 0.045em !important;
+    text-align: center !important;
+}
+
+.sub-resource-grid .sub-resource-value {
+    width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    text-align: center !important;
+}
+
+.sub-resource-grid .sub-resource-icon {
+    width: 1rem !important;
+    height: 1rem !important;
+    flex: 0 0 1rem;
+}
+
+.sub-resource-grid .sub-resource-icon svg {
+    width: 12px !important;
+    height: 12px !important;
+}
+
+@media (max-width: 380px) {
+    .sub-resource-grid .sub-minimal-stat {
+        padding-inline: 0.2rem !important;
+    }
+
+    .sub-resource-grid .sub-resource-heading {
+        gap: 0.22rem;
+    }
+
+    .sub-resource-grid .sub-resource-label {
+        display: block !important;
+        font-size: 10px !important;
+        letter-spacing: 0.02em !important;
+    }
+
+    .sub-resource-grid .sub-resource-icon {
+        display: flex !important;
+        width: 0.85rem !important;
+        height: 0.85rem !important;
+        flex-basis: 0.85rem;
+    }
+
+    .sub-resource-grid .sub-resource-icon svg {
+        width: 10px !important;
+        height: 10px !important;
+    }
+}
