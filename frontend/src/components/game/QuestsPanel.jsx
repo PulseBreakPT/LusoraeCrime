@@ -144,7 +144,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
       )}
 
       {q.unlocks_text && !dim && (
-        <p className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-purple-300">
+        <p className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-amber-300">
           <Sparkles size={10} /> {q.unlocks_text}
         </p>
       )}
@@ -347,7 +347,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
               >
                 {t.label}
                 {tabCounts[t.key] > 0 && (
-                  <Badge variant="outline" className="ml-1 border-transparent bg-white/10 px-1 py-0 font-mono text-[8px] font-bold text-zinc-300">
+                  <Badge variant="outline" className="ml-1 border-transparent bg-white/10 px-1 py-0 font-mono text-[9px] font-bold text-zinc-300">
                     {tabCounts[t.key]}
                   </Badge>
                 )}
