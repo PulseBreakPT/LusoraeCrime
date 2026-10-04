@@ -475,7 +475,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
 
 const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
   <div className="mt-4 space-y-3">
-    <SectionHeader icon={Coins} title="Mercado negro dinâmico" meta={`${market.used}/${market.capacity} espaço`} />
+    <SectionHeader icon={Coins} title="Mercado negro dinâmico" />
     <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-3">
         <div>

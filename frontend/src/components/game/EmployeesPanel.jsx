@@ -713,7 +713,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
           <PanelWatermark icon={IdCard} />
           <SheetTitle className="flex items-center gap-2 text-white">
             <IdCard size={18} className="text-primary" /> Operacionais
-            <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
             O coração da organização — recruta bem, paga a horas e vigia a lealdade.
@@ -750,20 +749,17 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
           const avgMorale = avg((e) => e.morale);
           const avgLoyalty = avg((e) => e.loyalty);
           const avgFatigue = avg((e) => e.fatigue);
-          const available = emps.filter((e) => e.status === "idle" && e.fatigue < 90).length;
           const statusCounts = {};
           emps.forEach((e) => { statusCounts[e.status] = (statusCounts[e.status] || 0) + 1; });
           return (
             <>
-              <SummaryStrip cols={4} className="mt-2" testId="hr-summary">
+              <SummaryStrip cols={3} className="mt-2" testId="hr-summary">
                 <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
                   tip="Moral média do efetivo. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
                 <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
                   tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
                 <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
                   tip="Fadiga média. Aos 90% um operacional fica indisponível — manda-o descansar (recupera 50)." />
-                <Kpi icon={UserCheck} label="Disponíveis" value={`${available}/${emps.length}`} color={available > 0 ? "#34D399" : "#EF4444"}
-                  tip="Operacionais prontos para operar já: sem tarefa atribuída e com fadiga abaixo de 90%." />
               </SummaryStrip>
               {Object.keys(statusCounts).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">
@@ -918,14 +914,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
 
         {tab === "recruit" && (
           <div className="mt-3" data-testid="recruitment-list">
-            <SummaryStrip cols={3} testId="recruitment-summary">
-              <Kpi
-                icon={UserPlus}
-                label="Contactos"
-                value={candidateRows.length}
-                color={candidateRows.length > 0 ? "#38BDF8" : "#71717A"}
-                tip="Candidatos atualmente disponíveis para contratação."
-              />
+            <SummaryStrip cols={2} testId="recruitment-summary">
               <Kpi
                 icon={UserCheck}
                 label="Capacidade"

@@ -199,17 +199,9 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
         {tab === "geral" && (
           <div className="mt-3 space-y-3" data-testid="hq-tab-geral-content">
-            <SummaryStrip cols={2}>
-              <Kpi
-                icon={Users} label="Cap. Operacionais" value={`+${currentTier?.cap_employees || 0}`} color="#34D399"
-                tip="Bónus de capacidade de operacionais concedido pelo nível atual do Quartel-General (soma-se à base e às propriedades)."
-              />
-              <Kpi
-                icon={Car} label="Cap. Veículos" value={`+${currentTier?.cap_vehicles || 0}`} color="#F59E0B"
-                tip="Bónus de capacidade de veículos concedido pelo nível atual do Quartel-General (soma-se à base e às propriedades)."
-              />
-            </SummaryStrip>
-            <p className="font-mono text-[10px] text-emerald-400">{hqBenefitDesc(currentTier)}</p>
+            <p className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.04] px-2.5 py-2 font-mono text-[10px] text-emerald-400">
+              {hqBenefitDesc(currentTier)}
+            </p>
 
             <div>
               <SectionHeader icon={Lightbulb} title="Recomendações do consultor" />
@@ -253,12 +245,6 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
         {tab === "melhorias" && (
           <div className="mt-3 space-y-3" data-testid="hq-tab-melhorias-content">
             <Card className="sub-card p-3 shadow-none">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                Nível {hq.level} — {"●".repeat(hq.level)}{"○".repeat(Math.max(0, maxLevel - hq.level))}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-white">{currentTier?.name}</p>
-              <p className="mt-0.5 text-[10px] text-zinc-500">{currentTier?.desc}</p>
-
               {upgrading ? (
                 <div className="mt-2">
                   <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-cyan-400">
