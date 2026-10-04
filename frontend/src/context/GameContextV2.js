@@ -577,7 +577,12 @@ export function GameProvider({ children }) {
       return { ok: false };
     }
   }, []);
-  const createTeam = (spec) => action("teams/create", { spec }, "Equipa formada");
+  const createTeam = (spec, employeeIds = [], vehicleId = null) =>
+    action("teams/create", {
+      spec,
+      employee_ids: employeeIds,
+      vehicle_id: vehicleId || null,
+    }, "Equipa formada");
   const recruitEmployee = (candidateId) =>
     action("employees/recruit", { candidate_id: candidateId }, "Operacional recrutado");
   const refreshPool = () => action("recruitment/refresh", {}, "Novos contactos disponíveis");

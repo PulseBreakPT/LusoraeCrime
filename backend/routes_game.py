@@ -169,6 +169,8 @@ class TypeKeyInput(BaseModel):
 
 class TeamCreateInput(BaseModel):
     spec: str
+    employee_ids: list[str] = Field(default_factory=list)
+    vehicle_id: Optional[str] = None
 
 
 class RecruitInput(BaseModel):
@@ -1318,19 +1320,72 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
     max_teams = max_teams_for(player["level"])
     if count >= max_teams:
         raise HTTPException(status_code=400, detail=f"Limite de {max_teams} equipas para o nível {player['level']} — sobe de nível para desbloquear mais.")
+
+    employee_ids = list(dict.fromkeys(body.employee_ids or []))
+    if len(employee_ids) > TEAM_MAX_MEMBERS:
+        raise HTTPException(status_code=400, detail=f"Uma equipa pode ter no máximo {TEAM_MAX_MEMBERS} membros")
+
+    employees = []
+    if employee_ids:
+        employee_oids = [_oid(employee_id, "Operacional inválido") for employee_id in employee_ids]
+        employees = await db.employees.find({"_id": {"$in": employee_oids}, "player_id": pid}).to_list(TEAM_MAX_MEMBERS)
+        if len(employees) != len(employee_ids):
+            raise HTTPException(status_code=404, detail="Um ou mais operacionais não foram encontrados")
+        blocked = [employee["name"] for employee in employees if employee.get("status") != "idle" or employee.get("team_id")]
+        if blocked:
+            raise HTTPException(status_code=400, detail=f"Operacionais indisponíveis: {', '.join(blocked)}")
+
+    vehicle = None
+    if body.vehicle_id:
+        vehicle = await db.vehicles.find_one({"_id": _oid(body.vehicle_id, "Veículo inválido"), "player_id": pid})
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Veículo não encontrado")
+        if vehicle.get("team_id"):
+            raise HTTPException(status_code=400, detail="O veículo já está atribuído a outra equipa")
+        if vehicle.get("transfer"):
+            raise HTTPException(status_code=400, detail="O veículo está em transferência")
+        model = VEHICLE_MODELS.get(vehicle.get("model_key"), {})
+        seats = int(model.get("seats", 0) or 0)
+        if employee_ids and seats and len(employee_ids) > seats:
+            raise HTTPException(status_code=400, detail=f"O veículo só tem {seats} lugares para {len(employee_ids)} membros")
+
     name = TEAM_NAMES[count % len(TEAM_NAMES)]
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST, "stats.teams_created": 1}})
     created = now_utc().isoformat()
-    await db.teams.insert_one({
+    team_doc = {
         "player_id": pid, "name": name, "spec": body.spec, "status": "idle",
-        "vehicle_id": None, "missions_done": 0, "created_at": created,
+        "vehicle_id": str(vehicle["_id"]) if vehicle else None,
+        "missions_done": 0, "created_at": created,
         "available_at": None, "roster_stable_since": created,
         # SSS v4: memória da equipa — momentum, familiaridade e entrosamento.
         "streak": 0, "category_missions": {}, "roster_missions": 0,
-    })
-    await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €.")
+    }
+    result = await db.teams.insert_one(team_doc)
+    team_id = str(result.inserted_id)
+
+    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST, "stats.teams_created": 1}})
+    if employee_ids:
+        await db.employees.update_many(
+            {"_id": {"$in": [employee["_id"] for employee in employees]}},
+            {"$set": {"team_id": team_id}},
+        )
+    if vehicle:
+        await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"team_id": team_id}})
+
+    details = []
+    if employees:
+        details.append(f"{len(employees)} membro(s)")
+    if vehicle:
+        details.append(vehicle["name"])
+    suffix = f" · {' · '.join(details)}" if details else ""
+    await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €{suffix}.")
     await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", player["clean_money"] - TEAM_CREATE_COST, f"Nova equipa: {name}")
-    return {"ok": True}
+    return {
+        "ok": True,
+        "team_id": team_id,
+        "team_name": name,
+        "assigned_members": len(employees),
+        "vehicle_id": str(vehicle["_id"]) if vehicle else None,
+    }
 
 
 # ---------------- Funcionários ----------------
