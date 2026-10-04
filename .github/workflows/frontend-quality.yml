@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          npx -y impeccable@4.5.0 detect --json src/ > ../impeccable-findings.json
+          npx -y impeccable detect --json src/ > ../impeccable-findings.json
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           cat ../impeccable-findings.json
