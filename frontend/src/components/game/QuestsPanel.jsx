@@ -124,7 +124,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
               bd.streak > 1 ? `série ${bd.streakCount}d ×${bd.streak.toFixed(2)}` : null,
             ].filter(Boolean).join(" · ");
             return (
-              <Tip tip={`Recompensa dinâmica ×${q.reward_mult.toFixed(2)} — decomposição do motor: ${parts}. Concluir na 1.ª metade do prazo dá +${Math.round(bd.speedBonus * 100)}% extra (teto global ×${bd.cap}).`}>
+              <Tip tip={`Recompensa ×${q.reward_mult.toFixed(2)}: ${parts}. Concluir na primeira metade do prazo dá +${Math.round(bd.speedBonus * 100)}% extra.`}>
                 <Badge
                   variant="outline"
                   data-testid={`quest-mult-${q.id || q.quest_key}`}
