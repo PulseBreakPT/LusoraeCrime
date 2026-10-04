@@ -50,10 +50,13 @@ const Section = ({ icon: Icon, title, children, testId, hidden = false }) => {
   if (hidden) return null;
   return (
   <div className="mt-6 first:mt-0" data-testid={testId}>
-    <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-      <Icon size={12} /> {title}
+    <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
+      <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/[0.07] bg-white/[0.03]">
+        <Icon size={12} className="text-red-400/90" />
+      </span>
+      {title}
     </h3>
-    <Card className="space-y-2 sub-card p-3 shadow-none">{children}</Card>
+    <Card className="sub-settings-section sub-card overflow-hidden p-0 shadow-none">{children}</Card>
   </div>
   );
 };
@@ -61,7 +64,7 @@ const Section = ({ icon: Icon, title, children, testId, hidden = false }) => {
 const Row = ({ label, hint, children, testId, hidden = false }) => {
   if (hidden) return null;
   return (
-  <div className="flex items-center justify-between gap-3 py-1" data-testid={testId}>
+  <div className="sub-settings-row flex min-h-12 items-center justify-between gap-4 px-3 py-2.5" data-testid={testId}>
     <div className="min-w-0">
       <p className="text-[11px] font-semibold text-zinc-300">{label}</p>
       {hint && <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{hint}</p>}
@@ -383,7 +386,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           variant="outline"
           data-testid="settings-advanced-toggle"
           onClick={() => setAdvancedOpen((value) => !value)}
-          className="mt-3 w-full justify-between border-white/10 bg-white/[0.03] font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300"
+          className="sub-settings-advanced mt-1 w-full justify-between border-white/[0.08] bg-[#111114] text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 hover:bg-[#17171b] hover:text-zinc-200"
         >
           <span>{advancedOpen ? "Ocultar avançado" : "Mostrar avançado"}</span>
           <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
