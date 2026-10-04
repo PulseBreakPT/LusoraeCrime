@@ -2045,6 +2045,7 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
 
 
 @router.post("/employees/rest")
+@idempotent("employees.rest")
 async def rest_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2205,6 +2206,7 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/employees/rename")
+@idempotent("employees.rename")
 async def rename_employee(body: EmployeeRenameInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2222,7 +2224,8 @@ async def rename_employee(body: EmployeeRenameInput, user: dict = Depends(get_cu
 # ---------------- Veículos ----------------
 
 @router.post("/employees/optimize")
-async def optimize_employees(user: dict = Depends(get_current_user)):
+@idempotent("employees.optimize")
+async def optimize_employees(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI do efetivo (SSS v6): preenche as vagas das equipas disponíveis com os
     operacionais disponíveis SEM equipa, maximizando a aptidão para a
     especialização de cada equipa — a mesma régua da eficácia de missão
@@ -2575,6 +2578,7 @@ async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_
 
 
 @router.post("/vehicles/rename")
+@idempotent("vehicles.rename")
 async def rename_vehicle(body: VehicleRenameInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2605,7 +2609,8 @@ async def _weapon_free(pid, weapon):
 
 
 @router.post("/vehicles/optimize")
-async def optimize_vehicles(user: dict = Depends(get_current_user)):
+@idempotent("vehicles.optimize")
+async def optimize_vehicles(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI da frota (SSS v6): redistribui os veículos disponíveis pelas equipas
     disponíveis maximizando a adequação global — a mesma régua da chance de
     missão (vehicle_mission_score da especialização, best_for, condição,
@@ -2880,6 +2885,7 @@ async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_cu
 
 
 @router.post("/weapons/auto_assign")
+@idempotent("weapons.auto_assign")
 async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
     """Atribui automaticamente a arma ao operacional disponível com o maior
     GANHO MARGINAL de score efetivo (SSS v5) — a mesma régua da chance de
@@ -2926,7 +2932,8 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
 
 
 @router.post("/weapons/optimize")
-async def optimize_weapons(user: dict = Depends(get_current_user)):
+@idempotent("weapons.optimize")
+async def optimize_weapons(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI das armas (SSS v5): redistribui TODO o arsenal disponível pelos
     operacionais disponíveis maximizando o score efetivo global — atribuição
     gulosa por score (a mesma régua da chance de missão). Só mexe em armas
@@ -3160,6 +3167,7 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
 
 
 @router.post("/properties/rename")
+@idempotent("properties.rename")
 async def rename_property(body: PropertyRenameInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
