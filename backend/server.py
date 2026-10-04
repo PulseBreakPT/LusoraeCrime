@@ -18,7 +18,7 @@ from routes_admin import router as admin_router
 from routes_legal import router as legal_router
 from routes_organization import router as organization_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
-from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
+from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY, WEAPON_MODELS
 from road_routing import road_router
 
 app = FastAPI(title="SUBMUNDO API")
@@ -86,6 +86,43 @@ async def migrate_v2():
 ROLE_MAP_V4 = {"musculo": "assaltante", "condutor": "motorista", "hacker": "hacker", "negociador": "negociador"}
 
 
+async def migrate_integrated_org():
+    """Add safe defaults to saves created before the organization systems."""
+    now = now_utc()
+    await db.players.update_many({"inventory": {"$exists": False}}, {"$set": {"inventory": {}}})
+    await db.players.update_many({"departments": {"$exists": False}}, {"$set": {"departments": {}}})
+    await db.players.update_many({"territories": {"$exists": False}}, {"$set": {"territories": {}}})
+    await db.players.update_many({"prestige_items": {"$exists": False}}, {"$set": {"prestige_items": []}})
+    await db.players.update_many({"governance": {"$exists": False}}, {"$set": {"governance": {}}})
+    await db.teams.update_many({"doctrine": {"$exists": False}}, {"$set": {"doctrine": "balanced"}})
+    await db.teams.update_many({"policies": {"$exists": False}}, {"$set": {"policies": {
+        "abort_below_pct": 0, "protect_injured": True,
+        "auto_use_medical": True, "auto_use_armor": True,
+    }}})
+    await db.teams.update_many({"loadout": {"$exists": False}}, {"$set": {"loadout": {}}})
+    await db.employees.update_many({"stress": {"$exists": False}}, {"$set": {"stress": 10.0}})
+    await db.employees.update_many({"traits": {"$exists": False}}, {"$set": {"traits": []}})
+    await db.employees.update_many({"relations": {"$exists": False}}, {"$set": {"relations": {}}})
+    await db.employees.update_many({"stationed_property_id": {"$exists": False}}, {"$set": {"stationed_property_id": None}})
+    await db.properties.update_many({"security_level": {"$exists": False}}, {"$set": {"security_level": 0}})
+    await db.properties.update_many({"storage_level": {"$exists": False}}, {"$set": {"storage_level": 0}})
+    await db.properties.update_many({"operations_level": {"$exists": False}}, {"$set": {"operations_level": 0}})
+    await db.properties.update_many({"staff_employee_ids": {"$exists": False}}, {"$set": {"staff_employee_ids": []}})
+    await db.vehicles.update_many({"last_service_km": {"$exists": False}}, {"$set": {"last_service_km": 0.0}})
+    await db.vehicles.update_many({"tires_pct": {"$exists": False}}, {"$set": {"tires_pct": 100.0}})
+    await db.vehicles.update_many({"notoriety": {"$exists": False}}, {"$set": {"notoriety": 0.0}})
+    await db.vehicles.update_many({"seized_until": {"$exists": False}}, {"$set": {"seized_until": None}})
+    inspection_due = (now + __import__("datetime").timedelta(days=365)).isoformat()
+    await db.vehicles.update_many({"inspection_due_at": {"$exists": False}}, {"$set": {"inspection_due_at": inspection_due}})
+    await db.vehicles.update_many({"insurance_until": {"$exists": False}}, {"$set": {"insurance_until": None}})
+    for model_key, model in WEAPON_MODELS.items():
+        await db.weapons.update_many(
+            {"model_key": model_key, "ammo_loaded": {"$exists": False}},
+            {"$set": {"ammo_loaded": int(model.get("magazine_capacity", 0) or 0)}},
+        )
+    await db.weapons.update_many({"upgrades": {"$exists": False}}, {"$set": {"upgrades": []}})
+
+
 async def migrate_v4():
     async for emp in db.employees.find({"rarity": {"$exists": False}}):
         role_key = ROLE_MAP_V4.get(emp.get("role_key"), "assaltante")
@@ -125,6 +162,7 @@ async def startup():
     await seed_admin()
     await migrate_v2()
     await migrate_v4()
+    await migrate_integrated_org()
 
 
 @app.on_event("shutdown")
