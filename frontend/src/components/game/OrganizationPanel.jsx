@@ -380,7 +380,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   const level = Number(departments[key] || 0);
                   const unlocked = Number(state.player.hq?.level || 1) >= d.unlock_hq;
                   const maxed = level >= d.max_level;
-                  const cost = Math.round(d.base_cost * (1 + 0.75 * level));
+                  const cost = Number(intelligence?.quotes?.departments?.[key]?.next_cost ?? Math.round(d.base_cost * (1 + 0.75 * level)));
                   return (
                     <Card key={key} className="sub-card flex items-center gap-3 p-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-300">
@@ -487,10 +487,12 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
             <div className="space-y-2">
               {supplyEntries.map(([key, item]) => {
                 const qty = Number(inventory[key] || 0);
+                const insight = stockIntel[key] || {};
                 const unlocked = state.player.level >= item.min_level;
                 const buySpace = Number(item.space || 0) * Number(item.pack || 0);
                 const hasRoom = storageCap <= 0 || storageUsed + buySpace <= storageCap;
-                const resale = Math.trunc(Number(item.price || 0) * 0.45);
+                const buyPrice = Number(insight.buy_price ?? item.price ?? 0);
+                const resale = Number(insight.sell_value ?? Math.trunc(Number(item.price || 0) * 0.45));
                 return (
                   <Card key={key} className="sub-card flex items-center gap-2.5 p-3">
                     <div className="min-w-0 flex-1">
@@ -500,16 +502,28 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       </div>
                       <p className="mt-0.5 text-[10px] text-zinc-500">{item.desc}</p>
                       <p className="mt-1 font-mono text-[10px] uppercase text-zinc-600">
-                        pack ×{item.pack} · {fmtMoney(item.price)} · espaço {item.space}
+                        pack ×{item.pack} · {fmtMoney(buyPrice)} · espaço {item.space}
+                        {insight.coverage_dispatches != null ? ` · ${insight.coverage_dispatches} despachos` : ""}
                       </p>
+                      <label className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-zinc-600">
+                        Alvo
+                        <Input
+                          type="number"
+                          min="0"
+                          value={policyDraft?.stock_targets?.[key] ?? 0}
+                          onChange={(e) => patchStockTarget(key, e.target.value)}
+                          className="h-7 w-20 bg-black/50 px-2 text-[10px]"
+                        />
+                        {insight.status && <span className={insight.status === "critical" ? "text-red-300" : insight.status === "low" ? "text-amber-300" : "text-emerald-400"}>{insight.status}</span>}
+                      </label>
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
                       <SmallAction
-                        disabled={!unlocked || money < item.price || !hasRoom}
-                        title={!unlocked ? `Desbloqueia no nível ${item.min_level}` : !hasRoom ? "Armazenamento insuficiente" : money < item.price ? "Dinheiro insuficiente" : `Comprar pack ×${item.pack}`}
+                        disabled={!unlocked || money < buyPrice || !hasRoom}
+                        title={!unlocked ? `Desbloqueia no nível ${item.min_level}` : !hasRoom ? "Armazenamento insuficiente" : money < buyPrice ? "Dinheiro insuficiente" : `Comprar pack ×${item.pack}`}
                         onClick={() => buySupply(key, 1)}
                       >
-                        <Plus size={11} /> {fmtMoney(item.price)}
+                        <Plus size={11} /> {fmtMoney(buyPrice)}
                       </SmallAction>
                       <SmallAction
                         disabled={qty < item.pack}
@@ -647,10 +661,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               const inspected = v.inspection_due_at && Date.parse(v.inspection_due_at) > now;
               const assignedTeam = v.team_id ? state.teams.find((team) => team.id === v.team_id) : null;
               const occupied = assignedTeam && assignedTeam.status !== "idle";
-              const serviceCost = serviceCostOf(v);
-              const tiresCost = Number(inventory.tire_set || 0) > 0 ? 0 : tireSetPrice;
-              const insuranceCost = insuranceCostOf(v);
-              const inspectionCost = Number(lifecycle.inspection_base || 85);
+              const serverCosts = fleetIntel[v.id]?.costs || {};
+              const serviceCost = Number(serverCosts.service ?? serviceCostOf(v));
+              const tiresCost = Number(serverCosts.tires ?? (Number(inventory.tire_set || 0) > 0 ? 0 : tireSetPrice));
+              const insuranceCost = Number(serverCosts.insurance ?? insuranceCostOf(v));
+              const inspectionCost = Number(serverCosts.inspection ?? lifecycle.inspection_base ?? 85);
               const inspectionReady = Number(v.condition || 0) >= 55 && Number(v.tires_pct ?? 100) >= 35;
               return (
                 <Card key={v.id} className="sub-card p-3">
@@ -801,14 +816,17 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       <p className="text-xs font-semibold text-white">{p.name}</p>
                       <p className="font-mono text-[10px] uppercase text-zinc-600">{p.district} · N{p.level}</p>
                     </div>
-                    <span className="font-mono text-[10px] text-zinc-500">{selectedStaff.size}/4 destacados</span>
+                    <div className="text-right">
+                      <span className="block font-mono text-[10px] text-zinc-500">{selectedStaff.size}/4 destacados</span>
+                      <span className="font-mono text-[10px] text-sky-300">eficiência {Math.round(Number(p.staff_effectiveness || propertyIntel[p.id]?.staff_score / 100 || 0) * 100)}%</span>
+                    </div>
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-1.5">
                     {Object.entries(propertyModules).map(([key, mod]) => {
                       const field = `${key}_level`;
                       const level = Number(p[field] || 0);
                       const maxed = level >= mod.max_level;
-                      const cost = moduleCostOf(p, mod, level);
+                      const cost = Number(propertyIntel[p.id]?.module_costs?.[key] ?? moduleCostOf(p, mod, level));
                       return (
                         <PurchaseButton
                           key={key}
@@ -846,6 +864,18 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                         Sem operacionais livres para destacar.
                       </p>
                     )}
+                    {(p.staff_roles && Object.keys(p.staff_roles).length > 0) && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {Object.entries(p.staff_roles).map(([employeeId, role]) => {
+                          const employee = state.employees.find((e) => e.id === employeeId);
+                          return (
+                            <span key={employeeId} className="rounded bg-sky-500/10 px-1.5 py-1 font-mono text-[10px] text-sky-300">
+                              {employee?.name || "Operacional"} · {role}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                     <SmallAction className="mt-2 w-full" onClick={() => assignPropertyStaff(p.id, [...selectedStaff])}>
                       <UserRoundCog size={11} /> Guardar destacamento
                     </SmallAction>
@@ -869,8 +899,8 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               const tier = Number(info.tier || 1);
               const tierCfg = territoryTiers[tier] || {};
               const next = territoryTiers[tier + 1];
-              const defendCost = Math.max(500, Math.trunc(Number(tierCfg.defense_weekly || 0) * 1.5));
-              const consolidateCost = Number(next?.cost || 0);
+              const defendCost = Number(territoryIntel[district]?.costs?.defend ?? Math.max(500, Math.trunc(Number(tierCfg.defense_weekly || 0) * 1.5)));
+              const consolidateCost = Number(territoryIntel[district]?.costs?.consolidate ?? next?.cost ?? 0);
               return (
                 <Card key={district} className="sub-card p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -915,14 +945,14 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <MapPinned size={14} className="text-zinc-500" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-white">{name}</p>
-                    <p className="font-mono text-[10px] text-zinc-600">Presença inicial · {fmtMoney(territoryTiers[1]?.cost || 0)}</p>
+                    <p className="font-mono text-[10px] text-zinc-600">Presença inicial · {fmtMoney(intelligence?.quotes?.territory_claim ?? territoryTiers[1]?.cost ?? 0)}</p>
                   </div>
                   <PurchaseButton
                     label="Tomar posição"
-                    can={state.player.level >= 5 && money >= (territoryTiers[1]?.cost || 0)}
+                    can={state.player.level >= 5 && money >= Number(intelligence?.quotes?.territory_claim ?? territoryTiers[1]?.cost ?? 0)}
                     blockedReasons={[
                       state.player.level < 5 ? "Requer nível 5." : null,
-                      money < (territoryTiers[1]?.cost || 0) ? "Dinheiro insuficiente." : null,
+                      money < Number(intelligence?.quotes?.territory_claim ?? territoryTiers[1]?.cost ?? 0) ? "Dinheiro insuficiente." : null,
                     ].filter(Boolean)}
                     onConfirm={() => claimTerritory(name)}
                   />
