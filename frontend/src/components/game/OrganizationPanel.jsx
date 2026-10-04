@@ -959,6 +959,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     <div>
                       <p className="text-xs font-semibold text-white">{district}</p>
                       <p className="font-mono text-[10px] uppercase text-zinc-600">{tierCfg.name || `Nível ${tier}`} · +{Math.round((tierCfg.reward_bonus || 0) * 100)}% recompensa local</p>
+                      {territoryIntel[district]?.rival?.name && (
+                        <p className="mt-0.5 font-mono text-[10px] text-red-300/70">
+                          Rival: {territoryIntel[district].rival.name} · {territoryIntel[district].rival.style} · força {territoryIntel[district].rival.strength}
+                        </p>
+                      )}
                     </div>
                     <span className="font-mono text-[10px] text-emerald-300">{fmtMoney(tierCfg.income_h || 0)}/h</span>
                   </div>
