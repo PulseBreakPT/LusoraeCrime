@@ -527,6 +527,8 @@ export function GameProvider({ children }) {
   };
   const recallTeam = (missionId) =>
     action("missions/recall", { mission_id: missionId }, "Equipa chamada de volta");
+  const resolveMissionDecision = (missionId, optionId) =>
+    action("missions/decision", { mission_id: missionId, option_id: optionId });
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
       const { data } = await api.post("/game/dispatch/preview", {
@@ -867,6 +869,7 @@ export function GameProvider({ children }) {
         previewDispatch,
         createTeam,
         recallTeam,
+        resolveMissionDecision,
         recommendOpportunityForTeam,
         recommendTeamForOpportunity,
         recommendRepeatForTeam,
