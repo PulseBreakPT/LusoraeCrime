@@ -114,7 +114,7 @@ from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
     VEHICLE_LIFECYCLE, INJURY_SEVERITIES, ensure_employee_profile,
-    prestige_effects, department_level,
+    prestige_effects, department_level, property_operations_factor,
 )
 
 logger = logging.getLogger(__name__)
@@ -2343,6 +2343,19 @@ async def _crew_returns(db, player, m, outcome):
                 "$inc": {"missions_done": 1, "missions_since_repair": 1},
             })
 
+    # Relações persistentes: trabalhar repetidamente com as mesmas pessoas
+    # aumenta química; falhas policiais criam tensão. É um sinal suave para
+    # futuras extensões, nunca um bloqueio oculto.
+    relation_delta = -1 if outcome == "police" else (2 if outcome == "success" else 1)
+    for emp in members:
+        for other in members:
+            if emp["_id"] == other["_id"]:
+                continue
+            key = f"relations.{str(other['_id'])}"
+            current = float((emp.get("relations") or {}).get(str(other["_id"]), 50) or 50)
+            target = max(0.0, min(100.0, current + relation_delta))
+            await db.employees.update_one({"_id": emp["_id"]}, {"$set": {key: target}})
+
     if members:
         if outcome == "failure":
             victim = random.choice(members)
@@ -3069,7 +3082,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
         if not property_active(p, now):
             continue
         pt = PROPERTY_TYPES[p["type_key"]]
-        factor = property_condition_factor(p)
+        factor = property_condition_factor(p) * property_operations_factor(p)
         if pt.get("dirty_per_h"):
             rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult * hq_income_mult
             share = rate * hours
@@ -3109,7 +3122,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
                     continue
                 pt = PROPERTY_TYPES[p["type_key"]]
                 if pt.get("launder_per_h"):
-                    factor = property_condition_factor(p)
+                    factor = property_condition_factor(p) * property_operations_factor(p)
                     share = conv * (pt["launder_per_h"] * p["level"] * factor * (1 + bonuses.get("empresa_boost", 0)) * hq_income_mult / launder_rate)
                     await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_laundered": share}})
 
