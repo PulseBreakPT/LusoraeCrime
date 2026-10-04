@@ -412,7 +412,13 @@ export function GameProvider({ children }) {
   const action = useCallback(
     async (path, payload, successMsg) => {
       try {
-        const { data } = await api.post(`/game/${path}`, payload);
+        const requestId = typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const body = payload && typeof payload === "object"
+          ? { ...payload, request_id: requestId }
+          : { request_id: requestId };
+        const { data } = await api.post(`/game/${path}`, body);
         if (successMsg) {
           toast.success(successMsg);
           haptics.success();
