@@ -1268,7 +1268,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
           <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full bg-cyan-400" /> A caminho — falta percorrer</span>
-            <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-sky-400" /> Regresso — falta chegar</span>
+            <span className="flex items-center gap-1.5"><span className="h-px w-6 rounded-full bg-amber-400" /> Regresso — falta chegar</span>
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t border-dotted border-zinc-300" /> Trilho a pé veículo ↔ alvo</span>
           </div>
         </Card>
