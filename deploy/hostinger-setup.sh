@@ -227,6 +227,20 @@ ln -sf /usr/local/bin/submundo /usr/local/bin/lusoraecrime
 ok "Comando 'submundo' instalado — corre a partir de qualquer diretória."
 
 # -----------------------------------------------------------------------------
+# 5b. Backup diário do MongoDB — instalado automaticamente e idempotente.
+# -----------------------------------------------------------------------------
+BACKUP_SCRIPT="$APP_ROOT/deploy/scripts/backup-mongo.sh"
+if [[ -f "$BACKUP_SCRIPT" ]]; then
+  chmod +x "$BACKUP_SCRIPT"
+  BACKUP_CRON="30 3 * * * /bin/bash $BACKUP_SCRIPT >> /var/log/submundo-backup.log 2>&1"
+  (crontab -l 2>/dev/null | grep -v 'backup-mongo.sh' || true; echo "$BACKUP_CRON") | crontab -
+  ok "Backup Mongo diário instalado (03:30, retenção definida pelo script)."
+else
+  err "Script de backup não encontrado em $BACKUP_SCRIPT"
+  exit 3
+fi
+
+# -----------------------------------------------------------------------------
 # 6. Estado final
 # -----------------------------------------------------------------------------
 echo
