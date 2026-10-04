@@ -83,6 +83,8 @@ def maybe_spawn_organization_event(
         expires = parse_dt(current.get("expires_at"))
         if not expires or expires > now:
             return current
+        current = {**current, "status": "expired", "resolved_at": now.isoformat()}
+        player["organization_event"] = current
 
     due = parse_dt(player.get("next_organization_event_at"))
     if due and due > now:
@@ -115,6 +117,9 @@ def maybe_spawn_organization_event(
 
 def public_event(event: dict | None) -> dict | None:
     if not event or event.get("status") != "pending":
+        return None
+    expires = parse_dt(event.get("expires_at"))
+    if expires and expires <= datetime.now(timezone.utc):
         return None
     cfg = EVENT_DEFS.get(event.get("type"), {})
     return {
