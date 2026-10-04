@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import timedelta
+import asyncio
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -87,6 +88,11 @@ class WeaponUpgradeInput(BaseModel):
 class PropertyModuleInput(BaseModel):
     property_id: str
     module_key: str
+
+
+class PropertyStaffInput(BaseModel):
+    property_id: str
+    employee_ids: list[str] = Field(default_factory=list)
 
 
 class DepartmentInput(BaseModel):
@@ -301,8 +307,18 @@ async def service_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
     player = await _player(user)
     pid = str(player["_id"])
     vehicle = await db.vehicles.find_one({"_id": _oid(body.id, "Veículo inválido"), "player_id": pid})
-    if not vehicle or vehicle.get("team_id") and (await db.teams.find_one({"_id": ObjectId(vehicle["team_id"])})).get("status") != "idle":
-        raise HTTPException(status_code=400, detail="Veículo inexistente ou ocupado")
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    if vehicle.get("seized_until"):
+        try:
+            if datetime.fromisoformat(vehicle["seized_until"]) > now_utc():
+                raise HTTPException(status_code=400, detail="Veículo apreendido")
+        except ValueError:
+            pass
+    if vehicle.get("team_id"):
+        team = await db.teams.find_one({"_id": ObjectId(vehicle["team_id"]), "player_id": pid})
+        if team and team.get("status") != "idle":
+            raise HTTPException(status_code=400, detail="Veículo ocupado")
     missing = max(0.0, 100 - float(vehicle.get("condition", 100) or 0))
     cost = max(120, int(vehicle.get("price", 0) * VEHICLE_LIFECYCLE["service_base_pct"] + missing * 8))
     await _debit(player, cost, stat="vehicle_services")
@@ -382,6 +398,38 @@ async def upgrade_property_module(body: PropertyModuleInput, user: dict = Depend
     await db.properties.update_one({"_id": prop["_id"]}, {"$set": {field: current + 1}})
     await record_tx(db, pid, "property_module", -cost, "clean", player["clean_money"], f"{cfg['name']} em {prop.get('name','imóvel')}")
     return {"ok": True, "cost": cost, "level": current + 1}
+
+
+@router.post("/properties/staff")
+async def assign_property_staff(body: PropertyStaffInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    prop = await db.properties.find_one({"_id": _oid(body.property_id, "Imóvel inválido"), "player_id": pid})
+    if not prop:
+        raise HTTPException(status_code=404, detail="Imóvel não encontrado")
+    ids = list(dict.fromkeys(body.employee_ids))[:4]
+    employees = []
+    if ids:
+        oid_list = [_oid(eid, "Operacional inválido") for eid in ids]
+        employees = await db.employees.find({"_id": {"$in": oid_list}, "player_id": pid}).to_list(10)
+        if len(employees) != len(ids):
+            raise HTTPException(status_code=400, detail="Um ou mais operacionais são inválidos")
+        blocked = [e["name"] for e in employees if e.get("status") != "idle" or e.get("team_id")]
+        if blocked:
+            raise HTTPException(status_code=400, detail="Só podes destacar operacionais livres: " + ", ".join(blocked))
+    old_ids = list(prop.get("staff_employee_ids") or [])
+    if old_ids:
+        await db.employees.update_many(
+            {"player_id": pid, "_id": {"$in": [ObjectId(eid) for eid in old_ids]}},
+            {"$set": {"stationed_property_id": None}},
+        )
+    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"staff_employee_ids": ids}})
+    if ids:
+        await db.employees.update_many(
+            {"player_id": pid, "_id": {"$in": [ObjectId(eid) for eid in ids]}},
+            {"$set": {"stationed_property_id": body.property_id}},
+        )
+    return {"ok": True, "staff_employee_ids": ids}
 
 
 @router.post("/departments/upgrade")
@@ -488,7 +536,7 @@ async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_use
 async def buy_protection(user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
-    employees, properties = await __import__("asyncio").gather(
+    employees, properties = await asyncio.gather(
         db.employees.count_documents({"player_id": pid}),
         db.properties.count_documents({"player_id": pid}),
     )
@@ -503,3 +551,51 @@ async def buy_protection(user: dict = Depends(get_current_user)):
     }})
     await record_tx(db, pid, "protection", -cost, "clean", player["clean_money"], "Rede de proteção — 30 dias")
     return {"ok": True, "cost": cost, "protection_until": until}
+
+
+@router.get("/finance/summary")
+async def finance_summary(user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    now = now_utc()
+    cutoff = now - timedelta(days=30)
+    transactions, vehicles, weapons, properties, employees = await asyncio.gather(
+        db.transactions.find({"player_id": pid}).sort("ts", -1).to_list(1000),
+        db.vehicles.find({"player_id": pid}).to_list(200),
+        db.weapons.find({"player_id": pid}).to_list(300),
+        db.properties.find({"player_id": pid}).to_list(200),
+        db.employees.find({"player_id": pid}).to_list(300),
+    )
+    recent = []
+    for tx in transactions:
+        try:
+            ts = datetime.fromisoformat(tx.get("ts"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts >= cutoff:
+                recent.append(tx)
+        except (TypeError, ValueError):
+            continue
+    income = sum(float(tx.get("amount", 0) or 0) for tx in recent if float(tx.get("amount", 0) or 0) > 0)
+    expenses = -sum(float(tx.get("amount", 0) or 0) for tx in recent if float(tx.get("amount", 0) or 0) < 0)
+    by_kind = {}
+    for tx in recent:
+        key = tx.get("kind") or "other"
+        by_kind[key] = round(by_kind.get(key, 0.0) + float(tx.get("amount", 0) or 0), 2)
+    property_value = sum(int(p.get("purchase_price", 0) or 0) * max(1, int(p.get("level", 1) or 1)) for p in properties)
+    fleet_value = sum(int(v.get("price", 0) or 0) * max(0, float(v.get("condition", 100) or 0)) / 100.0 for v in vehicles)
+    weapon_value = sum(int(WEAPON_MODELS.get(w.get("model_key"), {}).get("price", 0) or 0) * max(0, float(w.get("condition", 100) or 0)) / 100.0 for w in weapons)
+    return {
+        "window_days": 30,
+        "income": round(income),
+        "expenses": round(expenses),
+        "net": round(income - expenses),
+        "by_kind": by_kind,
+        "asset_value": round(property_value + fleet_value + weapon_value),
+        "property_value": round(property_value),
+        "fleet_value": round(fleet_value),
+        "weapon_value": round(weapon_value),
+        "headcount": len(employees),
+        "cash": int(player.get("clean_money", 0) or 0),
+        "dirty_cash": int(player.get("dirty_money", 0) or 0),
+    }
