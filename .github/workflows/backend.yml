@@ -31,10 +31,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate Python syntax
-        run: python -m py_compile backend/engine.py backend/routes_game.py backend/routes_organization.py backend/routes_city.py backend/city_systems.py backend/city_data.py backend/organization_systems.py backend/organization_intelligence.py backend/organization_automation.py backend/organization_events.py backend/models.py backend/retention_engine.py backend/road_routing.py backend/travel_metrics.py backend/time_rules.py backend/auth.py backend/reward_engine.py backend/server.py
+        run: python -m py_compile backend/engine.py backend/game_data.py backend/economy_constants.py backend/quests_data.py backend/mastermind_data.py backend/routes_game.py backend/routes_mastermind.py backend/routes_organization.py backend/routes_city.py backend/routes_admin.py backend/city_systems.py backend/city_data.py backend/organization_systems.py backend/organization_intelligence.py backend/organization_automation.py backend/organization_events.py backend/models.py backend/retention_engine.py backend/road_routing.py backend/travel_metrics.py backend/time_rules.py backend/auth.py backend/reward_engine.py backend/server.py
 
       - name: Test Portugal economy
         run: python backend/tests/test_economy_portugal_2026.py
+
+      - name: Test level 100 progression
+        run: PYTHONPATH=backend python backend/tests/test_level_100_progression.py
+
+      - name: Test launch safety contracts
+        run: python backend/tests/test_launch_contracts.py
 
       - name: Test retention engine
         run: python backend/tests/test_retention_engine.py

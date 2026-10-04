@@ -14,7 +14,7 @@ import { PanelWatermark } from "./hud";
 import {
   RadioTower, CloudRain, Newspaper, Skull, Building2, Users, Trophy, Clock3,
   ShieldAlert, Eye, Bomb, Handshake, TrendingUp, Coins, Dices, MessageCircle,
-  HeartPulse, RefreshCw, Zap, Landmark, Send, ArrowUpCircle,
+  HeartPulse, RefreshCw, Zap, Landmark, Send, ArrowUpCircle, Flag, UserX,
 } from "lucide-react";
 
 const TABS = [
@@ -52,7 +52,7 @@ const ActionButton = ({ children, onClick, disabled, tone = "default" }) => (
 );
 
 export const CityPanel = ({ open, onOpenChange }) => {
-  const { refresh: refreshGame } = useGame();
+  const { state, refresh: refreshGame } = useGame();
   const [tab, setTab] = useState("pulse");
   const [city, setCity] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -103,6 +103,9 @@ export const CityPanel = ({ open, onOpenChange }) => {
   const season = city?.season;
   const businesses = city?.businesses || [];
   const catalog = city?.business_catalog || {};
+  const rivalActions = city?.rival_actions || {};
+  const playerLevel = Number(state?.player?.level || 1);
+  const cleanMoney = Number(state?.player?.clean_money || 0);
   const ownedByType = useMemo(
     () => Object.fromEntries(Object.keys(catalog).map((key) => [key, businesses.filter((b) => b.type_key === key).length])),
     [catalog, businesses]
@@ -236,10 +239,10 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     {(city.boss?.hospital_until || city.boss?.sentence_until || Number(city.boss?.health || 100) < 100 || Number(city.boss?.stress || 0) >= 35) && (
                       <ActionButton
                         tone="good"
-                        disabled={!!busy}
+                        disabled={!!busy || cleanMoney < Number(city.boss?.recovery_cost || 0)}
                         onClick={() => act("boss-recover", "boss/recover", {}, "Chefe recuperado")}
                       >
-                        Recuperar
+                        Recuperar · {fmtMoney(city.boss?.recovery_cost || 0)}
                       </ActionButton>
                     )}
                   </div>
@@ -283,11 +286,11 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       <span>Intel <b className="text-zinc-300">{rival.intel}</b></span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      <ActionButton disabled={!!busy} onClick={() => act(`recon-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"recon" })}><Eye size={11} className="mr-1" /> Recon</ActionButton>
-                      <ActionButton tone="danger" disabled={!!busy} onClick={() => act(`sabotage-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"sabotage" })}><Bomb size={11} className="mr-1" /> Sabotar</ActionButton>
-                      <ActionButton disabled={!!busy} onClick={() => act(`pressure-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"pressure" })}><TrendingUp size={11} className="mr-1" /> Pressão</ActionButton>
-                      <ActionButton tone="good" disabled={!!busy} onClick={() => act(`truce-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"truce" })}><Handshake size={11} className="mr-1" /> Trégua</ActionButton>
-                      <ActionButton tone="good" disabled={!!busy} onClick={() => act(`alliance-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"alliance" })}>Acordo</ActionButton>
+                      <ActionButton disabled={!!busy || cleanMoney < Number(rivalActions.recon?.cost || 0)} onClick={() => act(`recon-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"recon" })}><Eye size={11} className="mr-1" /> Recon · {fmtMoney(rivalActions.recon?.cost || 0)}</ActionButton>
+                      <ActionButton tone="danger" disabled={!!busy || cleanMoney < Number(rivalActions.sabotage?.cost || 0)} onClick={() => act(`sabotage-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"sabotage" })}><Bomb size={11} className="mr-1" /> Sabotar · {fmtMoney(rivalActions.sabotage?.cost || 0)}</ActionButton>
+                      <ActionButton disabled={!!busy || cleanMoney < Number(rivalActions.pressure?.cost || 0)} onClick={() => act(`pressure-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"pressure" })}><TrendingUp size={11} className="mr-1" /> Pressão · {fmtMoney(rivalActions.pressure?.cost || 0)}</ActionButton>
+                      <ActionButton tone="good" disabled={!!busy || cleanMoney < Number(rivalActions.truce?.cost || 0)} onClick={() => act(`truce-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"truce" })}><Handshake size={11} className="mr-1" /> Trégua · {fmtMoney(rivalActions.truce?.cost || 0)}</ActionButton>
+                      <ActionButton tone="good" disabled={!!busy || cleanMoney < Number(rivalActions.alliance?.cost || 0)} onClick={() => act(`alliance-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"alliance" })}>Acordo · {fmtMoney(rivalActions.alliance?.cost || 0)}</ActionButton>
                     </div>
                   </Card>
                 ))}
@@ -319,9 +322,18 @@ export const CityPanel = ({ open, onOpenChange }) => {
                             <p className="text-xs font-bold text-white">{b.name} <span className="font-mono text-[10px] text-zinc-500">LV {b.level}</span></p>
                             <p className="mt-1 font-mono text-[10px] text-zinc-500">{fmtMoney(b.projection?.clean)} + {fmtMoney(b.projection?.dirty)} por recolher · segurança {b.security}</p>
                           </div>
-                          <ActionButton disabled={!!busy || b.level >= Number(b.config?.max_level || 5)} onClick={() => act(`upgrade-${b.id}`, "businesses/upgrade", { business_id:b.id }, `${b.name} melhorado`)}>
-                            <ArrowUpCircle size={11} className="mr-1" /> Melhorar
-                          </ActionButton>
+                          {(() => {
+                            const upgradeCost = Math.round(Number(b.config?.price || 0) * (.42 + Number(b.level || 1) * .18));
+                            return (
+                              <ActionButton
+                                disabled={!!busy || b.level >= Number(b.config?.max_level || 5) || cleanMoney < upgradeCost}
+                                onClick={() => act(`upgrade-${b.id}`, "businesses/upgrade", { business_id:b.id }, `${b.name} melhorado`)}
+                              >
+                                <ArrowUpCircle size={11} className="mr-1" />
+                                {b.level >= Number(b.config?.max_level || 5) ? "Máx." : <>Melhorar · {fmtMoney(upgradeCost)}</>}
+                              </ActionButton>
+                            );
+                          })()}
                         </div>
                       </Card>
                     ))}
@@ -339,8 +351,13 @@ export const CityPanel = ({ open, onOpenChange }) => {
                           <p className="text-xs font-bold text-white">{cfg.name}</p>
                           <p className="mt-1 min-h-8 text-[10px] leading-relaxed text-zinc-500">{cfg.description}</p>
                           <div className="mt-2 flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] text-zinc-400">{fmtMoney(estimated)}</span>
-                            <ActionButton disabled={!!busy} onClick={() => act(`buy-${key}`, "businesses/buy", { type_key:key }, `${cfg.name} adquirido`)}>Comprar</ActionButton>
+                            <span className="font-mono text-[10px] text-zinc-400">{fmtMoney(estimated)} · N{cfg.min_level || 1}</span>
+                            <ActionButton
+                              disabled={!!busy || playerLevel < Number(cfg.min_level || 1) || cleanMoney < estimated}
+                              onClick={() => act(`buy-${key}`, "businesses/buy", { type_key:key }, `${cfg.name} adquirido`)}
+                            >
+                              {playerLevel < Number(cfg.min_level || 1) ? `Nível ${cfg.min_level}` : "Comprar"}
+                            </ActionButton>
                           </div>
                         </Card>
                       );
@@ -356,9 +373,9 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Zap size={13} className="text-red-400" /> PvP opt-in</p>
-                      <p className="mt-1 text-[10px] text-zinc-500">Conflitos competitivos exigem consentimento dos dois jogadores.</p>
+                      <p className="mt-1 text-[10px] text-zinc-500">{playerLevel < 15 ? "Desbloqueia no nível 15." : "Consentimento obrigatório · cooldown de 6h por rival · retornos decrescentes anti-farm."}</p>
                     </div>
-                    <Switch checked={!!city.social?.pvp_opt_in} disabled={!!busy} onCheckedChange={(enabled) => act("pvp", "social/pvp", { enabled })} />
+                    <Switch checked={!!city.social?.pvp_opt_in} disabled={!!busy || playerLevel < 15} onCheckedChange={(enabled) => act("pvp", "social/pvp", { enabled })} />
                   </div>
 
                   {(city.social?.pvp_challenges || []).filter((c) => c.defender_id && c.status === "pending").length > 0 && (
@@ -421,12 +438,66 @@ export const CityPanel = ({ open, onOpenChange }) => {
                 <Card className="sub-card p-3 shadow-none">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Landmark size={13} className="text-cyan-400" /> Aliança</p>
                   {city.social?.alliance ? (
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-bold text-white">{city.social.alliance.name}</p>
-                        <p className="font-mono text-[10px] text-zinc-500">Código {city.social.alliance.code}</p>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-white">{city.social.alliance.name}</p>
+                          <p className="font-mono text-[10px] text-zinc-500">
+                            Código {city.social.alliance.code} · {nfmt(city.social.alliance.season_points || 0)} pts época · {(city.social.alliance.members || []).length} membros
+                          </p>
+                        </div>
+                        <ActionButton
+                          tone="danger"
+                          disabled={!!busy || (!!city.social.alliance.is_leader && (city.social.alliance.members || []).length > 1)}
+                          onClick={() => act("alliance-leave", "social/alliance/leave", {}, "Saíste da aliança")}
+                        >
+                          {!!city.social.alliance.is_leader && (city.social.alliance.members || []).length > 1 ? "Transfere liderança" : "Sair"}
+                        </ActionButton>
                       </div>
-                      <ActionButton tone="danger" disabled={!!busy} onClick={() => act("alliance-leave", "social/alliance/leave", {}, "Saíste da aliança")}>Sair</ActionButton>
+
+                      {(city.social.alliance.members || []).length > 0 && (
+                        <div className="space-y-1 border-t border-white/[0.06] pt-2">
+                          {(city.social.alliance.members || []).map((member) => (
+                            <div key={member.player_id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-1.5">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[10px] font-bold text-zinc-200">
+                                  {member.org_name}{member.is_you ? " · tu" : ""}
+                                </p>
+                                <p className="font-mono text-[10px] text-zinc-600">
+                                  N{member.level} · {nfmt(member.respect)} respeito {member.is_leader ? "· líder" : ""}
+                                </p>
+                              </div>
+                              {!!city.social.alliance.is_leader && !member.is_you && (
+                                <div className="flex gap-1">
+                                  <ActionButton
+                                    disabled={!!busy}
+                                    onClick={() => act(
+                                      `alliance-transfer-${member.player_id}`,
+                                      "social/alliance/transfer",
+                                      { player_id:member.player_id },
+                                      `Liderança transferida para ${member.org_name}`
+                                    )}
+                                  >
+                                    Liderar
+                                  </ActionButton>
+                                  <ActionButton
+                                    tone="danger"
+                                    disabled={!!busy}
+                                    onClick={() => act(
+                                      `alliance-kick-${member.player_id}`,
+                                      "social/alliance/kick",
+                                      { player_id:member.player_id },
+                                      `${member.org_name} removida da aliança`
+                                    )}
+                                  >
+                                    Expulsar
+                                  </ActionButton>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="mt-2 space-y-2">
@@ -442,12 +513,65 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   )}
                 </Card>
 
+                {(city.social?.alliance_leaderboard || []).length > 0 && (
+                  <Card className="sub-card p-3 shadow-none">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Trophy size={13} className="text-amber-400" /> Classificação de alianças</p>
+                    <div className="mt-2 space-y-1">
+                      {(city.social.alliance_leaderboard || []).slice(0, 10).map((row, index) => (
+                        <div key={row.id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 font-mono text-[10px] ${row.is_yours ? "bg-cyan-500/10 text-cyan-200" : "bg-black/20 text-zinc-400"}`}>
+                          <span className="w-5 text-zinc-600">#{index + 1}</span>
+                          <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                          <span>{row.members} membros</span>
+                          <span className="font-bold text-zinc-200">{nfmt(row.points)} pts</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
                 <Card className="sub-card p-3 shadow-none">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-white"><MessageCircle size={13} className="text-sky-400" /> Frequência da cidade</p>
                   <div className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-md bg-black/25 p-2">
-                    {(city.social?.chat || []).map((m) => (
-                      <p key={m.id} className="text-[10px] leading-relaxed text-zinc-400"><b className="text-zinc-200">{m.org_name}:</b> {m.message}</p>
-                    ))}
+                    {(city.social?.chat || []).map((m) => {
+                      const own = String(m.player_id || "") === String(state?.player?.id || "");
+                      return (
+                        <div key={m.id} className="group flex items-start gap-1 rounded px-1 py-0.5 hover:bg-white/[0.03]">
+                          <p className="min-w-0 flex-1 text-[10px] leading-relaxed text-zinc-400">
+                            <b className="text-zinc-200">{m.org_name}:</b> {m.message}
+                          </p>
+                          {!own && m.player_id && (
+                            <div className="flex shrink-0 gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
+                              <button
+                                type="button"
+                                title="Denunciar mensagem"
+                                aria-label="Denunciar mensagem"
+                                disabled={!!busy}
+                                onClick={() => act(`report-${m.id}`, "social/chat/report", {
+                                  message_id:m.id,
+                                  reason:"Conteúdo impróprio, abusivo ou contrário às regras",
+                                }, "Mensagem denunciada")}
+                                className="rounded p-1 text-zinc-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
+                              >
+                                <Flag size={10} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Bloquear organização"
+                                aria-label="Bloquear organização"
+                                disabled={!!busy}
+                                onClick={() => act(`block-${m.player_id}`, "social/chat/block", {
+                                  player_id:m.player_id,
+                                  blocked:true,
+                                }, `${m.org_name} foi bloqueada no chat`)}
+                                className="rounded p-1 text-zinc-600 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-30"
+                              >
+                                <UserX size={10} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="mt-2 flex gap-2">
                     <Input value={chat} onChange={(e) => setChat(e.target.value)} maxLength={280} placeholder="Mensagem…" className="h-8 bg-black/30 text-xs" />

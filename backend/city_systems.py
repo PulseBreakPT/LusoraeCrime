@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 from city_data import (
-    WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES,
+    WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES, RIVAL_ACTIONS,
     SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO, SEASON_REWARDS,
 )
 
@@ -541,8 +541,49 @@ async def city_snapshot(db, player):
     season = season_info(now)
     score = await _season_checkpoint(db, player, season)
     board = await _leaderboard(db, season["id"], player)
-    chat = await db.city_chat.find({}).sort("ts", -1).to_list(20)
+    blocked_ids = [str(value) for value in (player.get("city_blocked_player_ids") or [])]
+    chat_query = {"player_id": {"$nin": blocked_ids}} if blocked_ids else {}
+    chat = await db.city_chat.find(chat_query).sort("ts", -1).to_list(20)
     alliance = await db.city_alliances.find_one({"member_ids": pid})
+    alliance_view = None
+    alliance_board = []
+    if alliance:
+        if alliance.get("season_id") != season["id"]:
+            await db.city_alliances.update_one(
+                {"_id": alliance["_id"]},
+                {"$set": {"season_id": season["id"], "season_points": 0}},
+            )
+            alliance["season_id"] = season["id"]
+            alliance["season_points"] = 0
+
+        from bson import ObjectId
+        member_object_ids = [
+            ObjectId(value)
+            for value in (alliance.get("member_ids") or [])
+            if ObjectId.is_valid(str(value))
+        ]
+        member_docs = []
+        if member_object_ids:
+            member_docs = await db.players.find(
+                {"_id": {"$in": member_object_ids}}
+            ).sort("respect", -1).to_list(20)
+        member_map = {str(row["_id"]): row for row in member_docs}
+        alliance_view = _serialize(alliance)
+        alliance_view["is_leader"] = alliance.get("leader_id") == pid
+        alliance_view["members"] = [
+            {
+                "player_id": member_id,
+                "org_name": member_map.get(member_id, {}).get("org_name", "Organização"),
+                "level": int(member_map.get(member_id, {}).get("level", 1) or 1),
+                "respect": int(member_map.get(member_id, {}).get("respect", 0) or 0),
+                "is_leader": member_id == alliance.get("leader_id"),
+                "is_you": member_id == pid,
+            }
+            for member_id in (alliance.get("member_ids") or [])
+        ]
+        alliance_board = await db.city_alliances.find(
+            {"season_id": season["id"]}
+        ).sort("season_points", -1).limit(10).to_list(10)
     recent_events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(8)
     pvp_players = await db.players.find({
         "pvp_opt_in": True,
@@ -583,6 +624,16 @@ async def city_snapshot(db, player):
         d["config"] = BUSINESS_TYPES.get(doc.get("type_key"), {})
         business_out.append(d)
 
+    boss = boss_status(player, now)
+    recovery_cost = 0
+    if boss.get("hospital_until"):
+        recovery_cost += 3500
+    if boss.get("sentence_until"):
+        recovery_cost += 7500
+    if not boss.get("hospital_until") and not boss.get("sentence_until") and int(boss.get("stress", 0) or 0) >= 35:
+        recovery_cost += 1000
+    boss["recovery_cost"] = recovery_cost
+
     return {
         "world": ctx,
         "calendar": city_calendar(now, player.get("region") or "Portugal", 5),
@@ -594,6 +645,7 @@ async def city_snapshot(db, player):
         },
         "news": news[:12],
         "rivals": rival_out,
+        "rival_actions": RIVAL_ACTIONS,
         "businesses": business_out,
         "business_catalog": BUSINESS_TYPES,
         "business_totals": {
@@ -602,8 +654,19 @@ async def city_snapshot(db, player):
             "pending_heat": round(sum(p["heat"] for p in projections), 2),
         },
         "social": {
-            "alliance": _serialize(alliance) if alliance else None,
+            "alliance": alliance_view,
+            "alliance_leaderboard": [
+                {
+                    "id": str(row["_id"]),
+                    "name": row.get("name", "Aliança"),
+                    "members": len(row.get("member_ids") or []),
+                    "points": int(row.get("season_points", 0) or 0),
+                    "is_yours": bool(alliance and row["_id"] == alliance["_id"]),
+                }
+                for row in alliance_board
+            ],
             "chat": [_serialize(x) for x in chat],
+            "blocked_player_ids": blocked_ids,
             "pvp_opt_in": bool(player.get("pvp_opt_in", False)),
             "pvp_players": [
                 {
@@ -624,5 +687,5 @@ async def city_snapshot(db, player):
                 for x in pvp_challenges
             ],
         },
-        "boss": boss_status(player, now),
+        "boss": boss,
     }

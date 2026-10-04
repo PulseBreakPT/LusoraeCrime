@@ -19,9 +19,14 @@ test("living city produces a complete deterministic snapshot shape", () => {
   expect(city.businesses).toEqual([]);
 });
 
-test("businesses are purchased, accrue network effects and can be upgraded", () => {
+test("business unlocks are enforced and late-game businesses still upgrade", () => {
   const save=baseSave();
   ensureLocalCity(save);
+  expect(() => handleLocalCityRequest(
+    save,"post","/game/city/businesses/buy",{type_key:"empresa_tecnologia"}
+  )).toThrow("Este negócio desbloqueia no nível 65");
+
+  save.player.level=65;
   const bought=handleLocalCityRequest(save,"post","/game/city/businesses/buy",{type_key:"empresa_tecnologia"});
   expect(bought.handled).toBe(true);
   expect(save.city.businesses).toHaveLength(1);

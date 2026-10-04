@@ -90,7 +90,7 @@ from city_systems import (
     operation_world_modifier, business_network_effect, boss_leadership_modifier,
     ensure_rivals, advance_rival_world,
 )
-from game_data import operation_profile_of, OPERATION_PROFILE_LABELS
+from game_data import operation_profile_of, OPERATION_PROFILE_LABELS, ORG_LEVEL_UNLOCKS, MAX_ORG_LEVEL
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
@@ -439,6 +439,8 @@ def _oid(v, msg):
 @router.get("/catalog")
 async def catalog():
     return {
+        "max_org_level": MAX_ORG_LEVEL,
+        "org_level_unlocks": ORG_LEVEL_UNLOCKS,
         "team_specs": TEAM_SPECS,
         "team_create_cost": TEAM_CREATE_COST,
         "specializations": SPECIALIZATIONS,
@@ -1580,6 +1582,7 @@ async def recommend_repeat(body: TeamIdInput, user: dict = Depends(get_current_u
 
 
 @router.post("/opportunities/favorite")
+@idempotent("opportunities_favorite")
 async def toggle_favorite_type(body: TypeKeyInput, user: dict = Depends(get_current_user)):
     """Marca/desmarca um tipo de operação como favorito — favoritos aparecem
     primeiro no mapa e na lista de oportunidades."""
@@ -2042,6 +2045,7 @@ async def train_employee(body: TrainInput, user: dict = Depends(get_current_user
 
 
 @router.post("/employees/rest")
+@idempotent("employees.rest")
 async def rest_employee(body: EmployeeIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2202,6 +2206,7 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/employees/rename")
+@idempotent("employees.rename")
 async def rename_employee(body: EmployeeRenameInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2219,7 +2224,8 @@ async def rename_employee(body: EmployeeRenameInput, user: dict = Depends(get_cu
 # ---------------- Veículos ----------------
 
 @router.post("/employees/optimize")
-async def optimize_employees(user: dict = Depends(get_current_user)):
+@idempotent("employees.optimize")
+async def optimize_employees(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI do efetivo (SSS v6): preenche as vagas das equipas disponíveis com os
     operacionais disponíveis SEM equipa, maximizando a aptidão para a
     especialização de cada equipa — a mesma régua da eficácia de missão
@@ -2572,6 +2578,7 @@ async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_
 
 
 @router.post("/vehicles/rename")
+@idempotent("vehicles.rename")
 async def rename_vehicle(body: VehicleRenameInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2602,7 +2609,8 @@ async def _weapon_free(pid, weapon):
 
 
 @router.post("/vehicles/optimize")
-async def optimize_vehicles(user: dict = Depends(get_current_user)):
+@idempotent("vehicles.optimize")
+async def optimize_vehicles(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI da frota (SSS v6): redistribui os veículos disponíveis pelas equipas
     disponíveis maximizando a adequação global — a mesma régua da chance de
     missão (vehicle_mission_score da especialização, best_for, condição,
@@ -2877,6 +2885,7 @@ async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_cu
 
 
 @router.post("/weapons/auto_assign")
+@idempotent("weapons.auto_assign")
 async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
     """Atribui automaticamente a arma ao operacional disponível com o maior
     GANHO MARGINAL de score efetivo (SSS v5) — a mesma régua da chance de
@@ -2923,7 +2932,8 @@ async def auto_assign_weapon(body: WeaponIdInput, user: dict = Depends(get_curre
 
 
 @router.post("/weapons/optimize")
-async def optimize_weapons(user: dict = Depends(get_current_user)):
+@idempotent("weapons.optimize")
+async def optimize_weapons(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI das armas (SSS v5): redistribui TODO o arsenal disponível pelos
     operacionais disponíveis maximizando o score efetivo global — atribuição
     gulosa por score (a mesma régua da chance de missão). Só mexe em armas
@@ -3038,6 +3048,14 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {pt['min_level']}")
     market = property_market_price(pt["price"], body.lat, body.lng)
     price = market["price"]
+    # Onboarding protegido: o primeiro Esconderijo nunca custa mais do que o
+    # preço-base, mesmo em Lisboa/Porto/Algarve. Isto evita que a localização
+    # escolhida no início bloqueie o primeiro objetivo, sem inflacionar o
+    # capital inicial nem alterar o mercado das compras seguintes.
+    first_property = int((player.get("stats") or {}).get("properties_bought", 0) or 0) == 0
+    starter_discount = body.type_key == "esconderijo" and first_property
+    if starter_discount:
+        price = min(price, int(pt["price"]))
     if player["clean_money"] < price:
         raise HTTPException(
             status_code=400,
@@ -3068,7 +3086,13 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         db, pid, "property_buy", -price, "clean", fresh_player["clean_money"],
         f"Compra de {pt['name']} — {market['zone']}",
     )
-    return {"ok": True, "price": price, "market_zone": market["zone"], "market_multiplier": market["multiplier"]}
+    return {
+        "ok": True,
+        "price": price,
+        "market_zone": market["zone"],
+        "market_multiplier": market["multiplier"],
+        "starter_discount": starter_discount,
+    }
 
 
 @router.post("/properties/sell")
@@ -3157,6 +3181,7 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
 
 
 @router.post("/properties/rename")
+@idempotent("properties.rename")
 async def rename_property(body: PropertyRenameInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3408,6 +3433,7 @@ async def upgrade_hq(body: Optional[MutationInput] = None, user: dict = Depends(
 
 
 @router.post("/hq/priority")
+@idempotent("hq_priority")
 async def set_hq_priority(body: PriorityInput, user: dict = Depends(get_current_user)):
     if body.priority not in HQ_PRIORITIES:
         raise HTTPException(status_code=400, detail="Prioridade inválida")
@@ -3497,6 +3523,7 @@ class SettingsUpdateInput(BaseModel):
 
 
 @router.post("/settings")
+@idempotent("settings_update")
 async def update_settings(body: SettingsUpdateInput, user: dict = Depends(get_current_user)):
     """Guarda as preferências de automatização — só estas afetam o servidor
     (as restantes definições de interface/jogabilidade vivem só no dispositivo)."""
@@ -3739,6 +3766,7 @@ async def _consume_shop_timer(player_id, cost: int, collection, query, update):
 
 
 @router.post("/shop/speedup")
+@idempotent("shop_speedup")
 async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_user)):
     """Acelera um temporizador já existente (nunca cria lógica de conclusão
     nova) — só antecipa o timestamp relevante para agora. O próximo advance()
@@ -3849,6 +3877,7 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
 
 
 @router.post("/shop/buy_slot")
+@idempotent("shop_buy_slot")
 async def shop_buy_slot(body: ShopBuySlotInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3879,6 +3908,7 @@ async def shop_buy_slot(body: ShopBuySlotInput, user: dict = Depends(get_current
 
 
 @router.post("/shop/vip")
+@idempotent("shop_vip")
 async def shop_buy_vip(body: ShopVipInput, user: dict = Depends(get_current_user)):
     plan = VIP_PLANS.get(body.plan_key)
     if not plan:
@@ -3911,6 +3941,7 @@ _COSMETIC_CATALOGS = {"vehicle_paint": VEHICLE_PAINTS, "team_emblem": TEAM_EMBLE
 
 
 @router.post("/shop/cosmetic")
+@idempotent("shop_cosmetic")
 async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_current_user)):
     catalog_map = _COSMETIC_CATALOGS.get(body.category)
     if not catalog_map or body.key not in catalog_map:
@@ -3939,6 +3970,7 @@ async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_cu
 
 
 @router.post("/vehicles/equip_paint")
+@idempotent("vehicle_equip_paint")
 async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3954,6 +3986,7 @@ async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends
 
 
 @router.post("/teams/equip_emblem")
+@idempotent("team_equip_emblem")
 async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3969,6 +4002,7 @@ async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get
 
 
 @router.post("/hq/equip_skin")
+@idempotent("hq_equip_skin")
 async def equip_hq_skin(body: HqEquipSkinInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])

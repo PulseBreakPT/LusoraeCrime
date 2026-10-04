@@ -17,6 +17,7 @@ INITIAL_DIRTY_MONEY = 5000
 
 DIRTY_MONEY_CAP_BASE = 80000
 DIRTY_MONEY_CAP_PER_LEVEL = 8000
+DIRTY_MONEY_CAP_LATE_PER_LEVEL = 12000  # incremento adicional do nível 11 ao 100
 DIRTY_MONEY_HEAT_THRESHOLD = 60000
 DIRTY_MONEY_HEAT_PER_10K = 0.15
 
@@ -232,7 +233,7 @@ REFUEL_DURATION_PER_L_S = 0.5
 # QUARTEL-GENERAL (HQ) — CENTRO ESTRATÉGICO
 # ============================================================================
 
-HQ_MAX_LEVEL = 8
+HQ_MAX_LEVEL = 10
 
 # Benefícios cumulativos por nível de HQ (o nível 1 é a base, sem bónus nem
 # custo — já vem com a organização). upgrade_cost/upgrade_duration_s/
@@ -245,30 +246,16 @@ HQ_MAX_LEVEL = 8
 # custo combinado de todas as propriedades do jogo (~590k€) mesmo no total —
 # o HQ é o "capstone" da progressão, não deve eclipsar o sistema de imóveis.
 HQ_LEVEL_BENEFITS = [
-    {'level': 1, 'upgrade_cost': None, 'upgrade_duration_s': None, 'min_org_level': 1,
-     'cap_employees': 0, 'cap_vehicles': 0, 'passive_income_pct': 0.0, 'heat_reduction_pct': 0.0,
-     'unlocks': [], 'name': 'Armazém de Operações', 'desc': 'A base da organização.'},
-    {'level': 2, 'upgrade_cost': 12000, 'upgrade_duration_s': 480, 'min_org_level': 2,
-     'cap_employees': 2, 'cap_vehicles': 1, 'passive_income_pct': 0.0, 'heat_reduction_pct': 0.0,
-     'unlocks': [], 'name': 'Escritório Reforçado', 'desc': 'Mais postos de trabalho e uma vaga de garagem.'},
-    {'level': 3, 'upgrade_cost': 20000, 'upgrade_duration_s': 1200, 'min_org_level': 3,
-     'cap_employees': 2, 'cap_vehicles': 1, 'passive_income_pct': 0.05, 'heat_reduction_pct': 0.0,
-     'unlocks': ['financeiro'], 'name': 'Sala de Operações', 'desc': 'Desbloqueia o Gabinete Financeiro (em breve).'},
-    {'level': 4, 'upgrade_cost': 34000, 'upgrade_duration_s': 2400, 'min_org_level': 4,
-     'cap_employees': 3, 'cap_vehicles': 2, 'passive_income_pct': 0.05, 'heat_reduction_pct': 0.0,
-     'unlocks': ['rh'], 'name': 'Recrutamento', 'desc': 'Desbloqueia Recursos Humanos (em breve).'},
-    {'level': 5, 'upgrade_cost': 55000, 'upgrade_duration_s': 4200, 'min_org_level': 5,
-     'cap_employees': 3, 'cap_vehicles': 2, 'passive_income_pct': 0.10, 'heat_reduction_pct': 0.05,
-     'unlocks': ['logistica'], 'name': 'Comunicações', 'desc': 'Desbloqueia Logística e reduz o calor acumulado.'},
-    {'level': 6, 'upgrade_cost': 88000, 'upgrade_duration_s': 6600, 'min_org_level': 6,
-     'cap_employees': 4, 'cap_vehicles': 2, 'passive_income_pct': 0.10, 'heat_reduction_pct': 0.10,
-     'unlocks': [], 'name': 'Logística', 'desc': 'Mais capacidade e menos calor operacional.'},
-    {'level': 7, 'upgrade_cost': 140000, 'upgrade_duration_s': 9600, 'min_org_level': 7,
-     'cap_employees': 4, 'cap_vehicles': 3, 'passive_income_pct': 0.15, 'heat_reduction_pct': 0.10,
-     'unlocks': ['investigacao'], 'name': 'Laboratório de Análise', 'desc': 'Desbloqueia Investigação (em breve).'},
-    {'level': 8, 'upgrade_cost': 220000, 'upgrade_duration_s': 14400, 'min_org_level': 8,
-     'cap_employees': 5, 'cap_vehicles': 3, 'passive_income_pct': 0.20, 'heat_reduction_pct': 0.15,
-     'unlocks': ['comunicacoes'], 'name': 'Quartel-General Completo', 'desc': 'O centro de comando completo da organização.'},
+    {'level': 1, 'upgrade_cost': None, 'upgrade_duration_s': None, 'min_org_level': 1, 'cap_employees': 0, 'cap_vehicles': 0, 'passive_income_pct': 0.0, 'heat_reduction_pct': 0.0, 'unlocks': [], 'name': 'Armazém de Operações', 'desc': 'A base inicial da organização.'},
+    {'level': 2, 'upgrade_cost': 12000, 'upgrade_duration_s': 480, 'min_org_level': 3, 'cap_employees': 2, 'cap_vehicles': 1, 'passive_income_pct': 0.0, 'heat_reduction_pct': 0.0, 'unlocks': [], 'name': 'Escritório Reforçado', 'desc': 'Mais postos de trabalho e uma vaga de garagem.'},
+    {'level': 3, 'upgrade_cost': 28000, 'upgrade_duration_s': 1200, 'min_org_level': 8, 'cap_employees': 3, 'cap_vehicles': 2, 'passive_income_pct': 0.05, 'heat_reduction_pct': 0.0, 'unlocks': ['financeiro'], 'name': 'Sala de Operações', 'desc': 'Desbloqueia o Gabinete Financeiro.'},
+    {'level': 4, 'upgrade_cost': 60000, 'upgrade_duration_s': 2400, 'min_org_level': 15, 'cap_employees': 4, 'cap_vehicles': 2, 'passive_income_pct': 0.07, 'heat_reduction_pct': 0.03, 'unlocks': ['rh'], 'name': 'Centro de Recrutamento', 'desc': 'Desbloqueia Recursos Humanos.'},
+    {'level': 5, 'upgrade_cost': 125000, 'upgrade_duration_s': 4200, 'min_org_level': 25, 'cap_employees': 5, 'cap_vehicles': 3, 'passive_income_pct': 0.10, 'heat_reduction_pct': 0.05, 'unlocks': ['logistica'], 'name': 'Centro Logístico', 'desc': 'Desbloqueia Logística.'},
+    {'level': 6, 'upgrade_cost': 250000, 'upgrade_duration_s': 6600, 'min_org_level': 40, 'cap_employees': 6, 'cap_vehicles': 4, 'passive_income_pct': 0.14, 'heat_reduction_pct': 0.08, 'unlocks': [], 'name': 'Comando Regional', 'desc': 'Coordena várias equipas e bases.'},
+    {'level': 7, 'upgrade_cost': 475000, 'upgrade_duration_s': 9600, 'min_org_level': 55, 'cap_employees': 8, 'cap_vehicles': 5, 'passive_income_pct': 0.18, 'heat_reduction_pct': 0.11, 'unlocks': ['investigacao'], 'name': 'Laboratório de Análise', 'desc': 'Desbloqueia Investigação.'},
+    {'level': 8, 'upgrade_cost': 800000, 'upgrade_duration_s': 14400, 'min_org_level': 70, 'cap_employees': 9, 'cap_vehicles': 6, 'passive_income_pct': 0.22, 'heat_reduction_pct': 0.15, 'unlocks': ['comunicacoes'], 'name': 'Centro Nacional', 'desc': 'Desbloqueia Comunicações.'},
+    {'level': 9, 'upgrade_cost': 1250000, 'upgrade_duration_s': 21600, 'min_org_level': 85, 'cap_employees': 11, 'cap_vehicles': 7, 'passive_income_pct': 0.28, 'heat_reduction_pct': 0.20, 'unlocks': [], 'name': 'Rede Soberana', 'desc': 'Infraestrutura redundante de escala nacional.'},
+    {'level': 10, 'upgrade_cost': 2000000, 'upgrade_duration_s': 28800, 'min_org_level': 100, 'cap_employees': 14, 'cap_vehicles': 9, 'passive_income_pct': 0.35, 'heat_reduction_pct': 0.25, 'unlocks': [], 'name': 'SUBMUNDO', 'desc': 'Capstone máximo da organização.'},
 ]
 
 # Prioridades globais — influenciam o desempate das recomendações de
@@ -364,6 +351,7 @@ MISSION_REWARD_MULTIPLIER_CAP = 1.75
 # Organization level scaling
 ORG_LEVEL_MULTIPLIER_BASE = 1.0
 ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.12
+ORG_LEVEL_MULTIPLIER_LATE = 0.018
 # Nível 5: 1,48x; nível 10: 2,08x — crescimento relevante sem hiperinflação.
 
 CATEGORY_MULTIPLIERS = {
@@ -451,60 +439,60 @@ PRESTIGE_ITEMS = {
     'warehouse_expansion': {
         'name': 'Expansão de Armazém',
         'cost': 50000,
-        'unlock_level': 5,
+        'unlock_level': 20,
         'dirty_cap_increase': 5000,
     },
     'advanced_warehouse': {
         'name': 'Armazém Avançado',
         'cost': 100000,
-        'unlock_level': 7,
+        'unlock_level': 40,
         'dirty_cap_increase': 10000,
     },
     'ultimate_vault': {
         'name': 'Cofre Definitivo',
         'cost': 250000,
-        'unlock_level': 9,
+        'unlock_level': 80,
         'dirty_cap_increase': 25000,
     },
     'vehicle_customization': {
         'name': 'Personalização de Veículo',
         'cost': 75000,
-        'unlock_level': 6,
+        'unlock_level': 35,
         'mission_bonus': 0.15,
     },
     'crew_specialization': {
         'name': 'Especialização de Crew',
         'cost': 75000,
-        'unlock_level': 6,
+        'unlock_level': 45,
         'spec_bonus': 0.10,
     },
     'research_formula': {
         'name': 'Pesquisa: Fórmula Avançada',
         'cost': 150000,
-        'unlock_level': 8,
+        'unlock_level': 55,
         'lab_bonus': 0.20,
     },
     'research_laundry': {
         'name': 'Pesquisa: Técnicas de Lavagem',
         'cost': 150000,
-        'unlock_level': 8,
+        'unlock_level': 65,
         'laundry_bonus': 0.15,
     },
     'research_evasion': {
         'name': 'Pesquisa: Técnicas de Evasão',
         'cost': 200000,
-        'unlock_level': 9,
+        'unlock_level': 75,
         'heat_decay_bonus': 0.20,
     },
 }
 
 # Territory expansion (end-game progression)
-TERRITORY_CONTROL_UNLOCK_LEVEL = 9
+TERRITORY_CONTROL_UNLOCK_LEVEL = 20
 TERRITORY_CONTROL_COST = 300000
 TERRITORY_CONTROL_WEEKLY_DEFENSE = 20000
 TERRITORY_CONTROL_BONUS = 0.10  # +10% mission rewards in district
 
-REGIONAL_DOMINANCE_UNLOCK_LEVEL = 10
+REGIONAL_DOMINANCE_UNLOCK_LEVEL = 75
 REGIONAL_DOMINANCE_COST = 500000
 REGIONAL_DOMINANCE_BI_WEEKLY_DEFENSE = 40000
 REGIONAL_DOMINANCE_BONUS = 0.20  # +20% mission rewards in region
@@ -513,7 +501,12 @@ REGIONAL_DOMINANCE_BONUS = 0.20  # +20% mission rewards in region
 # ACHIEVEMENTS & PROGRESSION
 # ============================================================================
 
-LEVEL_THRESHOLDS = [0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000]
+MAX_ORG_LEVEL = 100
+LEGACY_LEVEL_THRESHOLDS = [0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000]
+LEVEL_THRESHOLDS = LEGACY_LEVEL_THRESHOLDS + [
+    42000 + 9000 * step + 35 * (step ** 2)
+    for step in range(1, MAX_ORG_LEVEL - len(LEGACY_LEVEL_THRESHOLDS) + 1)
+]
 TEAM_COUNT_BASE = 2
 TEAM_COUNT_PER_2_LEVELS = 1
 
@@ -541,7 +534,12 @@ RARITIES = {
     "lendario": {"name": "Lendário", "mult": 4.0, "max_level": 10, "talent_slots": 3, "talent_chance": 1.0},
 }
 
-RARITY_MIN_RESPECT = {"comum": 0, "raro": 300, "elite": 1200, "lendario": 3500}
+RARITY_MIN_RESPECT = {
+    "comum": 0,
+    "raro": LEVEL_THRESHOLDS[9],
+    "elite": LEVEL_THRESHOLDS[34],
+    "lendario": LEVEL_THRESHOLDS[69],
+}
 
 RANKS = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"]
 RANK_REQ_LEVEL = [1, 2, 3, 4, 6, 8, 10]

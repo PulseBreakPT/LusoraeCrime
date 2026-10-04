@@ -234,9 +234,34 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
     now = now_utc().isoformat()
 
     # Deletar tudo relacionado ao jogador
-    for coll in (db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
-                 db.missions, db.events, db.quests, db.candidates, db.transactions):
+    for coll in (
+        db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
+        db.missions, db.events, db.quests, db.candidates, db.transactions,
+        db.city_businesses, db.city_rivals, db.city_season_scores, db.city_chat,
+    ):
         await coll.delete_many({"player_id": pid})
+    await db.city_pvp_challenges.delete_many({"$or": [{"attacker_id": pid}, {"defender_id": pid}]})
+    await db.city_chat_reports.delete_many({"$or": [{"reporter_id": pid}, {"target_player_id": pid}]})
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    if alliance:
+        remaining = [member_id for member_id in (alliance.get("member_ids") or []) if member_id != pid]
+        if not remaining:
+            await db.city_alliances.delete_one({"_id": alliance["_id"]})
+        elif alliance.get("leader_id") == pid:
+            await db.city_alliances.update_one(
+                {"_id": alliance["_id"]},
+                {"$set": {
+                    "member_ids": remaining,
+                    "leader_id": remaining[0],
+                    "leadership_changed_at": now,
+                }},
+            )
+        else:
+            await db.city_alliances.update_one(
+                {"_id": alliance["_id"]},
+                {"$set": {"member_ids": remaining}},
+            )
+    await db.action_receipts.delete_many({"key": {"$regex": f"^{str(user_oid)}:"}})
 
     # Recriar player com estado inicial
     level = player.get("level", 1) if body.keep_level else 1
@@ -246,7 +271,7 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
         respect_for_level = LEVEL_THRESHOLDS[min(level - 1, len(LEVEL_THRESHOLDS) - 1)]
 
     await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "clean_money": 75000,
+        "clean_money": 100000,
         "dirty_money": 5000,
         "respect": respect_for_level,
         "level": level,
@@ -320,12 +345,18 @@ async def ban_user(user_id: str, body: BanUserInput, admin: dict = Depends(requi
         raise HTTPException(status_code=400, detail="Não é possível banir um administrador — remove primeiro a função")
 
     # Marcar como banido
-    await db.users.update_one({"_id": user_oid}, {"$set": {
-        "banned": True,
-        "ban_reason": body.reason,
-        "banned_at": now_utc().isoformat(),
-        "banned_by": admin["email"],
-    }})
+    await db.users.update_one(
+        {"_id": user_oid},
+        {
+            "$set": {
+                "banned": True,
+                "ban_reason": body.reason,
+                "banned_at": now_utc().isoformat(),
+                "banned_by": admin["email"],
+            },
+            "$inc": {"token_version": 1},
+        },
+    )
 
     # Log da ação
     await db.admin_logs.insert_one({
@@ -398,7 +429,7 @@ async def set_user_role(user_id: str, body: SetRoleInput, admin: dict = Depends(
     if previous_role == body.role:
         raise HTTPException(status_code=400, detail=f"Utilizador já tem a função '{body.role}'")
 
-    await db.users.update_one({"_id": user_oid}, {"$set": {"role": body.role}})
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": body.role}, "$inc": {"token_version": 1}})
 
     await db.admin_logs.insert_one({
         "admin_id": admin["_id"],
@@ -428,7 +459,7 @@ async def grant_admin(user_id: str, admin: dict = Depends(require_admin)):
     if user.get("role") == "admin":
         raise HTTPException(status_code=400, detail="Utilizador já é administrador")
 
-    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "admin"}})
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "admin"}, "$inc": {"token_version": 1}})
 
     # Log da ação
     await db.admin_logs.insert_one({
@@ -463,7 +494,7 @@ async def revoke_admin(user_id: str, admin: dict = Depends(require_admin)):
     if user.get("role") != "admin":
         raise HTTPException(status_code=400, detail="Utilizador não é administrador")
 
-    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "player"}})
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "player"}, "$inc": {"token_version": 1}})
 
     # Log da ação
     await db.admin_logs.insert_one({
@@ -498,6 +529,68 @@ async def get_admin_logs(admin: dict = Depends(require_staff), limit: int = 100)
     return {"logs": logs_data}
 
 
+class ResolveChatReportInput(BaseModel):
+    status: str
+    note: str = ""
+
+
+@router.get("/chat-reports")
+async def list_chat_reports(admin: dict = Depends(require_staff), status: str = "open", limit: int = 100):
+    """Fila de moderação do chat da Cidade."""
+    query = {} if status == "all" else {"status": status}
+    rows = await db.city_chat_reports.find(query).sort("created_at", -1).limit(min(200, max(1, limit))).to_list(200)
+    return {
+        "reports": [
+            {
+                "id": str(row["_id"]),
+                "reporter_id": row.get("reporter_id"),
+                "target_player_id": row.get("target_player_id"),
+                "message_id": row.get("message_id"),
+                "message_snapshot": row.get("message_snapshot", ""),
+                "reason": row.get("reason", ""),
+                "status": row.get("status", "open"),
+                "created_at": row.get("created_at"),
+                "resolved_at": row.get("resolved_at"),
+                "moderator_note": row.get("moderator_note", ""),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.post("/chat-reports/{report_id}/resolve")
+async def resolve_chat_report(report_id: str, body: ResolveChatReportInput, admin: dict = Depends(require_admin)):
+    """Resolve, arquiva ou rejeita uma denúncia e mantém auditoria."""
+    if body.status not in {"resolved", "dismissed"}:
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    try:
+        report_oid = ObjectId(report_id)
+    except (InvalidId, ValueError):
+        raise HTTPException(status_code=400, detail="ID de denúncia inválido")
+    report = await db.city_chat_reports.find_one({"_id": report_oid})
+    if not report:
+        raise HTTPException(status_code=404, detail="Denúncia não encontrada")
+    now = now_utc().isoformat()
+    await db.city_chat_reports.update_one(
+        {"_id": report_oid},
+        {"$set": {
+            "status": body.status,
+            "resolved_at": now,
+            "resolved_by": admin.get("email", ""),
+            "moderator_note": body.note[:500],
+        }},
+    )
+    await db.admin_logs.insert_one({
+        "admin_id": admin["_id"],
+        "admin_email": admin["email"],
+        "action": "resolve_chat_report",
+        "target_player_id": report.get("target_player_id", ""),
+        "details": {"report_id": report_id, "status": body.status, "note": body.note[:500]},
+        "ts": now,
+    })
+    return {"ok": True, "status": body.status}
+
+
 @router.get("/server-stats")
 async def get_server_stats(admin: dict = Depends(require_staff)):
     """Estatísticas avançadas do servidor."""
@@ -526,7 +619,7 @@ async def get_server_stats(admin: dict = Depends(require_staff)):
         }},
         {"$sort": {"_id": 1}},
     ]
-    levels_dist = await db.players.aggregate(levels_pipeline).to_list(10)
+    levels_dist = await db.players.aggregate(levels_pipeline).to_list(100)
 
     return {
         "server_time": now.isoformat(),

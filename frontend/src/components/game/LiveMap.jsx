@@ -1294,14 +1294,18 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
 // tem sempre o centro-fundo livre (z-40 garante topo da pilha). Mostra o tipo
 // de propriedade, o estado do ponto escolhido e botões grandes e clicáveis.
 export const PlacementControls = () => {
-  const { placement, confirmPlacement, cancelPlacement, catalog } = useGame();
+  const { state, placement, confirmPlacement, cancelPlacement, catalog } = useGame();
   if (!placement) return null;
   const propertyType = catalog?.property_types?.[placement.typeKey];
   const typeName = propertyType?.name || "Propriedade";
   const invalid = placement.point && !placement.checking && placement.valid === false;
-  const market = placement.point && placement.valid && propertyType?.price
+  const rawMarket = placement.point && placement.valid && propertyType?.price
     ? propertyMarketPrice(propertyType.price, placement.point.lat, placement.point.lng)
     : null;
+  const starterDiscount = placement.typeKey === "esconderijo" && (state?.properties || []).length === 0;
+  const market = rawMarket && starterDiscount
+    ? { ...rawMarket, price: Math.min(rawMarket.price, propertyType.price) }
+    : rawMarket;
   return (
     <div
       data-testid="placement-controls"
@@ -1328,7 +1332,9 @@ export const PlacementControls = () => {
         </p>
         {market && (
           <p className="mt-1 font-mono text-[10px] text-zinc-500">
-            Base {propertyType.price.toLocaleString("pt-PT")} € × índice regional {market.multiplier.toFixed(2)}
+            {starterDiscount
+              ? <>Preço inicial protegido · máximo {propertyType.price.toLocaleString("pt-PT")} €</>
+              : <>Base {propertyType.price.toLocaleString("pt-PT")} € × índice regional {market.multiplier.toFixed(2)}</>}
           </p>
         )}
         <div className="mt-2 flex items-center gap-2">

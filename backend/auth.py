@@ -88,10 +88,6 @@ def terms_acceptance_record(ip: str) -> dict:
         "privacy_version": privacy.get("version", "1.0"),
         "ip": ip,
     }
-# Única conta autorizada a auto-promover-se a administrador pelo botão do
-# frontend — qualquer outra conta recebe 403 ao chamar /claim-admin.
-SELF_CLAIM_ADMIN_EMAIL = "geral@lusorae.pt"
-
 # Sistema de funções (roles) da plataforma:
 #   player    — jogador normal, sem acesso a ferramentas de gestão
 #   moderator — acesso de LEITURA ao painel de administração (dashboard,
@@ -103,7 +99,7 @@ STAFF_ROLES = ("moderator", "admin")
 
 def root_admin_email() -> str:
     """Conta raiz criada pelo seed — protegida contra despromoção/banimento."""
-    return os.environ.get("ADMIN_EMAIL", "admin@lusorae.com")
+    return os.environ.get("ADMIN_EMAIL", "").strip().lower()
 
 
 def hash_password(password: str) -> str:
@@ -118,14 +114,14 @@ def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
 
-def create_access_token(user_id: str, email: str) -> str:
-    payload = {"sub": user_id, "email": email, "type": "access",
+def create_access_token(user_id: str, email: str, token_version: int = 0) -> str:
+    payload = {"sub": user_id, "email": email, "type": "access", "ver": int(token_version or 0),
                "exp": datetime.now(timezone.utc) + timedelta(minutes=60)}
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str) -> str:
-    payload = {"sub": user_id, "type": "refresh",
+def create_refresh_token(user_id: str, token_version: int = 0) -> str:
+    payload = {"sub": user_id, "type": "refresh", "ver": int(token_version or 0),
                "exp": datetime.now(timezone.utc) + timedelta(days=7)}
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
@@ -154,6 +150,8 @@ async def get_current_user(request: Request) -> dict:
         # sem isto, um banido manteria acesso até o refresh token expirar (7 dias).
         if user.get("banned"):
             raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'sem motivo indicado')}")
+        if int(payload.get("ver", 0) or 0) != int(user.get("token_version", 0) or 0):
+            raise HTTPException(status_code=401, detail="Sessão revogada")
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
@@ -406,8 +404,9 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
         await create_player_for_user(user_id, org_name)
         user = await db.users.find_one({"_id": result.inserted_id})
 
-    access = create_access_token(user_id, email)
-    refresh_tok = create_refresh_token(user_id)
+    token_version = int(user.get("token_version", 0) or 0)
+    access = create_access_token(user_id, email, token_version)
+    refresh_tok = create_refresh_token(user_id, token_version)
     set_auth_cookies(response, access, refresh_tok)
     return {**user_public(user), "access_token": access, "refresh_token": refresh_tok}
 
@@ -469,8 +468,9 @@ async def login(body: LoginInput, request: Request, response: Response):
     if not player:
         await create_player_for_user(user_id, user.get("name", "Organização Recuperada"))
 
-    access = create_access_token(user_id, email)
-    refresh_tok = create_refresh_token(user_id)
+    token_version = int(user.get("token_version", 0) or 0)
+    access = create_access_token(user_id, email, token_version)
+    refresh_tok = create_refresh_token(user_id, token_version)
     set_auth_cookies(response, access, refresh_tok)
     return {**user_public(user), "access_token": access, "refresh_token": refresh_tok}
 
@@ -487,22 +487,6 @@ async def me(user: dict = Depends(get_current_user)):
     return user_public({**user, "_id": user["_id"]})
 
 
-@router.post("/claim-admin")
-async def claim_admin(user: dict = Depends(get_current_user)):
-    """Auto-promoção a administrador — restrita a uma única conta autorizada."""
-    if user["email"] != SELF_CLAIM_ADMIN_EMAIL:
-        raise HTTPException(status_code=403, detail="Esta conta não tem permissão para se tornar administradora")
-    if user.get("role") == "admin":
-        return {"ok": True, "role": "admin", "message": "Esta conta já é administradora"}
-    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"role": "admin"}})
-    await db.admin_logs.insert_one({
-        "admin_id": user["_id"], "admin_email": user["email"],
-        "action": "self_claim_admin", "target_user_id": user["_id"],
-        "ts": now_utc().isoformat(),
-    })
-    return {"ok": True, "role": "admin", "message": "Acesso de administrador concedido"}
-
-
 @router.post("/change-password")
 async def change_password(body: ChangePasswordInput, user: dict = Depends(get_current_user)):
     validate_password_or_400(body.new_password)
@@ -513,8 +497,11 @@ async def change_password(body: ChangePasswordInput, user: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail="Esta conta usa acesso Google e não tem palavra-passe local")
     if not verify_password(body.current_password, full_user["password_hash"]):
         raise HTTPException(status_code=400, detail="Palavra-passe atual incorreta")
-    await db.users.update_one({"_id": full_user["_id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
-    return {"ok": True}
+    await db.users.update_one(
+        {"_id": full_user["_id"]},
+        {"$set": {"password_hash": hash_password(body.new_password)}, "$inc": {"token_version": 1}},
+    )
+    return {"ok": True, "sessions_revoked": True}
 
 
 @router.post("/delete-account")
@@ -532,10 +519,40 @@ async def delete_account(body: DeleteAccountInput, response: Response, user: dic
     player = await db.players.find_one({"user_id": user["_id"]})
     if player:
         pid = str(player["_id"])
-        for coll in (db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
-                     db.missions, db.events, db.quests, db.candidates, db.transactions):
+        for coll in (
+            db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
+            db.missions, db.events, db.quests, db.candidates, db.transactions,
+            db.city_businesses, db.city_rivals, db.city_season_scores, db.city_chat,
+        ):
             await coll.delete_many({"player_id": pid})
+        await db.city_pvp_challenges.delete_many({
+            "$or": [{"attacker_id": pid}, {"defender_id": pid}],
+        })
+        await db.city_chat_reports.delete_many({
+            "$or": [{"reporter_id": pid}, {"target_player_id": pid}],
+        })
+        alliance = await db.city_alliances.find_one({"member_ids": pid})
+        if alliance:
+            remaining = [member_id for member_id in (alliance.get("member_ids") or []) if member_id != pid]
+            if not remaining:
+                await db.city_alliances.delete_one({"_id": alliance["_id"]})
+            elif alliance.get("leader_id") == pid:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$set": {
+                        "member_ids": remaining,
+                        "leader_id": remaining[0],
+                        "leadership_changed_at": now_utc().isoformat(),
+                    }},
+                )
+            else:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$set": {"member_ids": remaining}},
+                )
         await db.players.delete_one({"_id": player["_id"]})
+    await db.action_receipts.delete_many({"key": {"$regex": f"^{re.escape(user['_id'])}:"}})
+    await db.login_attempts.delete_many({"identifier": {"$regex": f":{re.escape(full_user['email'])}$"}})
 
     await db.users.delete_one({"_id": ObjectId(user["_id"])})
     response.delete_cookie("access_token", path="/")
@@ -559,7 +576,11 @@ async def refresh(request: Request, response: Response):
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="Utilizador não encontrado")
-        access = create_access_token(str(user["_id"]), user["email"])
+        if user.get("banned"):
+            raise HTTPException(status_code=403, detail="Conta banida")
+        if int(payload.get("ver", 0) or 0) != int(user.get("token_version", 0) or 0):
+            raise HTTPException(status_code=401, detail="Sessão revogada")
+        access = create_access_token(str(user["_id"]), user["email"], int(user.get("token_version", 0) or 0))
         response.set_cookie("access_token", access, httponly=True, secure=True, samesite="lax", max_age=3600, path="/")
         return {"ok": True, "access_token": access}
     except jwt.InvalidTokenError:
@@ -567,16 +588,29 @@ async def refresh(request: Request, response: Response):
 
 
 async def seed_admin():
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@lusorae.com")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    """Provisiona admin apenas quando credenciais fortes são fornecidas."""
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    if not admin_email or not admin_password:
+        return
+    if admin_password == "admin123" or len(admin_password) < 12:
+        raise RuntimeError("ADMIN_PASSWORD insegura: usa pelo menos 12 caracteres e remove o valor default antigo")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
         result = await db.users.insert_one({
-            "email": admin_email, "password_hash": hash_password(admin_password),
-            "name": "Sindicato SUBMUNDO", "role": "admin",
-            "auth_provider": "password", "providers": ["password"],
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "name": "Sindicato SUBMUNDO",
+            "role": "admin",
+            "auth_provider": "password",
+            "providers": ["password"],
+            "token_version": 0,
             "created_at": now_utc().isoformat(),
         })
         await create_player_for_user(str(result.inserted_id), "Sindicato SUBMUNDO", with_default_hq=True)
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+    else:
+        update = {"role": "admin"}
+        if not existing.get("password_hash") or not verify_password(admin_password, existing["password_hash"]):
+            update["password_hash"] = hash_password(admin_password)
+            update["token_version"] = int(existing.get("token_version", 0) or 0) + 1
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": update})

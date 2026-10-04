@@ -78,6 +78,7 @@ OBJECTIVE_COMPLEXITY_PER_REQUIREMENT = 0.05  # +5% por requisito
 # O algoritmo garante que nenhuma operação sairá destes limites
 MONEY_REWARD_MIN = 1500        # Operação trivial mínima
 MONEY_REWARD_MAX = 90000     # Operação extrema máxima (aumentado para permitir spread)
+MONEY_REWARD_MAX_LATE_PER_LEVEL = 2500  # teto adicional por nível após o 10
 
 # Multiplicador base por dificuldade
 # Define o "valor" de uma operação de risco 1 ao nível 1
@@ -91,7 +92,8 @@ BASE_REWARD_PER_RISK = {
 
 # Escalamento por nível da organização
 ORG_LEVEL_MULTIPLIER_BASE = 1.0
-ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.12  # +12% por nível; evita inflação exponencial
+ORG_LEVEL_MULTIPLIER_PER_LEVEL = 0.12  # preserva níveis 1-10
+ORG_LEVEL_MULTIPLIER_LATE = 0.018       # crescimento suave do 11 ao 100
 
 # Escalamento por tipo de operação (category)
 # Alguns tipos são intrinsecamente mais valiosos

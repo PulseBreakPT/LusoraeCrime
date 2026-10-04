@@ -45,6 +45,16 @@ class ChatInput(MutationInput):
     message: str = Field(min_length=1, max_length=280)
 
 
+class ChatReportInput(MutationInput):
+    message_id: str
+    reason: str = Field(min_length=3, max_length=160)
+
+
+class ChatBlockInput(MutationInput):
+    player_id: str
+    blocked: bool = True
+
+
 class TogglePvpInput(MutationInput):
     enabled: bool
 
@@ -55,6 +65,10 @@ class AllianceCreateInput(MutationInput):
 
 class AllianceJoinInput(MutationInput):
     code: str = Field(min_length=4, max_length=12)
+
+
+class AllianceMemberInput(MutationInput):
+    player_id: str
 
 
 class PvpChallengeInput(MutationInput):
@@ -114,7 +128,17 @@ async def _change_dirty(player, amount, note, kind):
 @router.get("/state")
 async def get_city_state(user: dict = Depends(get_current_user)):
     player = await get_player(user)
-    return await city_snapshot(db, player)
+    snapshot = await city_snapshot(db, player)
+    blocked = {str(value) for value in (player.get("city_blocked_player_ids") or [])}
+    social = snapshot.get("social") or {}
+    if blocked:
+        social["chat"] = [
+            row for row in (social.get("chat") or [])
+            if str(row.get("player_id") or "") not in blocked
+        ]
+    social["blocked_player_ids"] = sorted(blocked)
+    snapshot["social"] = social
+    return snapshot
 
 
 @router.post("/businesses/buy")
@@ -124,6 +148,9 @@ async def buy_business(body: BusinessBuyInput, user: dict = Depends(get_current_
     cfg = BUSINESS_TYPES.get(body.type_key)
     if not cfg:
         raise HTTPException(status_code=404, detail="Tipo de negócio inexistente")
+    required_level = int(cfg.get("min_level", 1))
+    if int(player.get("level", 1)) < required_level:
+        raise HTTPException(status_code=400, detail=f"Este negócio desbloqueia no nível {required_level}")
     pid = str(player["_id"])
     owned = await db.city_businesses.count_documents({"player_id": pid})
     same = await db.city_businesses.count_documents({"player_id": pid, "type_key": body.type_key})
@@ -356,6 +383,8 @@ async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_us
 @idempotent("city_pvp_toggle")
 async def toggle_pvp(body: TogglePvpInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
+    if body.enabled and int(player.get("level", 1)) < 15:
+        raise HTTPException(status_code=400, detail="PvP desbloqueia no nível 15")
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"pvp_opt_in": bool(body.enabled)}})
     return {"ok": True, "enabled": bool(body.enabled)}
 
@@ -381,6 +410,60 @@ async def post_chat(body: ChatInput, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.post("/social/chat/report")
+@idempotent("city_chat_report")
+async def report_chat(body: ChatReportInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    reporter_id = str(player["_id"])
+    message = await db.city_chat.find_one({"_id": _oid(body.message_id, "Mensagem")})
+    if not message:
+        raise HTTPException(status_code=404, detail="Mensagem não encontrada")
+    target_id = str(message.get("player_id") or "")
+    if target_id == reporter_id:
+        raise HTTPException(status_code=400, detail="Não podes denunciar a tua própria mensagem")
+    existing = await db.city_chat_reports.find_one({
+        "reporter_id": reporter_id,
+        "message_id": str(message["_id"]),
+        "status": {"$in": ["open", "reviewing"]},
+    })
+    if existing:
+        raise HTTPException(status_code=409, detail="Esta mensagem já foi denunciada por ti")
+    await db.city_chat_reports.insert_one({
+        "reporter_id": reporter_id,
+        "target_player_id": target_id,
+        "message_id": str(message["_id"]),
+        "message_snapshot": str(message.get("message") or "")[:280],
+        "reason": body.reason.strip(),
+        "status": "open",
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}
+
+
+@router.post("/social/chat/block")
+@idempotent("city_chat_block")
+async def block_chat_player(body: ChatBlockInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    target_id = str(body.player_id or "").strip()
+    if target_id == pid:
+        raise HTTPException(status_code=400, detail="Não podes bloquear a tua própria organização")
+    target = await db.players.find_one({"_id": _oid(target_id, "Jogador")})
+    if not target:
+        raise HTTPException(status_code=404, detail="Organização não encontrada")
+    if body.blocked:
+        await db.players.update_one(
+            {"_id": player["_id"]},
+            {"$addToSet": {"city_blocked_player_ids": target_id}},
+        )
+    else:
+        await db.players.update_one(
+            {"_id": player["_id"]},
+            {"$pull": {"city_blocked_player_ids": target_id}},
+        )
+    return {"ok": True, "player_id": target_id, "blocked": bool(body.blocked)}
+
+
 def _alliance_code():
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     return "".join(secrets.choice(alphabet) for _ in range(6))
@@ -396,11 +479,13 @@ async def create_alliance(body: AllianceCreateInput, user: dict = Depends(get_cu
     code = _alliance_code()
     while await db.city_alliances.find_one({"code": code}):
         code = _alliance_code()
+    season = season_info()
     doc = {
         "name": body.name.strip(),
         "code": code,
         "leader_id": pid,
         "member_ids": [pid],
+        "season_id": season["id"],
         "season_points": 0,
         "created_at": now_utc().isoformat(),
     }
@@ -442,28 +527,94 @@ async def leave_alliance(body: MutationInput, user: dict = Depends(get_current_u
     return {"ok": True}
 
 
+@router.post("/social/alliance/transfer")
+@idempotent("city_alliance_transfer")
+async def transfer_alliance_leadership(body: AllianceMemberInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    target_id = str(body.player_id or "").strip()
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    if not alliance:
+        raise HTTPException(status_code=404, detail="Não pertences a uma aliança")
+    if alliance.get("leader_id") != pid:
+        raise HTTPException(status_code=403, detail="Só o líder pode transferir a liderança")
+    if target_id == pid:
+        raise HTTPException(status_code=400, detail="Já és o líder da aliança")
+    if target_id not in (alliance.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Esse jogador não pertence à aliança")
+    await db.city_alliances.update_one(
+        {"_id": alliance["_id"], "leader_id": pid},
+        {"$set": {"leader_id": target_id, "leadership_changed_at": now_utc().isoformat()}},
+    )
+    return {"ok": True, "leader_id": target_id}
+
+
+@router.post("/social/alliance/kick")
+@idempotent("city_alliance_kick")
+async def kick_alliance_member(body: AllianceMemberInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    target_id = str(body.player_id or "").strip()
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    if not alliance:
+        raise HTTPException(status_code=404, detail="Não pertences a uma aliança")
+    if alliance.get("leader_id") != pid:
+        raise HTTPException(status_code=403, detail="Só o líder pode expulsar membros")
+    if target_id == pid:
+        raise HTTPException(status_code=400, detail="O líder não se pode expulsar; transfere a liderança primeiro")
+    if target_id not in (alliance.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Esse jogador não pertence à aliança")
+    await db.city_alliances.update_one(
+        {"_id": alliance["_id"], "leader_id": pid},
+        {"$pull": {"member_ids": target_id}, "$set": {"updated_at": now_utc().isoformat()}},
+    )
+    return {"ok": True, "removed_player_id": target_id}
+
+
 @router.post("/social/pvp/challenge")
 @idempotent("city_pvp_challenge")
 async def challenge_pvp(body: PvpChallengeInput, user: dict = Depends(get_current_user)):
     attacker = await get_player(user)
     if not attacker.get("pvp_opt_in"):
         raise HTTPException(status_code=400, detail="Ativa primeiro o PvP")
+    if int(attacker.get("level", 1)) < 15:
+        raise HTTPException(status_code=400, detail="PvP desbloqueia no nível 15")
     defender = await db.players.find_one({"_id": _oid(body.defender_player_id, "Jogador"), "pvp_opt_in": True})
-    if not defender or defender["_id"] == attacker["_id"]:
+    if not defender or defender["_id"] == attacker["_id"] or int(defender.get("level", 1)) < 15:
         raise HTTPException(status_code=404, detail="Rival PvP indisponível")
-    pending = await db.city_pvp_challenges.find_one({
-        "attacker_id": str(attacker["_id"]), "defender_id": str(defender["_id"]), "status": "pending"
-    })
+    now = now_utc()
+    attacker_id, defender_id = str(attacker["_id"]), str(defender["_id"])
+    pair_query = {"$or": [
+        {"attacker_id": attacker_id, "defender_id": defender_id},
+        {"attacker_id": defender_id, "defender_id": attacker_id},
+    ]}
+    await db.city_pvp_challenges.update_many(
+        {**pair_query, "status": "pending", "expires_at": {"$lte": now.isoformat()}},
+        {"$set": {"status": "expired", "resolved_at": now.isoformat()}},
+    )
+    pending = await db.city_pvp_challenges.find_one({**pair_query, "status": "pending", "expires_at": {"$gt": now.isoformat()}})
     if pending:
-        raise HTTPException(status_code=409, detail="Já existe um desafio pendente")
+        raise HTTPException(status_code=409, detail="Já existe um desafio pendente entre estas organizações")
+    recent = await db.city_pvp_challenges.count_documents({
+        **pair_query, "status": "resolved",
+        "resolved_at": {"$gte": (now - timedelta(hours=24)).isoformat()},
+    })
+    if recent >= 3:
+        raise HTTPException(status_code=429, detail="Limite diário atingido contra este rival")
+    last = await db.city_pvp_challenges.find_one({
+        **pair_query, "status": "resolved",
+        "resolved_at": {"$gte": (now - timedelta(hours=6)).isoformat()},
+    })
+    if last:
+        raise HTTPException(status_code=429, detail="Este confronto está em cooldown durante 6 horas")
     doc = {
         "attacker_id": str(attacker["_id"]),
         "attacker_name": attacker.get("org_name", "Organização"),
         "defender_id": str(defender["_id"]),
         "defender_name": defender.get("org_name", "Organização"),
         "status": "pending",
-        "created_at": now_utc().isoformat(),
-        "expires_at": (now_utc() + timedelta(hours=12)).isoformat(),
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=12)).isoformat(),
     }
     result = await db.city_pvp_challenges.insert_one(doc)
     return {"ok": True, "challenge_id": str(result.inserted_id)}
@@ -496,16 +647,48 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
     winner = attacker if a_score >= d_score else defender
     loser = defender if winner["_id"] == attacker["_id"] else attacker
     season = season_info()
+    now = now_utc()
+    pair_query = {"$or": [
+        {"attacker_id": str(attacker["_id"]), "defender_id": str(defender["_id"])},
+        {"attacker_id": str(defender["_id"]), "defender_id": str(attacker["_id"])},
+    ]}
+    recent_count = await db.city_pvp_challenges.count_documents({
+        **pair_query, "status": "resolved",
+        "resolved_at": {"$gte": (now - timedelta(days=7)).isoformat()},
+    })
+    farm_mult = [1.0, 0.5, 0.25][recent_count] if recent_count < 3 else 0.10
+    winner_points = max(8, int(round(80 * farm_mult)))
+    loser_points = max(2, int(round(20 * farm_mult)))
     await db.city_season_scores.update_one(
         {"player_id": str(winner["_id"]), "season_id": season["id"]},
-        {"$inc": {"points": 80}, "$set": {"updated_at": now_utc().isoformat()}},
+        {"$inc": {"points": winner_points}, "$set": {"updated_at": now.isoformat()}},
         upsert=True,
     )
     await db.city_season_scores.update_one(
         {"player_id": str(loser["_id"]), "season_id": season["id"]},
-        {"$inc": {"points": 20}, "$set": {"updated_at": now_utc().isoformat()}},
+        {"$inc": {"points": loser_points}, "$set": {"updated_at": now.isoformat()}},
         upsert=True,
     )
+
+    # As alianças têm a mesma época dos jogadores. Ao mudar de época, os
+    # pontos antigos são arquivados implicitamente pelo season_id e a tabela
+    # começa novamente em zero antes de aplicar o resultado atual.
+    for member_id, points in (
+        (str(winner["_id"]), winner_points),
+        (str(loser["_id"]), loser_points),
+    ):
+        alliance = await db.city_alliances.find_one({"member_ids": member_id})
+        if alliance:
+            if alliance.get("season_id") != season["id"]:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$set": {"season_id": season["id"], "season_points": points}},
+                )
+            else:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$inc": {"season_points": points}},
+                )
     consequence = None
     loser_fields = {"boss_stress": min(100, int(loser.get("boss_stress", 0) or 0) + 8)}
     if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:

@@ -1,7 +1,14 @@
 import axios from "axios";
 import { isLocalGuestMode, localGuestRequest } from "../game/localGuestEngine";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const configuredBackend = String(process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+const legacyPreviewFallback = "https://lusora-patrols.preview.emergentagent.com";
+const onGithubPages = typeof window !== "undefined" && window.location.hostname.endsWith("github.io");
+// O Pages público nunca deve ligar silenciosamente ao backend de preview legado.
+// Sem backend público explícito, a chamada remota cai em /api e o utilizador pode
+// entrar no motor local/convidado sem misturar dados de ambientes.
+const safeBackend = onGithubPages && configuredBackend === legacyPreviewFallback ? "" : configuredBackend;
+const API = `${safeBackend}/api`;
 const TOKEN_KEY = "submundo_access_token";
 const REFRESH_KEY = "submundo_refresh_token";
 

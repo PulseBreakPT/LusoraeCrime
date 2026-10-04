@@ -8,7 +8,7 @@ import { Input } from "../components/ui/input";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, RotateCcw, Zap, ArrowLeft, Eye, Shield, Crown, User as UserIcon } from "lucide-react";
+import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, RotateCcw, Zap, ArrowLeft, Eye, Shield, Crown, User as UserIcon, Flag } from "lucide-react";
 import { toast } from "sonner";
 
 const ROLE_META = {
@@ -37,6 +37,7 @@ export default function AdminPanel() {
   const [userDetails, setUserDetails] = useState(null);
   const [logs, setLogs] = useState([]);
   const [serverStats, setServerStats] = useState(null);
+  const [chatReports, setChatReports] = useState([]);
   const [searchEmail, setSearchEmail] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -98,6 +99,25 @@ export default function AdminPanel() {
       setLogs(data.logs);
     } catch (e) {
       toast.error("Erro ao carregar logs");
+    }
+  };
+
+  const fetchChatReports = async () => {
+    try {
+      const { data } = await api.get("/admin/chat-reports?status=open&limit=100");
+      setChatReports(data.reports || []);
+    } catch (e) {
+      toast.error("Erro ao carregar denúncias do chat");
+    }
+  };
+
+  const resolveChatReport = async (reportId, status) => {
+    try {
+      await api.post(`/admin/chat-reports/${reportId}/resolve`, { status, note: "" });
+      toast.success(status === "resolved" ? "Denúncia resolvida" : "Denúncia arquivada");
+      fetchChatReports();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro ao resolver denúncia");
     }
   };
 
@@ -214,7 +234,7 @@ export default function AdminPanel() {
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 gap-1 border border-white/10 bg-zinc-900/50 sm:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3 gap-1 border border-white/10 bg-zinc-900/50 sm:grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <TrendingUp size={16} />
               <span className="hidden sm:inline">Dashboard</span>
@@ -234,6 +254,10 @@ export default function AdminPanel() {
             <TabsTrigger value="stats" className="flex items-center gap-2">
               <TrendingUp size={16} />
               <span className="hidden sm:inline">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="moderation" className="flex items-center gap-2" onClick={fetchChatReports}>
+              <Flag size={16} />
+              <span className="hidden sm:inline">Moderação</span>
             </TabsTrigger>
           </TabsList>
 
@@ -560,6 +584,48 @@ export default function AdminPanel() {
                   ))
                 ) : (
                   <p className="text-zinc-500 text-center py-8">Nenhum log disponível</p>
+                )}
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Moderação do chat */}
+          <TabsContent value="moderation" className="space-y-6 mt-6">
+            <Card className="border-white/10 bg-zinc-900/50 p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Denúncias do Chat</h3>
+                  <p className="text-xs text-zinc-500">Fila aberta da Cidade Viva</p>
+                </div>
+                <Button onClick={fetchChatReports} variant="outline" size="sm">Atualizar</Button>
+              </div>
+              <div className="space-y-3">
+                {chatReports.length ? chatReports.map((report) => (
+                  <div key={report.id} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-zinc-200">{report.message_snapshot || "Mensagem indisponível"}</p>
+                        <p className="mt-1 font-mono text-[10px] text-zinc-500">
+                          Motivo: {report.reason} · {report.created_at ? new Date(report.created_at).toLocaleString("pt-PT") : "—"}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-300">
+                        {report.status}
+                      </Badge>
+                    </div>
+                    {isAdmin && (
+                      <div className="mt-3 flex gap-2">
+                        <Button size="sm" variant="destructive" onClick={() => resolveChatReport(report.id, "resolved")}>
+                          Resolver
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => resolveChatReport(report.id, "dismissed")}>
+                          Arquivar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )) : (
+                  <p className="py-8 text-center text-sm text-zinc-500">Sem denúncias abertas.</p>
                 )}
               </div>
             </Card>

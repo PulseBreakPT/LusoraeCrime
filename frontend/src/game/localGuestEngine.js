@@ -84,7 +84,7 @@ const parseBody = (payload) => {
   return payload;
 };
 
-const rankThresholds = [0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000];
+const rankThresholds = LOCAL_CATALOG.level_thresholds || [0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000];
 const levelForRespect = (respect) => {
   let level = 1;
   rankThresholds.forEach((threshold, index) => {
@@ -228,14 +228,20 @@ const geoDistanceKm = (a, b) => {
 const missionRewardForOpportunity = (save, risk, category, distKm, rare, seedIndex = 0) => {
   const meta = LOCAL_CATALOG.economy_meta?.mission_rewards || {};
   const base = Number(meta.base_by_risk?.[risk] || 2500);
-  const levelMult = 1 + Math.max(0, (save.player.level || 1) - 1) * (meta.org_level_per_level || 0.12);
+  const orgLevel = Math.max(1, Math.min(100, Number(save.player.level || 1)));
+  const earlyLevel = Math.min(10, orgLevel);
+  const levelMult = 1
+    + Math.max(0, earlyLevel - 1) * (meta.org_level_per_level || 0.12)
+    + Math.max(0, orgLevel - 10) * (meta.org_level_late || 0.018);
   const categoryMult = Number(meta.category_mult?.[category] || 1);
   const distanceMult = 1 + Math.min(0.25, Math.max(0, Number(distKm) || 0) * 0.02);
   const rareMult = rare ? Number(meta.rare_mult || 1.6) : 1;
   const variation = 0.92 + ((seedIndex * 7) % 17) / 100;
   const raw = base * levelMult * categoryMult * distanceMult * rareMult * variation;
   const rounded = Math.round(raw / 100) * 100;
-  return clamp(rounded, Number(meta.min || 1500), Number(meta.max || 90000));
+  const lateLevels = Math.max(0, Math.min(100, orgLevel) - 10);
+  const rewardCap = Number(meta.max || 90000) + lateLevels * Number(meta.max_late_per_level || 2500);
+  return clamp(rounded, Number(meta.min || 1500), rewardCap);
 };
 
 const makeOpportunities = (save, count = 5) => {
@@ -873,13 +879,16 @@ const calcCaps = (save) => {
   return {
     employees:{used:save.employees.length,max:4 + hideouts + (save.player.extra_employee_slots || 0)},
     vehicles:{used:save.vehicles.length,max:2 + garages + (save.player.extra_vehicle_slots || 0)},
-    teams:{used:save.teams.length,max:Math.max(1,Math.min(6,1 + Math.floor(save.player.level / 2)))},
-    dirty_money:{used:money(save.player.dirty_money),max:50000 + save.player.level * 20000},
+    teams:{used:save.teams.length,max:save.player.level<=10
+      ? Math.max(1,Math.min(6,1 + Math.floor(save.player.level / 2)))
+      : Math.min(15,6 + Math.floor((save.player.level-10)/10))},
+    dirty_money:{used:money(save.player.dirty_money),max:80000 + Math.max(0,Math.min(save.player.level,10)-1)*8000 + Math.max(0,save.player.level-10)*12000},
   };
 };
 
 const updateLevel = (save) => {
   save.player.level = levelForRespect(save.player.respect);
+  if(save.player.level>100) save.player.level=100;
 };
 
 const rollFrom = (text) => {
@@ -1090,28 +1099,44 @@ const tick = (save) => {
 };
 
 const MM_TARGETS=[
-  {key:"auction",name:"Leilão da Meia-Noite",description:"Obras raras mudam de mãos numa rede privada.",base_reward:90000,base_success:0.68,heat:18,unlock_rank:1,
+  {key:"auction",name:"Leilão da Meia-Noite",description:"Obras raras mudam de mãos numa rede privada.",base_reward:90000,base_success:.68,heat:18,unlock_rank:1,min_org_level:10,
    preps:[{key:"routes",name:"Rotas de saída",cost:1800,duration_s:12,required:true},{key:"inside",name:"Ajuda interna",cost:2600,duration_s:14,required:true},{key:"signals",name:"Silenciar alarmes",cost:2200,duration_s:13,required:false}]},
-  {key:"estuary",name:"Reserva do Estuário",description:"Carga financeira protegida em trânsito.",base_reward:175000,base_success:0.58,heat:26,unlock_rank:2,
+  {key:"estuary",name:"Reserva do Estuário",description:"Carga financeira protegida em trânsito.",base_reward:175000,base_success:.58,heat:26,unlock_rank:2,min_org_level:25,
    preps:[{key:"tracker",name:"Rastrear comboio",cost:3200,duration_s:15,required:true},{key:"vehicle",name:"Veículo de apoio",cost:4500,duration_s:17,required:true},{key:"inside",name:"Credenciais",cost:3000,duration_s:14,required:false}]},
-  {key:"sovereign",name:"Nó Soberano",description:"Infraestrutura cifrada com segurança máxima.",base_reward:310000,base_success:0.48,heat:34,unlock_rank:4,
+  {key:"sovereign",name:"Nó Soberano",description:"Infraestrutura cifrada com segurança máxima.",base_reward:310000,base_success:.48,heat:34,unlock_rank:3,min_org_level:40,
    preps:[{key:"keys",name:"Chaves de acesso",cost:6500,duration_s:18,required:true},{key:"network",name:"Mapa de rede",cost:5200,duration_s:18,required:true},{key:"escape",name:"Janela de fuga",cost:4800,duration_s:16,required:true}]},
+  {key:"freeport",name:"Cofre do Freeport",description:"Ativos de alto valor circulam entre armazéns seguros.",base_reward:470000,base_success:.42,heat:38,unlock_rank:4,min_org_level:55,
+   preps:[{key:"rotation",name:"Rotação de Segurança",cost:18000,duration_s:20,required:true},{key:"registry",name:"Registo Fantasma",cost:24000,duration_s:22,required:true},{key:"exit",name:"Janela de Saída",cost:28000,duration_s:24,required:true}]},
+  {key:"consortium",name:"Bolsa do Consórcio",description:"Uma câmara privada liquida operações de várias redes.",base_reward:650000,base_success:.38,heat:44,unlock_rank:6,min_org_level:70,
+   preps:[{key:"counterparty",name:"Contraparte",cost:30000,duration_s:25,required:true},{key:"ledger",name:"Livro Paralelo",cost:36000,duration_s:27,required:true},{key:"mesh",name:"Malha de Rotas",cost:42000,duration_s:29,required:true}]},
+  {key:"archive",name:"Arquivo Soberano",description:"Documentos e chaves críticas circulam numa infraestrutura redundante.",base_reward:900000,base_success:.35,heat:50,unlock_rank:8,min_org_level:85,
+   preps:[{key:"identity",name:"Malha de Identidades",cost:45000,duration_s:30,required:true},{key:"coldroute",name:"Rota Fria",cost:52000,duration_s:32,required:true},{key:"relay",name:"Relé de Saída",cost:60000,duration_s:34,required:true}]},
+  {key:"submundo",name:"Operação SUBMUNDO",description:"O golpe final exige nível 100 e domínio máximo do Mastermind.",base_reward:1250000,base_success:.32,heat:58,unlock_rank:10,min_org_level:100,
+   preps:[{key:"national",name:"Mapa Nacional",cost:70000,duration_s:35,required:true},{key:"ghost",name:"Cadeia Fantasma",cost:85000,duration_s:38,required:true},{key:"final",name:"Janela Final",cost:100000,duration_s:42,required:true}]},
 ];
 const MM_APPROACHES=[
-  {key:"silent",name:"Silencioso",unlock_rank:1},{key:"infiltration",name:"Infiltração",unlock_rank:2},{key:"shock",name:"Choque",unlock_rank:3},
+  {key:"silent",name:"Silencioso",unlock_rank:1},{key:"infiltration",name:"Infiltração",unlock_rank:2},
+  {key:"shock",name:"Choque",unlock_rank:3},{key:"ghost",name:"Fantasma",unlock_rank:5},
+  {key:"distributed",name:"Distribuído",unlock_rank:8},
 ];
 const MM_FENCES=[
-  {key:"quick",name:"Liquidação Rápida",unlock_rank:1},{key:"discreet",name:"Rede Discreta",unlock_rank:2},{key:"exclusive",name:"Comprador Exclusivo",unlock_rank:3},
+  {key:"quick",name:"Liquidação Rápida",unlock_rank:1},{key:"discreet",name:"Rede Discreta",unlock_rank:2},
+  {key:"exclusive",name:"Comprador Exclusivo",unlock_rank:3},{key:"consortium",name:"Consórcio Privado",unlock_rank:6},
+  {key:"sovereign",name:"Mesa Soberana",unlock_rank:9},
 ];
 const MM_GOODS=[
   {key:"chips",name:"Microchips Selados",description:"Componentes compactos com procura constante.",unlock_rank:1,space:1,base_price:900},
-  {key:"art",name:"Caixas de Arte",description:"Peças valiosas, volumosas e difíceis de liquidar.",unlock_rank:2,space:3,base_price:2600},
-  {key:"medical",name:"Malas Clínicas",description:"Material médico escasso com mercado estável.",unlock_rank:2,space:2,base_price:1700},
-  {key:"cipher",name:"Chaves Cifradas",description:"Credenciais digitais raras e altamente voláteis.",unlock_rank:3,space:1,base_price:4200},
+  {key:"art",name:"Caixas de Arte",description:"Peças valiosas e volumosas.",unlock_rank:2,space:3,base_price:2600},
+  {key:"medical",name:"Malas Clínicas",description:"Material médico escasso.",unlock_rank:2,space:2,base_price:1700},
+  {key:"cipher",name:"Chaves Cifradas",description:"Credenciais digitais raras.",unlock_rank:3,space:1,base_price:4200},
+  {key:"metals",name:"Metais Raros",description:"Carga compacta de elevado valor.",unlock_rank:4,space:2,base_price:11800},
+  {key:"prototype",name:"Módulos Protótipo",description:"Tecnologia de circulação restrita.",unlock_rank:6,space:3,base_price:18500},
+  {key:"bonds",name:"Títulos Selados",description:"Ativos de elevada liquidez.",unlock_rank:8,space:4,base_price:32000},
+  {key:"keys",name:"Chaves Soberanas",description:"Mercadoria de endgame.",unlock_rank:10,space:5,base_price:52000},
 ];
 
 const mastermindRank=(xp)=>{
-  const ranks=[[0,"Planeador"],[150,"Coordenador"],[450,"Arquiteto"],[900,"Mastermind"],[1600,"Lenda"]];
+  const ranks=[[0,"Planeador"],[180,"Coordenador"],[520,"Arquiteto"],[1100,"Mastermind"],[2100,"Estratega"],[3600,"Diretor"],[5800,"Soberano"],[8800,"Arquiteto Nacional"],[12600,"Lenda"],[17500,"SUBMUNDO"]];
   let idx=0;ranks.forEach((r,i)=>{if(xp>=r[0])idx=i;});
   const cur=ranks[idx],next=ranks[idx+1];
   return {level:idx+1,name:cur[1],xp,next_name:next?.[1]||null,next_xp:next?.[0]||null,
@@ -1142,29 +1167,26 @@ const mastermindSnapshot=(save)=>{
     const remaining=Math.max(0,(Date.parse(active.finale.finish_at)-Date.now())/1000);
     active.finale.remaining_s=remaining;active.finale.progress_pct=clamp((1-remaining/total)*100,0,100);
   }
-  const used=MM_GOODS.reduce((s,g)=>s+(m.market.holdings[g.key]||0)*g.space,0);
+  const used=MM_GOODS.reduce((sum,g)=>sum+(m.market.holdings[g.key]||0)*g.space,0);
   const capacity=30+(save.player.hq.level||1)*10+save.properties.length*6;
   return {
     server_time:nowIso(),rank,
-    targets:MM_TARGETS.map(t=>({...clone(t),unlocked:rank.level>=t.unlock_rank,intel_cost:1500*t.unlock_rank,
-      cooldown_remaining_s:0,intel:m.intel[t.key]||null,intel_active:!!m.intel[t.key]})),
+    targets:MM_TARGETS.map(t=>({...clone(t),
+      unlocked:rank.level>=t.unlock_rank&&save.player.level>=t.min_org_level,
+      rank_unlocked:rank.level>=t.unlock_rank,org_unlocked:save.player.level>=t.min_org_level,
+      intel_cost:1500*t.unlock_rank,cooldown_remaining_s:0,intel:m.intel[t.key]||null,intel_active:!!m.intel[t.key]})),
     approaches:MM_APPROACHES.map(x=>({...x,unlocked:rank.level>=x.unlock_rank})),
     fences:MM_FENCES.map(x=>({...x,unlocked:rank.level>=x.unlock_rank})),
     active_heist:active,
     market:{goods:MM_GOODS.map((g,i)=>{
-      const wave=((Math.floor(Date.now()/900000)+i*3)%9)-4;
-      const changePct=wave*3;
-      return {...g,price:Math.round(g.base_price*(1+changePct/100)),
-        change_pct:changePct,trend:changePct>0?"up":changePct<0?"down":"flat",
-        owned:m.market.holdings[g.key]||0,unlocked:rank.level>=g.unlock_rank};
-    }),
-      capacity,used,raid_risk_pct:Math.round(3+save.player.heat*.2+(m.bounty||0)*.1),raid_log:m.market.raid_log||[]},
-    bounty:{value:m.bounty||0,tier:Math.min(4,Math.floor((m.bounty||0)/25)),name:(m.bounty||0)>=75?"Caçada total":(m.bounty||0)>=50?"Esquadrão rival":(m.bounty||0)>=25?"Rastreio ativo":(m.bounty||0)>0?"Rumores":"Sem contrato",
-      progress_pct:m.bounty||0,hunter_remaining_s:0,payoff_cost:Math.max(2000,(m.bounty||0)*180)},
-    caches:{districts:(save.player.districts||[]).slice(0,8).map(d=>({...d,signature:`SIG-${d.key.toUpperCase()}`,collected:m.caches_collected.includes(d.key),remaining_s:0})),
-      collected:m.caches_collected.length,total:Math.min(8,(save.player.districts||[]).length),completion_claimed:!!m.cache_completion_claimed},
-    history:m.history||[],
-    balances:{clean_money:save.player.clean_money,dirty_money:save.player.dirty_money,heat:save.player.heat},
+      const wave=((Math.floor(Date.now()/900000)+i*3)%9)-4,changePct=wave*3;
+      return {...g,price:Math.round(g.base_price*(1+changePct/100)),change_pct:changePct,
+        trend:changePct>0?"up":changePct<0?"down":"flat",owned:m.market.holdings[g.key]||0,
+        unlocked:rank.level>=g.unlock_rank};
+    }),capacity,used,raid_risk_pct:Math.round(3+save.player.heat*.2+(m.bounty||0)*.1),raid_log:m.market.raid_log||[]},
+    bounty:{value:m.bounty||0,tier:Math.min(4,Math.floor((m.bounty||0)/25)),name:(m.bounty||0)>=75?"Caçada total":(m.bounty||0)>=50?"Esquadrão rival":(m.bounty||0)>=25?"Rastreio ativo":(m.bounty||0)>0?"Rumores":"Sem contrato",progress_pct:m.bounty||0,hunter_remaining_s:0,payoff_cost:Math.max(2000,(m.bounty||0)*180)},
+    caches:{districts:(save.player.districts||[]).slice(0,8).map(d=>({...d,signature:`SIG-${d.key.toUpperCase()}`,collected:m.caches_collected.includes(d.key),remaining_s:0})),collected:m.caches_collected.length,total:Math.min(8,(save.player.districts||[]).length),completion_claimed:!!m.cache_completion_claimed},
+    history:m.history||[],balances:{clean_money:save.player.clean_money,dirty_money:save.player.dirty_money,heat:save.player.heat},
   };
 };
 
@@ -1594,7 +1616,9 @@ const mutateGame=(save,path,payload)=>{
       const cfg=LOCAL_CATALOG.property_types[p.type_key];if(!cfg)fail(400,"Tipo inválido");
       if(save.player.level<cfg.min_level)fail(400,"Nível insuficiente");
       const market=propertyMarketPrice(cfg.price,Number(p.lat),Number(p.lng));
-      chargeClean(save,market.price,`Compra de propriedade — ${market.zone}`);
+      const starterDiscount=p.type_key==="esconderijo"&&save.properties.length===0;
+      const finalPrice=starterDiscount?Math.min(market.price,Number(cfg.price)):market.price;
+      chargeClean(save,finalPrice,`Compra de propriedade — ${market.zone}`);
       const nearest=(save.player.districts||[]).slice().sort((a,b)=>{
         const da=(a.lat-Number(p.lat))**2+(a.lng-Number(p.lng))**2;
         const db=(b.lat-Number(p.lat))**2+(b.lng-Number(p.lng))**2;
@@ -1602,12 +1626,12 @@ const mutateGame=(save,path,payload)=>{
       })[0];
       const np={
         id:uid("prop"),type_key:p.type_key,name:cfg.name,district:nearest?.name||"Zona operacional",
-        lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,purchase_price:market.price,
+        lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,purchase_price:finalPrice,
         market_zone:market.zone,market_multiplier:market.multiplier,condition:100,upgrading_until:null
       };
       save.properties.push(np);
-      addEvent(save,"property",`${cfg.name} comprado por ${market.price.toLocaleString("pt-PT")} € (${market.zone} ×${market.multiplier.toFixed(2)}).`);
-      return {ok:true,property_id:np.id,price:market.price,market_zone:market.zone,market_multiplier:market.multiplier};
+      addEvent(save,"property",`${cfg.name} comprado por ${finalPrice.toLocaleString("pt-PT")} € (${market.zone} ×${market.multiplier.toFixed(2)}).`);
+      return {ok:true,property_id:np.id,price:finalPrice,market_zone:market.zone,market_multiplier:market.multiplier,starter_discount:starterDiscount};
     }
     if(path==="properties/sell"){const basis=Number(pr.purchase_price||pr.price);const value=Math.round(basis*.7*pr.level);save.player.clean_money+=value;save.properties=save.properties.filter(x=>x.id!==pr.id);return {ok:true,value};}
     if(path==="properties/upgrade"){if(pr.level>=LOCAL_CATALOG.property_max_level)fail(400,"Nível máximo");const basis=Number(pr.purchase_price||pr.price);const cost=Math.round(basis*.6*(pr.level+1));chargeClean(save,cost,"Melhoria de propriedade");pr.upgrading_until=new Date(Date.now()+15000).toISOString();return {ok:true,cost};}
@@ -1850,7 +1874,8 @@ const mutateGame=(save,path,payload)=>{
 
     const tiers=org.territory_tiers||{};
     if(path==="org/territories/claim"){
-      if(save.player.level<5)fail(400,"Requer nível 5");
+      const unlock=Number(tiers[1]?.unlock_level||20);
+      if(save.player.level<unlock)fail(400,`Requer nível ${unlock}`);
       if(save.player.territories[p.district])fail(400,"Território já controlado");
       const cost=Number(tiers[1]?.cost||55000); chargeClean(save,cost,`Expansão territorial — ${p.district}`);
       save.player.territories[p.district]={tier:1,defense:55,pressure:10,claimed_at:nowIso(),rival:guestRivalProfile(p.district)}; return {ok:true,cost};
@@ -1858,6 +1883,7 @@ const mutateGame=(save,path,payload)=>{
     if(path==="org/territories/consolidate"){
       const info=save.player.territories[p.district]; if(!info)fail(404,"Território não controlado");
       const next=tiers[Number(info.tier||1)+1]; if(!next)fail(400,"Território no nível máximo");
+      if(save.player.level<Number(next.unlock_level||1))fail(400,`Requer nível ${next.unlock_level}`);
       const cost=Number(next.cost||0); chargeClean(save,cost,`Consolidação territorial — ${p.district}`);
       info.tier=Number(info.tier||1)+1; info.defense=Math.min(100,Number(info.defense||0)+18); info.pressure=Math.max(0,Number(info.pressure||0)-12); return {ok:true,cost};
     }
@@ -1879,7 +1905,7 @@ const mutateGame=(save,path,payload)=>{
     }
   }
 
-  if(path==="hq/upgrade"){const level=save.player.hq?.level||1;const next=LOCAL_CATALOG.hq_level_benefits[level];if(!next)fail(400,"Quartel-General no nível máximo");chargeClean(save,next.upgrade_cost,"Melhoria do QG");save.player.hq.upgrading_until=new Date(Date.now()+20000).toISOString();return {ok:true};}
+  if(path==="hq/upgrade"){const level=save.player.hq?.level||1;const next=LOCAL_CATALOG.hq_level_benefits[level];if(!next)fail(400,"Quartel-General no nível máximo");if(save.player.level<Number(next.min_org_level||1))fail(400,`Requer organização nível ${next.min_org_level}`);chargeClean(save,next.upgrade_cost,"Melhoria do QG");save.player.hq.upgrading_until=new Date(Date.now()+Math.max(20000,Number(next.upgrade_duration_s||0)*1000)).toISOString();return {ok:true};}
   if(path==="hq/priority"){save.player.priorities.active=p.priority||"equilibrio";return {ok:true};}
   if(path==="hq/equip_skin"){save.player.hq_skin_key=p.skin_key||null;return {ok:true};}
   if(path==="police/bribe"){const cost=Math.max(1200,Math.round(save.player.heat*120));chargeClean(save,cost,"Suborno");save.player.heat=Math.max(0,save.player.heat-28);return {ok:true,cost};}
@@ -1926,8 +1952,8 @@ const mutateGame=(save,path,payload)=>{
     return {ok:true,cost:0};
   }
 
-  if(path==="mastermind/heists/intel"){const target=MM_TARGETS.find(x=>x.key===p.target_key);if(!target)fail(404,"Alvo não encontrado");const cost=1500*target.unlock_rank;chargeClean(save,cost,"Dossiê Mastermind");save.mastermind.intel[target.key]={scouted_at:nowIso(),expires_at:new Date(Date.now()+30*60000).toISOString(),recommended_approach:"silent",recommended_name:"Silencioso",reward_min:Math.round(target.base_reward*.72),reward_max:Math.round(target.base_reward*1.34),risk_note:"Rotas sob vigilância"};return {ok:true};}
-  if(path==="mastermind/heists/create"){if(save.mastermind.active_heist)fail(409,"Já existe um grande golpe em preparação");const target=MM_TARGETS.find(x=>x.key===p.target_key);const team=save.teams.find(x=>x.id===p.team_id),vehicle=save.vehicles.find(x=>x.id===p.vehicle_id);if(!target||!team||!vehicle)fail(400,"Configuração incompleta");const approach=MM_APPROACHES.find(x=>x.key===p.approach_key)||MM_APPROACHES[0],fence=MM_FENCES.find(x=>x.key===p.fence_key)||MM_FENCES[0];save.mastermind.active_heist={id:uid("heist"),target_key:target.key,target_name:target.name,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,vehicle_name:vehicle.name,approach_key:approach.key,approach_name:approach.name,fence_key:fence.key,fence_name:fence.name,crew_cut_pct:Number(p.crew_cut_pct||20),phase:"planning",preps:target.preps.map(x=>({...x,status:"available",attempts:0})),current_prep:null,finale:null};return {ok:true};}
+  if(path==="mastermind/heists/intel"){const target=MM_TARGETS.find(x=>x.key===p.target_key);if(!target)fail(404,"Alvo não encontrado");const rank=mastermindRank(save.mastermind.xp||0);if(rank.level<target.unlock_rank)fail(400,"Rank Mastermind insuficiente");if(save.player.level<target.min_org_level)fail(400,`Requer organização nível ${target.min_org_level}`);const cost=1500*target.unlock_rank;chargeClean(save,cost,"Dossiê Mastermind");save.mastermind.intel[target.key]={scouted_at:nowIso(),expires_at:new Date(Date.now()+30*60000).toISOString(),recommended_approach:"silent",recommended_name:"Silencioso",reward_min:Math.round(target.base_reward*.72),reward_max:Math.round(target.base_reward*1.34),risk_note:"Rotas sob vigilância"};return {ok:true};}
+  if(path==="mastermind/heists/create"){if(save.mastermind.active_heist)fail(409,"Já existe um grande golpe em preparação");const target=MM_TARGETS.find(x=>x.key===p.target_key);const team=save.teams.find(x=>x.id===p.team_id),vehicle=save.vehicles.find(x=>x.id===p.vehicle_id);if(!target||!team||!vehicle)fail(400,"Configuração incompleta");const rank=mastermindRank(save.mastermind.xp||0);if(rank.level<target.unlock_rank)fail(400,"Rank Mastermind insuficiente");if(save.player.level<target.min_org_level)fail(400,`Requer organização nível ${target.min_org_level}`);const approach=MM_APPROACHES.find(x=>x.key===p.approach_key)||MM_APPROACHES[0],fence=MM_FENCES.find(x=>x.key===p.fence_key)||MM_FENCES[0];save.mastermind.active_heist={id:uid("heist"),target_key:target.key,target_name:target.name,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,vehicle_name:vehicle.name,approach_key:approach.key,approach_name:approach.name,fence_key:fence.key,fence_name:fence.name,crew_cut_pct:Number(p.crew_cut_pct||20),phase:"planning",preps:target.preps.map(x=>({...x,status:"available",attempts:0})),current_prep:null,finale:null};return {ok:true};}
   if(path==="mastermind/heists/prep/start"){const h=save.mastermind.active_heist;if(!h||h.id!==p.heist_id)fail(404,"Plano não encontrado");if(h.current_prep)fail(409,"Já existe preparação em curso");const prep=h.preps.find(x=>x.key===p.prep_key);if(!prep)fail(404,"Preparação não encontrada");chargeClean(save,prep.cost,"Preparação Mastermind");prep.status="running";prep.attempts=(prep.attempts||0)+1;h.current_prep={...prep,prep_key:prep.key,status:"running",started_at:nowIso(),finish_at:new Date(Date.now()+prep.duration_s*1000).toISOString()};return {ok:true};}
   if(path==="mastermind/heists/prep/claim"){const h=save.mastermind.active_heist;if(!h?.current_prep||h.current_prep.prep_key!==p.prep_key)fail(404,"Preparação não encontrada");if(h.current_prep.status!=="ready")fail(400,"Preparação ainda em curso");const prep=h.preps.find(x=>x.key===p.prep_key);prep.status="complete";h.current_prep=null;return {ok:true,success:true,message:"Preparação concluída."};}
   if(path==="mastermind/heists/launch"){const h=save.mastermind.active_heist;if(!h||h.id!==p.heist_id)fail(404,"Plano não encontrado");if(!h.preps.filter(x=>x.required).every(x=>x.status==="complete"))fail(400,"Conclui as preparações obrigatórias");const target=MM_TARGETS.find(x=>x.key===h.target_key);const reward=Math.round(target.base_reward*(1-h.crew_cut_pct/100));h.finale={status:"running",started_at:nowIso(),finish_at:new Date(Date.now()+25000).toISOString(),chance:clamp(target.base_success+save.mastermind.xp/10000-save.player.heat*.001,0.15,.92),net_reward:reward,loot_capacity_pct:85,complication_name:"Janela Instável",complication_description:"A segurança alterou a rotina no último momento."};h.phase="finale";return {ok:true};}

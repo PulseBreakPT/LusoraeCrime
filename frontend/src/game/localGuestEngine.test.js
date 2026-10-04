@@ -56,8 +56,10 @@ describe("offline guest engine", () => {
     expect(state.caps.employees.max).toBeGreaterThanOrEqual(4);
 
     const mastermind = (await localGuestRequest("get", "/game/mastermind/state")).data;
-    expect(mastermind.targets.length).toBe(3);
+    expect(mastermind.targets.length).toBeGreaterThanOrEqual(7);
     expect(mastermind.rank.level).toBe(1);
+    expect(mastermind.targets.find((target) => target.key === "auction").unlocked).toBe(false);
+    expect(mastermind.targets.find((target) => target.key === "submundo").min_org_level).toBe(100);
   });
 
   test("dispatches a mission through the same API contract used by the UI", async () => {
@@ -180,11 +182,15 @@ describe("offline guest engine", () => {
     });
     expect(property.data.property_id).toBeTruthy();
 
-    await localGuestRequest("post", "/game/mastermind/heists/intel", {
+    await expect(localGuestRequest("post", "/game/mastermind/heists/intel", {
       target_key: "auction",
-    });
+    })).rejects.toThrow("Requer organização nível 10");
+
     const mastermind = (await localGuestRequest("get", "/game/mastermind/state")).data;
-    expect(mastermind.targets.find((target) => target.key === "auction").intel).toBeTruthy();
+    const auction = mastermind.targets.find((target) => target.key === "auction");
+    expect(auction.unlocked).toBe(false);
+    expect(auction.org_unlocked).toBe(false);
+    expect(auction.min_org_level).toBe(10);
 
     await localGuestRequest("post", "/game/shop/cosmetic", {
       category: "team_emblem",

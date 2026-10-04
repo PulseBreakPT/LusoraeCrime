@@ -130,7 +130,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   if (!state || !catalog) return null;
 
   const hq = state.player.hq;
-  const maxLevel = catalog.hq_max_level || 8;
+  const maxLevel = catalog.hq_max_level || 10;
   const currentTier = hqBenefitsAt(catalog, hq.level);
   const nextTier = hq.level < maxLevel ? hqBenefitsAt(catalog, hq.level + 1) : null;
   const upgrading = hq.upgrading_until && Date.parse(hq.upgrading_until) > serverNow();
@@ -204,7 +204,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
               {tips.length === 0 ? (
                 <Alert className="border-emerald-500/20 bg-emerald-500/5 py-2">
                   <AlertDescription className="font-mono text-[11px] text-emerald-400">
-                    Tudo sob controlo. Lisboa está calma — aproveita enquanto dura.
+                    Tudo sob controlo. A rede está estável — aproveita enquanto dura.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -276,7 +276,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                     label={`Melhorar — ${fmtMoney(nextTier.upgrade_cost)}`}
                     can={canAffordNext && meetsOrgLevel}
                     blockedReasons={[
-                      !meetsOrgLevel ? `Requer Quartel-General nível ${nextTier.min_org_level}.` : null,
+                      !meetsOrgLevel ? `Requer organização nível ${nextTier.min_org_level}.` : null,
                       meetsOrgLevel && !canAffordNext ? "Dinheiro insuficiente." : null,
                     ].filter(Boolean)}
                     availableTip={`Melhorar para o nível ${hq.level + 1} por ${fmtMoney(nextTier.upgrade_cost)} — demora ${fmtDuration(nextTier.upgrade_duration_s)}.`}

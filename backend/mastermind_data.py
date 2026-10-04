@@ -9,7 +9,12 @@ MASTERMIND_RANKS = [
     {"level": 2, "name": "Coordenador", "min_xp": 180},
     {"level": 3, "name": "Arquiteto", "min_xp": 520},
     {"level": 4, "name": "Mastermind", "min_xp": 1100},
-    {"level": 5, "name": "Lenda", "min_xp": 2100},
+    {"level": 5, "name": "Estratega", "min_xp": 2100},
+    {"level": 6, "name": "Diretor", "min_xp": 3600},
+    {"level": 7, "name": "Soberano", "min_xp": 5800},
+    {"level": 8, "name": "Arquiteto Nacional", "min_xp": 8800},
+    {"level": 9, "name": "Lenda", "min_xp": 12600},
+    {"level": 10, "name": "SUBMUNDO", "min_xp": 17500},
 ]
 
 HEIST_TARGETS = {
@@ -17,6 +22,7 @@ HEIST_TARGETS = {
         "name": "Leilão da Meia-Noite",
         "description": "Obras raras mudam de mãos durante uma janela de segurança privada.",
         "unlock_rank": 1,
+        "min_org_level": 10,
         "base_reward": 90000,
         "base_success": 0.56,
         "duration_s": 180,
@@ -34,6 +40,7 @@ HEIST_TARGETS = {
         "name": "Reserva do Estuário",
         "description": "Um contentor blindado permanece no terminal apenas durante a mudança de turno.",
         "unlock_rank": 2,
+        "min_org_level": 25,
         "base_reward": 175000,
         "base_success": 0.48,
         "duration_s": 240,
@@ -51,6 +58,7 @@ HEIST_TARGETS = {
         "name": "Nó Soberano",
         "description": "Chaves financeiras ficam online minutos antes da replicação internacional.",
         "unlock_rank": 3,
+        "min_org_level": 40,
         "base_reward": 310000,
         "base_success": 0.42,
         "duration_s": 300,
@@ -65,6 +73,49 @@ HEIST_TARGETS = {
         ],
     },
 }
+
+HEIST_TARGETS.update({
+    "freeport_vault": {
+        "name": "Cofre do Freeport", "description": "Uma rede privada movimenta ativos de elevado valor entre armazéns seguros.",
+        "unlock_rank": 4, "min_org_level": 55, "base_reward": 470000, "base_success": 0.39,
+        "duration_s": 360, "heat": 38, "bounty": 60, "cooldown_s": 2400,
+        "preps": [
+            {"key": "rotation", "name": "Rotação de Segurança", "required": True, "duration_s": 95, "cost": 18000, "base_success": 0.62, "bonus": 0.05},
+            {"key": "registry", "name": "Registo Fantasma", "required": True, "duration_s": 110, "cost": 24000, "base_success": 0.56, "bonus": 0.07},
+            {"key": "exit_window", "name": "Janela de Saída", "required": True, "duration_s": 120, "cost": 28000, "base_success": 0.52, "bonus": 0.08},
+        ],
+    },
+    "consortium_exchange": {
+        "name": "Bolsa do Consórcio", "description": "Uma câmara privada liquida operações de várias organizações numa única janela.",
+        "unlock_rank": 6, "min_org_level": 70, "base_reward": 650000, "base_success": 0.36,
+        "duration_s": 420, "heat": 44, "bounty": 70, "cooldown_s": 3000,
+        "preps": [
+            {"key": "counterparty", "name": "Contraparte", "required": True, "duration_s": 120, "cost": 30000, "base_success": 0.58, "bonus": 0.06},
+            {"key": "ledger", "name": "Livro Paralelo", "required": True, "duration_s": 135, "cost": 36000, "base_success": 0.53, "bonus": 0.08},
+            {"key": "route_mesh", "name": "Malha de Rotas", "required": True, "duration_s": 150, "cost": 42000, "base_success": 0.49, "bonus": 0.09},
+        ],
+    },
+    "sovereign_archive": {
+        "name": "Arquivo Soberano", "description": "Documentos e chaves de alto valor circulam numa infraestrutura redundante.",
+        "unlock_rank": 8, "min_org_level": 85, "base_reward": 900000, "base_success": 0.33,
+        "duration_s": 480, "heat": 50, "bounty": 82, "cooldown_s": 3600,
+        "preps": [
+            {"key": "identity_mesh", "name": "Malha de Identidades", "required": True, "duration_s": 150, "cost": 45000, "base_success": 0.54, "bonus": 0.07},
+            {"key": "cold_route", "name": "Rota Fria", "required": True, "duration_s": 165, "cost": 52000, "base_success": 0.49, "bonus": 0.09},
+            {"key": "relay", "name": "Relé de Saída", "required": True, "duration_s": 180, "cost": 60000, "base_success": 0.46, "bonus": 0.10},
+        ],
+    },
+    "submundo_capstone": {
+        "name": "Operação SUBMUNDO", "description": "O golpe final exige organização nível 100 e domínio total do sistema Mastermind.",
+        "unlock_rank": 10, "min_org_level": 100, "base_reward": 1250000, "base_success": 0.30,
+        "duration_s": 600, "heat": 58, "bounty": 95, "cooldown_s": 5400,
+        "preps": [
+            {"key": "national_map", "name": "Mapa Nacional", "required": True, "duration_s": 180, "cost": 70000, "base_success": 0.52, "bonus": 0.08},
+            {"key": "ghost_chain", "name": "Cadeia Fantasma", "required": True, "duration_s": 210, "cost": 85000, "base_success": 0.47, "bonus": 0.10},
+            {"key": "final_window", "name": "Janela Final", "required": True, "duration_s": 240, "cost": 100000, "base_success": 0.43, "bonus": 0.12},
+        ],
+    },
+})
 
 HEIST_APPROACHES = {
     "silent": {
@@ -125,6 +176,15 @@ FENCES = {
         "unlock_rank": 3,
     },
 }
+
+HEIST_APPROACHES.update({
+    "ghost": {"name": "Fantasma", "description": "Execução compartimentada com assinatura mínima.", "success": 0.08, "reward_mult": 0.90, "heat_mult": 0.42, "duration_mult": 1.35, "unlock_rank": 5},
+    "distributed": {"name": "Distribuído", "description": "Células independentes reduzem pontos únicos de falha.", "success": 0.05, "reward_mult": 1.12, "heat_mult": 0.88, "duration_mult": 1.10, "unlock_rank": 8},
+})
+FENCES.update({
+    "consortium": {"name": "Consórcio Privado", "description": "Liquidação lenta com preço superior.", "reward_mult": 1.16, "heat_mult": 0.92, "delay_s": 120, "success": -0.02, "unlock_rank": 6},
+    "sovereign": {"name": "Mesa Soberana", "description": "Liquidez máxima para redes de endgame.", "reward_mult": 1.24, "heat_mult": 0.78, "delay_s": 180, "success": -0.06, "unlock_rank": 9},
+})
 
 COMPLICATIONS = {
     "inside_help": {
@@ -195,6 +255,13 @@ MARKET_GOODS = {
     },
 }
 
+
+MARKET_GOODS.update({
+    "rare_metals": {"name": "Metais Raros", "description": "Carga compacta com procura industrial global.", "base_price": 11800, "unlock_rank": 4, "space": 2},
+    "prototype_modules": {"name": "Módulos Protótipo", "description": "Tecnologia de elevada volatilidade.", "base_price": 18500, "unlock_rank": 6, "space": 3},
+    "sealed_bonds": {"name": "Títulos Selados", "description": "Ativos de liquidez alta e exposição elevada.", "base_price": 32000, "unlock_rank": 8, "space": 4},
+    "sovereign_keys": {"name": "Chaves Soberanas", "description": "Mercadoria reservada ao endgame.", "base_price": 52000, "unlock_rank": 10, "space": 5},
+})
 
 def mastermind_rank(xp):
     value = max(0, int(xp or 0))

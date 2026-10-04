@@ -41,7 +41,7 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        WEAR_PER_MISSION_SINCE_REPAIR, WEAR_MISSIONS_SINCE_REPAIR_CAP,
                        EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
                        RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
-                       PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
+                       PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL, DIRTY_MONEY_CAP_LATE_PER_LEVEL,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
                        FUEL_PRICES,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS,
@@ -599,9 +599,16 @@ def property_stack_mult(rank):
 
 
 def dirty_money_cap(level):
-    """Limite de armazenamento de dinheiro sujo — acima disto, o excesso
-    produzido é desperdiçado (por isso vale a pena lavar regularmente)."""
-    return DIRTY_MONEY_CAP_BASE + DIRTY_MONEY_CAP_PER_LEVEL * max(0, level - 1)
+    """Capacidade do cofre com curva piecewise até ao nível 100.
+
+    Os níveis 1-10 preservam exatamente a economia anterior. A partir do 11,
+    o cofre cresce mais depressa para comportar golpes de endgame sem retirar
+    a pressão de lavar dinheiro regularmente.
+    """
+    level = max(1, min(100, int(level or 1)))
+    early = DIRTY_MONEY_CAP_BASE + DIRTY_MONEY_CAP_PER_LEVEL * max(0, min(level, 10) - 1)
+    late = DIRTY_MONEY_CAP_LATE_PER_LEVEL * max(0, level - 10)
+    return early + late
 
 
 async def push_history(db, emp_id, text):
@@ -746,8 +753,11 @@ def achievement_bonus_pct(missions_success):
 
 
 def max_teams_for(level):
-    """Nº máximo de equipas que a organização pode ter, crescente com o nível."""
-    return TEAM_COUNT_BASE + ((max(1, level) - 1) // 2) * TEAM_COUNT_PER_2_LEVELS
+    """Capacidade de equipas controlada até ao nível 100."""
+    level = max(1, min(100, int(level or 1)))
+    if level <= 10:
+        return TEAM_COUNT_BASE + ((level - 1) // 2) * TEAM_COUNT_PER_2_LEVELS
+    return TEAM_COUNT_BASE + 4 * TEAM_COUNT_PER_2_LEVELS + ((level - 10) // 10)
 
 
 def duration_reward_mult(duration_s):
@@ -3354,6 +3364,11 @@ async def advance(db, player):
         # Automação é uma conveniência: nunca pode derrubar o tick principal.
         logger.exception("Falha na automação da organização (player %s)", pid)
 
+    # Territórios e Cidade Viva partilham a mesma rede rival persistente.
+    # Saves antigos sem city_key continuam a usar o rival determinístico local.
+    city_rival_docs = await db.city_rivals.find({"player_id": pid}).to_list(20)
+    city_rivals_by_key = {str(r.get("key")): r for r in city_rival_docs if r.get("key")}
+
     # Territórios: rendimento passivo com pressão rival crescente e defesa que
     # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
     territory_rate = territory_income_per_hour(player)
@@ -3372,13 +3387,36 @@ async def advance(db, player):
             pressure = float(data.get("pressure", 0) or 0)
             defense = float(data.get("defense", 100) or 0)
             rival = dict(data.get("rival") or rival_profile(district))
+            city_rival = city_rivals_by_key.get(str(rival.get("city_key") or rival.get("key") or ""))
+            if city_rival:
+                power = float(city_rival.get("power", rival.get("strength", 50)) or 50)
+                hostility = float(city_rival.get("hostility", 40) or 40)
+                rival.update({
+                    "city_key": city_rival.get("key"),
+                    "key": city_rival.get("key"),
+                    "name": city_rival.get("name", rival.get("name")),
+                    "style": city_rival.get("style", rival.get("style")),
+                    "strength": max(20, min(100, round(power * 0.72 + hostility * 0.28))),
+                    "relation": city_rival.get("relation", "neutral"),
+                })
             data["rival"] = {
-                "key": rival.get("key"), "name": rival.get("name"), "style": rival.get("style"),
+                "key": rival.get("key"), "city_key": rival.get("city_key"),
+                "name": rival.get("name"), "style": rival.get("style"),
                 "strength": max(20, min(100, int(rival.get("strength", 50) or 50))),
+                "relation": rival.get("relation", "neutral"),
+                "pressure_mult": float(rival.get("pressure_mult", 1.0) or 1.0),
+                "defense_mult": float(rival.get("defense_mult", 1.0) or 1.0),
             }
             rival_strength = float(data["rival"]["strength"])
             rival_pressure_mult = float(rival.get("pressure_mult", 1.0) or 1.0)
             rival_defense_mult = float(rival.get("defense_mult", 1.0) or 1.0)
+            relation = rival.get("relation", "neutral")
+            if relation == "allied":
+                rival_pressure_mult *= 0.25
+                rival_defense_mult *= 0.65
+            elif relation == "truce":
+                rival_pressure_mult *= 0.50
+                rival_defense_mult *= 0.80
             pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
             pressure_gain *= (0.72 + rival_strength / 180.0) * rival_pressure_mult
             pressure_gain *= float(organization_specialization_effects(player).get("territory_pressure_mult", 1.0) or 1.0)

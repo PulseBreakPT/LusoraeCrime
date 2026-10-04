@@ -219,7 +219,12 @@ RARITIES = {
     "lendario": {"name": "Lendário", "mult": 4.0, "max_level": 10, "talent_slots": 3, "talent_chance": 1.0},
 }
 
-RARITY_MIN_RESPECT = {"comum": 0, "raro": 300, "elite": 1200, "lendario": 3500}
+RARITY_MIN_RESPECT = {
+    "comum": 0,
+    "raro": LEVEL_THRESHOLDS[9],
+    "elite": LEVEL_THRESHOLDS[34],
+    "lendario": LEVEL_THRESHOLDS[69],
+}
 
 RANKS = ["recruta", "membro", "especialista", "veterano", "tenente", "chefe_equipa", "braco_direito"]
 RANK_REQ_LEVEL = [1, 2, 3, 4, 6, 8, 10]
@@ -753,9 +758,9 @@ DIRTY_MONEY_HEAT_PER_10K = 0.15          # calor extra por hora, por cada 10 mil
 
 # ---------------- Progressão ----------------
 
-LOW_LEVEL_XP_GAP = 2                     # diferença de nível (missão vs. organização) a partir da qual a XP é reduzida
-LOW_LEVEL_XP_MULT_PER_GAP = 0.15         # redução de XP por cada nível de diferença acima do limiar
-LOW_LEVEL_XP_MULT_MIN = 0.3              # redução mínima de XP para missões muito abaixo do nível
+LOW_LEVEL_XP_GAP = 10                     # diferença de nível (missão vs. organização) a partir da qual a XP é reduzida
+LOW_LEVEL_XP_MULT_PER_GAP = 0.05         # redução de XP por cada nível de diferença acima do limiar
+LOW_LEVEL_XP_MULT_MIN = 0.25              # redução mínima de XP para missões muito abaixo do nível
 TEAM_COUNT_BASE = 2                      # nº máximo de equipas ao nível 1
 TEAM_COUNT_PER_2_LEVELS = 1              # +1 equipa máxima a cada 2 níveis da organização
 ACHIEVEMENT_MILESTONES = [10, 50, 150, 400]  # missões bem-sucedidas para desbloquear cada bónus permanente
@@ -800,3 +805,64 @@ NIGHT_STEALTH_BONUS = 0.04               # bónus de chance em operações discr
 # PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
 # REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S, and PAYROLL_MORALE_REGEN
 # are now imported from economy_constants.py for centralized economic management
+
+
+# ============================================================================
+# PROGRESSÃO 1-100 — desbloqueios distribuídos por toda a carreira
+# ============================================================================
+MAX_ORG_LEVEL = len(LEVEL_THRESHOLDS)
+
+def _progression_level(index: int, total: int, curve: float = 1.35) -> int:
+    if total <= 1:
+        return 1
+    ratio = max(0.0, min(1.0, index / (total - 1)))
+    return max(1, min(MAX_ORG_LEVEL, 1 + round((MAX_ORG_LEVEL - 1) * (ratio ** curve))))
+
+def _spread_unlocks(table: dict, value_key: str, fixed: dict | None = None) -> None:
+    fixed = fixed or {}
+    ordered = sorted(table.items(), key=lambda item: (float(item[1].get(value_key, 0) or 0), item[0]))
+    for index, (key, cfg) in enumerate(ordered):
+        cfg["min_level"] = int(fixed.get(key, _progression_level(index, len(ordered))))
+    for key, level in fixed.items():
+        if key in table:
+            table[key]["min_level"] = min(MAX_ORG_LEVEL, max(1, int(level)))
+
+_spread_unlocks(VEHICLE_MODELS, "price", {"usado": 1, "moto": 1, "van": 5})
+_spread_unlocks(WEAPON_MODELS, "price", {"faca_taser": 1, "pistola": 1})
+_spread_unlocks(PROPERTY_TYPES, "price", {"esconderijo": 1, "garagem": 1, "empresa_legal": 5})
+_spread_unlocks(OPPORTUNITY_TYPES, "base_reward", {"assalto": 1, "roubo": 1, "cobranca": 1, "transporte": 1})
+
+RECRUIT_SOURCE_LEVELS = {
+    "rua": 1, "bares": 1, "empresas": 10, "prisoes": 25,
+    "mercado_negro": 50, "contactos": 75,
+}
+for _key, _level in RECRUIT_SOURCE_LEVELS.items():
+    if _key in RECRUIT_SOURCES:
+        RECRUIT_SOURCES[_key]["min_level"] = _level
+
+for _cfg in OPPORTUNITY_TYPES.values():
+    _required = [VEHICLE_MODELS[k]["min_level"] for k in (_cfg.get("required_models") or []) if k in VEHICLE_MODELS]
+    if _required:
+        _cfg["min_level"] = max(int(_cfg.get("min_level", 1)), min(_required))
+    _cfg["respect"] = max(
+        int(_cfg.get("respect", 0) or 0),
+        30 + int(_cfg.get("min_level", 1)) * 5 + int(_cfg.get("risk", 1)) * 12,
+    )
+
+ORG_LEVEL_UNLOCKS = {level: [] for level in range(1, MAX_ORG_LEVEL + 1)}
+for _kind, _table in (
+    ("operação", OPPORTUNITY_TYPES), ("veículo", VEHICLE_MODELS),
+    ("arma", WEAPON_MODELS), ("imóvel", PROPERTY_TYPES),
+    ("recrutamento", RECRUIT_SOURCES),
+):
+    for _key, _cfg in _table.items():
+        _level = max(1, min(MAX_ORG_LEVEL, int(_cfg.get("min_level", 1) or 1)))
+        ORG_LEVEL_UNLOCKS[_level].append({"kind": _kind, "key": _key, "name": _cfg.get("name", _key)})
+
+for _level, _name in {
+    10: "Rede profissional", 20: "Controlo territorial", 25: "Estrutura regional",
+    35: "Mercado de elite", 50: "Operação nacional", 60: "Especialização estratégica",
+    70: "Talento lendário", 75: "Rede de contactos", 85: "Infraestrutura soberana",
+    100: "Império SUBMUNDO",
+}.items():
+    ORG_LEVEL_UNLOCKS[_level].append({"kind": "marco", "key": f"milestone_{_level}", "name": _name})

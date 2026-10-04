@@ -41,6 +41,12 @@ export default function GamePage() {
   const [mapLegendOpen, setMapLegendOpen] = useState(false);
   const [focusTarget, setFocusTarget] = useState(null);
   const [hudAwake, setHudAwake] = useState(true);
+  const playerLevel = Number(state?.player?.level || 1);
+  const unlocks = {
+    city: playerLevel >= 5,
+    organization: playerLevel >= 10,
+    mastermind: playerLevel >= 10,
+  };
   const shellAlerts = state ? orgAlerts(state) : { total: 0 };
   const { online, stale } = useGameShell({
     state,
@@ -281,10 +287,12 @@ export default function GamePage() {
           {navGroup && (
             <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2.5 w-[min(92vw,26rem)] -translate-x-1/2">
               {navGroup === "operations" && (
-                <div className="grid grid-cols-3 gap-1">
+                <div className={`grid ${unlocks.mastermind ? "grid-cols-3" : "grid-cols-2"} gap-1`}>
                   <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
                   <NavAction testId="open-quests-button" icon={Target} label="Objetivos" color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
-                  <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-sky-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
+                  {unlocks.mastermind && (
+                    <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-sky-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
+                  )}
                 </div>
               )}
 
@@ -317,8 +325,12 @@ export default function GamePage() {
                     <NavAction testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300" onClick={() => openFromNav("shop")} />
                     <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
                     <NavAction testId="map-legend-toggle" icon={MapIcon} label="Legenda" color="text-zinc-300" active={mapLegendOpen} onClick={() => { setNavGroup(null); setMapLegendOpen((value) => !value); }} />
-                    <NavAction testId="open-organization-button" icon={Network} label="Organização" color="text-cyan-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("organization")} />
-                    <NavAction testId="open-city-button" icon={RadioTower} label="Cidade" color="text-red-300" onClick={() => openFromNav("city")} />
+                    {unlocks.organization && (
+                      <NavAction testId="open-organization-button" icon={Network} label="Organização" color="text-cyan-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("organization")} />
+                    )}
+                    {unlocks.city && (
+                      <NavAction testId="open-city-button" icon={RadioTower} label="Cidade" color="text-red-300" onClick={() => openFromNav("city")} />
+                    )}
                     <NavAction testId="open-settings-button" icon={Settings} label="Definições" color="text-zinc-400" onClick={() => openFromNav("settings")} />
                   </div>
 
@@ -397,7 +409,7 @@ export default function GamePage() {
         </div>
       )}
 
-      {openPanel === "mastermind" && <MastermindPanel open onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />}
+      {openPanel === "mastermind" && unlocks.mastermind && <MastermindPanel open onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />}
       {commandOpen && (
         <CommandCenter
           open
@@ -407,8 +419,8 @@ export default function GamePage() {
         />
       )}
       {openPanel === "shop" && <ShopPanel open onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />}
-      {openPanel === "organization" && <OrganizationPanel open onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />}
-      {openPanel === "city" && <CityPanel open onOpenChange={(o) => setOpenPanel(o ? "city" : null)} />}
+      {openPanel === "organization" && unlocks.organization && <OrganizationPanel open onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />}
+      {openPanel === "city" && unlocks.city && <CityPanel open onOpenChange={(o) => setOpenPanel(o ? "city" : null)} />}
       {openPanel === "operations" && (
         <OpportunitiesPanel
           open

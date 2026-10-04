@@ -128,16 +128,19 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
 
   const commands = useMemo(() => {
     if (!state) return [];
-    const panelCommands = PANEL_COMMANDS.map(([panel, label, hint, Icon, shortcut]) => ({
-      id: `panel:${panel}`,
-      label,
-      hint,
-      Icon,
-      shortcut,
-      group: "Navegação",
-      keywords: `${panel} painel menu`,
-      run: () => onNavigate(panel),
-    }));
+    const panelMinLevel = { mastermind: 10 };
+    const panelCommands = PANEL_COMMANDS
+      .filter(([panel]) => Number(state.player?.level || 1) >= Number(panelMinLevel[panel] || 1))
+      .map(([panel, label, hint, Icon, shortcut]) => ({
+        id: `panel:${panel}`,
+        label,
+        hint,
+        Icon,
+        shortcut,
+        group: "Navegação",
+        keywords: `${panel} painel menu`,
+        run: () => onNavigate(panel),
+      }));
 
     const priorities = (state.retention?.next_moves || []).map((move) => ({
       id: `priority:${move.id}`,
