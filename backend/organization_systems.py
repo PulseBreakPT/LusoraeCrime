@@ -281,6 +281,14 @@ def loadout_effect(loadout: dict, category: str, policies: dict | None = None) -
         chance += 0.018
     if loadout.get("burner_phones"):
         heat *= 0.95
+    if loadout.get("signal_kit"):
+        if category in {"tecnica", "logistica"}:
+            chance += 0.016
+        heat *= 0.93
+    if loadout.get("fake_docs"):
+        if category in {"influencia", "logistica"}:
+            chance += 0.015
+        heat *= 0.91
     if loadout.get("evidence_cleanup"):
         heat *= 0.86
     if loadout.get("medical_kit") and policies.get("auto_use_medical", True):
