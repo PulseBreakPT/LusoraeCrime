@@ -114,6 +114,7 @@ from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
     VEHICLE_LIFECYCLE, INJURY_SEVERITIES, ensure_employee_profile,
+    prestige_effects, department_level,
 )
 
 logger = logging.getLogger(__name__)
@@ -1086,7 +1087,9 @@ def effective_speed(vehicle):
     de sempre (60%) a condição 0."""
     c = max(0.0, min(100.0, vehicle["condition"]))
     factor = VEHICLE_SPEED_FLOOR + (1 - VEHICLE_SPEED_FLOOR) * (c / 100) ** VEHICLE_SPEED_CURVE_EXP
-    return vehicle["speed"] * factor
+    tires = max(0.0, min(100.0, float(vehicle.get("tires_pct", 100) or 0)))
+    tire_factor = 0.82 + 0.18 * (tires / 100.0)
+    return vehicle["speed"] * factor * tire_factor
 
 
 BASE_CHANCE = 0.92
@@ -2143,7 +2146,7 @@ async def _pay_pending_reward(db, player, m):
         player["clean_money"] += reward
         stats["earned_clean"] = stats.get("earned_clean", 0) + reward
     else:
-        cap = dirty_money_cap(player.get("level", 1))
+        cap = dirty_money_cap(player.get("level", 1)) + prestige.get("dirty_cap_increase", 0) + prestige_effects(player)["dirty_cap_increase"]
         room = max(0, cap - player["dirty_money"])
         credited = min(reward, room)
         wasted = reward - credited
@@ -2509,7 +2512,7 @@ async def _progress_mission(db, player, m, now):
                 await _pay_pending_reward(db, player, m)
         phase = "done"
         updates["phase"] = phase
-        reorg_until = (now + timedelta(seconds=REORG_AFTER_MISSION_S)).isoformat()
+        reorg_until = (now + timedelta(seconds=REORG_AFTER_MISSION_S * max(0.6, 1.0 - 0.10 * department_level(player, "comunicacoes")))).isoformat()
         await db.teams.update_one({"_id": team_oid}, {"$set": {"status": "idle", "available_at": reorg_until}})
         if m.get("member_ids"):
             await db.employees.update_many(
@@ -2568,13 +2571,17 @@ async def _process_statuses(db, pid, now):
         sets = {"status": "idle", "status_until": None}
         if e["status"] == "resting":
             sets["fatigue"] = max(0.0, e["fatigue"] - 50)
+            sets["stress"] = max(0.0, float(e.get("stress", 10) or 0) - 18)
             sets["morale"] = min(100.0, e.get("morale", 70) + 5)
             msg = f"{e['name']} terminou o descanso."
         elif e["status"] == "injured":
+            sets["injury"] = None
+            sets["stress"] = max(0.0, float(e.get("stress", 10) or 0) - 8)
             msg = f"{e['name']} recuperou dos ferimentos."
         elif e["status"] == "absent":
             msg = f"{e['name']} voltou ao trabalho."
         else:
+            sets["sentence"] = None
             sets["morale"] = max(0.0, e.get("morale", 70) - 5)
             msg = f"{e['name']} cumpriu a pena e saiu da prisão."
         await db.employees.update_one({"_id": e["_id"]}, {"$set": sets})
@@ -3048,7 +3055,8 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
     heat_rate = 0
     launder_rate = 0
     # Químicos na equipa tornam os laboratórios mais produtivos.
-    lab_mult = 1 + bonuses.get("lab_boost", 0)
+    prestige = prestige_effects(player)
+    lab_mult = 1 + bonuses.get("lab_boost", 0) + float(prestige.get("lab_bonus", 0.0))
     # O Quartel-General melhora a eficiência de todas as propriedades: mais
     # produção/lavagem passiva e menos calor gerado pelas ilegais.
     hq_tier = HQ_LEVEL_BENEFITS[min(player["hq"]["level"], HQ_MAX_LEVEL) - 1]
@@ -3071,7 +3079,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
             heat_rate += pt["heat_per_h"] * p["level"] * factor * hq_heat_mult
         if pt.get("launder_per_h"):
             launder_rate += pt["launder_per_h"] * p["level"] * factor
-    launder_rate *= (1 + bonuses.get("empresa_boost", 0)) * hq_income_mult
+    launder_rate *= (1 + bonuses.get("empresa_boost", 0) + float(prestige.get("laundry_bonus", 0.0))) * hq_income_mult
 
     if dirty_rate > 0:
         fd = player.get("frac_dirty", 0.0) + dirty_rate * hours
@@ -3282,6 +3290,7 @@ async def advance(db, player):
     # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
     # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
     decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
+    decay_rate *= 1.0 + float(prestige_effects(player).get("heat_decay_bonus", 0.0))
     player["heat"] = round(max(0.0, player["heat"] - minutes * decay_rate), 3)
     # A atenção policial por distrito arrefece com o tempo — zonas quentes
     # voltam gradualmente a ser operáveis.
