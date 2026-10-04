@@ -1051,7 +1051,7 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_ou
         failure_probability=1.0 - chance,  # Probabilidade de falha
         is_rare_mission=bool(opp.get("rare")),
         multiplier_stack=1.0,  # bónus de propriedades/conquistas é aplicado UMA vez abaixo
-        repeat_count=repeat_count
+        repeat_count=repeat_count,
         vehicles_dict=VEHICLE_MODELS,
         specialization_match=spec_match,
     )
@@ -1112,7 +1112,7 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_ou
         "doctrine": doctrine.get("key", "balanced"),
         "doctrine_heat_mult": float(doctrine.get("heat", 1.0)) * float(loadout_fx.get("heat", 1.0)),
         "doctrine_fatigue_mult": float(doctrine.get("fatigue", 1.0)),
-        "loadout": prep.get("loadout", {}),
+        "loadout": loadout,
         "loadout_injury_mult": float(loadout_fx.get("injury", 1.0)),
         "territory_bonus": territory_bonus,
         "prestige_reward_bonus": prestige_reward,
@@ -1122,8 +1122,8 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_ou
 def _validated_client_road_plan(plan, origin, target):
     """Aceita apenas geometria OSRM-like razoável enviada pelo cliente.
 
-    A rota é puramente visual: custos, combustível, duração e sucesso continuam
-    a ser calculados pelo backend. Ainda assim limitamos tamanho, coordenadas,
+    A rota é validada pelo backend e alimenta distância, combustível e duração;
+    por isso limitamos tamanho, coordenadas,
     tempos e distância dos extremos para não persistir lixo arbitrário.
     """
     if not isinstance(plan, dict) or plan.get("unavailable"):
@@ -1241,7 +1241,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "doctrine": prep.get("doctrine", "balanced"),
         "doctrine_heat_mult": prep.get("doctrine_heat_mult", 1.0),
         "doctrine_fatigue_mult": prep.get("doctrine_fatigue_mult", 1.0),
-        "loadout": loadout,
+        "loadout": prep.get("loadout", {}),
         "loadout_injury_mult": prep.get("loadout_injury_mult", 1.0),
     }
 
