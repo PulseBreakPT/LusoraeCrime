@@ -163,7 +163,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           );
         })()}
 
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="sub-route-toolbar mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
             <Input
@@ -206,7 +206,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="fleet-list">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="fleet-list">
           {state.vehicles.length === 0 && (
             <p className="col-span-full rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[11px] text-zinc-500">
               Ainda não tens veículos — compra o primeiro no stand abaixo.
@@ -499,7 +499,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
 
         <div className="mt-6">
           <SectionHeader icon={ShoppingCart} title="Stand de veículos" meta={catalog ? `${Object.keys(catalog.vehicle_models || {}).length} modelos` : undefined} />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {catalog &&
               Object.entries(catalog.vehicle_models).map(([key, m]) => {
                 const tier = vehicleTier(m);
