@@ -9,7 +9,7 @@ import { cn } from "../../lib/utils";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
 import { usePanelFocus } from "../../hooks/usePanelFocus";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, EmptyState, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, EmptyState, SectionHeader, ActionGrid } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -66,7 +66,7 @@ const RarityBadge = ({ rarity, rar }) => (
   </Tip>
 );
 
-const ActionBtn = ({ testId, icon, label, onClick, disabled, title, blockedReasons }) => (
+const ActionBtn = ({ testId, icon, label, onClick, disabled, title, blockedReasons, density = "comfortable" }) => (
   <PurchaseButton
     testId={testId}
     icon={icon}
@@ -75,6 +75,7 @@ const ActionBtn = ({ testId, icon, label, onClick, disabled, title, blockedReaso
     blockedReasons={blockedReasons || (title ? [title] : [])}
     availableTip={title}
     onConfirm={onClick}
+    density={density}
   />
 );
 
@@ -430,12 +431,13 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
           <div>
             <SectionHeader icon={Sparkles} title="Ações" />
-            <div className="grid grid-cols-2 gap-1.5">
+            <ActionGrid count={4}>
               <ActionBtn
                 testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar"
                 onClick={() => restEmployee(e.id)} disabled={!idle || e.fatigue < 15}
                 title="Recupera 50 de fadiga e +5 moral."
                 blockedReasons={[!idle ? "Operacional indisponível." : null, idle && e.fatigue < 15 ? "Fadiga já baixa." : null].filter(Boolean)}
+                density="dense"
               />
               <ActionBtn
                 testId={`emp-promote-${e.id}`} icon={ChevronUp}
@@ -449,19 +451,22 @@ const EmployeeCard = ({ e, onNavigate }) => {
                   !isTopRank && e.level < nextRankReq ? `Requer nível ${nextRankReq}.` : null,
                   !isTopRank && e.level >= nextRankReq && money < promoteCost ? "Dinheiro insuficiente." : null,
                 ].filter(Boolean)}
+                density="dense"
               />
               <ActionBtn
                 testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`}
                 onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
                 title="+15 moral e +10 lealdade." blockedReasons={money < bonusCost ? ["Dinheiro insuficiente."] : []}
+                density="dense"
               />
               <ConfirmButton
                 testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?"
                 color="text-red-400" onConfirm={() => fireEmployee(e.id)}
                 disabled={e.status === "on_mission" || money < fireCost}
                 tip={e.status === "on_mission" ? "Operacional em missão." : money < fireCost ? "Dinheiro insuficiente." : "Indemnização de 3 salários. Ação irreversível."}
+                density="dense"
               />
-            </div>
+            </ActionGrid>
           </div>
 
           {(e.history || []).length > 0 && (
@@ -826,7 +831,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
 
                 <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                   <Select value={rosterSort} onValueChange={setRosterSort}>
-                    <SelectTrigger data-testid="employees-sort" className="min-h-10 w-full border-white/10 bg-black/50 font-mono text-[10px] text-zinc-300">
+                    <SelectTrigger data-testid="employees-sort" className="h-8 min-h-0 w-full border-white/10 bg-black/50 px-2 font-mono text-[10px] text-zinc-300">
                       <ArrowUpDown size={11} className="mr-1 shrink-0 text-zinc-500" />
                       <SelectValue />
                     </SelectTrigger>
@@ -848,7 +853,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                       onClick={() => canOptimize && optimizeEmployees()}
                       disabled={!canOptimize}
                       className={cn(
-                        "flex min-h-10 w-full items-center justify-center gap-1 rounded-md border px-2 font-mono text-[10px] font-bold uppercase transition-colors",
+                        "flex h-8 w-full items-center justify-center gap-1 rounded-md border px-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
                         canOptimize
                           ? "border-cyan-500/30 bg-cyan-500/[0.08] text-cyan-300 hover:bg-cyan-500/[0.14]"
                           : "cursor-not-allowed border-white/[0.06] bg-white/[0.02] text-zinc-600"
@@ -862,7 +867,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                     data-testid="employees-toggle-unavailable"
                     variant="outline"
                     onClick={() => setHideUnavailable(!hideUnavailable)}
-                    className="min-h-10 w-full gap-1 border-white/10 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
+                    className="h-8 min-h-0 w-full gap-1 border-white/10 px-1.5 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
                   >
                     {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
                     {hideUnavailable ? `Disponíveis${hiddenCount > 0 ? ` +${hiddenCount}` : ""}` : "Todos"}
@@ -874,7 +879,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                     onClick={restAll}
                     disabled={restAllBusy || restAllIds.length === 0}
                     aria-busy={restAllBusy}
-                    className="min-h-10 w-full gap-1 border-white/10 font-mono text-[10px] text-amber-300 hover:bg-white/5 disabled:text-zinc-600"
+                    className="h-8 min-h-0 w-full gap-1 border-white/10 px-1.5 font-mono text-[10px] text-amber-300 hover:bg-white/5 disabled:text-zinc-600"
                   >
                     {restAllBusy ? <Loader2 size={11} className="animate-spin" /> : <BedDouble size={11} />}
                     Descansar {restAllIds.length}
