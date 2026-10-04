@@ -197,8 +197,6 @@ const BoardTab = ({
   const active = mastermind.active_heist;
   return (
     <div className="mt-4 space-y-3">
-      <RankCard rank={mastermind.rank} />
-
       {!active ? (
         <>
           <SectionHeader icon={BriefcaseBusiness} title="Configuração do plano" />
@@ -295,6 +293,8 @@ const BoardTab = ({
           onAbort={onAbort}
         />
       )}
+
+      <RankCard rank={mastermind.rank} />
     </div>
   );
 };
