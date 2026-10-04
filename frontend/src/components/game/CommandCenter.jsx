@@ -280,7 +280,6 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="command-center"
-        overlayClassName="bg-black/45 backdrop-blur-[2px]"
         className="sub-menu-modal max-w-none overflow-hidden p-0 text-white"
         onKeyDown={onKeyDown}
       >
