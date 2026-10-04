@@ -136,9 +136,9 @@ DEPARTMENTS = {
 }
 
 TERRITORY_TIERS = {
-    1: {"name": "Presença", "cost": 55000, "income_h": 180, "reward_bonus": 0.01, "defense_weekly": 900},
-    2: {"name": "Consolidado", "cost": 90000, "income_h": 420, "reward_bonus": 0.025, "defense_weekly": 2200},
-    3: {"name": "Dominante", "cost": 155000, "income_h": 850, "reward_bonus": 0.05, "defense_weekly": 4800},
+    1: {"name": "Presença", "unlock_level": 20, "cost": 55000, "income_h": 180, "reward_bonus": 0.01, "defense_weekly": 900},
+    2: {"name": "Consolidado", "unlock_level": 45, "cost": 90000, "income_h": 420, "reward_bonus": 0.025, "defense_weekly": 2200},
+    3: {"name": "Dominante", "unlock_level": 75, "cost": 155000, "income_h": 850, "reward_bonus": 0.05, "defense_weekly": 4800},
 }
 
 RIVAL_ARCHETYPES = [
@@ -186,21 +186,21 @@ ORGANIZATION_SPECIALIZATIONS = {
     "shadow_network": {
         "name": "Rede Sombra",
         "cost": 280000,
-        "unlock_level": 9,
+        "unlock_level": 50,
         "desc": "Contrainteligência e discrição: menos rusgas, melhor dissipação de calor, menor foco em rendimento bruto.",
         "effects": {"raid_mult": 0.84, "heat_decay_bonus": 0.12, "property_income_mult": 0.97},
     },
     "industrial_machine": {
         "name": "Máquina Industrial",
         "cost": 280000,
-        "unlock_level": 9,
+        "unlock_level": 65,
         "desc": "Escala logística: compras mais eficientes e imóveis mais produtivos, com maior pegada operacional.",
         "effects": {"supply_mult": 0.92, "property_income_mult": 1.12, "raid_mult": 1.05},
     },
     "territorial_empire": {
         "name": "Império Territorial",
         "cost": 300000,
-        "unlock_level": 9,
+        "unlock_level": 80,
         "desc": "Domínio local: mais rendimento e prémio nos distritos controlados, pressão rival mais controlável.",
         "effects": {"territory_income_mult": 1.18, "territory_reward_bonus": 0.03, "territory_pressure_mult": 0.88},
     },
