@@ -118,4 +118,20 @@ describe("UI action ownership", () => {
   });
 
 
+  test("retention engine exposes decisions, world pulse and three-horizon roadmap", () => {
+    const liveOps = read("components/game/LiveOpsDock.jsx");
+    const opportunities = read("components/game/OpportunitiesPanel.jsx");
+    const commandCenter = read("components/game/CommandCenter.jsx");
+    expect(gameContext).toContain('action("missions/decision"');
+    expect(liveOps).toContain('data-testid="liveops-decision"');
+    expect(liveOps).toContain("Não escolher nada mantém o plano original sem penalização.");
+    expect(opportunities).toContain('data-testid="world-pulse-card"');
+    expect(intel).toContain('data-testid="retention-roadmap"');
+    expect(intel).toContain('data-testid="organization-records"');
+    expect(commandCenter).toContain('group: "Prioridades"');
+    expect(localGuest).toContain('if(path==="missions/decision")');
+    expect(localGuest).toContain("localWorldPulse");
+  });
+
+
 });
