@@ -85,7 +85,6 @@ class Team(BaseDocument):
     doctrine: str = "balanced"
     policies: dict = {}
     loadout: dict = {}
-    loadout_injury_mult: float = 1.0
 
 
 class Employee(BaseDocument):
@@ -295,6 +294,7 @@ class Mission(BaseDocument):
     doctrine_heat_mult: float = 1.0
     doctrine_fatigue_mult: float = 1.0
     loadout: dict = {}
+    loadout_injury_mult: float = 1.0
 
 
 class Event(BaseDocument):
