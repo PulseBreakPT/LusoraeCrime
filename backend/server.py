@@ -100,6 +100,13 @@ async def migrate_integrated_org():
             "reserve_cash": 25000,
             "max_single_spend_pct": 0.35,
             "stock_targets": {},
+            "weekly_budgets": {
+                "supplies": 0,
+                "fleet": 0,
+                "infrastructure": 0,
+                "territory": 0,
+                "people": 0,
+            },
             "automation": {
                 "enabled": False,
                 "auto_restock": False,
