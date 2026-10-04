@@ -297,6 +297,7 @@ class Mission(BaseDocument):
     decision: Optional[dict] = None
     decision_reward_mult: float = 1.0
     world_pulse: Optional[dict] = None
+    city_world: Optional[dict] = None
     doctrine: str = "balanced"
     doctrine_heat_mult: float = 1.0
     doctrine_fatigue_mult: float = 1.0

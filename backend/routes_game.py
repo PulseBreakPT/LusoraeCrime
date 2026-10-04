@@ -86,6 +86,7 @@ from economy_constants import (
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from retention_engine import build_retention_snapshot, mission_decision, world_pulse
+from city_systems import operation_world_modifier, business_network_effect
 from game_data import operation_profile_of, OPERATION_PROFILE_LABELS
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
@@ -833,6 +834,9 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     round_km = 2 * straight_dist / 1000
 
     props = await db.properties.find({"player_id": pid}).to_list(200)
+    city_businesses = await db.city_businesses.find({"player_id": pid}).to_list(100)
+    city_fx = operation_world_modifier(opp["category"], now, player.get("region") or "Portugal")
+    business_chance = business_network_effect(city_businesses, opp["category"])
 
     speed = effective_speed(vehicle)
     travel_s = max(20, straight_dist / speed)
@@ -890,6 +894,10 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
                                (best_driver - DRIVER_ATTR_BASELINE) * DRIVER_TRAVEL_REDUCTION_PER_POINT)
         travel_s = max(20, travel_s * (1 - driver_reduction))
         return_travel_s = max(20, return_travel_s * (1 - driver_reduction))
+
+    # Cidade Viva: clima + hora + evento são globais e transparentes no preview.
+    travel_s = max(20, travel_s * float(city_fx["travel_mult"]))
+    return_travel_s = max(20, return_travel_s * float(city_fx["travel_mult"]))
 
     mult = 1.0
     prop_ranks = property_stack_ranks(props)
@@ -968,6 +976,21 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     if loadout_delta:
         breakdown.append({"key": "loadout", "label": "Equipamento preparado", "pct": loadout_delta})
     chance = max(0.02, min(0.97, chance + doctrine_delta + loadout_delta))
+
+    city_delta = float(city_fx.get("chance_delta", 0.0))
+    if city_delta:
+        breakdown.append({
+            "key": "cidade_viva",
+            "label": f"Cidade Viva: {city_fx['label']}",
+            "pct": city_delta,
+        })
+    if business_chance:
+        breakdown.append({
+            "key": "rede_empresarial",
+            "label": "Rede empresarial ativa",
+            "pct": business_chance,
+        })
+    chance = max(0.02, min(0.97, chance + city_delta + business_chance))
 
     profile_delta, profile_label = _operation_profile_effect(
         operation_profile, members, vehicle, weapons_by_employee_id
@@ -1064,7 +1087,7 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     if spec_match:
         prestige_reward += float(prestige.get("spec_bonus", 0.0))
     reward = int(
-        reward_data["money"] * mult * pulse_reward_mult * age_mult * split_mult
+        reward_data["money"] * mult * pulse_reward_mult * float(city_fx["reward_mult"]) * age_mult * split_mult
         * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward)
     )
     reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
@@ -1082,9 +1105,12 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
         "return_travel_s": return_travel_s, "road_outward": road_outward, "road_inward": road_inward,
         "repeat_count": repeat_count, "operation_profile": operation_profile, "operation_profile_label": profile_label,
         "reward": reward,
-        "reward_mult": mult * pulse_reward_mult * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward),
+        "reward_mult": mult * pulse_reward_mult * float(city_fx["reward_mult"]) * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward),
         "age_mult": age_mult, "split_mult": split_mult,
         "world_pulse": mission_pulse,
+        "city_world": city_fx["context"],
+        "city_heat_mult": float(city_fx["heat_mult"]),
+        "business_chance_bonus": business_chance,
         "reward_difficulty_score": reward_data["difficulty_score"],
         "reward_xp": reward_data["xp"],
         "reward_reputation": reward_data["reputation"],
@@ -1171,6 +1197,8 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "min_members_met": len(prep["members"]) >= prep["min_members"],
         "weapon_alerts": prep.get("weapon_alerts", []),
         "world_pulse": prep.get("world_pulse"),
+        "city_world": prep.get("city_world"),
+        "business_chance_bonus": prep.get("business_chance_bonus", 0.0),
         "doctrine": prep.get("doctrine", "balanced"),
         "doctrine_heat_mult": prep.get("doctrine_heat_mult", 1.0),
         "doctrine_fatigue_mult": prep.get("doctrine_fatigue_mult", 1.0),
@@ -1219,19 +1247,20 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     road_outward = prep["road_outward"]
     road_inward = prep["road_inward"]
 
-    # Pequenos imprevistos, decididos só no momento do despacho (não na
-    # pré-visualização, para esta continuar a mostrar sempre o valor de base):
-    # trânsito e chuva podem atrasar ligeiramente a viagem.
+    # O clima deixou de ser um dado aleatório por missão: é o estado global
+    # da Cidade Viva, já incluído no preview e no tempo base. O trânsito mantém
+    # uma pequena componente local/ocasional.
     travel_s = prep["travel_s"]
     return_travel_s = prep.get("return_travel_s", travel_s)
     incidents = []
     if random.random() < TRAFFIC_DELAY_CHANCE:
         travel_s *= 1 + random.uniform(0.03, TRAFFIC_DELAY_MAX_PCT)
         incidents.append("trânsito")
-    if random.random() < RAIN_CHANCE:
-        travel_s *= RAIN_TRAVEL_MULT
-        return_travel_s *= RAIN_TRAVEL_MULT
+    weather_key = ((prep.get("city_world") or {}).get("weather") or {}).get("key")
+    if weather_key in {"chuva", "chuva_forte", "tempestade"}:
         incidents.append("chuva")
+    elif weather_key == "nevoeiro":
+        incidents.append("nevoeiro")
     if incidents:
         await add_event(db, pid, "team", f"{team['name']} apanhou {' e '.join(incidents)} a caminho de {opp['name']} — viagem mais lenta.")
 
@@ -1297,7 +1326,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
-            "risk": opp["risk"], "heat": round(opp["heat"] * prep.get("doctrine_heat_mult", 1.0), 3),
+            "risk": opp["risk"], "heat": round(opp["heat"] * prep.get("doctrine_heat_mult", 1.0) * prep.get("city_heat_mult", 1.0), 3),
             "pays": opp["pays"], "min_level": opp["min_level"],
             "profile": prep.get("operation_profile", "confrontation"),
             "distance_km": round(prep.get("dist", 0) / 1000.0, 2),
@@ -1319,6 +1348,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "decision": decision,
         "decision_reward_mult": 1.0,
         "world_pulse": prep.get("world_pulse"),
+        "city_world": prep.get("city_world"),
     }
     # Reserva atómica: duas tabs/requests nunca conseguem despachar a mesma
     # oportunidade ou a mesma equipa em simultâneo.

@@ -18,6 +18,7 @@ from routes_mastermind import router as mastermind_router
 from routes_admin import router as admin_router
 from routes_legal import router as legal_router
 from routes_organization import router as organization_router
+from routes_city import router as city_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY, WEAPON_MODELS
 from road_routing import road_router
@@ -30,6 +31,7 @@ app.include_router(mastermind_router)
 app.include_router(admin_router)
 app.include_router(legal_router)
 app.include_router(organization_router)
+app.include_router(city_router)
 
 
 @app.get("/api/")
@@ -182,6 +184,14 @@ async def startup():
     await db.action_receipts.create_index("key", unique=True)
     await db.action_receipts.create_index("expires_at", expireAfterSeconds=0)
     await db.organization_audit.create_index([("player_user_id", 1), ("ts", -1)])
+    await db.city_businesses.create_index([("player_id", 1), ("type_key", 1)])
+    await db.city_rivals.create_index([("player_id", 1), ("key", 1)], unique=True)
+    await db.city_season_scores.create_index([("season_id", 1), ("points", -1)])
+    await db.city_season_scores.create_index([("player_id", 1), ("season_id", 1)], unique=True)
+    await db.city_chat.create_index([("ts", -1)])
+    await db.city_alliances.create_index("code", unique=True)
+    await db.city_alliances.create_index("member_ids")
+    await db.city_pvp_challenges.create_index([("defender_id", 1), ("status", 1)])
     await db.quests.create_index([("player_id", 1), ("status", 1)])
     await db.road_routes.create_index("key", unique=True)
     await db.road_routes.create_index("expires_at")

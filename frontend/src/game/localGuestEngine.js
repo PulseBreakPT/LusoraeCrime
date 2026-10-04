@@ -1,5 +1,6 @@
 import { LOCAL_CATALOG, LOCAL_GUEST_SAVE_VERSION } from "./localGuestCatalog";
 import { propertyMarketPrice } from "../lib/propertyMarket";
+import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance } from "./livingCity";
 
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
@@ -615,6 +616,7 @@ const loadSave = () => {
     normalizeSavedStats(save);
     normalizeSavedEconomy(save);
     ensureOrganizationSave(save);
+    ensureLocalCity(save);
     save.version = LOCAL_GUEST_SAVE_VERSION;
     persist(save);
     return save;
@@ -907,6 +909,9 @@ const missionChance = (save, opp, team) => {
   if (members.length >= (opp.min_members || 1)) chance += 0.04;
   if (vehicle) chance += clamp((vehicle.condition-50)/500, -0.1, 0.1);
   chance += operationProfileEffect(save,opp,members,vehicle).delta;
+  const cityWorld=localCityWorld(save);
+  chance += Number(cityWorld.modifiers?.chance?.[opp.category]||0);
+  chance += localBusinessChance(save,opp.category);
   return clamp(chance,0.08,0.95);
 };
 
@@ -942,7 +947,8 @@ const finalizeMission = (save, mission) => {
     const risk = normalizeRisk(mission.risk);
     save.player.respect += Math.max(20, risk * 24);
     const pulseHeat=Number(mission.world_pulse?.applied_heat_mult||1);
-    save.player.heat=clamp(save.player.heat + risk * 2.2 * pulseHeat,0,100);
+    const cityHeat=Number(mission.city_heat_mult||mission.city_world?.modifiers?.heat_mult||1);
+    save.player.heat=clamp(save.player.heat + risk * 2.2 * pulseHeat * cityHeat,0,100);
     stats.missions_success=(stats.missions_success||0)+1;
     stats.success_by_category ||= {};
     stats.success_by_category[mission.category]=(stats.success_by_category[mission.category]||0)+1;
@@ -956,7 +962,8 @@ const finalizeMission = (save, mission) => {
   } else {
     const risk = normalizeRisk(mission.risk);
     const pulseHeat=Number(mission.world_pulse?.applied_heat_mult||1);
-    save.player.heat=clamp(save.player.heat + risk * 4.5 * pulseHeat,0,100);
+    const cityHeat=Number(mission.city_heat_mult||mission.city_world?.modifiers?.heat_mult||1);
+    save.player.heat=clamp(save.player.heat + risk * 4.5 * pulseHeat * cityHeat,0,100);
     stats.missions_failure=(stats.missions_failure||0)+1;
     stats.missions_failed=stats.missions_failure;
     mission.pending_reward=0; mission.pending_pays=mission.pays;
@@ -967,6 +974,7 @@ const finalizeMission = (save, mission) => {
 };
 
 const tick = (save) => {
+  advanceLocalCity(save);
   const now=Date.now();
   const previous=Number(save.last_tick||now);
   const elapsed=Math.max(0,Math.min(24*3600,(now-previous)/1000));
@@ -1361,20 +1369,27 @@ const mutateGame=(save,path,payload)=>{
     const members=save.employees.filter(e=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90);
     const vehicle=save.vehicles.find(v=>v.id===team.vehicle_id);
     const chance=missionChance(save,opp,team);
+    const cityWorld=localCityWorld(save);
+    const cityRewardMult=Number(cityWorld.modifiers?.reward_mult||1);
+    const cityTravelMult=Number(cityWorld.modifiers?.travel_mult||1);
+    const businessChance=localBusinessChance(save,opp.category);
     const pulse=localWorldPulse();
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
     const repeatCount=consecutiveRepeatCount(team,opp);
     const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
     const profile=operationProfileEffect(save,opp,members,vehicle);
-    return {chance,reward:Math.round(opp.reward*pulseRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
+    return {chance,reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult*cityRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
       repeat_count:repeatCount,repeat_penalty_pct:Math.round((repeatMult-1)*1000)/10,operation_profile:profile.profile,operation_profile_label:profile.label,distance_km:Math.round(opp.dist_km*2*10)/10,
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
+      city_world:cityWorld,business_chance_bonus:businessChance,
       fuel_needed:vehicle?Math.max(1,Math.round((opp.dist_km*2*vehicle.cons/100)*10)/10):0,
-      eta_s:10+Math.round(opp.dist_km*2),duration_s:opp.duration_s||24,
+      eta_s:Math.round((10+opp.dist_km*2)*cityTravelMult),duration_s:opp.duration_s||24,
       breakdown:[
         {key:"base",label:"Base",pct:.5},{key:"team",label:"Competência",pct:(chance-.5)/2},
         {key:"risk",label:"Risco",pct:-(opp.risk||0)/500},{key:"heat",label:"Calor",pct:-save.player.heat/1000},
+        {key:"cidade_viva",label:`Cidade Viva: ${cityWorld.weather.name} · ${cityWorld.event.name}`,pct:Number(cityWorld.modifiers?.chance?.[opp.category]||0)},
+        ...(businessChance?[{key:"rede_empresarial",label:"Rede empresarial ativa",pct:businessChance}]:[]),
       ],members:members.length};
   }
   if(path==="dispatch/recommend_team"){
@@ -1405,12 +1420,17 @@ const mutateGame=(save,path,payload)=>{
     const target={lat:Number(opp.lat),lng:Number(opp.lng)};
     const rawOutward=p.route_outward;
     const rawInward=p.route_inward;
-    const outwardTravelS=rawOutward && !rawOutward.unavailable
+    const cityWorld=localCityWorld(save);
+    const cityTravelMult=Number(cityWorld.modifiers?.travel_mult||1);
+    const cityRewardMult=Number(cityWorld.modifiers?.reward_mult||1);
+    const baseOutwardTravelS=rawOutward && !rawOutward.unavailable
       ? routeTravelSeconds(rawOutward,vehicle)
       : Math.max(20,(10000+opp.dist_km*1200)/1000);
-    const inwardTravelS=rawInward && !rawInward.unavailable
+    const baseInwardTravelS=rawInward && !rawInward.unavailable
       ? routeTravelSeconds(rawInward,vehicle)
-      : outwardTravelS;
+      : baseOutwardTravelS;
+    const outwardTravelS=Math.max(20,baseOutwardTravelS*cityTravelMult);
+    const inwardTravelS=Math.max(20,baseInwardTravelS*cityTravelMult);
     const eta=Math.round(outwardTravelS*1000);
     const ret=Math.round(inwardTravelS*1000);
     const oper=(opp.duration_s||24)*1000;
@@ -1431,7 +1451,7 @@ const mutateGame=(save,path,payload)=>{
     const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
     const profile=operationProfileEffect(save,opp,members,vehicle);
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
-      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult*repeatMult),pays:opp.pays,
+      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),pays:opp.pays,
       repeat_type:repeatCount>0,repeat_count:repeatCount,operation_profile:profile.profile,
       fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:baseChance,success_chance:baseChance,
       live_chance_delta:0,decision_reward_mult:1,phase:"en_route",
@@ -1441,8 +1461,9 @@ const mutateGame=(save,path,payload)=>{
       live_log:[],
       decision:localMissionDecision(opp.category,opp.risk,arriveAt,finishAt),
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
+      city_world:cityWorld,city_heat_mult:Number(cityWorld.modifiers?.heat_mult||1),
       opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
-        reward:Math.round(opp.reward*pulseRewardMult*repeatMult),risk:opp.risk,heat:opp.heat,pays:opp.pays,profile:profile.profile}};
+        reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),risk:opp.risk,heat:Number(opp.heat||0)*Number(cityWorld.modifiers?.heat_mult||1),pays:opp.pays,profile:profile.profile}};
     team.status="on_mission";team.last_type_key=opp.type_key;team.last_type_at=new Date(start).toISOString();team.repeat_type_count=repeatCount;members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
@@ -1944,6 +1965,9 @@ export async function localGuestRequest(method,url,payload){
   let save=tick(loadSave());
   const path=String(url||"").replace(/^https?:\/\/[^/]+\/api/,"").replace(/^\/api/,"");
   const verb=String(method||"get").toLowerCase();
+
+  const cityResult=handleLocalCityRequest(save,verb,path,payload||{});
+  if(cityResult.handled){persist(save);return {data:cityResult.data,status:200};}
 
   if(verb==="get"&&path==="/auth/me") return {data:getLocalGuestUser(),status:200};
   if(verb==="post"&&path==="/auth/logout") return {data:{ok:true},status:200};
