@@ -13,7 +13,7 @@ import { Input } from "../ui/input";
 import {
   Network, Wallet, PackageOpen, Users, Car, Swords, Warehouse, MapPinned,
   TrendingUp, ShieldCheck, Gauge, Wrench, Fuel, Shield, ClipboardCheck,
-  Crosshair, Plus, Minus, Crown, Building2,
+  Crosshair, Plus, Minus, Crown,
   Boxes, UserRoundCog, Landmark, Banknote,
 } from "lucide-react";
 
@@ -155,10 +155,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
 
         {tab === "centro" && (
           <div className="mt-3 space-y-4">
-            <SummaryStrip cols={4}>
+            <SummaryStrip cols={3}>
               <Kpi icon={Wallet} label="Caixa" value={fmtMoney(state.player.clean_money)} color="#34D399" />
               <Kpi icon={TrendingUp} label="Resultado 30d" value={finance ? fmtMoney(finance.net) : "—"} color={(finance?.net || 0) >= 0 ? "#34D399" : "#EF4444"} />
-              <Kpi icon={Building2} label="Ativos" value={finance ? fmtMoney(finance.asset_value) : "—"} color="#22D3EE" />
               <Kpi icon={Banknote} label="Fixos/sem." value={fmtMoney(state.weekly_fixed_total || 0)} color="#F59E0B" />
             </SummaryStrip>
 
@@ -263,9 +262,8 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
 
         {tab === "stock" && (
           <div className="mt-3 space-y-3">
-            <SummaryStrip cols={3}>
+            <SummaryStrip cols={2}>
               <Kpi icon={Boxes} label="Ocupado" value={`${storageUsed.toFixed(0)}/${storageCap}`} color="#22D3EE" bar={storageCap ? storageUsed / storageCap * 100 : 0} />
-              <Kpi icon={PackageOpen} label="Referências" value={supplyEntries.length} color="#F59E0B" />
               <Kpi icon={Wallet} label="Caixa" value={fmtMoney(money)} color="#34D399" />
             </SummaryStrip>
             <SectionHeader icon={PackageOpen} title="Armazém logístico" meta="18 stocks" />
