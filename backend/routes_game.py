@@ -1884,6 +1884,7 @@ async def refresh_recruitment(body: Optional[MutationInput] = None, user: dict =
 
 
 @router.post("/employees/assign")
+@idempotent("employees.assign")
 async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -1899,15 +1900,29 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
             raise HTTPException(status_code=400, detail=f"A equipa já está no limite de {TEAM_MAX_MEMBERS} membros")
     old_team_id = emp.get("team_id")
     station = emp.get("stationed_property_id")
-    if body.team_id and station:
-        await db.properties.update_one(
-            {"_id": ObjectId(station), "player_id": pid},
-            {"$pull": {"staff_employee_ids": body.employee_id}},
-        )
-    await db.employees.update_one(
-        {"_id": emp["_id"]},
+    if old_team_id == body.team_id:
+        return {"ok": True}
+
+    changed = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "status": "idle", "team_id": old_team_id},
         {"$set": {"team_id": body.team_id, **({"stationed_property_id": None} if body.team_id else {})}},
     )
+    if changed.modified_count != 1:
+        raise HTTPException(status_code=409, detail="A atribuição do operacional mudou noutra sessão")
+
+    if body.team_id:
+        after = await db.employees.count_documents({"player_id": pid, "team_id": body.team_id})
+        if after > TEAM_MAX_MEMBERS:
+            await db.employees.update_one(
+                {"_id": emp["_id"], "team_id": body.team_id},
+                {"$set": {"team_id": old_team_id, "stationed_property_id": station}},
+            )
+            raise HTTPException(status_code=409, detail=f"A equipa atingiu o limite de {TEAM_MAX_MEMBERS} membros noutra sessão")
+        if station:
+            await db.properties.update_one(
+                {"_id": ObjectId(station), "player_id": pid},
+                {"$pull": {"staff_employee_ids": body.employee_id}},
+            )
     # Mudar o plantel de uma equipa quebra a coordenação: reinicia a veterania e
     # aplica um pequeno cooldown de reorganização antes do próximo despacho.
     affected_ids = {tid for tid in (old_team_id, body.team_id) if tid}
@@ -2363,6 +2378,7 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/vehicles/assign")
+@idempotent("vehicles.assign")
 async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2371,18 +2387,59 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if not await _vehicle_free(pid, vehicle):
         raise HTTPException(status_code=400, detail="O veículo está em operação")
-    if vehicle.get("team_id"):
-        await db.teams.update_one({"_id": ObjectId(vehicle["team_id"])}, {"$set": {"vehicle_id": None}})
+    old_team_id = vehicle.get("team_id")
+    vehicle_id = str(vehicle["_id"])
+    if old_team_id == body.team_id:
+        return {"ok": True}
+
     if body.team_id:
         team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": pid})
         if not team:
             raise HTTPException(status_code=404, detail="Equipa não encontrada")
         if team["status"] != "idle":
             raise HTTPException(status_code=400, detail="A equipa está em operação")
-        if team.get("vehicle_id"):
-            await db.vehicles.update_one({"_id": ObjectId(team["vehicle_id"])}, {"$set": {"team_id": None}})
-        await db.teams.update_one({"_id": team["_id"]}, {"$set": {"vehicle_id": str(vehicle["_id"])}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"team_id": body.team_id}})
+        previous_vehicle_id = team.get("vehicle_id")
+
+        claimed_team = await db.teams.update_one(
+            {"_id": team["_id"], "player_id": pid, "status": "idle", "vehicle_id": previous_vehicle_id},
+            {"$set": {"vehicle_id": vehicle_id}},
+        )
+        if claimed_team.modified_count != 1:
+            raise HTTPException(status_code=409, detail="A frota da equipa mudou noutra sessão")
+
+        claimed_vehicle = await db.vehicles.update_one(
+            {"_id": vehicle["_id"], "player_id": pid, "team_id": old_team_id},
+            {"$set": {"team_id": body.team_id}},
+        )
+        if claimed_vehicle.modified_count != 1:
+            await db.teams.update_one(
+                {"_id": team["_id"], "vehicle_id": vehicle_id},
+                {"$set": {"vehicle_id": previous_vehicle_id}},
+            )
+            raise HTTPException(status_code=409, detail="O veículo foi atribuído noutra sessão")
+
+        if old_team_id and old_team_id != body.team_id:
+            await db.teams.update_one(
+                {"_id": ObjectId(old_team_id), "player_id": pid, "vehicle_id": vehicle_id},
+                {"$set": {"vehicle_id": None}},
+            )
+        if previous_vehicle_id and previous_vehicle_id != vehicle_id:
+            await db.vehicles.update_one(
+                {"_id": ObjectId(previous_vehicle_id), "player_id": pid, "team_id": body.team_id},
+                {"$set": {"team_id": None}},
+            )
+    else:
+        claimed_vehicle = await db.vehicles.update_one(
+            {"_id": vehicle["_id"], "player_id": pid, "team_id": old_team_id},
+            {"$set": {"team_id": None}},
+        )
+        if claimed_vehicle.modified_count != 1:
+            raise HTTPException(status_code=409, detail="O veículo foi atribuído noutra sessão")
+        if old_team_id:
+            await db.teams.update_one(
+                {"_id": ObjectId(old_team_id), "player_id": pid, "vehicle_id": vehicle_id},
+                {"$set": {"vehicle_id": None}},
+            )
     return {"ok": True}
 
 
@@ -2673,6 +2730,7 @@ async def repair_weapon(body: WeaponIdInput, user: dict = Depends(get_current_us
 
 
 @router.post("/weapons/assign")
+@idempotent("weapons.assign")
 async def assign_weapon(body: WeaponAssignInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2684,19 +2742,44 @@ async def assign_weapon(body: WeaponAssignInput, user: dict = Depends(get_curren
         raise HTTPException(status_code=400, detail="Operacional está ocupado")
     if not await _weapon_free(pid, weapon):
         raise HTTPException(status_code=400, detail="O funcionário atualmente equipado está em operação")
-    # Desatribuir a arma anterior do funcionário (de volta ao inventário) e
-    # esta arma de outro funcionário, se aplicável — mirror do padrão de
-    # vehicles/assign, mas do lado do funcionário.
-    if emp.get("weapon_id") and emp["weapon_id"] != str(weapon["_id"]):
-        await db.weapons.update_one({"_id": ObjectId(emp["weapon_id"])}, {"$set": {"employee_id": None}})
-    if weapon.get("employee_id") and weapon["employee_id"] != body.employee_id:
-        await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"weapon_id": str(weapon["_id"])}})
-    await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"employee_id": body.employee_id}})
+    weapon_id = str(weapon["_id"])
+    old_weapon_id = emp.get("weapon_id")
+    old_holder_id = weapon.get("employee_id")
+    if old_weapon_id == weapon_id and old_holder_id == body.employee_id:
+        return {"ok": True}
+
+    claimed_emp = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "status": "idle", "weapon_id": old_weapon_id},
+        {"$set": {"weapon_id": weapon_id}},
+    )
+    if claimed_emp.modified_count != 1:
+        raise HTTPException(status_code=409, detail="O armamento do operacional mudou noutra sessão")
+    claimed_weapon = await db.weapons.update_one(
+        {"_id": weapon["_id"], "player_id": pid, "employee_id": old_holder_id},
+        {"$set": {"employee_id": body.employee_id}},
+    )
+    if claimed_weapon.modified_count != 1:
+        await db.employees.update_one(
+            {"_id": emp["_id"], "weapon_id": weapon_id},
+            {"$set": {"weapon_id": old_weapon_id}},
+        )
+        raise HTTPException(status_code=409, detail="A arma foi atribuída noutra sessão")
+
+    if old_weapon_id and old_weapon_id != weapon_id:
+        await db.weapons.update_one(
+            {"_id": ObjectId(old_weapon_id), "player_id": pid, "employee_id": body.employee_id},
+            {"$set": {"employee_id": None}},
+        )
+    if old_holder_id and old_holder_id != body.employee_id:
+        await db.employees.update_one(
+            {"_id": ObjectId(old_holder_id), "player_id": pid, "weapon_id": weapon_id},
+            {"$set": {"weapon_id": None}},
+        )
     return {"ok": True}
 
 
 @router.post("/weapons/unassign")
+@idempotent("weapons.unassign")
 async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2705,8 +2788,17 @@ async def unassign_weapon(body: WeaponUnassignInput, user: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail="Operacional não tem arma equipada")
     if emp["status"] != "idle":
         raise HTTPException(status_code=400, detail="Operacional está ocupado")
-    await db.weapons.update_one({"_id": ObjectId(emp["weapon_id"])}, {"$set": {"employee_id": None}})
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"weapon_id": None}})
+    weapon_id = emp["weapon_id"]
+    changed = await db.employees.update_one(
+        {"_id": emp["_id"], "player_id": pid, "status": "idle", "weapon_id": weapon_id},
+        {"$set": {"weapon_id": None}},
+    )
+    if changed.modified_count != 1:
+        raise HTTPException(status_code=409, detail="O armamento do operacional mudou noutra sessão")
+    await db.weapons.update_one(
+        {"_id": ObjectId(weapon_id), "player_id": pid, "employee_id": body.employee_id},
+        {"$set": {"employee_id": None}},
+    )
     return {"ok": True}
 
 
