@@ -713,6 +713,39 @@ OPPORTUNITY_TYPES = {
                          "required_models": ["carro_furtivo"]},
 }
 
+# Perfis mecânicos das operações. Os 67 tipos deixam de diferir apenas por
+# nome/números: cada perfil recompensa uma preparação diferente no despacho.
+OPERATION_PROFILE_LABELS = {
+    "confrontation": "Confronto",
+    "mobility": "Mobilidade",
+    "digital": "Digital",
+    "stealth": "Furtivo",
+    "influence": "Influência",
+}
+
+OPERATION_PROFILE_KEYWORDS = (
+    ("digital", ("hack", "ciber", "phishing", "cartoes", "dados", "ddos", "cript", "servidor", "semafor")),
+    ("mobility", ("transporte", "entrega", "rota", "carga", "contrabando", "porto", "frota")),
+    ("stealth", ("infiltr", "fantasma", "vigilancia", "espion", "encoberta", "obra_arte", "museu")),
+    ("influence", ("suborno", "chantag", "acordo", "imprensa", "protecao", "boato", "diplomat", "leilao")),
+    ("confrontation", ("assalto", "roubo", "emboscada", "guerra", "sequestro", "resgate", "assassinato", "ataque")),
+)
+
+
+def operation_profile_of(type_key, category):
+    key = str(type_key or "").lower()
+    for profile, keywords in OPERATION_PROFILE_KEYWORDS:
+        if any(token in key for token in keywords):
+            return profile
+    return {
+        "assalto": "confrontation",
+        "logistica": "mobility",
+        "tecnica": "digital",
+        "influencia": "influence",
+        "especial": "stealth",
+    }.get(category, "confrontation")
+
+
 # ---------------- Economia e recursos ----------------
 
 DIRTY_MONEY_HEAT_THRESHOLD = 60000       # acima deste montante de dinheiro sujo acumulado, gera calor extra

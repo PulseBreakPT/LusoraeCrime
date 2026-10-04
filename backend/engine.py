@@ -3,6 +3,7 @@ import logging
 import math
 import random
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from bson import ObjectId
 
 from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LEVEL_XP,
@@ -110,6 +111,10 @@ from economy_constants import (
     PROPERTY_CONDITION_RECOVERY_PER_WEEK, PROPERTY_CONDITION_DECAY_MISSED_WEEK,
 )
 from economy_calendar import next_weekly_settlement, is_weekly_settlement
+from game_data import operation_profile_of
+
+PORTUGAL_TZ = ZoneInfo("Europe/Lisbon")
+
 from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
@@ -756,12 +761,15 @@ def duration_reward_mult(duration_s):
 
 
 def hour_allowed(type_key, now):
-    """Algumas oportunidades só aparecem em certas horas do dia (UTC)."""
+    """Algumas oportunidades só aparecem nas horas locais configuradas para Portugal."""
     hours = OPPORTUNITY_TYPES[type_key].get("hours")
     if not hours:
         return True
     start, end = hours
-    h = now.hour
+    # O resto da economia já trabalha em Europe/Lisbon. Usar UTC aqui fazia
+    # operações noturnas abrir uma hora errada durante o horário de verão.
+    local_now = now.astimezone(PORTUGAL_TZ) if now.tzinfo else now.replace(tzinfo=timezone.utc).astimezone(PORTUGAL_TZ)
+    h = local_now.hour
     if start <= end:
         return start <= h < end
     return h >= start or h < end  # intervalo que atravessa a meia-noite
@@ -1003,7 +1011,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         return {
             "player_id": pid, "type_key": key,
             "name": (f"Golpe de Oportunidade: {t['name']}" if special else t["name"]),
-            "category": t["category"], "district": spot["name"],
+            "category": t["category"], "profile": operation_profile_of(key, t["category"]), "district": spot["name"],
             "lat": lat,
             "lng": lng,
             "dist_km": round(dist_km, 2),

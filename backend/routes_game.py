@@ -1,10 +1,12 @@
 import asyncio
 import math
 import random
+from functools import wraps
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from typing import Optional
 from datetime import timedelta
 
@@ -72,7 +74,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        SLOT_COST_VEHICLE_BASE, SLOT_COST_EMPLOYEE_BASE, SLOT_COST_SCALE_PER_UNIT,
                        VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
-from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX
+from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX, REPEAT_PENALTY_MULTIPLIER
 from property_market import property_market_price
 from road_routing import road_router
 from economy_calendar import WEEKLY_SETTLEMENT_WEEKDAY, WEEKLY_SETTLEMENT_HOUR
@@ -83,6 +85,7 @@ from economy_constants import (
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from retention_engine import build_retention_snapshot, mission_decision, world_pulse
+from game_data import operation_profile_of, OPERATION_PROFILE_LABELS
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
@@ -148,6 +151,127 @@ async def get_player(user: dict, allow_pending: bool = False) -> dict:
     return player
 
 
+class MutationInput(BaseModel):
+    request_id: Optional[str] = Field(default=None, max_length=80)
+
+
+def idempotent(action_name: str):
+    """Impede retries/reenvios de rede de executar a mesma mutação duas vezes."""
+    def decorator(fn):
+        @wraps(fn)
+        async def wrapped(*args, **kwargs):
+            body = kwargs.get("body")
+            if body is None:
+                body = next((arg for arg in args if isinstance(arg, BaseModel)), None)
+            request_id = getattr(body, "request_id", None)
+            user = kwargs.get("user")
+            if user is None:
+                user = next((arg for arg in args if isinstance(arg, dict) and "_id" in arg), None)
+            if not request_id or not user:
+                return await fn(*args, **kwargs)
+
+            key = f"{user['_id']}:{action_name}:{request_id}"
+            now = now_utc()
+            try:
+                await db.action_receipts.insert_one({
+                    "key": key, "status": "processing", "created_at": now,
+                    "expires_at": now + timedelta(hours=24),
+                })
+            except DuplicateKeyError:
+                existing = await db.action_receipts.find_one({"key": key})
+                if existing and existing.get("status") == "done":
+                    return existing.get("result") or {"ok": True, "idempotent_replay": True}
+                raise HTTPException(status_code=409, detail="Ação já está a ser processada")
+
+            try:
+                result = await fn(*args, **kwargs)
+            except Exception:
+                await db.action_receipts.delete_one({"key": key, "status": "processing"})
+                raise
+            await db.action_receipts.update_one(
+                {"key": key}, {"$set": {"status": "done", "result": result}}
+            )
+            return result
+        return wrapped
+    return decorator
+
+
+async def _debit_clean_atomic(player: dict, amount: int, extra_inc: Optional[dict] = None):
+    """Debita saldo numa única operação Mongo para impedir overspend concorrente."""
+    amount = max(0, int(amount))
+    inc = {"clean_money": -amount}
+    for key, value in (extra_inc or {}).items():
+        inc[key] = inc.get(key, 0) + value
+    fresh = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": amount}},
+        {"$inc": inc},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    player["clean_money"] = fresh["clean_money"]
+    return fresh
+
+
+def _road_mission_metrics(outward: dict, inward: dict, vehicle: dict, speed: float):
+    """Métricas autoritativas da viagem a partir da estrada real, não haversine."""
+    out_m = max(0.0, float((outward or {}).get("distance") or 0))
+    in_m = max(0.0, float((inward or {}).get("distance") or 0))
+    if out_m <= 0 or in_m <= 0:
+        raise HTTPException(status_code=422, detail="Percurso rodoviário sem distância válida")
+    round_km = (out_m + in_m) / 1000.0
+    fuel_needed = round_km * float(vehicle.get("cons", 0) or 0) / 100.0
+    effective = max(1.0, float(speed or 1))
+    return {
+        "out_m": out_m,
+        "in_m": in_m,
+        "round_km": round_km,
+        "fuel_needed": fuel_needed,
+        "travel_s": max(20.0, out_m / effective),
+        "return_travel_s": max(20.0, in_m / effective),
+    }
+
+
+def _operation_profile_effect(profile: str, members: list, vehicle: dict, weapons_by_employee_id: dict):
+    """Pequeno modificador contextual que torna o tipo concreto da operação relevante."""
+    role_sets = {
+        "digital": {"hacker", "criptografo", "engenheiro_social", "falsificador"},
+        "mobility": {"motorista", "piloto", "estafeta", "contrabandista"},
+        "stealth": {"espiao", "arrombador", "falsificador", "informador"},
+        "influence": {"negociador", "advogado", "chantagista", "relacoes_publicas", "informador"},
+        "confrontation": {"assaltante", "seguranca", "franco_atirador", "arrombador"},
+    }
+    attr_sets = {
+        "digital": ("hack", "inteligencia"),
+        "mobility": ("conducao", "discricao"),
+        "stealth": ("discricao", "sangue_frio"),
+        "influence": ("negociacao", "sangue_frio"),
+        "confrontation": ("tiro", "forca"),
+    }
+    roles = {m.get("role_key") for m in members}
+    attrs = attr_sets.get(profile, ("sangue_frio",))
+    values = [float((m.get("attrs") or {}).get(attr, 0) or 0) for m in members for attr in attrs]
+    avg = sum(values) / len(values) if values else 0.0
+    specialist = bool(roles & role_sets.get(profile, set()))
+    delta = (avg - 5.0) * 0.007 + (0.025 if specialist else -0.012)
+
+    model = VEHICLE_MODELS.get((vehicle or {}).get("model_key"), {})
+    if profile == "stealth":
+        if float(model.get("discretion", 50) or 50) >= STEALTH_VEHICLE_DISCRETION_MIN:
+            delta += 0.015
+        if any(WEAPON_MODELS.get(w.get("model_key"), {}).get("loud", False) for w in weapons_by_employee_id.values()):
+            delta -= 0.02
+    elif profile == "mobility":
+        delta += max(-0.015, min(0.02, (float((vehicle or {}).get("condition", 100) or 100) - 70) / 1500))
+    elif profile == "confrontation":
+        armed = sum(1 for m in members if str(m.get("_id")) in weapons_by_employee_id)
+        if members:
+            delta += (armed / len(members) - 0.5) * 0.025
+
+    delta = max(-0.06, min(0.07, delta))
+    return round(delta, 3), OPERATION_PROFILE_LABELS.get(profile, profile.title())
+
+
 class MapPointInput(BaseModel):
     lat: float
     lng: float
@@ -158,164 +282,164 @@ class RoadRouteInput(BaseModel):
     target: MapPointInput
 
 
-class DispatchInput(BaseModel):
+class DispatchInput(MutationInput):
     opportunity_id: str
     team_id: str
     route_outward: Optional[dict] = None
     route_inward: Optional[dict] = None
 
 
-class TeamIdInput(BaseModel):
+class TeamIdInput(MutationInput):
     team_id: str
 
 
-class OpportunityIdInput(BaseModel):
+class OpportunityIdInput(MutationInput):
     opportunity_id: str
 
 
-class TypeKeyInput(BaseModel):
+class TypeKeyInput(MutationInput):
     type_key: str
 
 
-class TeamCreateInput(BaseModel):
+class TeamCreateInput(MutationInput):
     spec: str
     employee_ids: list[str] = Field(default_factory=list)
     vehicle_id: Optional[str] = None
 
 
-class RecruitInput(BaseModel):
+class RecruitInput(MutationInput):
     candidate_id: str
 
 
-class EmployeeIdInput(BaseModel):
+class EmployeeIdInput(MutationInput):
     employee_id: str
 
 
-class EmployeeRenameInput(BaseModel):
+class EmployeeRenameInput(MutationInput):
     employee_id: str
     name: str = Field(min_length=1, max_length=40)
 
 
-class AssignEmployeeInput(BaseModel):
+class AssignEmployeeInput(MutationInput):
     employee_id: str
     team_id: Optional[str] = None
 
 
-class TrainInput(BaseModel):
+class TrainInput(MutationInput):
     employee_id: str
     course_key: str
 
 
-class VehicleBuyInput(BaseModel):
+class VehicleBuyInput(MutationInput):
     model_key: str
 
 
-class VehicleIdInput(BaseModel):
+class VehicleIdInput(MutationInput):
     vehicle_id: str
 
 
-class VehicleRenameInput(BaseModel):
+class VehicleRenameInput(MutationInput):
     vehicle_id: str
     name: str = Field(min_length=1, max_length=40)
 
 
-class MissionIdInput(BaseModel):
+class MissionIdInput(MutationInput):
     mission_id: str
 
 
-class MissionDecisionInput(BaseModel):
+class MissionDecisionInput(MutationInput):
     mission_id: str
     option_id: str
 
 
-class VehicleAssignInput(BaseModel):
+class VehicleAssignInput(MutationInput):
     vehicle_id: str
     team_id: Optional[str] = None
 
 
-class VehicleTransferInput(BaseModel):
+class VehicleTransferInput(MutationInput):
     vehicle_id: str
     to_property_id: Optional[str] = None
 
 
-class WeaponBuyInput(BaseModel):
+class WeaponBuyInput(MutationInput):
     model_key: str
 
 
-class WeaponIdInput(BaseModel):
+class WeaponIdInput(MutationInput):
     weapon_id: str
 
 
-class WeaponAssignInput(BaseModel):
+class WeaponAssignInput(MutationInput):
     weapon_id: str
     employee_id: str
 
 
-class WeaponUnassignInput(BaseModel):
+class WeaponUnassignInput(MutationInput):
     employee_id: str
 
 
-class PropertyBuyInput(BaseModel):
+class PropertyBuyInput(MutationInput):
     type_key: str
     lat: float
     lng: float
 
 
-class PropertyIdInput(BaseModel):
+class PropertyIdInput(MutationInput):
     property_id: str
 
 
-class PropertyRenameInput(BaseModel):
+class PropertyRenameInput(MutationInput):
     property_id: str
     name: str = Field(min_length=1, max_length=40)
 
 
-class PriorityInput(BaseModel):
+class PriorityInput(MutationInput):
     priority: str
 
 
-class LaunderInput(BaseModel):
+class LaunderInput(MutationInput):
     amount: int
 
 
-class QuestClaimInput(BaseModel):
+class QuestClaimInput(MutationInput):
     quest_id: str
 
 
-class QuestChooseInput(BaseModel):
+class QuestChooseInput(MutationInput):
     quest_id: str
     option: str
 
 
-class ShopSpeedupInput(BaseModel):
+class ShopSpeedupInput(MutationInput):
     kind: str  # vehicle_refuel | vehicle_transfer | property_upgrade | hq_upgrade | team_reorg
     id: Optional[str] = None  # não usado para hq_upgrade
 
 
-class ShopBuySlotInput(BaseModel):
+class ShopBuySlotInput(MutationInput):
     kind: str  # vehicle | employee
 
 
-class ShopVipInput(BaseModel):
+class ShopVipInput(MutationInput):
     plan_key: str
 
 
-class ShopCosmeticInput(BaseModel):
+class ShopCosmeticInput(MutationInput):
     category: str  # vehicle_paint | team_emblem | hq_skin
     key: str
 
 
-class VehicleEquipPaintInput(BaseModel):
+class VehicleEquipPaintInput(MutationInput):
     vehicle_id: str
     paint_key: Optional[str] = None
 
 
-class TeamEquipEmblemInput(BaseModel):
+class TeamEquipEmblemInput(MutationInput):
     team_id: str
     emblem_key: Optional[str] = None
 
 
-class HqEquipSkinInput(BaseModel):
+class HqEquipSkinInput(MutationInput):
     skin_key: Optional[str] = None
 
 
@@ -676,7 +800,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
     }
 
 
-async def _prepare_dispatch(player, opp, team):
+async def _prepare_dispatch(player, opp, team, *, resolve_routes=False, route_outward=None, route_inward=None):
     pid = str(player["_id"])
     if team["status"] != "idle":
         raise HTTPException(status_code=400, detail="Equipa está ocupada")
@@ -720,16 +844,37 @@ async def _prepare_dispatch(player, opp, team):
         raise HTTPException(status_code=400, detail=f"Esta operação exige um destes veículos: {names}")
 
     origin = await resolve_mission_origin(db, player, vehicle)
-    dist = haversine_m(origin["lat"], origin["lng"], opp["lat"], opp["lng"])
-    round_km = 2 * dist / 1000
-    fuel_needed = round_km * vehicle["cons"] / 100
-    if vehicle["fuel_l"] < fuel_needed:
-        raise HTTPException(status_code=400, detail="Combustível insuficiente para a viagem")
+    straight_dist = haversine_m(origin["lat"], origin["lng"], opp["lat"], opp["lng"])
+    dist = straight_dist
+    round_km = 2 * straight_dist / 1000
 
     props = await db.properties.find({"player_id": pid}).to_list(200)
 
     speed = effective_speed(vehicle)
-    travel_s = max(20, dist / speed)
+    travel_s = max(20, straight_dist / speed)
+    return_travel_s = travel_s
+    road_outward = None
+    road_inward = None
+    if resolve_routes:
+        target_point = {"lat": float(opp["lat"]), "lng": float(opp["lng"])}
+        road_outward = _validated_client_road_plan(route_outward, origin, target_point)
+        road_inward = _validated_client_road_plan(route_inward, target_point, origin)
+        if not road_outward or not road_inward:
+            road_outward, road_inward = await asyncio.gather(
+                road_router.get(origin, target_point),
+                road_router.get(target_point, origin),
+            )
+        metrics = _road_mission_metrics(road_outward, road_inward, vehicle, speed)
+        dist = metrics["out_m"]
+        round_km = metrics["round_km"]
+        travel_s = metrics["travel_s"]
+        return_travel_s = metrics["return_travel_s"]
+        fuel_needed = metrics["fuel_needed"]
+    else:
+        fuel_needed = round_km * vehicle["cons"] / 100
+
+    if vehicle["fuel_l"] < fuel_needed:
+        raise HTTPException(status_code=400, detail="Combustível insuficiente para a viagem rodoviária")
     # Equipas incompletas (abaixo da capacidade máxima) demoram mais tempo a
     # preparar-se antes de partir — esconderijos maiores (mais ativos e em bom
     # estado) reduzem esse atraso.
@@ -758,6 +903,7 @@ async def _prepare_dispatch(player, opp, team):
         driver_reduction = min(DRIVER_TRAVEL_REDUCTION_MAX,
                                (best_driver - DRIVER_ATTR_BASELINE) * DRIVER_TRAVEL_REDUCTION_PER_POINT)
         travel_s = max(20, travel_s * (1 - driver_reduction))
+        return_travel_s = max(20, return_travel_s * (1 - driver_reduction))
 
     mult = 1.0
     prop_ranks = property_stack_ranks(props)
@@ -780,6 +926,8 @@ async def _prepare_dispatch(player, opp, team):
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
+    repeat_count = int(team.get("repeat_type_count", 0) or 0) + 1 if team.get("last_type_key") == opp["type_key"] else 0
+    operation_profile = opp.get("profile") or operation_profile_of(opp.get("type_key"), opp.get("category"))
     # Inteligência da equipa (SSS v4): papéis internos e memória, lidos uma vez
     # aqui e usados na chance, nas perseguições e nas consequências pós-missão.
     try:
@@ -827,6 +975,17 @@ async def _prepare_dispatch(player, opp, team):
     if loadout_delta:
         breakdown.append({"key": "loadout", "label": "Equipamento preparado", "pct": loadout_delta})
     chance = max(0.02, min(0.97, chance + doctrine_delta + loadout_delta))
+
+    profile_delta, profile_label = _operation_profile_effect(
+        operation_profile, members, vehicle, weapons_by_employee_id
+    )
+    if profile_delta:
+        breakdown.append({
+            "key": f"perfil_{operation_profile}",
+            "label": f"Perfil da operação: {profile_label}",
+            "pct": profile_delta,
+        })
+        chance = max(0.02, min(0.97, chance + profile_delta))
 
     # Forense pré-falha (SSS v4): os 3 fatores mais negativos do despacho, para
     # o relatório de falha explicar PORQUÊ ("Fator crítico: ...").
@@ -884,15 +1043,15 @@ async def _prepare_dispatch(player, opp, team):
         min_members_required=opp.get("min_members", 1),
         required_models=opp.get("required_models", []),
         duration_s=int(duration_avg),
-        distance_km=dist,
+        distance_km=dist / 1000.0,
         num_objectives=opp.get("num_objectives", 1),
         specialization_required=opp["category"] != "especial",
         org_level=player.get("level", 1),
         category=opp["category"],
         failure_probability=1.0 - chance,  # Probabilidade de falha
-        is_rare_mission=opp.get("weight", 1) >= 8,  # Missões com weight alto são raras
+        is_rare_mission=bool(opp.get("rare")),
         multiplier_stack=1.0,  # bónus de propriedades/conquistas é aplicado UMA vez abaixo
-        repeat_count=0,  # TODO: rastrear repetições consecutivas se desejado
+        repeat_count=repeat_count
         vehicles_dict=VEHICLE_MODELS,
         specialization_match=spec_match,
     )
@@ -927,6 +1086,8 @@ async def _prepare_dispatch(player, opp, team):
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
+        "return_travel_s": return_travel_s, "road_outward": road_outward, "road_inward": road_inward,
+        "repeat_count": repeat_count, "operation_profile": operation_profile, "operation_profile_label": profile_label,
         "reward": reward,
         "reward_mult": mult * pulse_reward_mult * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward),
         "age_mult": age_mult, "split_mult": split_mult,
@@ -951,7 +1112,7 @@ async def _prepare_dispatch(player, opp, team):
         "doctrine": doctrine.get("key", "balanced"),
         "doctrine_heat_mult": float(doctrine.get("heat", 1.0)) * float(loadout_fx.get("heat", 1.0)),
         "doctrine_fatigue_mult": float(doctrine.get("fatigue", 1.0)),
-        "loadout": loadout,
+        "loadout": prep.get("loadout", {}),
         "loadout_injury_mult": float(loadout_fx.get("injury", 1.0)),
         "territory_bonus": territory_bonus,
         "prestige_reward_bonus": prestige_reward,
@@ -1050,7 +1211,10 @@ async def road_route(body: RoadRouteInput, user: dict = Depends(get_current_user
 @router.post("/dispatch/preview")
 async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current_user)):
     player, opp, team = await _validate_dispatch_inputs(body, user)
-    prep = await _prepare_dispatch(player, opp, team)
+    prep = await _prepare_dispatch(
+        player, opp, team, resolve_routes=True,
+        route_outward=body.route_outward, route_inward=body.route_inward,
+    )
     return {
         "chance": round(prep["chance"], 3),
         "breakdown": prep["breakdown"],
@@ -1061,6 +1225,11 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "reward_bonus_pct": round((prep["reward_mult"] - 1) * 100, 1),
         "age_decay_pct": round((prep["age_mult"] - 1) * 100, 1),
         "split_penalty_pct": round((prep["split_mult"] - 1) * 100, 1),
+        "repeat_count": prep.get("repeat_count", 0),
+        "repeat_penalty_pct": round((REPEAT_PENALTY_MULTIPLIER ** prep.get("repeat_count", 0) - 1) * 100, 1),
+        "operation_profile": prep.get("operation_profile"),
+        "operation_profile_label": prep.get("operation_profile_label"),
+        "distance_km": round(prep.get("round_km", 0), 1),
         "members": len(prep["members"]),
         "effective_speed": round(prep["speed"], 1),
         "spec_match": prep["spec_match"],
@@ -1078,11 +1247,15 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
 
 
 @router.post("/dispatch")
+@idempotent("dispatch")
 async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     player, opp, team = await _validate_dispatch_inputs(body, user)
     pid = str(player["_id"])
     now = now_utc()
-    prep = await _prepare_dispatch(player, opp, team)
+    prep = await _prepare_dispatch(
+        player, opp, team, resolve_routes=True,
+        route_outward=body.route_outward, route_inward=body.route_inward,
+    )
     if len(prep["members"]) < prep["min_members"]:
         raise HTTPException(
             status_code=400,
@@ -1108,28 +1281,22 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     if shortages:
         raise HTTPException(status_code=400, detail="Stock insuficiente: " + ", ".join(shortages))
 
-    # Resolve ida e regresso ANTES de alterar qualquer estado. A missão nasce
-    # sempre com geometria real persistida; se o serviço rodoviário falhar,
-    # nada é debitado, ocupado ou marcado como "taken".
-    target_point = {"lat": float(opp["lat"]), "lng": float(opp["lng"])}
-    road_outward = _validated_client_road_plan(body.route_outward, prep["origin"], target_point)
-    road_inward = _validated_client_road_plan(body.route_inward, target_point, prep["origin"])
-    if not road_outward or not road_inward:
-        road_outward, road_inward = await asyncio.gather(
-            road_router.get(prep["origin"], target_point),
-            road_router.get(target_point, prep["origin"]),
-        )
+    # As duas rotas reais já foram validadas/resolvidas em _prepare_dispatch.
+    road_outward = prep["road_outward"]
+    road_inward = prep["road_inward"]
 
     # Pequenos imprevistos, decididos só no momento do despacho (não na
     # pré-visualização, para esta continuar a mostrar sempre o valor de base):
     # trânsito e chuva podem atrasar ligeiramente a viagem.
     travel_s = prep["travel_s"]
+    return_travel_s = prep.get("return_travel_s", travel_s)
     incidents = []
     if random.random() < TRAFFIC_DELAY_CHANCE:
         travel_s *= 1 + random.uniform(0.03, TRAFFIC_DELAY_MAX_PCT)
         incidents.append("trânsito")
     if random.random() < RAIN_CHANCE:
         travel_s *= RAIN_TRAVEL_MULT
+        return_travel_s *= RAIN_TRAVEL_MULT
         incidents.append("chuva")
     if incidents:
         await add_event(db, pid, "team", f"{team['name']} apanhou {' e '.join(incidents)} a caminho de {opp['name']} — viagem mais lenta.")
@@ -1137,7 +1304,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     depart = now
     arrive = depart + timedelta(seconds=travel_s)
     finish = arrive + timedelta(seconds=opp["duration_s"])
-    ret = finish + timedelta(seconds=travel_s)
+    ret = finish + timedelta(seconds=return_travel_s)
     member_ids = [str(e["_id"]) for e in members]
 
     # Operação em direto (SSS): guião narrativo da ida+operação com timestamps
@@ -1165,6 +1332,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
         "weapon_loud": prep.get("weapon_loud", False),
         "repeat_type": repeat_type,
+        "repeat_count": prep.get("repeat_count", 0),
+        "operation_profile": prep.get("operation_profile", "confrontation"),
         "talents": prep["talents"],
         # QI da equipa (SSS v4): campos que alimentam perseguições, clutch save,
         # papéis internos, aviso do líder e forense de falha.
@@ -1188,6 +1357,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
             "risk": opp["risk"], "heat": round(opp["heat"] * prep.get("doctrine_heat_mult", 1.0), 3),
             "pays": opp["pays"], "min_level": opp["min_level"],
+            "profile": prep.get("operation_profile", "confrontation"),
+            "distance_km": round(prep.get("dist", 0) / 1000.0, 2),
             "police_force": opp.get("police_force") or police_force_for(opp["lat"], opp["lng"]),
         },
         # Dados de recompensa dinâmica para cálculo consistente de XP/reputação
@@ -1207,17 +1378,44 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "decision_reward_mult": 1.0,
         "world_pulse": prep.get("world_pulse"),
     }
-    result = await db.missions.insert_one(mission)
-    await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
-    await db.teams.update_one({"_id": team["_id"]}, {"$set": {"status": "en_route", "last_type_key": opp["type_key"]}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
+    # Reserva atómica: duas tabs/requests nunca conseguem despachar a mesma
+    # oportunidade ou a mesma equipa em simultâneo.
+    claimed_opp = await db.opportunities.find_one_and_update(
+        {"_id": opp["_id"], "player_id": pid, "status": "active"},
+        {"$set": {"status": "taken"}},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not claimed_opp:
+        raise HTTPException(status_code=409, detail="A oportunidade acabou de ser ocupada")
+    claimed_team = await db.teams.find_one_and_update(
+        {"_id": team["_id"], "player_id": pid, "status": "idle"},
+        {"$set": {
+            "status": "en_route", "last_type_key": opp["type_key"],
+            "repeat_type_count": prep.get("repeat_count", 0),
+        }},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not claimed_team:
+        await db.opportunities.update_one({"_id": opp["_id"], "status": "taken"}, {"$set": {"status": "active"}})
+        raise HTTPException(status_code=409, detail="A equipa acabou de ser ocupada")
+
+    result = None
+    try:
+        result = await db.missions.insert_one(mission)
+        await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
         "fuel_l": round(vehicle["fuel_l"] - prep["fuel_needed"], 2),
         "km_total": round(vehicle["km_total"] + prep["round_km"], 2),
     }})
-    await db.employees.update_many(
-        {"_id": {"$in": [ObjectId(i) for i in member_ids]}},
-        {"$set": {"status": "on_mission"}},
-    )
+        await db.employees.update_many(
+            {"_id": {"$in": [ObjectId(i) for i in member_ids]}},
+            {"$set": {"status": "on_mission"}},
+        )
+    except Exception:
+        if result is not None:
+            await db.missions.delete_one({"_id": result.inserted_id})
+        await db.opportunities.update_one({"_id": opp["_id"], "status": "taken"}, {"$set": {"status": "active"}})
+        await db.teams.update_one({"_id": team["_id"], "status": "en_route"}, {"$set": {"status": "idle"}})
+        raise
     # Anti-repetição narrativa: guardar as frases usadas no guião de despacho
     # na memória da organização (mantida com um teto) — o regresso e as
     # próximas missões preferem voz nova.
@@ -1559,6 +1757,7 @@ async def resolve_mission_decision(body: MissionDecisionInput, user: dict = Depe
 
 
 @router.post("/teams/create")
+@idempotent("teams.create")
 async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_user)):
     if body.spec not in TEAM_SPECS:
         raise HTTPException(status_code=400, detail="Especialização inválida")
@@ -1611,12 +1810,16 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         "available_at": None, "roster_stable_since": created,
         # SSS v4: memória da equipa — momentum, familiaridade e entrosamento.
         "streak": 0, "category_missions": {}, "roster_missions": 0,
+        "repeat_type_count": 0,
         "doctrine": "balanced", "policies": default_team_policies(), "loadout": {},
     }
-    result = await db.teams.insert_one(team_doc)
+    fresh_player = await _debit_clean_atomic(player, TEAM_CREATE_COST, {"stats.teams_created": 1})
+    try:
+        result = await db.teams.insert_one(team_doc)
+    except Exception:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": TEAM_CREATE_COST, "stats.teams_created": -1}})
+        raise
     team_id = str(result.inserted_id)
-
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -TEAM_CREATE_COST, "stats.teams_created": 1}})
     if employee_ids:
         await db.employees.update_many(
             {"_id": {"$in": [employee["_id"] for employee in employees]}},
@@ -1632,7 +1835,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         details.append(vehicle["name"])
     suffix = f" · {' · '.join(details)}" if details else ""
     await add_event(db, pid, "team", f"{name} ({TEAM_SPECS[body.spec]['name']}) formada por {TEAM_CREATE_COST:,} €{suffix}.")
-    await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", player["clean_money"] - TEAM_CREATE_COST, f"Nova equipa: {name}")
+    await record_tx(db, pid, "team_create", -TEAM_CREATE_COST, "clean", fresh_player["clean_money"], f"Nova equipa: {name}")
     return {
         "ok": True,
         "team_id": team_id,
@@ -2002,6 +2205,7 @@ async def optimize_employees(user: dict = Depends(get_current_user)):
 # ---------------- Veículos ----------------
 
 @router.post("/vehicles/buy")
+@idempotent("vehicles.buy")
 async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_user)):
     if body.model_key not in VEHICLE_MODELS:
         raise HTTPException(status_code=400, detail="Modelo inválido")
@@ -2016,10 +2220,14 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
     used = await db.vehicles.count_documents({"player_id": pid})
     if used >= caps["vehicles"]:
         raise HTTPException(status_code=400, detail="Garagem cheia. Compra ou melhora uma garagem.")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -model["price"], "stats.vehicles_bought": 1}})
-    await db.vehicles.insert_one(vehicle_doc(pid, body.model_key, now_utc().isoformat()))
+    fresh_player = await _debit_clean_atomic(player, model["price"], {"stats.vehicles_bought": 1})
+    try:
+        await db.vehicles.insert_one(vehicle_doc(pid, body.model_key, now_utc().isoformat()))
+    except Exception:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": model["price"], "stats.vehicles_bought": -1}})
+        raise
     await add_event(db, pid, "vehicle", f"{model['name']} adquirido por {model['price']:,} €.")
-    await record_tx(db, pid, "vehicle_buy", -model["price"], "clean", player["clean_money"] - model["price"], f"Compra de {model['name']}")
+    await record_tx(db, pid, "vehicle_buy", -model["price"], "clean", fresh_player["clean_money"], f"Compra de {model['name']}")
     return {"ok": True}
 
 
@@ -2037,6 +2245,7 @@ async def _vehicle_free(pid, vehicle):
 
 
 @router.post("/vehicles/sell")
+@idempotent("vehicles.sell")
 async def sell_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2050,10 +2259,14 @@ async def sell_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_us
     value = int(vehicle["price"] * 0.4 * vehicle["condition"] / 100)
     if vehicle.get("team_id"):
         await db.teams.update_one({"_id": ObjectId(vehicle["team_id"])}, {"$set": {"vehicle_id": None}})
-    await db.vehicles.delete_one({"_id": vehicle["_id"]})
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
+    deleted = await db.vehicles.delete_one({"_id": vehicle["_id"], "player_id": pid})
+    if deleted.deleted_count != 1:
+        raise HTTPException(status_code=409, detail="O veículo já foi vendido noutra sessão")
+    fresh_player = await db.players.find_one_and_update(
+        {"_id": player["_id"]}, {"$inc": {"clean_money": value}}, return_document=ReturnDocument.AFTER
+    )
     await add_event(db, pid, "vehicle", f"{vehicle['name']} abatido. Recebeste {value:,} €.")
-    await record_tx(db, pid, "vehicle_sell", value, "clean", player["clean_money"] + value, f"Venda de {vehicle['name']}")
+    await record_tx(db, pid, "vehicle_sell", value, "clean", fresh_player["clean_money"], f"Venda de {vehicle['name']}")
     return {"value": value}
 
 
@@ -2336,6 +2549,7 @@ async def optimize_vehicles(user: dict = Depends(get_current_user)):
 
 
 @router.post("/weapons/buy")
+@idempotent("weapons.buy")
 async def buy_weapon(body: WeaponBuyInput, user: dict = Depends(get_current_user)):
     if body.model_key not in WEAPON_MODELS:
         raise HTTPException(status_code=400, detail="Modelo inválido")
@@ -2346,20 +2560,25 @@ async def buy_weapon(body: WeaponBuyInput, user: dict = Depends(get_current_user
         raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {model['min_level']}")
     if player["clean_money"] < model["price"]:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -model["price"]}})
-    await db.weapons.insert_one({
+    fresh_player = await _debit_clean_atomic(player, model["price"])
+    try:
+        await db.weapons.insert_one({
         "player_id": pid, "model_key": body.model_key, "name": model["name"],
         "condition": 100.0, "employee_id": None, "missions_since_repair": 0,
         "missions_done": 0, "upgrades": [],
         "ammo_loaded": int(model.get("magazine_capacity", 0) or 0),
-        "bought_at": now_utc().isoformat(),
-    })
+            "bought_at": now_utc().isoformat(),
+        })
+    except Exception:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": model["price"]}})
+        raise
     await add_event(db, pid, "weapon", f"{model['name']} adquirida por {model['price']:,} €.")
-    await record_tx(db, pid, "weapon_buy", -model["price"], "clean", player["clean_money"] - model["price"], f"Compra de {model['name']}")
+    await record_tx(db, pid, "weapon_buy", -model["price"], "clean", fresh_player["clean_money"], f"Compra de {model['name']}")
     return {"ok": True}
 
 
 @router.post("/weapons/sell")
+@idempotent("weapons.sell")
 async def sell_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2372,10 +2591,14 @@ async def sell_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user
     value = int(model.get("price", 0) * WEAPON_SELL_FRACTION * weapon.get("condition", 100) / 100)
     if weapon.get("employee_id"):
         await db.employees.update_one({"_id": ObjectId(weapon["employee_id"])}, {"$set": {"weapon_id": None}})
-    await db.weapons.delete_one({"_id": weapon["_id"]})
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
+    deleted = await db.weapons.delete_one({"_id": weapon["_id"], "player_id": pid})
+    if deleted.deleted_count != 1:
+        raise HTTPException(status_code=409, detail="A arma já foi vendida noutra sessão")
+    fresh_player = await db.players.find_one_and_update(
+        {"_id": player["_id"]}, {"$inc": {"clean_money": value}}, return_document=ReturnDocument.AFTER
+    )
     await add_event(db, pid, "weapon", f"{weapon['name']} vendida. Recebeste {value:,} €.")
-    await record_tx(db, pid, "weapon_sell", value, "clean", player["clean_money"] + value, f"Venda de {weapon['name']}")
+    await record_tx(db, pid, "weapon_sell", value, "clean", fresh_player["clean_money"], f"Venda de {weapon['name']}")
     return {"value": value}
 
 
@@ -2589,6 +2812,7 @@ async def validate_property_location(body: MapPointInput, user: dict = Depends(g
 
 
 @router.post("/properties/buy")
+@idempotent("properties.buy")
 async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_user)):
     if body.type_key not in PROPERTY_TYPES:
         raise HTTPException(status_code=400, detail="Tipo de propriedade inválido")
@@ -2607,8 +2831,9 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
             detail=f"Dinheiro limpo insuficiente — preço regional: {price:,} € ({market['zone']})",
         )
     district = nearest_district(body.lat, body.lng, player.get("districts"))
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -price, "stats.properties_bought": 1}})
-    await db.properties.insert_one({
+    fresh_player = await _debit_clean_atomic(player, price, {"stats.properties_bought": 1})
+    try:
+        await db.properties.insert_one({
         "player_id": pid, "type_key": body.type_key,
         "name": f"{pt['name']} — {district}", "district": district,
         "lat": body.lat, "lng": body.lng,
@@ -2616,21 +2841,25 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         "purchase_price": price,
         "market_zone": market["zone"],
         "market_multiplier": market["multiplier"],
-        "bought_at": now_utc().isoformat(),
-    })
+            "bought_at": now_utc().isoformat(),
+        })
+    except Exception:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": price, "stats.properties_bought": -1}})
+        raise
     await add_event(
         db, pid, "property",
         f"{pt['name']} comprado em {district} por {price:,} € "
         f"(índice {market['zone']} ×{market['multiplier']:.2f}).",
     )
     await record_tx(
-        db, pid, "property_buy", -price, "clean", player["clean_money"] - price,
+        db, pid, "property_buy", -price, "clean", fresh_player["clean_money"],
         f"Compra de {pt['name']} — {market['zone']}",
     )
     return {"ok": True, "price": price, "market_zone": market["zone"], "market_multiplier": market["multiplier"]}
 
 
 @router.post("/properties/sell")
+@idempotent("properties.sell")
 async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2666,10 +2895,14 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
             {"player_id": pid, "_id": {"$in": [ObjectId(eid) for eid in prop.get("staff_employee_ids", [])]}},
             {"$set": {"stationed_property_id": None}},
         )
-    await db.properties.delete_one({"_id": prop["_id"]})
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
+    deleted = await db.properties.delete_one({"_id": prop["_id"], "player_id": pid})
+    if deleted.deleted_count != 1:
+        raise HTTPException(status_code=409, detail="O imóvel já foi vendido noutra sessão")
+    fresh_player = await db.players.find_one_and_update(
+        {"_id": player["_id"]}, {"$inc": {"clean_money": value}}, return_document=ReturnDocument.AFTER
+    )
     await add_event(db, pid, "property", f"{prop['name']} vendido por {value:,} €.")
-    await record_tx(db, pid, "property_sell", value, "clean", player["clean_money"] + value, f"Venda de {prop['name']}")
+    await record_tx(db, pid, "property_sell", value, "clean", fresh_player["clean_money"], f"Venda de {prop['name']}")
     return {"value": value}
 
 
@@ -2944,6 +3177,7 @@ async def bribe_police(user: dict = Depends(get_current_user)):
 
 
 @router.post("/launder")
+@idempotent("launder")
 async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
     if body.amount <= 0:
         raise HTTPException(status_code=400, detail="Montante inválido")
@@ -2960,12 +3194,18 @@ async def launder(body: LaunderInput, user: dict = Depends(get_current_user)):
     )
     rate = min(LAUNDER_MAX_RATE, LAUNDER_BASE_RATE + bonuses["launder_rate"] + property_bonus)
     clean_gain = int(body.amount * rate)
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {
-        "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,
-    }})
+    fresh_player = await db.players.find_one_and_update(
+        {"_id": player["_id"], "dirty_money": {"$gte": body.amount}},
+        {"$inc": {
+            "dirty_money": -body.amount, "clean_money": clean_gain, "stats.laundered_total": body.amount,
+        }},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh_player:
+        raise HTTPException(status_code=409, detail="O saldo de dinheiro sujo mudou antes do pedido")
     await add_event(db, pid, "launder", f"Lavagem de {body.amount:,} € — recebeste {clean_gain:,} € limpos (taxa {round((1 - rate) * 100)}%).")
-    await record_tx(db, pid, "launder_out", -body.amount, "dirty", player["dirty_money"] - body.amount, "Lavagem de dinheiro")
-    await record_tx(db, pid, "launder_in", clean_gain, "clean", player["clean_money"] + clean_gain, "Lavagem de dinheiro")
+    await record_tx(db, pid, "launder_out", -body.amount, "dirty", fresh_player["dirty_money"], "Lavagem de dinheiro")
+    await record_tx(db, pid, "launder_in", clean_gain, "clean", fresh_player["clean_money"], "Lavagem de dinheiro")
     return {"clean_gain": clean_gain}
 
 
