@@ -59,6 +59,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
   const [busy, setBusy] = useState("");
   const [chat, setChat] = useState("");
   const [allianceName, setAllianceName] = useState("");
+  const [allianceCode, setAllianceCode] = useState("");
   const [rouletteChoice, setRouletteChoice] = useState("red");
   const [bet, setBet] = useState(500);
 
@@ -186,6 +187,19 @@ export const CityPanel = ({ open, onOpenChange }) => {
                         <Badge variant="outline" className="border-white/10 font-mono text-[9px] text-zinc-400">calor {pct((world?.modifiers?.heat_mult || 1) - 1)}</Badge>
                       </div>
                     </div>
+                  </div>
+                </Card>
+
+                <Card className="sub-card p-3 shadow-none">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-white"><Clock3 size={13} className="text-sky-400" /> Calendário da cidade</p>
+                  <div className="space-y-1">
+                    {(city.calendar || []).slice(0, 5).map((slot) => (
+                      <div key={`${slot.key}-${slot.starts_at}`} className={`flex items-center gap-2 rounded-md px-2 py-1.5 font-mono text-[9px] ${slot.active ? "bg-sky-500/10 text-sky-200" : "bg-white/[0.025] text-zinc-500"}`}>
+                        <span className="w-14 shrink-0">{slot.active ? "AGORA" : new Date(slot.starts_at).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" })}</span>
+                        <span className="min-w-0 flex-1 truncate">{slot.name}</span>
+                        <span className="uppercase text-zinc-600">{slot.severity}</span>
+                      </div>
+                    ))}
                   </div>
                 </Card>
 
@@ -338,6 +352,62 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     </div>
                     <Switch checked={!!city.social?.pvp_opt_in} disabled={!!busy} onCheckedChange={(enabled) => act("pvp", "social/pvp", { enabled })} />
                   </div>
+
+                  {(city.social?.pvp_challenges || []).filter((c) => c.defender_id && c.status === "pending").length > 0 && (
+                    <div className="mt-3 space-y-1 border-t border-white/[0.06] pt-2">
+                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">Desafios pendentes</p>
+                      {(city.social?.pvp_challenges || []).filter((c) => c.status === "pending").map((challenge) => (
+                        <div key={challenge.id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-2">
+                          <span className="min-w-0 flex-1 truncate text-[10px] text-zinc-300">
+                            {challenge.attacker_name} → {challenge.defender_name}
+                          </span>
+                          {challenge.defender_id && challenge.defender_id !== challenge.attacker_id && (
+                            <>
+                              <ActionButton
+                                tone="good"
+                                disabled={!!busy}
+                                onClick={() => act(`accept-${challenge.id}`, "social/pvp/accept", { challenge_id:challenge.id }, (d) => `Conflito resolvido: ${d.winner_name} venceu`)}
+                              >
+                                Aceitar
+                              </ActionButton>
+                              <ActionButton
+                                disabled={!!busy}
+                                onClick={() => act(`decline-${challenge.id}`, "social/pvp/decline", { challenge_id:challenge.id }, "Desafio recusado")}
+                              >
+                                Recusar
+                              </ActionButton>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!!city.social?.pvp_opt_in && (city.social?.pvp_players || []).length > 0 && (
+                    <div className="mt-3 space-y-1 border-t border-white/[0.06] pt-2">
+                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">Organizações disponíveis</p>
+                      {(city.social?.pvp_players || []).slice(0, 8).map((player) => (
+                        <div key={player.player_id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[10px] font-bold text-zinc-200">{player.org_name}</p>
+                            <p className="font-mono text-[9px] text-zinc-600">LV {player.level} · {nfmt(player.respect)} respeito</p>
+                          </div>
+                          <ActionButton
+                            tone="danger"
+                            disabled={!!busy}
+                            onClick={() => act(
+                              `challenge-${player.player_id}`,
+                              "social/pvp/challenge",
+                              { defender_player_id:player.player_id },
+                              (d) => d.winner_name ? `Conflito resolvido: ${d.winner_name} venceu` : "Desafio PvP enviado"
+                            )}
+                          >
+                            Desafiar
+                          </ActionButton>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Card>
 
                 <Card className="sub-card p-3 shadow-none">
@@ -351,9 +421,15 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       <ActionButton tone="danger" disabled={!!busy} onClick={() => act("alliance-leave", "social/alliance/leave", {}, "Saíste da aliança")}>Sair</ActionButton>
                     </div>
                   ) : (
-                    <div className="mt-2 flex gap-2">
-                      <Input value={allianceName} onChange={(e) => setAllianceName(e.target.value)} placeholder="Nome da aliança" className="h-8 bg-black/30 text-xs" />
-                      <ActionButton disabled={!!busy || allianceName.trim().length < 3} onClick={async () => { const d=await act("alliance-create","social/alliance/create",{name:allianceName.trim()},"Aliança criada"); if(d)setAllianceName(""); }}>Criar</ActionButton>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex gap-2">
+                        <Input value={allianceName} onChange={(e) => setAllianceName(e.target.value)} placeholder="Nome da nova aliança" className="h-8 bg-black/30 text-xs" />
+                        <ActionButton disabled={!!busy || allianceName.trim().length < 3} onClick={async () => { const d=await act("alliance-create","social/alliance/create",{name:allianceName.trim()},"Aliança criada"); if(d)setAllianceName(""); }}>Criar</ActionButton>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input value={allianceCode} onChange={(e) => setAllianceCode(e.target.value.toUpperCase())} maxLength={12} placeholder="Código de convite" className="h-8 bg-black/30 font-mono text-xs uppercase" />
+                        <ActionButton disabled={!!busy || allianceCode.trim().length < 4} onClick={async () => { const d=await act("alliance-join","social/alliance/join",{code:allianceCode.trim()},"Entraste na aliança"); if(d)setAllianceCode(""); }}>Entrar</ActionButton>
+                      </div>
                     </div>
                   )}
                 </Card>
