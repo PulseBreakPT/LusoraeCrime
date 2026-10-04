@@ -969,6 +969,100 @@ const mastermindSnapshot=(save)=>{
   };
 };
 
+const LOCAL_WORLD_PULSES=[
+  {key:"cash_window",label:"Dinheiro na rua",category:"assalto",description:"Alvos de assalto estão a movimentar mais numerário, mas a exposição também subiu.",reward_mult:1.18,heat_mult:1.12},
+  {key:"cold_routes",label:"Rotas frias",category:"logistica",description:"Menos fiscalização nas rotas logísticas. O lucro melhora e o calor cresce mais devagar.",reward_mult:1.14,heat_mult:.88},
+  {key:"digital_noise",label:"Ruído digital",category:"tecnica",description:"Infraestruturas digitais estão mais vulneráveis durante esta janela operacional.",reward_mult:1.17,heat_mult:.96},
+  {key:"open_doors",label:"Portas abertas",category:"influencia",description:"Contactos e intermediários estão mais recetivos. Operações de influência pagam melhor.",reward_mult:1.15,heat_mult:.90},
+];
+
+const localWorldPulse=(at=Date.now())=>{
+  const slotMs=4*60*60*1000;
+  const slot=Math.floor(at/slotMs);
+  const pulse={...LOCAL_WORLD_PULSES[slot%LOCAL_WORLD_PULSES.length]};
+  const starts=slot*slotMs;
+  return {...pulse,starts_at:new Date(starts).toISOString(),ends_at:new Date(starts+slotMs).toISOString(),
+    reward_bonus_pct:Math.round((pulse.reward_mult-1)*100),heat_delta_pct:Math.round((pulse.heat_mult-1)*100)};
+};
+
+const localMissionDecision=(category,risk,arriveAt,finishAt)=>{
+  const start=Date.parse(arriveAt), finish=Date.parse(finishAt), duration=Math.max(0,finish-start);
+  if(duration<35000)return null;
+  const riskScale=clamp((Number(risk||1)-1)/4,0,1);
+  const labels={
+    assalto:["A segurança mudou de posição","Forçar a entrada","Mudar o plano"],
+    logistica:["A rota de saída ficou congestionada","Manter a rota rápida","Desviar por secundárias"],
+    tecnica:["Foi detetado um sistema adicional","Explorar o acesso","Isolar e continuar"],
+    influencia:["O intermediário mudou as condições","Pressionar o contacto","Fechar acordo seguro"],
+  }[category]||["O terreno mudou","Aproveitar a abertura","Consolidar posição"];
+  return {status:"pending",title:labels[0],description:"A equipa aguarda uma decisão tática. Ignorar mantém o plano original.",
+    opens_at:new Date(start+duration*.28).toISOString(),expires_at:new Date(start+duration*.78).toISOString(),choice:null,
+    options:[
+      {id:"steady",label:"Manter plano",description:"Sem alterar risco, recompensa ou calor.",chance_delta:0,reward_mult:1,heat_delta:0,fatigue_delta:0},
+      {id:"push",label:labels[1],description:"Melhor retorno em troca de mais risco.",chance_delta:-(.025+.02*riskScale),reward_mult:1.15,heat_delta:3+3*riskScale,fatigue_delta:3+2*riskScale},
+      {id:"safe",label:labels[2],description:"Mais controlo em troca de parte da recompensa.",chance_delta:.035+.015*riskScale,reward_mult:.88,heat_delta:-(1.5+1.5*riskScale),fatigue_delta:1.5},
+    ]};
+};
+
+const localRetention=(save,caps)=>{
+  const pulse=localWorldPulse();
+  const moves=[];
+  const liveDecision=save.missions.find(m=>{
+    const d=m.decision; if(!d||d.status!=="pending")return false;
+    const now=Date.now(); return now>=Date.parse(d.opens_at)&&now<=Date.parse(d.expires_at);
+  });
+  if(liveDecision)moves.push({id:"live-decision",horizon:"agora",priority:100,title:`Decisão em ${liveDecision.team_name}`,
+    description:liveDecision.decision.title,panel:"operations",focus_test_id:null,progress:{value:1,target:1,pct:100},tone:"red"});
+  else {
+    const ready=save.teams.filter(t=>t.status==="idle"&&t.vehicle_id).length;
+    const opps=save.opportunities.filter(o=>o.status==="active").length;
+    if(ready&&opps)moves.push({id:"dispatch-next",horizon:"agora",priority:90,title:"Há trabalho pronto",
+      description:`${ready} equipa(s) pronta(s) e ${opps} oportunidade(s) disponíveis.`,panel:"operations",focus_test_id:null,
+      progress:{value:ready,target:ready,pct:100},tone:"cyan"});
+  }
+  const tired=[...save.employees].filter(e=>(e.fatigue||0)>=65).sort((a,b)=>b.fatigue-a.fatigue)[0];
+  const damaged=[...save.vehicles].filter(v=>(v.condition??100)<45).sort((a,b)=>a.condition-b.condition)[0];
+  if(tired)moves.push({id:"fatigue-pressure",horizon:"sessao",priority:80,title:`${tired.name} está no limite`,
+    description:`Fadiga a ${Math.round(tired.fatigue)}%.`,panel:"employees",focus_test_id:`employee-card-${tired.id}`,
+    progress:{value:tired.fatigue,target:100,pct:tired.fatigue},tone:"amber"});
+  else if(damaged)moves.push({id:"fleet-pressure",horizon:"sessao",priority:78,title:`${damaged.name} precisa de oficina`,
+    description:`Condição a ${Math.round(damaged.condition)}%.`,panel:"fleet",focus_test_id:`vehicle-card-${damaged.id}`,
+    progress:{value:100-damaged.condition,target:100,pct:100-damaged.condition},tone:"amber"});
+  else moves.push({id:"dirty-capacity",horizon:"sessao",priority:45,title:"Mantém a tesouraria respirável",
+    description:"Evita que o dinheiro sujo bloqueie novas recompensas.",panel:"empire",focus_test_id:save.player.dirty_money?"launder-amount-input":null,
+    progress:{value:save.player.dirty_money,target:Math.max(1,caps.dirty_money.max),pct:clamp(save.player.dirty_money/Math.max(1,caps.dirty_money.max)*100,0,100)},tone:"green"});
+
+  const next=rankThresholds[save.player.level]||save.player.respect;
+  moves.push({id:"next-level",horizon:"plano",priority:60,title:`Constrói o caminho para o nível ${save.player.level+1}`,
+    description:next>save.player.respect?`Faltam ${next-save.player.respect} pontos de progressão.`:"Expande a organização para abrir novas possibilidades.",
+    panel:"operations",focus_test_id:null,progress:{value:save.player.respect,target:Math.max(1,next),pct:clamp(save.player.respect/Math.max(1,next)*100,0,100)},tone:"cyan"});
+
+  const completed=save.history.filter(m=>["success","partial","failure","police"].includes(m.outcome));
+  const best=[...completed].sort((a,b)=>(b.pending_reward||0)-(a.pending_reward||0))[0];
+  const veteran=[...save.employees].sort((a,b)=>(b.missions_done||0)-(a.missions_done||0))[0];
+  const car=[...save.vehicles].sort((a,b)=>(b.km_total||b.km||0)-(a.km_total||a.km||0))[0];
+  const topTeam=[...save.teams].sort((a,b)=>(b.missions_done||0)-(a.missions_done||0))[0];
+  const records=[];
+  if(best)records.push({key:"best_mission",label:"Maior saque",value:best.pending_reward||0,detail:`${best.team_name} · ${best.opportunity?.name||"Operação"}`});
+  if(veteran)records.push({key:"veteran",label:"Veterano",value:veteran.missions_done||0,detail:veteran.name});
+  if(car)records.push({key:"road_car",label:"Mais quilómetros",value:Number(car.km_total||car.km||0),detail:car.name});
+  if(topTeam)records.push({key:"top_team",label:"Equipa mais rodada",value:topTeam.missions_done||0,detail:topTeam.name});
+
+  const team_legacy={};
+  save.teams.forEach(t=>{
+    const n=t.missions_done||0;
+    const tier=n>=50?4:n>=25?3:n>=10?2:n>=3?1:0;
+    const names=["Nova","Rodada","Estabelecida","Veterana","Lenda"];
+    const cats=t.category_missions||{};
+    const identity=Object.keys(cats).sort((a,b)=>(cats[b]||0)-(cats[a]||0))[0]||t.spec;
+    team_legacy[t.id]={tier,title:names[tier],identity,missions:n,streak:t.streak||0,next_at:[3,10,25,50,null][tier]};
+  });
+  return {world_pulse:pulse,next_moves:moves.slice(0,3),records,team_legacy,
+    active_pressure:{heat:save.player.heat||0,tired_operatives:save.employees.filter(e=>(e.fatigue||0)>=65).length,
+      damaged_vehicles:save.vehicles.filter(v=>(v.condition??100)<45).length,
+      low_loyalty:save.employees.filter(e=>(e.loyalty??100)<55).length}};
+};
+
 const publicState=(save)=>{
   if(!save.player.hq){
     return {hq_pending:true,server_time:nowIso(),player:{
@@ -984,6 +1078,7 @@ const publicState=(save)=>{
     candidates:clone(save.candidates),vehicles:clone(save.vehicles),weapons:clone(save.weapons),
     properties:clone(save.properties),opportunities:clone(save.opportunities),missions:clone(save.missions),
     history:clone(save.history),events:clone(save.events),quests:clone(save.quests),caps,
+    retention:localRetention(save,caps),
     bonuses:{heal:0,legal:0,bribe_discount:0,repair_discount:save.properties.some(p=>p.type_key==="oficina") ? 0.15 : 0},
     ...(()=>{
       const economy=LOCAL_CATALOG.economy_meta||{};
