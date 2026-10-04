@@ -239,10 +239,10 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     {(city.boss?.hospital_until || city.boss?.sentence_until || Number(city.boss?.health || 100) < 100 || Number(city.boss?.stress || 0) >= 35) && (
                       <ActionButton
                         tone="good"
-                        disabled={!!busy}
+                        disabled={!!busy || cleanMoney < Number(city.boss?.recovery_cost || 0)}
                         onClick={() => act("boss-recover", "boss/recover", {}, "Chefe recuperado")}
                       >
-                        Recuperar
+                        Recuperar · {fmtMoney(city.boss?.recovery_cost || 0)}
                       </ActionButton>
                     )}
                   </div>
@@ -322,9 +322,18 @@ export const CityPanel = ({ open, onOpenChange }) => {
                             <p className="text-xs font-bold text-white">{b.name} <span className="font-mono text-[10px] text-zinc-500">LV {b.level}</span></p>
                             <p className="mt-1 font-mono text-[10px] text-zinc-500">{fmtMoney(b.projection?.clean)} + {fmtMoney(b.projection?.dirty)} por recolher · segurança {b.security}</p>
                           </div>
-                          <ActionButton disabled={!!busy || b.level >= Number(b.config?.max_level || 5)} onClick={() => act(`upgrade-${b.id}`, "businesses/upgrade", { business_id:b.id }, `${b.name} melhorado`)}>
-                            <ArrowUpCircle size={11} className="mr-1" /> Melhorar
-                          </ActionButton>
+                          {(() => {
+                            const upgradeCost = Math.round(Number(b.config?.price || 0) * (.42 + Number(b.level || 1) * .18));
+                            return (
+                              <ActionButton
+                                disabled={!!busy || b.level >= Number(b.config?.max_level || 5) || cleanMoney < upgradeCost}
+                                onClick={() => act(`upgrade-${b.id}`, "businesses/upgrade", { business_id:b.id }, `${b.name} melhorado`)}
+                              >
+                                <ArrowUpCircle size={11} className="mr-1" />
+                                {b.level >= Number(b.config?.max_level || 5) ? "Máx." : <>Melhorar · {fmtMoney(upgradeCost)}</>}
+                              </ActionButton>
+                            );
+                          })()}
                         </div>
                       </Card>
                     ))}
@@ -342,8 +351,13 @@ export const CityPanel = ({ open, onOpenChange }) => {
                           <p className="text-xs font-bold text-white">{cfg.name}</p>
                           <p className="mt-1 min-h-8 text-[10px] leading-relaxed text-zinc-500">{cfg.description}</p>
                           <div className="mt-2 flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] text-zinc-400">{fmtMoney(estimated)}</span>
-                            <ActionButton disabled={!!busy} onClick={() => act(`buy-${key}`, "businesses/buy", { type_key:key }, `${cfg.name} adquirido`)}>Comprar</ActionButton>
+                            <span className="font-mono text-[10px] text-zinc-400">{fmtMoney(estimated)} · N{cfg.min_level || 1}</span>
+                            <ActionButton
+                              disabled={!!busy || playerLevel < Number(cfg.min_level || 1) || cleanMoney < estimated}
+                              onClick={() => act(`buy-${key}`, "businesses/buy", { type_key:key }, `${cfg.name} adquirido`)}
+                            >
+                              {playerLevel < Number(cfg.min_level || 1) ? `Nível ${cfg.min_level}` : "Comprar"}
+                            </ActionButton>
                           </div>
                         </Card>
                       );
@@ -359,9 +373,9 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Zap size={13} className="text-red-400" /> PvP opt-in</p>
-                      <p className="mt-1 text-[10px] text-zinc-500">Conflitos competitivos exigem consentimento dos dois jogadores.</p>
+                      <p className="mt-1 text-[10px] text-zinc-500">{playerLevel < 15 ? "Desbloqueia no nível 15." : "Consentimento obrigatório · cooldown de 6h por rival · retornos decrescentes anti-farm."}</p>
                     </div>
-                    <Switch checked={!!city.social?.pvp_opt_in} disabled={!!busy} onCheckedChange={(enabled) => act("pvp", "social/pvp", { enabled })} />
+                    <Switch checked={!!city.social?.pvp_opt_in} disabled={!!busy || playerLevel < 15} onCheckedChange={(enabled) => act("pvp", "social/pvp", { enabled })} />
                   </div>
 
                   {(city.social?.pvp_challenges || []).filter((c) => c.defender_id && c.status === "pending").length > 0 && (
@@ -427,7 +441,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-bold text-white">{city.social.alliance.name}</p>
-                        <p className="font-mono text-[10px] text-zinc-500">Código {city.social.alliance.code}</p>
+                        <p className="font-mono text-[10px] text-zinc-500">Código {city.social.alliance.code} · {nfmt(city.social.alliance.season_points || 0)} pts época</p>
                       </div>
                       <ActionButton tone="danger" disabled={!!busy} onClick={() => act("alliance-leave", "social/alliance/leave", {}, "Saíste da aliança")}>Sair</ActionButton>
                     </div>
