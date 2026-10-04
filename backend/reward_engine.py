@@ -267,8 +267,11 @@ def calculate_money_reward(
     # Aplicar score de dificuldade
     reward = base * difficulty_score
 
-    # Multiplicador por nível da organização
-    org_multiplier = ORG_LEVEL_MULTIPLIER_BASE + (org_level - 1) * ORG_LEVEL_MULTIPLIER_PER_LEVEL
+    # Preserva a economia 1-10; depois cresce de forma suave até ao 100.
+    legacy_level = min(10, max(1, int(org_level or 1)))
+    org_multiplier = ORG_LEVEL_MULTIPLIER_BASE + (legacy_level - 1) * ORG_LEVEL_MULTIPLIER_PER_LEVEL
+    if org_level > 10:
+        org_multiplier += (min(100, int(org_level)) - 10) * ORG_LEVEL_MULTIPLIER_LATE
     reward *= org_multiplier
 
     # Multiplicador por categoria
