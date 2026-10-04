@@ -140,6 +140,19 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
       run: () => onNavigate(panel),
     }));
 
+    const priorities = (state.retention?.next_moves || []).map((move) => ({
+      id: `priority:${move.id}`,
+      label: move.title,
+      hint: move.description,
+      Icon: Crosshair,
+      group: "Prioridades",
+      keywords: `${move.horizon || ""} prioridade próximo passo agora sessão plano`,
+      run: () => onNavigate(
+        move.panel,
+        move.focus_test_id ? { focusTestId: move.focus_test_id } : undefined
+      ),
+    }));
+
     const quick = [
       {
         id: "action:refresh", label: "Atualizar", hint: "Obtém os dados mais recentes",
@@ -224,7 +237,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
         run: () => onSelectOpp(item),
       })),
     ];
-    return [...quick, ...panelCommands, ...entities];
+    return [...priorities, ...quick, ...panelCommands, ...entities];
   }, [
     state, refresh, fetchTransactions, claimAllQuests, restAllEligible,
     refuelAllEligible, repairFleetAll, repairWeaponsAll, optimizeOrganization,
@@ -235,9 +248,14 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
     const q = fold(query);
     if (!q) {
       const byId = new Map(commands.map((command) => [command.id, command]));
+      const priorities = commands.filter((command) => command.group === "Prioridades");
       const recent = recentIds.map((id) => byId.get(id)).filter(Boolean);
       const defaults = commands.filter((command) => command.group === "Ações rápidas");
-      return [...recent, ...defaults.filter((command) => !recentIds.includes(command.id))].slice(0, 14);
+      return [
+        ...priorities,
+        ...recent.filter((command) => command.group !== "Prioridades"),
+        ...defaults.filter((command) => !recentIds.includes(command.id)),
+      ].slice(0, 14);
     }
     return commands
       .map((command) => ({

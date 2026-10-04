@@ -95,6 +95,10 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
   }, [opps, state, catalog, search, sortKey, catFilter, forceFilter, reachableOnly, favOnly]);
 
   const reachableCount = rows.filter((r) => r.reachable).length;
+  const pulse = state?.retention?.world_pulse || null;
+  const pulseEndsS = pulse?.ends_at
+    ? Math.max(0, (Date.parse(pulse.ends_at) - serverNow()) / 1000)
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -113,6 +117,40 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           <Kpi icon={Target} label="No mapa" value={`${opps.length}`} color="#38BDF8" />
           <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
         </SummaryStrip>
+
+        {pulse && (
+          <Card
+            data-testid="world-pulse-card"
+            className="mt-3 border-cyan-500/15 bg-cyan-500/[0.035] p-3 shadow-none"
+          >
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-300">
+                <TrendingUp size={15} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="text-xs font-bold text-white">{pulse.label}</p>
+                  <span className="rounded-full border border-cyan-500/20 bg-cyan-500/[0.07] px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase text-cyan-300">
+                    {SPEC_LABELS[pulse.category] || pulse.category}
+                  </span>
+                  {pulseEndsS != null && (
+                    <span className="ml-auto font-mono text-[10px] tabular-nums text-zinc-500">
+                      {fmtDuration(pulseEndsS)}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{pulse.description}</p>
+                <p className="mt-1.5 font-mono text-[10px] text-cyan-300">
+                  +{pulse.reward_bonus_pct}% recompensa
+                  {pulse.heat_delta_pct !== 0 && (
+                    <> · {pulse.heat_delta_pct > 0 ? "+" : ""}{pulse.heat_delta_pct}% geração de calor</>
+                  )}
+                  {" "}nas operações desta categoria durante a janela.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Procura + ordenação */}
         <div className="mt-3 space-y-2">
@@ -207,6 +245,11 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                   <p className="flex items-center gap-1 truncate text-xs font-semibold text-white">
                     {isFav && <Star size={10} className="shrink-0 text-amber-400" fill="currentColor" />}
                     {opp.name}
+                    {pulse?.category === opp.category && (
+                      <span className="shrink-0 rounded bg-cyan-500/10 px-1 py-0.5 font-mono text-[10px] font-bold text-cyan-300">
+                        +{pulse.reward_bonus_pct}%
+                      </span>
+                    )}
                   </p>
                   <p className="flex items-center gap-1 truncate font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                     <MapPin size={8} /> {opp.district} · {SPEC_LABELS[opp.category]}

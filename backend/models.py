@@ -41,6 +41,7 @@ class Player(BaseDocument):
     quest_perf: dict = {}
     temp_bonus: Optional[dict] = None
     stats: dict = {}
+    records: dict = {}
     hq: Optional[dict] = None
     region: str = ""
     districts: List[dict] = []
@@ -264,6 +265,11 @@ class Mission(BaseDocument):
     live_log: List[dict] = []
     live_chance_delta: float = 0.0
     final_chance: Optional[float] = None
+    # Retention engine: one optional, transparent tactical choice during the
+    # operation. Ignoring it is neutral.
+    decision: Optional[dict] = None
+    decision_reward_mult: float = 1.0
+    world_pulse: Optional[dict] = None
 
 
 class Event(BaseDocument):

@@ -645,7 +645,8 @@ const finalizeMission = (save, mission) => {
   const team = save.teams.find((t)=>t.id===mission.team_id);
   const vehicle = save.vehicles.find((v)=>v.id===mission.vehicle_id);
   const members = save.employees.filter((e)=>mission.member_ids.includes(e.id));
-  const success = rollFrom(mission.id) <= mission.chance;
+  const effectiveChance=clamp(Number(mission.success_chance??mission.chance??.5)+Number(mission.live_chance_delta||0),.02,.98);
+  const success = rollFrom(mission.id) <= effectiveChance;
   if (team) {
     team.status="idle"; team.available_at=null; team.missions_done=(team.missions_done||0)+1;
     team.streak = success ? Math.max(0,(team.streak||0))+1 : Math.min(0,(team.streak||0))-1;
@@ -667,12 +668,13 @@ const finalizeMission = (save, mission) => {
   stats.by_category ||= {};
   stats.by_category[mission.category]=(stats.by_category[mission.category]||0)+1;
   if(success){
-    const reward=money(mission.reward);
+    const reward=money(Number(mission.reward||0)*Number(mission.decision_reward_mult||1));
     if(mission.pays==="clean") save.player.clean_money += reward;
     else save.player.dirty_money += reward;
     const risk = normalizeRisk(mission.risk);
     save.player.respect += Math.max(20, risk * 24);
-    save.player.heat=clamp(save.player.heat + risk * 2.2,0,100);
+    const pulseHeat=Number(mission.world_pulse?.applied_heat_mult||1);
+    save.player.heat=clamp(save.player.heat + risk * 2.2 * pulseHeat,0,100);
     stats.missions_success=(stats.missions_success||0)+1;
     stats.success_by_category ||= {};
     stats.success_by_category[mission.category]=(stats.success_by_category[mission.category]||0)+1;
@@ -685,7 +687,8 @@ const finalizeMission = (save, mission) => {
     addEvent(save,"success",`${team?.name||"Equipa"} concluiu ${mission.opportunity?.name||"a operação"} com sucesso.`);
   } else {
     const risk = normalizeRisk(mission.risk);
-    save.player.heat=clamp(save.player.heat + risk * 4.5,0,100);
+    const pulseHeat=Number(mission.world_pulse?.applied_heat_mult||1);
+    save.player.heat=clamp(save.player.heat + risk * 4.5 * pulseHeat,0,100);
     stats.missions_failure=(stats.missions_failure||0)+1;
     stats.missions_failed=stats.missions_failure;
     mission.pending_reward=0; mission.pending_pays=mission.pays;
@@ -723,7 +726,10 @@ const tick = (save) => {
   for(const mission of [...save.missions]){
     const t=now;
     if(t < Date.parse(mission.arrive_at)) mission.phase="en_route";
-    else if(t < Date.parse(mission.finish_at)) mission.phase="operating";
+    else if(t < Date.parse(mission.finish_at)){
+      mission.phase="operating";
+      if(mission.decision?.status==="pending"&&t>Date.parse(mission.decision.expires_at))mission.decision.status="expired";
+    }
     else if(t < Date.parse(mission.return_at)) mission.phase="returning";
     else {
       finalizeMission(save,mission);
@@ -969,6 +975,109 @@ const mastermindSnapshot=(save)=>{
   };
 };
 
+const LOCAL_WORLD_PULSES=[
+  {key:"cash_window",label:"Dinheiro na rua",category:"assalto",description:"Alvos de assalto estão a movimentar mais numerário, mas a exposição também subiu.",reward_mult:1.18,heat_mult:1.12},
+  {key:"cold_routes",label:"Rotas frias",category:"logistica",description:"Menos fiscalização nas rotas logísticas. O lucro melhora e o calor cresce mais devagar.",reward_mult:1.14,heat_mult:.88},
+  {key:"digital_noise",label:"Ruído digital",category:"tecnica",description:"Infraestruturas digitais estão mais vulneráveis durante esta janela operacional.",reward_mult:1.17,heat_mult:.96},
+  {key:"open_doors",label:"Portas abertas",category:"influencia",description:"Contactos e intermediários estão mais recetivos. Operações de influência pagam melhor.",reward_mult:1.15,heat_mult:.90},
+];
+
+const localWorldPulse=(at=Date.now())=>{
+  const slotMs=4*60*60*1000;
+  const slot=Math.floor(at/slotMs);
+  const pulse={...LOCAL_WORLD_PULSES[slot%LOCAL_WORLD_PULSES.length]};
+  const starts=slot*slotMs;
+  return {...pulse,starts_at:new Date(starts).toISOString(),ends_at:new Date(starts+slotMs).toISOString(),
+    reward_bonus_pct:Math.round((pulse.reward_mult-1)*100),heat_delta_pct:Math.round((pulse.heat_mult-1)*100)};
+};
+
+const localMissionDecision=(category,risk,arriveAt,finishAt)=>{
+  const start=Date.parse(arriveAt), finish=Date.parse(finishAt), duration=Math.max(0,finish-start);
+  if(duration<35000)return null;
+  const riskScale=clamp((Number(risk||1)-1)/4,0,1);
+  const labels={
+    assalto:["A segurança mudou de posição","Forçar a entrada","Mudar o plano"],
+    logistica:["A rota de saída ficou congestionada","Manter a rota rápida","Desviar por secundárias"],
+    tecnica:["Foi detetado um sistema adicional","Explorar o acesso","Isolar e continuar"],
+    influencia:["O intermediário mudou as condições","Pressionar o contacto","Fechar acordo seguro"],
+  }[category]||["O terreno mudou","Aproveitar a abertura","Consolidar posição"];
+  return {status:"pending",title:labels[0],description:"A equipa aguarda uma decisão tática. Ignorar mantém o plano original.",
+    opens_at:new Date(start+duration*.28).toISOString(),expires_at:new Date(start+duration*.78).toISOString(),choice:null,
+    options:[
+      {id:"steady",label:"Manter plano",description:"Sem alterar risco, recompensa ou calor.",chance_delta:0,reward_mult:1,heat_delta:0,fatigue_delta:0},
+      {id:"push",label:labels[1],description:"Melhor retorno em troca de mais risco.",chance_delta:-(.025+.02*riskScale),reward_mult:1.15,heat_delta:3+3*riskScale,fatigue_delta:3+2*riskScale},
+      {id:"safe",label:labels[2],description:"Mais controlo em troca de parte da recompensa.",chance_delta:.035+.015*riskScale,reward_mult:.88,heat_delta:-(1.5+1.5*riskScale),fatigue_delta:1.5},
+    ]};
+};
+
+const localRetention=(save,caps)=>{
+  const pulse=localWorldPulse();
+  const moves=[];
+  const liveDecision=save.missions.find(m=>{
+    const d=m.decision; if(!d||d.status!=="pending")return false;
+    const now=Date.now(); return now>=Date.parse(d.opens_at)&&now<=Date.parse(d.expires_at);
+  });
+  if(liveDecision)moves.push({id:"live-decision",horizon:"agora",priority:100,title:`Decisão em ${liveDecision.team_name}`,
+    description:liveDecision.decision.title,panel:"operations",focus_test_id:null,progress:{value:1,target:1,pct:100},tone:"red"});
+  else {
+    const ready=save.teams.filter(t=>t.status==="idle"&&t.vehicle_id).length;
+    const opps=save.opportunities.filter(o=>o.status==="active").length;
+    if(ready&&opps)moves.push({id:"dispatch-next",horizon:"agora",priority:90,title:"Há trabalho pronto",
+      description:`${ready} equipa(s) pronta(s) e ${opps} oportunidade(s) disponíveis.`,panel:"operations",focus_test_id:null,
+      progress:{value:ready,target:ready,pct:100},tone:"cyan"});
+    else if(!save.teams.length)moves.push({id:"build-first-team",horizon:"agora",priority:88,title:"Monta uma equipa operacional",
+      description:"Sem uma equipa não consegues transformar oportunidades em progresso.",panel:"teams",focus_test_id:"team-builder",
+      progress:{value:0,target:1,pct:0},tone:"cyan"});
+    else if(!ready)moves.push({id:"restore-readiness",horizon:"agora",priority:86,title:"Põe uma equipa pronta",
+      description:"Há equipas, mas nenhuma está em condições de receber uma nova ordem.",panel:"teams",focus_test_id:null,
+      progress:{value:0,target:save.teams.length,pct:0},tone:"amber"});
+    else moves.push({id:"scan-opportunities",horizon:"agora",priority:72,title:"Lê o terreno",
+      description:"As equipas estão prontas. Verifica a próxima janela operacional no mapa.",panel:"operations",focus_test_id:null,
+      progress:{value:0,target:1,pct:0},tone:"cyan"});
+  }
+  const tired=[...save.employees].filter(e=>(e.fatigue||0)>=65).sort((a,b)=>b.fatigue-a.fatigue)[0];
+  const damaged=[...save.vehicles].filter(v=>(v.condition??100)<45).sort((a,b)=>a.condition-b.condition)[0];
+  if(tired)moves.push({id:"fatigue-pressure",horizon:"sessao",priority:80,title:`${tired.name} está no limite`,
+    description:`Fadiga a ${Math.round(tired.fatigue)}%.`,panel:"employees",focus_test_id:`employee-card-${tired.id}`,
+    progress:{value:tired.fatigue,target:100,pct:tired.fatigue},tone:"amber"});
+  else if(damaged)moves.push({id:"fleet-pressure",horizon:"sessao",priority:78,title:`${damaged.name} precisa de oficina`,
+    description:`Condição a ${Math.round(damaged.condition)}%.`,panel:"fleet",focus_test_id:`vehicle-card-${damaged.id}`,
+    progress:{value:100-damaged.condition,target:100,pct:100-damaged.condition},tone:"amber"});
+  else moves.push({id:"dirty-capacity",horizon:"sessao",priority:45,title:"Mantém a tesouraria respirável",
+    description:"Evita que o dinheiro sujo bloqueie novas recompensas.",panel:"empire",focus_test_id:save.player.dirty_money?"launder-amount-input":null,
+    progress:{value:save.player.dirty_money,target:Math.max(1,caps.dirty_money.max),pct:clamp(save.player.dirty_money/Math.max(1,caps.dirty_money.max)*100,0,100)},tone:"green"});
+
+  const next=rankThresholds[save.player.level]||save.player.respect;
+  moves.push({id:"next-level",horizon:"plano",priority:60,title:`Constrói o caminho para o nível ${save.player.level+1}`,
+    description:next>save.player.respect?`Faltam ${next-save.player.respect} pontos de progressão.`:"Expande a organização para abrir novas possibilidades.",
+    panel:"operations",focus_test_id:null,progress:{value:save.player.respect,target:Math.max(1,next),pct:clamp(save.player.respect/Math.max(1,next)*100,0,100)},tone:"cyan"});
+
+  const completed=save.history.filter(m=>["success","partial","failure","police"].includes(m.outcome));
+  const best=[...completed].sort((a,b)=>(b.pending_reward||0)-(a.pending_reward||0))[0];
+  const veteran=[...save.employees].sort((a,b)=>(b.missions_done||0)-(a.missions_done||0))[0];
+  const car=[...save.vehicles].sort((a,b)=>(b.km_total||b.km||0)-(a.km_total||a.km||0))[0];
+  const topTeam=[...save.teams].sort((a,b)=>(b.missions_done||0)-(a.missions_done||0))[0];
+  const records=[];
+  if(best)records.push({key:"best_mission",label:"Maior saque",value:best.pending_reward||0,detail:`${best.team_name} · ${best.opportunity?.name||"Operação"}`});
+  if(veteran)records.push({key:"veteran",label:"Veterano",value:veteran.missions_done||0,detail:veteran.name});
+  if(car)records.push({key:"road_car",label:"Mais quilómetros",value:Number(car.km_total||car.km||0),detail:car.name});
+  if(topTeam)records.push({key:"top_team",label:"Equipa mais rodada",value:topTeam.missions_done||0,detail:topTeam.name});
+
+  const team_legacy={};
+  save.teams.forEach(t=>{
+    const n=t.missions_done||0;
+    const tier=n>=50?4:n>=25?3:n>=10?2:n>=3?1:0;
+    const names=["Nova","Rodada","Estabelecida","Veterana","Lenda"];
+    const cats=t.category_missions||{};
+    const identity=Object.keys(cats).sort((a,b)=>(cats[b]||0)-(cats[a]||0))[0]||t.spec;
+    team_legacy[t.id]={tier,title:names[tier],identity,missions:n,streak:t.streak||0,next_at:[3,10,25,50,null][tier]};
+  });
+  return {world_pulse:pulse,next_moves:moves.slice(0,3),records,team_legacy,
+    active_pressure:{heat:save.player.heat||0,tired_operatives:save.employees.filter(e=>(e.fatigue||0)>=65).length,
+      damaged_vehicles:save.vehicles.filter(v=>(v.condition??100)<45).length,
+      low_loyalty:save.employees.filter(e=>(e.loyalty??100)<55).length}};
+};
+
 const publicState=(save)=>{
   if(!save.player.hq){
     return {hq_pending:true,server_time:nowIso(),player:{
@@ -984,6 +1093,7 @@ const publicState=(save)=>{
     candidates:clone(save.candidates),vehicles:clone(save.vehicles),weapons:clone(save.weapons),
     properties:clone(save.properties),opportunities:clone(save.opportunities),missions:clone(save.missions),
     history:clone(save.history),events:clone(save.events),quests:clone(save.quests),caps,
+    retention:localRetention(save,caps),
     bonuses:{heal:0,legal:0,bribe_discount:0,repair_discount:save.properties.some(p=>p.type_key==="oficina") ? 0.15 : 0},
     ...(()=>{
       const economy=LOCAL_CATALOG.economy_meta||{};
@@ -1055,7 +1165,11 @@ const mutateGame=(save,path,payload)=>{
     const members=save.employees.filter(e=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90);
     const vehicle=save.vehicles.find(v=>v.id===team.vehicle_id);
     const chance=missionChance(save,opp,team);
-    return {chance,reward:opp.reward,reward_bonus_pct:0,age_decay_pct:0,split_penalty_pct:0,
+    const pulse=localWorldPulse();
+    const pulseActive=pulse.category===opp.category;
+    const pulseRewardMult=pulseActive?pulse.reward_mult:1;
+    return {chance,reward:Math.round(opp.reward*pulseRewardMult),reward_bonus_pct:Math.round((pulseRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
+      world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       fuel_needed:vehicle?Math.max(1,Math.round((opp.dist_km*2*vehicle.cons/100)*10)/10):0,
       eta_s:10+Math.round(opp.dist_km*2),duration_s:opp.duration_s||24,
       breakdown:[
@@ -1106,18 +1220,52 @@ const mutateGame=(save,path,payload)=>{
     const missionFuelNeeded=Math.max(1,(roadRoundKm>0?roadRoundKm:opp.dist_km*2)*vehicle.cons/100);
     if(vehicle.fuel_l<missionFuelNeeded)fail(400,"Combustível insuficiente para a viagem rodoviária");
     const departAt=new Date(start).toISOString();
+    const arriveAt=new Date(start+eta).toISOString();
+    const finishAt=new Date(start+eta+oper).toISOString();
+    const returnAt=new Date(start+eta+oper+ret).toISOString();
+    const baseChance=missionChance(save,opp,team);
+    const pulse=localWorldPulse(start);
+    const pulseActive=pulse.category===opp.category;
+    const pulseRewardMult=pulseActive?pulse.reward_mult:1;
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
-      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:opp.reward,pays:opp.pays,
-      fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:missionChance(save,opp,team),phase:"en_route",
-      depart_at:departAt,started_at:departAt,arrive_at:new Date(start+eta).toISOString(),
-      finish_at:new Date(start+eta+oper).toISOString(),return_at:new Date(start+eta+oper+ret).toISOString(),
+      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult),pays:opp.pays,
+      fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:baseChance,success_chance:baseChance,
+      live_chance_delta:0,decision_reward_mult:1,phase:"en_route",
+      depart_at:departAt,started_at:departAt,arrive_at:arriveAt,finish_at:finishAt,return_at:returnAt,
       origin,origin_property_id:vehicle.property_id||null,target,
       road_outward:roadOutward,road_inward:roadInward,
-      opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
+      live_log:[],
+      decision:localMissionDecision(opp.category,opp.risk,arriveAt,finishAt),
+      world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
+      opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
+        reward:Math.round(opp.reward*pulseRewardMult),risk:opp.risk,heat:opp.heat,pays:opp.pays}};
     team.status="on_mission";members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
     addEvent(save,"dispatch",`${team.name} saiu para ${opp.name}.`);return {ok:true,mission_id:mission.id};
+  }
+  if(path==="missions/decision"){
+    const mission=save.missions.find(m=>m.id===p.mission_id);
+    if(!mission)fail(404,"Operação não encontrada");
+    const decision=mission.decision;
+    if(!decision||decision.status!=="pending")fail(400,"Esta decisão já não está disponível");
+    const now=Date.now();
+    if(mission.phase!=="operating"||now<Date.parse(decision.opens_at))fail(400,"A janela de decisão ainda não abriu");
+    if(now>Date.parse(decision.expires_at)){decision.status="expired";fail(400,"A janela de decisão terminou — a equipa manteve o plano original");}
+    const option=(decision.options||[]).find(o=>o.id===p.option_id);
+    if(!option)fail(400,"Opção tática inválida");
+    mission.live_chance_delta=(mission.live_chance_delta||0)+Number(option.chance_delta||0);
+    mission.decision_reward_mult=Number(option.reward_mult||1);
+    decision.status="resolved";decision.choice=option.id;decision.choice_label=option.label;decision.resolved_at=nowIso();
+    save.player.heat=clamp(save.player.heat+Number(option.heat_delta||0),0,100);
+    save.employees.filter(e=>mission.member_ids.includes(e.id)).forEach(e=>{
+      e.fatigue=clamp((e.fatigue||0)+Number(option.fatigue_delta||0),0,100);
+    });
+    mission.live_log ||= [];
+    mission.live_log.push({at:nowIso(),speaker:"COMANDO",kind:Number(option.chance_delta||0)>0?"comp_good":Number(option.chance_delta||0)<0?"comp_bad":"radio",
+      text:`${option.label} — ordem executada.`,...(Number(option.chance_delta||0)?{pct:Number(option.chance_delta)}:{})});
+    addEvent(save,"intel",`${mission.team_name}: decisão tática — ${option.label}.`);
+    return {ok:true,choice:option.id,effects:{chance_delta:option.chance_delta||0,reward_mult:option.reward_mult||1,heat_delta:option.heat_delta||0,fatigue_delta:option.fatigue_delta||0}};
   }
   if(path==="missions/recall"){
     const mission=save.missions.find(m=>m.id===p.mission_id);if(!mission)fail(404,"Missão não encontrada");

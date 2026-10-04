@@ -155,7 +155,7 @@ def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
 
 
-MISSION_STATS_VERSION = 5
+MISSION_STATS_VERSION = 6
 
 
 def default_stats():
@@ -217,6 +217,8 @@ async def reconcile_mission_stats(db, player):
     by_category = {}
     success_by_category = {}
     target_fines = 0
+    historical_best = None
+    historical_clutch = None
 
     for mission in missions:
         raw_outcome = mission.get("outcome")
@@ -240,6 +242,24 @@ async def reconcile_mission_stats(db, player):
                 mission_earned_clean += reward
             elif pays == "dirty":
                 mission_earned_dirty += reward
+            if historical_best is None or reward > historical_best["value"]:
+                historical_best = {
+                    "value": reward,
+                    "team_name": mission.get("team_name", "Equipa"),
+                    "operation": (mission.get("opportunity") or {}).get("name", "Operação"),
+                    "district": (mission.get("opportunity") or {}).get("district"),
+                    "chance": round(float(mission.get("final_chance", mission.get("success_chance", 0)) or 0), 3),
+                    "at": mission.get("return_at") or mission.get("finish_at"),
+                }
+            chance = float(mission.get("final_chance", mission.get("success_chance", 1)) or 1)
+            if outcome == "success" and (historical_clutch is None or chance < historical_clutch["chance"]):
+                historical_clutch = {
+                    "chance": round(chance, 3),
+                    "team_name": mission.get("team_name", "Equipa"),
+                    "operation": (mission.get("opportunity") or {}).get("name", "Operação"),
+                    "reward": reward,
+                    "at": mission.get("return_at") or mission.get("finish_at"),
+                }
 
         if outcome == "success":
             success += 1
@@ -314,9 +334,20 @@ async def reconcile_mission_stats(db, player):
     mission_docs = await db.missions.count_documents({"player_id": pid})
     _max_stat(stats, "ops_dispatched", mission_docs)
 
+    records = player.setdefault("records", {})
+    current_best = records.get("best_mission") or {}
+    if historical_best and int(historical_best["value"]) > int(current_best.get("value", 0) or 0):
+        records["best_mission"] = historical_best
+    current_clutch = records.get("lowest_chance_success") or {}
+    if historical_clutch and float(historical_clutch["chance"]) < float(current_clutch.get("chance", 1.01) or 1.01):
+        records["lowest_chance_success"] = historical_clutch
+
     stats["_mission_outcome_version"] = MISSION_STATS_VERSION
     player["stats"] = stats
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {"stats": stats}})
+    await db.players.update_one(
+        {"_id": player["_id"]},
+        {"$set": {"stats": stats, "records": records}},
+    )
     return stats
 
 
@@ -1848,6 +1879,29 @@ def _record_terminal_mission_stats(player, m, outcome):
     """Regista exatamente um resultado terminal por operação."""
     stats = ensure_stats(player)
     stats["missions_total"] = stats.get("missions_total", 0) + 1
+    records = player.setdefault("records", {})
+    if outcome in ("success", "partial"):
+        reward = int(m.get("pending_reward", 0) or 0)
+        best = records.get("best_mission") or {}
+        if reward > int(best.get("value", 0) or 0):
+            records["best_mission"] = {
+                "value": reward,
+                "team_name": m.get("team_name", "Equipa"),
+                "operation": (m.get("opportunity") or {}).get("name", "Operação"),
+                "district": (m.get("opportunity") or {}).get("district"),
+                "chance": round(float(m.get("final_chance", m.get("success_chance", 0)) or 0), 3),
+                "at": now_utc().isoformat(),
+            }
+        chance = float(m.get("final_chance", m.get("success_chance", 1)) or 1)
+        clutch = records.get("lowest_chance_success") or {}
+        if outcome == "success" and chance < float(clutch.get("chance", 1.01) or 1.01):
+            records["lowest_chance_success"] = {
+                "chance": round(chance, 3),
+                "team_name": m.get("team_name", "Equipa"),
+                "operation": (m.get("opportunity") or {}).get("name", "Operação"),
+                "reward": reward,
+                "at": now_utc().isoformat(),
+            }
     cat = m["opportunity"].get("category")
     if cat:
         stats["by_category"][cat] = stats["by_category"].get(cat, 0) + 1
@@ -1889,10 +1943,14 @@ def _apply_outcome(player, m, outcome):
         heat_mult *= LUXURY_HEAT_MULT
     if m.get("weapon_loud") and t["category"] in DISCREET_CATEGORIES:
         heat_mult *= WEAPON_LOUD_HEAT_MULT
+    # Rotating world pulse is persisted with the mission at dispatch so a
+    # four-hour window cannot change underneath an operation already running.
+    heat_mult *= float((m.get("world_pulse") or {}).get("applied_heat_mult", 1.0) or 1.0)
+    decision_reward_mult = float(m.get("decision_reward_mult", 1.0) or 1.0)
     if outcome == "success":
         # Money is *not* credited here anymore. Store as pending reward — paid on arrival at HQ
         # if the police chase (if any) is escaped.
-        reward = t["reward"]
+        reward = int(t["reward"] * decision_reward_mult)
         # Pequeno imprevisto: saque adicional aleatório.
         if random.random() < BONUS_LOOT_CHANCE:
             bonus_pct = random.uniform(0.02, BONUS_LOOT_MAX_PCT)
@@ -1913,7 +1971,7 @@ def _apply_outcome(player, m, outcome):
         # Sucesso parcial (SSS v3): a equipa abortou a meio mas salvou parte do
         # saque — paga menos, faz mais barulho e a polícia fica mais desconfiada.
         frac = random.uniform(PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX)
-        m["pending_reward"] = int(t["reward"] * frac)
+        m["pending_reward"] = int(t["reward"] * decision_reward_mult * frac)
         m["pending_pays"] = t["pays"]
         m["partial_fraction"] = round(frac, 2)
         base_rep = m.get("reward_reputation", t["respect"])
@@ -2358,6 +2416,16 @@ async def _progress_mission(db, player, m, now):
             if heat_now - heat_then >= SMART_WARN_HEAT_DELTA:
                 await add_event(db, m["player_id"], "intel",
                                 f"Líder de {m['team_name']} reporta do alvo: o calor subiu de {round(heat_then)}% para {round(heat_now)}% desde a partida — condições piores do que o planeado. A equipa mantém a operação.")
+    if phase == "operating":
+        decision = m.get("decision") or {}
+        if (
+            decision.get("status") == "pending"
+            and decision.get("expires_at")
+            and now > parse_dt(decision["expires_at"])
+        ):
+            decision = {**decision, "status": "expired"}
+            updates["decision"] = decision
+            m["decision"] = decision
     if phase == "operating" and now >= parse_dt(m["finish_at"]):
         outcome = _roll_outcome(player, m)
         _apply_outcome(player, m, outcome)

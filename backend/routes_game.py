@@ -82,6 +82,7 @@ from economy_constants import (
     VEHICLE_REPAIR_BASE_MULTIPLIER, PROPERTY_MAINTENANCE_PCT_PER_WEEK,
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
+from retention_engine import build_retention_snapshot, mission_decision, world_pulse
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
                                DRIVER_TRAVEL_REDUCTION_MAX,
@@ -211,6 +212,11 @@ class VehicleRenameInput(BaseModel):
 
 class MissionIdInput(BaseModel):
     mission_id: str
+
+
+class MissionDecisionInput(BaseModel):
+    mission_id: str
+    option_id: str
 
 
 class VehicleAssignInput(BaseModel):
@@ -581,6 +587,25 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         for pr in properties
     )))
     weekly_fixed_total = gross_salary + employer_ss + fleet_weekly + property_weekly
+    caps_out = {
+        "employees": {"used": len(employees), "max": caps["employees"]},
+        "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
+        "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
+        "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
+    }
+    retention = build_retention_snapshot(
+        now=now_utc(),
+        player=p,
+        teams=teams,
+        employees=employees,
+        vehicles=vehicles,
+        properties=properties,
+        opportunities=opportunities,
+        missions=missions,
+        history=history,
+        caps=caps_out,
+        weekly_fixed_total=weekly_fixed_total,
+    )
 
     return {
         "server_time": now_iso,
@@ -596,12 +621,8 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         "history": [Mission.from_mongo(h).model_dump() for h in history],
         "events": [Event.from_mongo(e).model_dump() for e in events],
         "quests": quests_out,
-        "caps": {
-            "employees": {"used": len(employees), "max": caps["employees"]},
-            "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
-            "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
-            "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
-        },
+        "caps": caps_out,
+        "retention": retention,
         "bonuses": bonuses,
         "salary_total": gross_salary,
         "weekly_fixed_total": weekly_fixed_total,
@@ -812,15 +833,30 @@ async def _prepare_dispatch(player, opp, team):
         specialization_match=spec_match,
     )
 
+    # Pulso do mundo: uma janela global de quatro horas muda o valor relativo
+    # de uma categoria. É a mesma para todos os jogadores e aparece no preview,
+    # por isso não existe multiplicador escondido.
+    pulse = world_pulse(now)
+    pulse_active = opp["category"] == pulse["category"]
+    pulse_reward_mult = pulse["reward_mult"] if pulse_active else 1.0
+
     # Aplicar multiplicadores existentes uma única vez. Antes, "mult" entrava
     # no reward_engine e voltava a ser multiplicado aqui, inflacionando o saque.
-    reward = int(reward_data["money"] * mult * age_mult * split_mult)
+    reward = int(reward_data["money"] * mult * pulse_reward_mult * age_mult * split_mult)
     reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
+
+    mission_pulse = {
+        **pulse,
+        "active_for_mission": pulse_active,
+        "applied_reward_mult": pulse_reward_mult,
+        "applied_heat_mult": pulse["heat_mult"] if pulse_active else 1.0,
+    }
 
     return {
         "members": members, "vehicle": vehicle, "dist": dist, "round_km": round_km,
         "fuel_needed": fuel_needed, "speed": speed, "travel_s": travel_s,
-        "reward": reward, "reward_mult": mult, "age_mult": age_mult, "split_mult": split_mult,
+        "reward": reward, "reward_mult": mult * pulse_reward_mult, "age_mult": age_mult, "split_mult": split_mult,
+        "world_pulse": mission_pulse,
         "reward_difficulty_score": reward_data["difficulty_score"],
         "reward_xp": reward_data["xp"],
         "reward_reputation": reward_data["reputation"],
@@ -951,6 +987,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "min_members": prep["min_members"],
         "min_members_met": len(prep["members"]) >= prep["min_members"],
         "weapon_alerts": prep.get("weapon_alerts", []),
+        "world_pulse": prep.get("world_pulse"),
     }
 
 
@@ -1015,6 +1052,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         heat=player.get("heat", 0), has_leader=prep.get("has_leader", False),
         vehicle_name=vehicle_name, memory=player.get("phrase_memory"),
     )
+    decision = mission_decision(opp["category"], opp["risk"], arrive, finish)
 
     mission = {
         "player_id": pid, "team_id": str(team["_id"]), "team_name": team["name"],
@@ -1065,6 +1103,9 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "depart_at": depart.isoformat(), "arrive_at": arrive.isoformat(),
         "finish_at": finish.isoformat(), "return_at": ret.isoformat(),
         "live_log": live_log, "live_chance_delta": live_delta,
+        "decision": decision,
+        "decision_reward_mult": 1.0,
+        "world_pulse": prep.get("world_pulse"),
     }
     result = await db.missions.insert_one(mission)
     await db.opportunities.update_one({"_id": opp["_id"]}, {"$set": {"status": "taken"}})
@@ -1306,6 +1347,111 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
         msg += f" Chamada tardia (já a {round(t * 100)}% do caminho) — +{RECALL_PENALTY_HEAT} calor e equipa mais cansada."
     await add_event(db, pid, "team", msg)
     return {"ok": True, "return_at": ret.isoformat(), "late_penalty": late}
+
+
+
+@router.post("/missions/decision")
+async def resolve_mission_decision(body: MissionDecisionInput, user: dict = Depends(get_current_user)):
+    """Resolve one optional live tactical choice.
+
+    Choices are transparent trade-offs. Doing nothing keeps the original plan
+    and never carries a hidden penalty.
+    """
+    player = await get_player(user)
+    pid = str(player["_id"])
+    mission = await db.missions.find_one({
+        "_id": _oid(body.mission_id, "Operação inválida"),
+        "player_id": pid,
+    })
+    if not mission:
+        raise HTTPException(status_code=404, detail="Operação não encontrada")
+    decision = mission.get("decision") or {}
+    if not decision or decision.get("status") != "pending":
+        raise HTTPException(status_code=400, detail="Esta decisão já não está disponível")
+
+    now = now_utc()
+    opens_at = parse_dt(decision.get("opens_at"))
+    expires_at = parse_dt(decision.get("expires_at"))
+    if mission.get("phase") != "operating" or now < opens_at:
+        raise HTTPException(status_code=400, detail="A janela de decisão ainda não abriu")
+    if now > expires_at:
+        await db.missions.update_one(
+            {"_id": mission["_id"]},
+            {"$set": {"decision.status": "expired"}},
+        )
+        raise HTTPException(status_code=400, detail="A janela de decisão terminou — a equipa manteve o plano original")
+
+    option = next((item for item in decision.get("options", []) if item.get("id") == body.option_id), None)
+    if not option:
+        raise HTTPException(status_code=400, detail="Opção tática inválida")
+
+    chance_delta = float(option.get("chance_delta", 0) or 0)
+    reward_mult = float(option.get("reward_mult", 1) or 1)
+    heat_delta = float(option.get("heat_delta", 0) or 0)
+    fatigue_delta = float(option.get("fatigue_delta", 0) or 0)
+    new_heat = max(0.0, min(100.0, float(player.get("heat", 0) or 0) + heat_delta))
+
+    resolved = {
+        **decision,
+        "status": "resolved",
+        "choice": option["id"],
+        "choice_label": option["label"],
+        "resolved_at": now.isoformat(),
+    }
+    effect_bits = []
+    if chance_delta:
+        effect_bits.append(f"{chance_delta * 100:+.0f}% chance")
+    if reward_mult != 1:
+        effect_bits.append(f"{(reward_mult - 1) * 100:+.0f}% recompensa")
+    if heat_delta:
+        effect_bits.append(f"{heat_delta:+.0f} calor")
+    effect_text = " · ".join(effect_bits) if effect_bits else "plano original"
+
+    live_entry = {
+        "at": now.isoformat(),
+        "speaker": "COMANDO",
+        "kind": "comp_good" if chance_delta > 0 else ("comp_bad" if chance_delta < 0 else "radio"),
+        "text": f"{option['label']} — {effect_text}.",
+    }
+    if chance_delta:
+        live_entry["pct"] = chance_delta
+
+    update = {
+        "$set": {
+            "decision": resolved,
+            "decision_reward_mult": reward_mult,
+        },
+        "$push": {"live_log": live_entry},
+    }
+    if chance_delta:
+        update["$inc"] = {"live_chance_delta": chance_delta}
+    await db.missions.update_one({"_id": mission["_id"]}, update)
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"heat": new_heat}})
+
+    if fatigue_delta and mission.get("member_ids"):
+        member_oids = [ObjectId(member_id) for member_id in mission["member_ids"]]
+        await db.employees.update_many({"_id": {"$in": member_oids}}, {"$inc": {"fatigue": fatigue_delta}})
+        await db.employees.update_many(
+            {"_id": {"$in": member_oids}, "fatigue": {"$gt": 100}},
+            {"$set": {"fatigue": 100.0}},
+        )
+
+    await add_event(
+        db,
+        pid,
+        "intel",
+        f"{mission['team_name']}: decisão tática — {option['label']} ({effect_text}).",
+    )
+    return {
+        "ok": True,
+        "choice": option["id"],
+        "effects": {
+            "chance_delta": chance_delta,
+            "reward_mult": reward_mult,
+            "heat_delta": heat_delta,
+            "fatigue_delta": fatigue_delta,
+        },
+    }
 
 
 @router.post("/teams/create")
