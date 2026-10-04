@@ -2003,6 +2003,9 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
 
 
 async def _vehicle_free(pid, vehicle):
+    seized_until = vehicle.get("seized_until")
+    if seized_until and parse_dt(seized_until) > now_utc():
+        return False
     if vehicle.get("transfer"):
         return False
     if vehicle.get("team_id"):
