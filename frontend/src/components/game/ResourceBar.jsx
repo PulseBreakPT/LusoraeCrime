@@ -46,7 +46,6 @@ export const ResourceBar = () => {
           label="Nível"
           value={p.level}
           tip={respectTip}
-          className="sub-level-readout"
         />
 
         <Stat
@@ -84,10 +83,10 @@ export const ResourceBar = () => {
 };
 
 const Stat = ({ icon: Icon, color, label, value, tip, testId, className = "" }) => (
-  <Tip tip={tip} side="bottom" className="min-w-0">
+  <Tip tip={tip} side="bottom" className="h-full w-full min-w-0">
     <div
       data-testid={testId}
-      className={`sub-minimal-stat flex min-w-0 flex-col items-center justify-center gap-1 px-1.5 py-2 text-center ${className}`}
+      className={`sub-minimal-stat flex h-full w-full min-w-0 flex-col items-center justify-center gap-1 px-1.5 py-2 text-center ${className}`}
     >
       <span className="sub-resource-heading flex min-w-0 items-center justify-center gap-1">
         <span className="sub-resource-icon flex h-5 w-5 shrink-0 items-center justify-center">
