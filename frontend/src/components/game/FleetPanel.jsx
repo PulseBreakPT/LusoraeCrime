@@ -288,9 +288,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           </span>
                         </Tip>
                       )}
-                      <Tip tip={`${Math.round(v.km_total)} km percorridos ao serviço da organização.`}>
+                      <Tip tip={`${Math.round(Number(v.km_total) || 0)} km percorridos ao serviço da organização.`}>
                         <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
-                          <BarChart3 size={9} /> {Math.round(v.km_total)} km
+                          <BarChart3 size={9} /> {Math.round(Number(v.km_total) || 0)} km
                         </span>
                       </Tip>
                     </div>
@@ -479,7 +479,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   <div data-testid={`vehicle-stats-${v.id}`} className="relative z-[1] mt-1.5 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-2">
                     <VStat label="Missões" value={`${v.missions_success || 0}✓/${v.missions_done || 0}`} />
                     <VStat label="Sucesso" value={v.missions_done ? `${Math.round(((v.missions_success || 0) / v.missions_done) * 100)}%` : "—"} />
-                    <VStat label="Km" value={Math.round(v.km_total)} />
+                    <VStat label="Km" value={Math.round(Number(v.km_total) || 0)} />
                     <VStat label="Comb. gasto" value={fmtMoney(v.fuel_spent_total || 0)} />
                     <VStat label="Reparações" value={fmtMoney(v.repair_spent_total || 0)} />
                     <VStat label="Vel. efetiva" value={`${effSpeed.toFixed(1)} m/s`} />
