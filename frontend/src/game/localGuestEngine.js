@@ -409,8 +409,13 @@ const ensureOrganizationSave = (save) => {
     vehicle.seized_until ||= null;
   });
   (save.weapons || []).forEach((weapon) => {
-    weapon.loaded_rounds = Number(weapon.loaded_rounds || 0);
-    weapon.upgrades ||= {};
+    weapon.ammo_loaded = Number(weapon.ammo_loaded ?? weapon.loaded_rounds ?? 0);
+    if (!Array.isArray(weapon.upgrades)) {
+      const legacy = weapon.upgrades || {};
+      weapon.upgrades = Object.entries(legacy).flatMap(([key,count]) =>
+        Array.from({ length:Math.max(0,Number(count||0)) }, () => ({ key, installed_at:nowIso() }))
+      );
+    }
   });
   (save.properties || []).forEach((property) => {
     property.security_level = Number(property.security_level || 0);
@@ -1523,19 +1528,20 @@ const mutateGame=(save,path,payload)=>{
       const model=LOCAL_CATALOG.weapon_models?.[weapon.model_key]||{};
       const ammoKey=org.weapon_ammo?.[weapon.model_key];
       if(!ammoKey)fail(400,"Esta arma não usa munições");
-      const cap=Number(model.magazine_capacity||0), loaded=Number(weapon.loaded_rounds||0);
+      const cap=Number(model.magazine_capacity||0), loaded=Number(weapon.ammo_loaded||0);
       const need=Math.max(0,cap-loaded), available=Number(inventory[ammoKey]||0), used=Math.min(need,available);
       if(used<=0)fail(400,need<=0?"Carregador cheio":"Sem munições no stock");
-      inventory[ammoKey]-=used; weapon.loaded_rounds=loaded+used; return {ok:true,used};
+      inventory[ammoKey]-=used; weapon.ammo_loaded=loaded+used; return {ok:true,ammo_loaded:weapon.ammo_loaded,used};
     }
     if(path==="org/weapons/upgrade"){
       if(!weapon)fail(404,"Arma não encontrada");
       const cfg=org.weapon_upgrades?.[p.upgrade_key]; if(!cfg)fail(400,"Upgrade inválido");
       if(save.player.level<Number(cfg.min_level||1))fail(400,"Nível insuficiente");
-      weapon.upgrades ||= {}; const rank=Number(weapon.upgrades[p.upgrade_key]||0);
+      weapon.upgrades = Array.isArray(weapon.upgrades) ? weapon.upgrades : [];
+      const rank=weapon.upgrades.filter((upgrade)=>upgrade?.key===p.upgrade_key).length;
       if(rank>=Number(cfg.max_rank||0))fail(400,"Upgrade no nível máximo");
       const cost=Math.trunc(Number(cfg.cost||0)*(1+rank*.65)); chargeClean(save,cost,`Upgrade de arma — ${cfg.name}`);
-      weapon.upgrades[p.upgrade_key]=rank+1; return {ok:true,cost,rank:rank+1};
+      weapon.upgrades.push({key:p.upgrade_key,installed_at:nowIso()}); return {ok:true,cost,rank:rank+1};
     }
 
     const vehicle=save.vehicles.find((x)=>x.id===p.id);
@@ -1545,7 +1551,7 @@ const mutateGame=(save,path,payload)=>{
       if(assigned&&assigned.status!=="idle")fail(400,"Veículo em operação");
       const lc=org.vehicle_lifecycle||{}, missing=Math.max(0,100-Number(vehicle.condition||0));
       const cost=Math.max(120,Math.trunc(Number(vehicle.price||LOCAL_CATALOG.vehicle_models?.[vehicle.model_key]?.price||0)*Number(lc.service_base_pct||.018)+missing*8));
-      chargeClean(save,cost,"Revisão de veículo"); vehicle.condition=100; vehicle.last_service_km=Number(vehicle.km_total??vehicle.km??0);
+      chargeClean(save,cost,"Revisão de veículo"); vehicle.condition=Math.min(100,Number(vehicle.condition||0)+18); vehicle.last_service_km=Number(vehicle.km_total??vehicle.km??0);
       vehicle.notoriety=Math.max(0,Number(vehicle.notoriety||0)-10); return {ok:true,cost};
     }
     if(path==="org/vehicles/tires"){
