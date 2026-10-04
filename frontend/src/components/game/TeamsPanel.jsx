@@ -698,10 +698,10 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                 tip="Equipas prontas a operar já: com membros disponíveis, veículo abastecido e em condições." />
               <Kpi icon={Activity} label="Em operação" value={tr.busy} color={tr.busy > 0 ? "#22D3EE" : "#FFFFFF"}
                 tip="Equipas em viagem ou a executar operações neste momento — acompanha-as no mapa." />
-              <Kpi icon={Flame} label="Série" value={bestStreak > 0 ? `${bestStreak}` : "—"} color={bestStreak >= 2 ? "#34D399" : "#FFFFFF"}
-                tip={`Maior série de vitórias ativa entre as equipas. A partir de 2 vitórias seguidas o momentum dá +${((teamMeta.momentum_bonus_per_win ?? 0.012) * 100).toFixed(1)}%/vitória de chance (máx. +${Math.round((teamMeta.momentum_bonus_max ?? 0.06) * 100)}%). Total de operações concluídas: ${opsDone}.`} />
               <Kpi icon={Target} label="Fadiga" value={`${avgFat}%`} color={fatigueColor(avgFat)} bar={avgFat} barColor={fatigueColor(avgFat)}
                 tip={`Fadiga média dos membros das equipas (${assigned.length}/${state.employees.length} afetos). Acima de 90% ficam indisponíveis.`} />
+              <Kpi icon={Flame} label="Série" value={bestStreak > 0 ? `${bestStreak}` : "—"} color={bestStreak >= 2 ? "#34D399" : "#FFFFFF"}
+                tip={`Maior série de vitórias ativa entre as equipas. A partir de 2 vitórias seguidas o momentum dá +${((teamMeta.momentum_bonus_per_win ?? 0.012) * 100).toFixed(1)}%/vitória de chance (máx. +${Math.round((teamMeta.momentum_bonus_max ?? 0.06) * 100)}%). Total de operações concluídas: ${opsDone}.`} />
             </SummaryStrip>
           );
         })()}
