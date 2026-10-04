@@ -280,10 +280,11 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="command-center"
-        className="max-w-xl overflow-hidden border-white/10 bg-[#08080a]/98 p-0 text-white shadow-2xl"
+        overlayClassName="bg-black/45 backdrop-blur-[2px]"
+        className="sub-menu-modal max-w-none overflow-hidden p-0 text-white"
         onKeyDown={onKeyDown}
       >
-        <DialogHeader className="border-b border-white/10 px-4 pb-3 pt-4">
+        <DialogHeader className="sub-menu-modal-header border-b border-white/[0.065] px-4 pb-3.5 pt-4">
           <DialogTitle className="flex items-center gap-2 text-base">
             <Search size={17} className="text-red-400" /> Pesquisa
           </DialogTitle>
