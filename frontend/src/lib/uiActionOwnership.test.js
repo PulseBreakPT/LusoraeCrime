@@ -14,6 +14,8 @@ describe("UI action ownership", () => {
   const weapons = read("components/game/WeaponsPanel.jsx");
   const gamePage = read("pages/GamePage.jsx");
   const focusHook = read("hooks/usePanelFocus.js");
+  const gameContext = read("context/GameContextV2.js");
+  const localGuest = read("game/localGuestEngine.js");
 
   test("team management does not duplicate recovery or fleet maintenance mutations", () => {
     for (const forbidden of [
@@ -93,5 +95,17 @@ describe("UI action ownership", () => {
     expect(focusHook).toContain('classList.add("sub-nav-focus-flash")');
     expect(focusHook).toContain("2600");
   });
+
+  test("team builder creates the selected configuration in one action", () => {
+    expect(teams).toContain('data-testid="team-builder"');
+    expect(teams).toContain('data-testid="team-builder-vehicle"');
+    expect(teams).toContain('data-testid="team-builder-create"');
+    expect(teams).toContain("createTeam(spec, memberIds, selectedVehicle?.id || null)");
+    expect(teams).not.toContain("testId={`create-team-${key}`}");
+    expect(gameContext).toContain("employee_ids: employeeIds");
+    expect(gameContext).toContain("vehicle_id: vehicleId || null");
+    expect(localGuest).toContain("const memberIds=[...new Set(p.employee_ids||[])]");
+  });
+
 
 });
