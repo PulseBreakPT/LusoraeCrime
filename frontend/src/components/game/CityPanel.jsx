@@ -438,12 +438,66 @@ export const CityPanel = ({ open, onOpenChange }) => {
                 <Card className="sub-card p-3 shadow-none">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Landmark size={13} className="text-cyan-400" /> Aliança</p>
                   {city.social?.alliance ? (
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-bold text-white">{city.social.alliance.name}</p>
-                        <p className="font-mono text-[10px] text-zinc-500">Código {city.social.alliance.code} · {nfmt(city.social.alliance.season_points || 0)} pts época</p>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-white">{city.social.alliance.name}</p>
+                          <p className="font-mono text-[10px] text-zinc-500">
+                            Código {city.social.alliance.code} · {nfmt(city.social.alliance.season_points || 0)} pts época · {(city.social.alliance.members || []).length} membros
+                          </p>
+                        </div>
+                        <ActionButton
+                          tone="danger"
+                          disabled={!!busy || (!!city.social.alliance.is_leader && (city.social.alliance.members || []).length > 1)}
+                          onClick={() => act("alliance-leave", "social/alliance/leave", {}, "Saíste da aliança")}
+                        >
+                          {!!city.social.alliance.is_leader && (city.social.alliance.members || []).length > 1 ? "Transfere liderança" : "Sair"}
+                        </ActionButton>
                       </div>
-                      <ActionButton tone="danger" disabled={!!busy} onClick={() => act("alliance-leave", "social/alliance/leave", {}, "Saíste da aliança")}>Sair</ActionButton>
+
+                      {(city.social.alliance.members || []).length > 0 && (
+                        <div className="space-y-1 border-t border-white/[0.06] pt-2">
+                          {(city.social.alliance.members || []).map((member) => (
+                            <div key={member.player_id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-1.5">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[10px] font-bold text-zinc-200">
+                                  {member.org_name}{member.is_you ? " · tu" : ""}
+                                </p>
+                                <p className="font-mono text-[10px] text-zinc-600">
+                                  N{member.level} · {nfmt(member.respect)} respeito {member.is_leader ? "· líder" : ""}
+                                </p>
+                              </div>
+                              {!!city.social.alliance.is_leader && !member.is_you && (
+                                <div className="flex gap-1">
+                                  <ActionButton
+                                    disabled={!!busy}
+                                    onClick={() => act(
+                                      `alliance-transfer-${member.player_id}`,
+                                      "social/alliance/transfer",
+                                      { player_id:member.player_id },
+                                      `Liderança transferida para ${member.org_name}`
+                                    )}
+                                  >
+                                    Liderar
+                                  </ActionButton>
+                                  <ActionButton
+                                    tone="danger"
+                                    disabled={!!busy}
+                                    onClick={() => act(
+                                      `alliance-kick-${member.player_id}`,
+                                      "social/alliance/kick",
+                                      { player_id:member.player_id },
+                                      `${member.org_name} removida da aliança`
+                                    )}
+                                  >
+                                    Expulsar
+                                  </ActionButton>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="mt-2 space-y-2">
@@ -458,6 +512,22 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     </div>
                   )}
                 </Card>
+
+                {(city.social?.alliance_leaderboard || []).length > 0 && (
+                  <Card className="sub-card p-3 shadow-none">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Trophy size={13} className="text-amber-400" /> Classificação de alianças</p>
+                    <div className="mt-2 space-y-1">
+                      {(city.social.alliance_leaderboard || []).slice(0, 10).map((row, index) => (
+                        <div key={row.id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 font-mono text-[10px] ${row.is_yours ? "bg-cyan-500/10 text-cyan-200" : "bg-black/20 text-zinc-400"}`}>
+                          <span className="w-5 text-zinc-600">#{index + 1}</span>
+                          <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                          <span>{row.members} membros</span>
+                          <span className="font-bold text-zinc-200">{nfmt(row.points)} pts</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
                 <Card className="sub-card p-3 shadow-none">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-white"><MessageCircle size={13} className="text-sky-400" /> Frequência da cidade</p>
