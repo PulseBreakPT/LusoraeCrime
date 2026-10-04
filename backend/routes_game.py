@@ -1756,6 +1756,12 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": TEAM_CREATE_COST, "stats.teams_created": -1}})
         raise
     team_id = str(result.inserted_id)
+    # Segunda barreira contra duas criações concorrentes que passaram pelo
+    # mesmo count inicial. No pior caso ambas recuam; nunca excedemos o cap.
+    if await db.teams.count_documents({"player_id": pid}) > max_teams:
+        await db.teams.delete_one({"_id": result.inserted_id})
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": TEAM_CREATE_COST, "stats.teams_created": -1}})
+        raise HTTPException(status_code=409, detail="O limite de equipas foi atingido noutra sessão")
     if employee_ids:
         await db.employees.update_many(
             {"_id": {"$in": [employee["_id"] for employee in employees]}},
@@ -1821,7 +1827,7 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
         await db.candidates.insert_one(reserved)
         raise
     try:
-        await db.employees.insert_one(doc)
+        inserted = await db.employees.insert_one(doc)
     except Exception:
         refund = {"clean_money": recruit_cost, "stats.recruits_hired": -1}
         if cand["role_key"] == "informador":
@@ -1829,6 +1835,14 @@ async def recruit_employee(body: RecruitInput, user: dict = Depends(get_current_
         await db.players.update_one({"_id": player["_id"]}, {"$inc": refund})
         await db.candidates.insert_one(reserved)
         raise
+    if await db.employees.count_documents({"player_id": pid}) > caps["employees"]:
+        await db.employees.delete_one({"_id": inserted.inserted_id})
+        refund = {"clean_money": recruit_cost, "stats.recruits_hired": -1}
+        if cand["role_key"] == "informador":
+            refund["stats.recruits_informador"] = -1
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": refund})
+        await db.candidates.insert_one(reserved)
+        raise HTTPException(status_code=409, detail="O limite de operacionais foi atingido noutra sessão")
     role_name = SPECIALIZATIONS[cand["role_key"]]["name"]
     await add_event(db, pid, "team", f"{cand['name']} ({role_name}, {RARITIES[cand['rarity']]['name']}) recrutado por {recruit_cost:,} €.")
     await record_tx(db, pid, "recruit", -recruit_cost, "clean", fresh_player["clean_money"], f"Recrutamento de {cand['name']}")
@@ -2217,10 +2231,14 @@ async def buy_vehicle(body: VehicleBuyInput, user: dict = Depends(get_current_us
         raise HTTPException(status_code=400, detail="Garagem cheia. Compra ou melhora uma garagem.")
     fresh_player = await _debit_clean_atomic(player, model["price"], {"stats.vehicles_bought": 1})
     try:
-        await db.vehicles.insert_one(vehicle_doc(pid, body.model_key, now_utc().isoformat()))
+        inserted = await db.vehicles.insert_one(vehicle_doc(pid, body.model_key, now_utc().isoformat()))
     except Exception:
         await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": model["price"], "stats.vehicles_bought": -1}})
         raise
+    if await db.vehicles.count_documents({"player_id": pid}) > caps["vehicles"]:
+        await db.vehicles.delete_one({"_id": inserted.inserted_id})
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": model["price"], "stats.vehicles_bought": -1}})
+        raise HTTPException(status_code=409, detail="A garagem ficou cheia noutra sessão")
     await add_event(db, pid, "vehicle", f"{model['name']} adquirido por {model['price']:,} €.")
     await record_tx(db, pid, "vehicle_buy", -model["price"], "clean", fresh_player["clean_money"], f"Compra de {model['name']}")
     return {"ok": True}
