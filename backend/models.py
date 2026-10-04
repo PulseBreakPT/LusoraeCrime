@@ -118,6 +118,7 @@ class Employee(BaseDocument):
     injury: Optional[dict] = None
     sentence: Optional[dict] = None
     relations: dict = {}
+    stationed_property_id: Optional[str] = None
 
 
 class Candidate(BaseDocument):
