@@ -96,7 +96,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
           </Card>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 sm:grid-cols-4">
               {TABS.map(([key, label, Icon]) => (
                 <button
                   key={key}
@@ -311,7 +311,7 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
         {fmtMoney(target.base_reward)}
       </Badge>
     </div>
-    <div className="mt-3 grid grid-cols-3 gap-1 text-center">
+    <div className="mt-3 grid grid-cols-1 gap-1 text-center min-[390px]:grid-cols-3">
       <Info label="Base" value={`${Math.round(target.base_success * 100)}%`} />
       <Info label="Calor" value={`+${target.heat}`} />
       <Info label="Preps" value={target.preps.length} />
@@ -379,7 +379,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
             </p>
             <p className="mt-1 text-[10px] text-zinc-500">{finale.complication_description}</p>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-1 text-center">
+          <div className="mt-3 grid grid-cols-1 gap-1 text-center min-[390px]:grid-cols-3">
             <Info label="Chance" value={`${Math.round(finale.chance * 100)}%`} />
             <Info label="Líquido" value={fmtMoney(finale.net_reward)} />
             <Info label="Capacidade" value={`${finale.loot_capacity_pct}%`} />
