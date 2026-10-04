@@ -373,7 +373,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel">
+      <SheetContent side="right" className="sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Settings} />
           <SheetTitle className="flex items-center gap-2 text-white">
