@@ -96,7 +96,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="shop-panel">
+      <SheetContent side="right" className="sub-panel" data-testid="shop-panel">
         <SheetHeader>
           <PanelWatermark icon={ShoppingBag} />
           <SheetTitle className="flex items-center gap-2 text-white">
