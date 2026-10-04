@@ -1611,22 +1611,28 @@ const mutateGame=(save,path,payload)=>{
       const policy=guestOrgPolicy(save),actions=[],reserve=Number(policy.reserve_cash||0);
       const intel=guestOrgIntelligence(save);
       const canSpend=(cost)=>Number(save.player.clean_money||0)-cost>=reserve;
+      const budgetRows=Object.fromEntries((intel.finance?.budgets||[]).map((row)=>[row.key,{...row}]));
+      const budgetAllows=(category,cost)=>{
+        const row=budgetRows[category];
+        return !row||Number(row.limit||0)<=0||Number(row.spent||0)+Number(cost||0)<=Number(row.limit||0);
+      };
+      const consumeBudget=(category,cost)=>{if(budgetRows[category])budgetRows[category].spent=Number(budgetRows[category].spent||0)+Number(cost||0);};
       if(policy.automation.auto_restock){
         for(const row of intel.stock){
           if(row.reorder_packs<=0)continue;
           const cfg=org.supplies[row.key],packs=row.reorder_packs,units=Number(cfg.pack||1)*packs;
           const cost=Math.max(1,Math.trunc(Number(cfg.price||0)*packs*guestLogisticsMult(save)));
           const projected={...inventory,[row.key]:Number(inventory[row.key]||0)+units};
-          if(!canSpend(cost)||orgInventoryUsed({...save,player:{...save.player,inventory:projected}})>orgInventoryCapacity(save))continue;
-          save.player.clean_money-=cost;inventory[row.key]=projected[row.key];tx(save,"automation_restock",-cost,"clean",`Auto-stock — ${cfg.name}`);actions.push({type:"restock",item_key:row.key,units,cost});
+          if(!canSpend(cost)||!budgetAllows("supplies",cost)||orgInventoryUsed({...save,player:{...save.player,inventory:projected}})>orgInventoryCapacity(save))continue;
+          save.player.clean_money-=cost;consumeBudget("supplies",cost);inventory[row.key]=projected[row.key];tx(save,"automation_restock",-cost,"clean",`Auto-stock — ${cfg.name}`);actions.push({type:"restock",item_key:row.key,units,cost});
         }
       }
       if(policy.automation.renew_insurance){
         for(const v of save.vehicles||[]){
           if(v.insurance_until&&Date.parse(v.insurance_until)-Date.now()>3*86400000)continue;
           const lc=org.vehicle_lifecycle||{},cost=Math.max(80,Math.trunc(Number(v.price||0)*Number(lc.insurance_week_pct||.0012)*4));
-          if(!canSpend(cost))continue;
-          save.player.clean_money-=cost;v.insurance_until=new Date(Date.now()+Number(lc.insurance_days||28)*86400000).toISOString();
+          if(!canSpend(cost)||!budgetAllows("fleet",cost))continue;
+          save.player.clean_money-=cost;consumeBudget("fleet",cost);v.insurance_until=new Date(Date.now()+Number(lc.insurance_days||28)*86400000).toISOString();
           tx(save,"automation_insurance",-cost,"clean",`Auto-seguro — ${v.name}`);actions.push({type:"insurance",vehicle_id:v.id,cost});
         }
       }
@@ -1641,8 +1647,8 @@ const mutateGame=(save,path,payload)=>{
           const useFluids=Number(inventory.service_fluids||0)>0,useParts=missing>=20&&Number(inventory.vehicle_parts||0)>0;
           const material=(useFluids?Number(org.supplies?.service_fluids?.price||0):0)+(useParts?Number(org.supplies?.vehicle_parts?.price||0):0);
           const cost=Math.max(60,base-Math.trunc(material*.70));
-          if(!canSpend(cost))continue;
-          save.player.clean_money-=cost;if(useFluids)inventory.service_fluids-=1;if(useParts)inventory.vehicle_parts-=1;
+          if(!canSpend(cost)||!budgetAllows("fleet",cost))continue;
+          save.player.clean_money-=cost;consumeBudget("fleet",cost);if(useFluids)inventory.service_fluids-=1;if(useParts)inventory.vehicle_parts-=1;
           v.condition=Math.min(100,Number(v.condition||0)+18);v.last_service_km=Number(v.km_total||0);v.missions_since_repair=0;
           tx(save,"automation_service",-cost,"clean",`Auto-revisão — ${v.name}`);actions.push({type:"service",vehicle_id:v.id,cost});
         }
