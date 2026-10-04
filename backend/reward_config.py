@@ -78,6 +78,7 @@ OBJECTIVE_COMPLEXITY_PER_REQUIREMENT = 0.05  # +5% por requisito
 # O algoritmo garante que nenhuma operação sairá destes limites
 MONEY_REWARD_MIN = 1500        # Operação trivial mínima
 MONEY_REWARD_MAX = 90000     # Operação extrema máxima (aumentado para permitir spread)
+MONEY_REWARD_MAX_LATE_PER_LEVEL = 2500  # teto adicional por nível após o 10
 
 # Multiplicador base por dificuldade
 # Define o "valor" de uma operação de risco 1 ao nível 1
