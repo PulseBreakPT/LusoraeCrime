@@ -170,11 +170,38 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, catalog } = useGame();
   if (!state) return null;
   const s = state.player.stats || {};
-  const total = s.missions_total || 0;
-  const successes = s.missions_success || 0;
-  const partials = s.missions_partial || 0;
+  // Fallback defensivo: se um save antigo chegar com stats a zero, o próprio
+  // histórico visível impede a UI de mentir enquanto a reconciliação V5 do
+  // servidor reconstitui o histórico completo.
+  const terminalHistory = (state.history || []).filter((mission) =>
+    ["success", "partial", "failure", "police"].includes(
+      mission.chase_outcome === "caught" ? "police" : mission.outcome
+    )
+  );
+  const historyCount = (outcome) => terminalHistory.filter((mission) =>
+    (mission.chase_outcome === "caught" ? "police" : mission.outcome) === outcome
+  ).length;
+  const total = Math.max(Number(s.missions_total || 0), terminalHistory.length);
+  const successes = Math.max(Number(s.missions_success || 0), historyCount("success"));
+  const partials = Math.max(Number(s.missions_partial || 0), historyCount("partial"));
+  const failures = Math.max(Number(s.missions_failure || 0), historyCount("failure"));
+  const police = Math.max(Number(s.missions_police || 0), historyCount("police"));
   const successRate = total ? Math.round(((successes + partials) / total) * 100) : null;
 
+  const historyEarnedClean = terminalHistory.reduce((sum, mission) => {
+    const outcome = mission.chase_outcome === "caught" ? "police" : mission.outcome;
+    return outcome !== "police" && mission.pending_pays === "clean"
+      ? sum + Number(mission.pending_reward || 0)
+      : sum;
+  }, 0);
+  const historyEarnedDirty = terminalHistory.reduce((sum, mission) => {
+    const outcome = mission.chase_outcome === "caught" ? "police" : mission.outcome;
+    return outcome !== "police" && mission.pending_pays !== "clean"
+      ? sum + Number(mission.pending_reward || 0)
+      : sum;
+  }, 0);
+  const earnedClean = Math.max(Number(s.earned_clean || 0), historyEarnedClean);
+  const earnedDirty = Math.max(Number(s.earned_dirty || 0), historyEarnedDirty);
 
   const vehs = state.vehicles;
 
@@ -204,8 +231,8 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
                   tip="Percentagem de operações que terminaram com sucesso total ou parcial." />
             <Cell label="Sucessos" value={successes} color="#34D399" tip="Operações concluídas com sucesso e com regresso seguro ao QG." />
             <Cell label="Parciais" value={partials} color="#38BDF8" tip="Operações em que a equipa salvou parte do objetivo e regressou ao QG." />
-            <Cell label="Falhadas" value={s.missions_failure || 0} color="#F59E0B" tip="Operações falhadas — sem recompensa e com possíveis ferimentos." />
-            <Cell label="Interceções" value={s.missions_police || 0} color="#EF4444" tip="Operações terminadas em interceção policial, incluindo equipas apanhadas no regresso." />
+            <Cell label="Falhadas" value={failures} color="#F59E0B" tip="Operações falhadas — sem recompensa e com possíveis ferimentos." />
+            <Cell label="Interceções" value={police} color="#EF4444" tip="Operações terminadas em interceção policial, incluindo equipas apanhadas no regresso." />
           </Grid>
           {(() => {
             const milestones = catalog?.achievement_milestones || [];
@@ -246,8 +273,8 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Section title="Resumo financeiro" testId="intel-economy">
           <Grid>
-            <Cell label="Ganho sujo" value={fmtMoney(s.earned_dirty || 0)} color="#F59E0B" tip="Total de dinheiro sujo ganho em operações desde o início." />
-            <Cell label="Ganho limpo" value={fmtMoney(s.earned_clean || 0)} color="#10B981" tip="Total de dinheiro limpo ganho diretamente em operações." />
+            <Cell label="Ganho sujo" value={fmtMoney(earnedDirty)} color="#F59E0B" tip="Total de dinheiro sujo ganho em operações desde o início." />
+            <Cell label="Ganho limpo" value={fmtMoney(earnedClean)} color="#10B981" tip="Total de dinheiro limpo ganho diretamente em operações." />
             <Cell label="Lavado total" value={fmtMoney(s.laundered_total || 0)} color="#34D399" tip="Total convertido de sujo para limpo (manual e passivo)." />
             <Cell label="Multas/Apreensões" value={fmtMoney(s.fines_paid || 0)} color="#EF4444" tip="Dinheiro perdido para a polícia em multas e apreensões." />
             <Cell label="Fortuna total" value={fmtMoney(netWorth)} tip="Caixa (limpo + sujo) + valor de revenda da frota e do património." />
