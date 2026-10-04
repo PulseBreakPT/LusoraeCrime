@@ -108,4 +108,14 @@ describe("UI action ownership", () => {
   });
 
 
+  test("reports recover non-zero statistics from persisted history", () => {
+    expect(intel).toContain("terminalHistory");
+    expect(intel).toContain('Math.max(Number(s.missions_total || 0), terminalHistory.length)');
+    expect(intel).toContain("historyEarnedClean");
+    expect(intel).toContain("historyEarnedDirty");
+    expect(localGuest).toContain("_local_stats_version:3");
+    expect(localGuest).toContain('maxStat("missions_total", terminal.length)');
+  });
+
+
 });

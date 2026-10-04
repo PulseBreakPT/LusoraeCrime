@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 import random
@@ -154,7 +155,7 @@ def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
 
 
-MISSION_STATS_VERSION = 4
+MISSION_STATS_VERSION = 5
 
 
 def default_stats():
@@ -183,38 +184,63 @@ def ensure_stats(player):
     return current
 
 
+def _max_stat(stats, key, reconstructed):
+    """Backfills only upwards so a migration can never erase valid lifetime data."""
+    stats[key] = max(int(stats.get(key, 0) or 0), int(reconstructed or 0))
+
+
 async def reconcile_mission_stats(db, player):
-    """Repara uma vez os contadores de resultados a partir do histórico real."""
+    """Reconstroi estatísticas antigas a partir das fontes persistentes reais.
+
+    V5 deixa de confiar num snapshot de stats que pode ter sido marcado como
+    migrado quando ainda estava vazio. Missões concluídas são a fonte de
+    verdade para resultados; o extrato reconstrói ganhos e ações históricas.
+    Os restantes contadores só sobem, nunca são apagados pela migração.
+    """
     stats = ensure_stats(player)
     if int(stats.get("_mission_outcome_version", 0) or 0) >= MISSION_STATS_VERSION:
         return stats
 
     pid = str(player["_id"])
-    missions = await db.missions.find({
-        "player_id": pid,
-        "phase": {"$in": ["returning", "done"]},
-        "outcome": {"$in": ["success", "partial", "failure", "police"]},
-    }).to_list(10000)
+    missions, transactions, properties = await asyncio.gather(
+        db.missions.find({
+            "player_id": pid,
+            "phase": {"$in": ["returning", "done"]},
+            "outcome": {"$in": ["success", "partial", "failure", "police"]},
+        }).to_list(10000),
+        db.transactions.find({"player_id": pid}).to_list(50000),
+        db.properties.find({"player_id": pid}).to_list(500),
+    )
 
     total = success = partial = failure = police = high_value = 0
+    mission_earned_clean = mission_earned_dirty = 0
     by_category = {}
     success_by_category = {}
+    target_fines = 0
+
     for mission in missions:
         raw_outcome = mission.get("outcome")
         if raw_outcome not in ("success", "partial", "failure", "police"):
             continue
-        # Success/partial ainda em regresso não têm resultado terminal: podem
-        # chegar ao QG ou acabar apanhados numa perseguição. Só entram nas
-        # estatísticas quando o regresso terminar.
+
+        # Success/partial em regresso ainda podem transformar-se em interceção.
         if mission.get("phase") == "returning" and raw_outcome in ("success", "partial"):
             continue
 
         total += 1
-        category = (mission.get("opportunity") or {}).get("category")
+        category = (mission.get("opportunity") or {}).get("category") or mission.get("category")
         if category:
             by_category[category] = by_category.get(category, 0) + 1
 
         outcome = "police" if mission.get("chase_outcome") == "caught" else raw_outcome
+        if outcome in ("success", "partial"):
+            reward = max(0, int(mission.get("pending_reward", 0) or 0))
+            pays = mission.get("pending_pays") or (mission.get("opportunity") or {}).get("pays")
+            if pays == "clean":
+                mission_earned_clean += reward
+            elif pays == "dirty":
+                mission_earned_dirty += reward
+
         if outcome == "success":
             success += 1
             if category:
@@ -227,7 +253,10 @@ async def reconcile_mission_stats(db, player):
             failure += 1
         else:
             police += 1
+            target_fines += max(0, int(mission.get("fine", 0) or 0))
 
+    # Resultados de missão são reconstruíveis de forma exata e substituem
+    # snapshots zero/incorretos de versões anteriores.
     stats.update({
         "missions_total": total,
         "missions_success": success,
@@ -237,8 +266,55 @@ async def reconcile_mission_stats(db, player):
         "by_category": by_category,
         "success_by_category": success_by_category,
         "high_value_ops": high_value,
-        "_mission_outcome_version": MISSION_STATS_VERSION,
     })
+
+    tx_counts = {}
+    earned_clean = 0
+    earned_dirty = 0
+    manual_laundered = 0
+    for tx_doc in transactions:
+        kind = tx_doc.get("kind")
+        tx_counts[kind] = tx_counts.get(kind, 0) + 1
+        amount = float(tx_doc.get("amount", 0) or 0)
+        currency = tx_doc.get("currency")
+        if kind == "mission_reward" and amount > 0:
+            if currency == "clean":
+                earned_clean += amount
+            elif currency == "dirty":
+                earned_dirty += amount
+        elif kind == "launder_out" and amount < 0:
+            manual_laundered += abs(amount)
+
+    # O histórico financeiro é independente do saldo atual: gastar dinheiro
+    # depois de o ganhar nunca deve fazer o relatório voltar a zero.
+    _max_stat(stats, "earned_clean", round(max(earned_clean, mission_earned_clean)))
+    _max_stat(stats, "earned_dirty", round(max(earned_dirty, mission_earned_dirty)))
+    passive_laundered = sum(max(0, float(prop.get("total_laundered", 0) or 0)) for prop in properties)
+    _max_stat(stats, "laundered_total", round(manual_laundered + passive_laundered))
+    _max_stat(stats, "fines_paid", target_fines)
+
+    # Ações que têm uma transação persistente podem ser recuperadas com
+    # precisão suficiente mesmo em saves anteriores à introdução de stats.
+    count_map = {
+        "recruits_hired": "recruit",
+        "employees_promoted": "promote",
+        "bonuses_paid": "bonus",
+        "vehicles_bought": "vehicle_buy",
+        "vehicles_repaired": "repair",
+        "vehicles_refueled": "refuel",
+        "properties_bought": "property_buy",
+        "properties_upgraded": "property_upgrade",
+        "teams_created": "team_create",
+        "bribes_paid": "bribe",
+    }
+    for stat_key, tx_kind in count_map.items():
+        _max_stat(stats, stat_key, tx_counts.get(tx_kind, 0))
+
+    # Cada despacho gera um documento Mission, incluindo recalls e falhas.
+    mission_docs = await db.missions.count_documents({"player_id": pid})
+    _max_stat(stats, "ops_dispatched", mission_docs)
+
+    stats["_mission_outcome_version"] = MISSION_STATS_VERSION
     player["stats"] = stats
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"stats": stats}})
     return stats

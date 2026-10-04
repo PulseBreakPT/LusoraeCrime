@@ -324,7 +324,7 @@ const createInitialSave = () => {
         ops_dispatched:0, recruits_hired:0, recruits_informador:0, trainings_completed:0,
         employees_promoted:0, employees_rested:0, bonuses_paid:0, vehicles_bought:0,
         vehicles_repaired:0, vehicles_refueled:0, properties_bought:0, properties_upgraded:0,
-        teams_created:0, bribes_paid:0, raids_survived:0, _local_stats_version:2,
+        teams_created:0, bribes_paid:0, raids_survived:0, _local_stats_version:3,
       },
     },
     teams:[team], employees, candidates:[
@@ -395,37 +395,62 @@ const normalizeSavedStats = (save) => {
     ops_dispatched:0, recruits_hired:0, recruits_informador:0, trainings_completed:0,
     employees_promoted:0, employees_rested:0, bonuses_paid:0, vehicles_bought:0,
     vehicles_repaired:0, vehicles_refueled:0, properties_bought:0, properties_upgraded:0,
-    teams_created:0, bribes_paid:0, raids_survived:0, _local_stats_version:2,
+    teams_created:0, bribes_paid:0, raids_survived:0, _local_stats_version:3,
   };
   const previous = save.player?.stats || {};
   const stats = { ...defaults, ...previous };
   stats.by_category = { ...(previous.by_category || {}) };
   stats.success_by_category = { ...(previous.success_by_category || {}) };
 
-  if (Number(previous._local_stats_version || 0) < 2) {
-    const terminal = (save.history || []).filter((m) =>
-      ["success","partial","failure","police"].includes(m.outcome)
+  if (Number(previous._local_stats_version || 0) < 3) {
+    const terminal = (save.history || []).filter((mission) =>
+      ["success","partial","failure","police"].includes(mission.outcome)
     );
-    stats.missions_total = terminal.length;
-    stats.missions_success = terminal.filter((m) => m.outcome === "success").length;
-    stats.missions_partial = terminal.filter((m) => m.outcome === "partial").length;
-    stats.missions_failure = terminal.filter((m) => m.outcome === "failure").length;
-    stats.missions_police = terminal.filter((m) => m.outcome === "police").length;
-    stats.missions_failed = stats.missions_failure;
-    stats.by_category = {};
-    stats.success_by_category = {};
-    stats.high_value_ops = 0;
-    for (const m of terminal) {
-      const category = m.category || m.opportunity?.category;
-      if (category) stats.by_category[category] = (stats.by_category[category] || 0) + 1;
-      if (m.outcome === "success" && category) {
-        stats.success_by_category[category] = (stats.success_by_category[category] || 0) + 1;
+    const count = (outcome) => terminal.filter((mission) => mission.outcome === outcome).length;
+    const maxStat = (key, value) => {
+      stats[key] = Math.max(Number(stats[key] || 0), Number(value || 0));
+    };
+
+    maxStat("missions_total", terminal.length);
+    maxStat("missions_success", count("success"));
+    maxStat("missions_partial", count("partial"));
+    maxStat("missions_failure", count("failure"));
+    maxStat("missions_police", count("police"));
+    stats.missions_failed = Math.max(Number(stats.missions_failed || 0), Number(stats.missions_failure || 0));
+
+    const derivedByCategory = {};
+    const derivedSuccessByCategory = {};
+    let highValue = 0;
+    for (const mission of terminal) {
+      const category = mission.category || mission.opportunity?.category;
+      if (category) derivedByCategory[category] = (derivedByCategory[category] || 0) + 1;
+      if (mission.outcome === "success" && category) {
+        derivedSuccessByCategory[category] = (derivedSuccessByCategory[category] || 0) + 1;
       }
-      if (m.outcome === "success" && Number(m.pending_reward || m.reward || 0) >= 8000) {
-        stats.high_value_ops += 1;
+      if (mission.outcome === "success" && Number(mission.pending_reward || mission.reward || 0) >= 8000) {
+        highValue += 1;
       }
     }
-    stats._local_stats_version = 2;
+    for (const [category, value] of Object.entries(derivedByCategory)) {
+      stats.by_category[category] = Math.max(Number(stats.by_category[category] || 0), value);
+    }
+    for (const [category, value] of Object.entries(derivedSuccessByCategory)) {
+      stats.success_by_category[category] = Math.max(Number(stats.success_by_category[category] || 0), value);
+    }
+    maxStat("high_value_ops", highValue);
+    maxStat("ops_dispatched", terminal.length + (save.missions || []).length);
+
+    let earnedClean = 0;
+    let earnedDirty = 0;
+    for (const transaction of save.transactions || []) {
+      if (transaction.kind !== "mission_reward" || Number(transaction.amount || 0) <= 0) continue;
+      if (transaction.wallet === "clean") earnedClean += Number(transaction.amount || 0);
+      if (transaction.wallet === "dirty") earnedDirty += Number(transaction.amount || 0);
+    }
+    maxStat("earned_clean", earnedClean);
+    maxStat("earned_dirty", earnedDirty);
+    maxStat("total_earned", earnedClean + earnedDirty);
+    stats._local_stats_version = 3;
   }
 
   save.player.stats = stats;
@@ -1217,7 +1242,7 @@ const mutateGame=(save,path,payload)=>{
   if(path==="hq/priority"){save.player.priorities.active=p.priority||"equilibrio";return {ok:true};}
   if(path==="hq/equip_skin"){save.player.hq_skin_key=p.skin_key||null;return {ok:true};}
   if(path==="police/bribe"){const cost=Math.max(1200,Math.round(save.player.heat*120));chargeClean(save,cost,"Suborno");save.player.heat=Math.max(0,save.player.heat-28);return {ok:true,cost};}
-  if(path==="launder"){const amount=Math.min(money(p.amount),save.player.dirty_money);if(amount<=0)fail(400,"Montante inválido");save.player.dirty_money-=amount;const received=Math.round(amount*(LOCAL_CATALOG.economy_meta?.launder_base_rate||.78));save.player.clean_money+=received;tx(save,"launder",received,"clean","Lavagem");return {ok:true,received};}
+  if(path==="launder"){const amount=Math.min(money(p.amount),save.player.dirty_money);if(amount<=0)fail(400,"Montante inválido");save.player.dirty_money-=amount;const received=Math.round(amount*(LOCAL_CATALOG.economy_meta?.launder_base_rate||.78));save.player.clean_money+=received;normalizeSavedStats(save);save.player.stats.laundered_total=(save.player.stats.laundered_total||0)+amount;tx(save,"launder",received,"clean","Lavagem");return {ok:true,received};}
   if(path==="settings"){save.player.settings={...(save.player.settings||{}),...p};return {ok:true};}
   if(path==="quests/claim_all")return {ok:true,claimed:0,rewards:[]};
   if(path.startsWith("quests/"))return {ok:true,rewards:[]};
