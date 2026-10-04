@@ -11,10 +11,10 @@ import { useFlash } from "./hud";
 import { LiveOpsPanel, phaseInfo } from "./LiveOpsDock";
 
 /*
- * Central da rede — uma só superfície de UI que junta a transmissão EM DIRETO
+ * Atividade — uma só superfície de UI que junta a transmissão OPERAÇÕES
  * das operações (antigo dock central) e os REGISTOS de atividade num painel
  * com separadores. Quando uma equipa é despachada, a central muda sozinha
- * para EM DIRETO; sem operações, o separador mostra o estado vazio tático.
+ * para OPERAÇÕES; sem operações, o separador mostra o estado vazio tático.
  */
 
 const KIND_LABELS = {
@@ -26,14 +26,14 @@ const KIND_LABELS = {
   vehicle: "Veículo",
   weapon: "Arsenal",
   launder: "Lavagem",
-  system: "Sistema",
+  system: "Jogo",
   property: "Imóvel",
   intel: "Informação",
 };
 
 const PANEL_LABELS = {
   teams: "Equipas", fleet: "Frota", properties: "Imóveis", empire: "Império",
-  employees: "Operacionais", quests: "Missões", intel: "Central de Inteligência",
+  employees: "Operacionais", quests: "Missões", intel: "Relatórios",
   weapons: "Arsenal", hq: "Quartel-General", shop: "Loja",
 };
 
@@ -159,7 +159,7 @@ function useUnread(events, playerId) {
   return { unread, markSeen };
 }
 
-// ---------- Operações ativas + mudança automática para EM DIRETO ----------
+// ---------- Operações ativas + mudança automática para OPERAÇÕES ----------
 function useLiveOps(state, onFresh) {
   const liveMissions = useMemo(
     () => (state?.missions || []).filter((m) => m.phase !== "done"),
@@ -180,7 +180,7 @@ function useLiveOps(state, onFresh) {
 
 // ---------- Separadores da central (partilhados desktop/mobile) ----------
 const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) => (
-  <div className="flex border-b border-white/[0.06]" role="tablist" aria-label="Central da rede">
+  <div className="flex border-b border-white/[0.06]" role="tablist" aria-label="Atividade">
     <button
       type="button"
       role="tab"
@@ -192,7 +192,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
       }`}
     >
       <span className="sub-lo-rec" style={liveCount === 0 ? { animation: "none", opacity: 0.25, boxShadow: "none" } : undefined} />
-      Em direto
+      Operações
       {liveCount > 0 && (
         <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold text-red-300">
           {liveCount}
@@ -300,7 +300,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   const events = state?.events || [];
   const firstId = events[0]?.id;
   // Flash vermelho no registo mais recente quando chega um novo — o feed é a
-  // "voz" da rede; a entrada tem de se sentir. (Hooks antes do early-return.)
+  // a entrada mais recente deve ser percetível. (Hooks antes do early-return.)
   const newFlash = useFlash(firstId);
   const [filter, setFilter] = useState("all");
   const [tab, setTab] = useState("log");
@@ -311,7 +311,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   const nowMs = serverNow();
   const { rows, counts } = useFeedData(events, filter, nowMs);
   const { unread, markSeen } = useUnread(events, state?.player?.id);
-  // Nova operação no terreno → a central muda sozinha para EM DIRETO e abre-se.
+  // Nova operação no terreno → a central muda sozinha para OPERAÇÕES e abre-se.
   const liveMissions = useLiveOps(state, () => { setTab("live"); setCollapsed(false); });
   const liveCount = liveMissions.length;
 
@@ -350,16 +350,16 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
           type="button"
           data-testid="feed-collapse-toggle"
           onClick={toggleCollapsed}
-          title={collapsed ? "Abrir a central da rede" : "Encolher a central da rede"}
+          title={collapsed ? "Abrir a atividade" : "Encolher a atividade"}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
         >
           <span className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-destructive" />
           <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-            Central da rede
+            Atividade
           </span>
           {collapsed && liveCount > 0 && (
             <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold uppercase text-red-300">
-              Em direto · {liveCount}
+              Operações · {liveCount}
             </span>
           )}
           {unread > 0 && (
@@ -400,7 +400,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
               <ScrollArea className={`${expanded ? "h-80" : "h-44"} p-2`}>
                 {rows.length === 0 ? (
                   <p className="px-1 font-mono text-[11px] text-zinc-600">
-                    {filter === "all" ? "Silêncio na rede. Por agora." : "Sem registos nesta categoria."}
+                    {filter === "all" ? "Sem atividade recente." : "Sem registos nesta categoria."}
                   </p>
                 ) : (
                   <FeedList rows={rows} nowMs={nowMs} onNavigate={onNavigate} firstId={firstId} newFlash={newFlash} />
@@ -482,7 +482,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
-              Central da rede
+              Atividade
             </p>
             <span className="font-mono text-[9px] text-zinc-600">{events.length} registos</span>
           </div>
@@ -541,8 +541,8 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           type="button"
           onClick={() => setOpen((value) => !value)}
           className="sub-hud-btn pointer-events-auto relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300"
-          aria-label={open ? "Fechar Central da rede" : "Abrir Central da rede"}
-          title="Central da rede"
+          aria-label={open ? "Fechar Atividade" : "Abrir Atividade"}
+          title="Atividade"
         >
           <Bell size={17} />
           {(unread > 0 || liveCount > 0) && !open && (
