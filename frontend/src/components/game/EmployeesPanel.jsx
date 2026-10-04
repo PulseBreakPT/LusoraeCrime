@@ -404,7 +404,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
             <SectionHeader icon={GraduationCap} title="Desenvolvimento" />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Select value={course} onValueChange={setCourse}>
-                <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="min-h-10 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="h-8 min-h-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
                   <SelectValue placeholder="Escolher formação..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -425,6 +425,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
                   idle && !course ? "Escolhe uma formação." : null,
                   idle && course && money < (catalog.training_courses[course]?.cost || Infinity) ? "Dinheiro insuficiente." : null,
                 ].filter(Boolean)}
+                density="compact"
               />
             </div>
           </div>
@@ -943,7 +944,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
 
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Select value={recruitSort} onValueChange={setRecruitSort}>
-                <SelectTrigger data-testid="recruit-sort" className="min-h-11 w-full border-white/10 bg-black/50 font-mono text-[10px] text-zinc-300">
+                <SelectTrigger data-testid="recruit-sort" className="h-8 min-h-0 w-full border-white/10 bg-black/50 font-mono text-[10px] text-zinc-300">
                   <ArrowUpDown size={11} className="mr-1 shrink-0 text-zinc-500" />
                   <SelectValue />
                 </SelectTrigger>
@@ -966,6 +967,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                 requireConfirm
                 onConfirm={() => refreshPool()}
                 className="w-full sm:w-auto"
+                density="compact"
               />
             </div>
 
