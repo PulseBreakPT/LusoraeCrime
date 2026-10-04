@@ -37,6 +37,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Upload frontend source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-source-snapshot
+          path: frontend/src
+          retention-days: 2
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
