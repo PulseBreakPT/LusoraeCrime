@@ -746,8 +746,11 @@ def achievement_bonus_pct(missions_success):
 
 
 def max_teams_for(level):
-    """Nº máximo de equipas que a organização pode ter, crescente com o nível."""
-    return TEAM_COUNT_BASE + ((max(1, level) - 1) // 2) * TEAM_COUNT_PER_2_LEVELS
+    """Capacidade de equipas controlada até ao nível 100."""
+    level = max(1, min(100, int(level or 1)))
+    if level <= 10:
+        return TEAM_COUNT_BASE + ((level - 1) // 2) * TEAM_COUNT_PER_2_LEVELS
+    return TEAM_COUNT_BASE + 4 * TEAM_COUNT_PER_2_LEVELS + ((level - 10) // 10)
 
 
 def duration_reward_mult(duration_s):
