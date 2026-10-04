@@ -37,7 +37,7 @@
   },
   "typography": {
     "body": {
-      "family": "Inter, sans-serif",
+      "family": "IBM Plex Sans, sans-serif",
       "ordinary_floor": "14px in dense game UI; 16px for prose"
     },
     "display": {
