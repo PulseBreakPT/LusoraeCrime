@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from pathlib import Path
+from datetime import timedelta
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -112,7 +113,7 @@ async def migrate_integrated_org():
     await db.vehicles.update_many({"tires_pct": {"$exists": False}}, {"$set": {"tires_pct": 100.0}})
     await db.vehicles.update_many({"notoriety": {"$exists": False}}, {"$set": {"notoriety": 0.0}})
     await db.vehicles.update_many({"seized_until": {"$exists": False}}, {"$set": {"seized_until": None}})
-    inspection_due = (now + __import__("datetime").timedelta(days=365)).isoformat()
+    inspection_due = (now + timedelta(days=365)).isoformat()
     await db.vehicles.update_many({"inspection_due_at": {"$exists": False}}, {"$set": {"inspection_due_at": inspection_due}})
     await db.vehicles.update_many({"insurance_until": {"$exists": False}}, {"$set": {"insurance_until": None}})
     for model_key, model in WEAPON_MODELS.items():
