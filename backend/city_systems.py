@@ -197,6 +197,15 @@ async def advance_rival_world(db, player, rivals, businesses, now=None):
         return None
 
     pid = str(player["_id"])
+    if player.get("city_rival_slot") is None:
+        grace = await db.players.update_one(
+            {"_id": player["_id"], "city_rival_slot": {"$exists": False}},
+            {"$set": {"city_rival_slot": slot}},
+        )
+        if grace.modified_count == 1:
+            player["city_rival_slot"] = slot
+            return {"kind": "grace", "rival": None, "message": None}
+
     rng = random.Random(_seed_int(pid, slot, "rival-auto"))
     rival = rivals[rng.randrange(len(rivals))]
     relation = rival.get("relation", "neutral")
