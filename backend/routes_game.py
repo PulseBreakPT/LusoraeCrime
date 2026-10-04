@@ -1365,8 +1365,15 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     new_memory = update_memory(player.get("phrase_memory"), live_used_keys)
     player_inc = {"stats.ops_dispatched": 1}
     for key, qty in loadout.items():
-        if key in SUPPLY_CATALOG and int(qty or 0) > 0:
-            player_inc[f"inventory.{key}"] = -int(qty)
+        if key not in SUPPLY_CATALOG or int(qty or 0) <= 0:
+            continue
+        # Material configurado mas com auto-utilização desligada fica reservado
+        # para a próxima operação em vez de desaparecer sem efeito.
+        if key == "medical_kit" and not bool(policies.get("auto_use_medical", True)):
+            continue
+        if key == "body_armor" and not bool(policies.get("auto_use_armor", True)):
+            continue
+        player_inc[f"inventory.{key}"] = -int(qty)
     await db.players.update_one(
         {"_id": player["_id"]},
         {"$inc": player_inc, "$set": {"phrase_memory": new_memory}},
