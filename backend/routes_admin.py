@@ -234,9 +234,16 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
     now = now_utc().isoformat()
 
     # Deletar tudo relacionado ao jogador
-    for coll in (db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
-                 db.missions, db.events, db.quests, db.candidates, db.transactions):
+    for coll in (
+        db.teams, db.employees, db.vehicles, db.weapons, db.properties, db.opportunities,
+        db.missions, db.events, db.quests, db.candidates, db.transactions,
+        db.city_businesses, db.city_rivals, db.city_season_scores, db.city_chat,
+    ):
         await coll.delete_many({"player_id": pid})
+    await db.city_pvp_challenges.delete_many({"$or": [{"attacker_id": pid}, {"defender_id": pid}]})
+    await db.city_chat_reports.delete_many({"$or": [{"reporter_id": pid}, {"target_player_id": pid}]})
+    await db.city_alliances.update_many({"member_ids": pid}, {"$pull": {"member_ids": pid}})
+    await db.action_receipts.delete_many({"key": {"$regex": f"^{str(user_oid)}:"}})
 
     # Recriar player com estado inicial
     level = player.get("level", 1) if body.keep_level else 1
@@ -504,6 +511,68 @@ async def get_admin_logs(admin: dict = Depends(require_staff), limit: int = 100)
     return {"logs": logs_data}
 
 
+class ResolveChatReportInput(BaseModel):
+    status: str
+    note: str = ""
+
+
+@router.get("/chat-reports")
+async def list_chat_reports(admin: dict = Depends(require_staff), status: str = "open", limit: int = 100):
+    """Fila de moderação do chat da Cidade."""
+    query = {} if status == "all" else {"status": status}
+    rows = await db.city_chat_reports.find(query).sort("created_at", -1).limit(min(200, max(1, limit))).to_list(200)
+    return {
+        "reports": [
+            {
+                "id": str(row["_id"]),
+                "reporter_id": row.get("reporter_id"),
+                "target_player_id": row.get("target_player_id"),
+                "message_id": row.get("message_id"),
+                "message_snapshot": row.get("message_snapshot", ""),
+                "reason": row.get("reason", ""),
+                "status": row.get("status", "open"),
+                "created_at": row.get("created_at"),
+                "resolved_at": row.get("resolved_at"),
+                "moderator_note": row.get("moderator_note", ""),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.post("/chat-reports/{report_id}/resolve")
+async def resolve_chat_report(report_id: str, body: ResolveChatReportInput, admin: dict = Depends(require_admin)):
+    """Resolve, arquiva ou rejeita uma denúncia e mantém auditoria."""
+    if body.status not in {"resolved", "dismissed"}:
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    try:
+        report_oid = ObjectId(report_id)
+    except (InvalidId, ValueError):
+        raise HTTPException(status_code=400, detail="ID de denúncia inválido")
+    report = await db.city_chat_reports.find_one({"_id": report_oid})
+    if not report:
+        raise HTTPException(status_code=404, detail="Denúncia não encontrada")
+    now = now_utc().isoformat()
+    await db.city_chat_reports.update_one(
+        {"_id": report_oid},
+        {"$set": {
+            "status": body.status,
+            "resolved_at": now,
+            "resolved_by": admin.get("email", ""),
+            "moderator_note": body.note[:500],
+        }},
+    )
+    await db.admin_logs.insert_one({
+        "admin_id": admin["_id"],
+        "admin_email": admin["email"],
+        "action": "resolve_chat_report",
+        "target_player_id": report.get("target_player_id", ""),
+        "details": {"report_id": report_id, "status": body.status, "note": body.note[:500]},
+        "ts": now,
+    })
+    return {"ok": True, "status": body.status}
+
+
 @router.get("/server-stats")
 async def get_server_stats(admin: dict = Depends(require_staff)):
     """Estatísticas avançadas do servidor."""
@@ -532,7 +601,7 @@ async def get_server_stats(admin: dict = Depends(require_staff)):
         }},
         {"$sort": {"_id": 1}},
     ]
-    levels_dist = await db.players.aggregate(levels_pipeline).to_list(10)
+    levels_dist = await db.players.aggregate(levels_pipeline).to_list(100)
 
     return {
         "server_time": now.isoformat(),
