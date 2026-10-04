@@ -56,14 +56,14 @@ describe("UI action ownership", () => {
   });
 
   test("bulk maintenance controls are wired to GameContext actions", () => {
-    expect(employees).toMatch(/const\s*\{[\s\\S]*?restAllEligible[\s\\S]*?\}\s*=\s*useGame\(\)/);
+    expect(employees).toMatch(/const\s*\{[\s\S]*?restAllEligible[\s\S]*?\}\s*=\s*useGame\(\)/);
     expect(employees).toContain("await restAllEligible()");
-    expect(weapons).toMatch(/const\s*\{[\s\\S]*?repairWeaponsAll[\s\\S]*?\}\s*=\s*useGame\(\)/);
+    expect(weapons).toMatch(/const\s*\{[\s\S]*?repairWeaponsAll[\s\S]*?\}\s*=\s*useGame\(\)/);
     expect(weapons).toContain("const repairAll = () => repairWeaponsAll()");
   });
 
   test("available operations HUD opens Operations while wanted stars remain an indicator", () => {
-    expect(gamePage).toMatch(/<button[\s\\S]*?data-testid="available-missions-hud"[\s\\S]*?onClick=\{\(\) => openFromNav\("operations"\)\}[\s\\S]*?<\/button>/);
+    expect(gamePage).toMatch(/<button[\s\S]*?data-testid="available-missions-hud"[\s\S]*?onClick=\{\(\) => openFromNav\("operations"\)\}[\s\S]*?<\/button>/);
 
     const marker = 'data-testid="wanted-stars-hud"';
     const at = gamePage.indexOf(marker);
