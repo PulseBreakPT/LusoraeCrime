@@ -52,7 +52,7 @@ const PANEL_COMMANDS = [
   ["street", "Cidade Viva", "Procurado, territórios, contactos e atividades de rua", Radar, null],
   ["mastermind", "Mastermind", "Grandes golpes, mercado negro, caçadores e sinais", Vault, null],
   ["hq", "Quartel-General", "Estratégia, melhorias e desempenho", Landmark, null],
-  ["intel", "Central de Inteligência", "Alertas, relatórios e histórico", BrainCircuit, null],
+  ["intel", "Relatórios", "Alertas e histórico", BrainCircuit, null],
   ["settings", "Definições", "Interface, jogabilidade e notificações", Settings, null],
 ];
 
@@ -101,7 +101,7 @@ const copyBriefing = async (state) => {
     return;
   }
   await navigator.clipboard.writeText(briefing);
-  toast.success("Resumo operacional copiado.");
+  toast.success("Resumo copiado.");
 };
 
 const readRecent = () => {
@@ -142,12 +142,12 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
 
     const quick = [
       {
-        id: "action:refresh", label: "Sincronizar agora", hint: "Atualiza o estado do servidor",
+        id: "action:refresh", label: "Atualizar", hint: "Obtém os dados mais recentes",
         Icon: RefreshCw, shortcut: "R", group: "Ações rápidas", keywords: "refresh atualizar recarregar",
         run: refresh,
       },
       {
-        id: "action:briefing", label: "Copiar resumo operacional", hint: "Copia dinheiro, calor, equipas e alertas",
+        id: "action:briefing", label: "Copiar resumo", hint: "Copia dinheiro, calor, equipas e alertas",
         Icon: ClipboardCopy, group: "Ações rápidas", keywords: "copiar relatório briefing resumo",
         run: () => copyBriefing(state),
       },
