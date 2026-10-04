@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 
 from city_systems import (
     world_context, season_info, business_projection, business_network_effect,
+    boss_leadership_modifier,
 )
 
 
@@ -38,6 +39,23 @@ def run():
         "tecnica",
     )
     assert 0 < effect <= 0.06
+
+    leadership = boss_leadership_modifier({
+        "boss_health": 55,
+        "boss_stress": 80,
+        "boss_sentence_until": (now + timedelta(minutes=20)).isoformat(),
+    }, now)
+    assert leadership["sentence_until"] is not None
+    assert -0.075 <= leadership["chance_delta"] < 0
+    assert "detida" in leadership["label"]
+
+    recovered = boss_leadership_modifier({
+        "boss_health": 100,
+        "boss_stress": 0,
+        "boss_sentence_until": (now - timedelta(minutes=1)).isoformat(),
+    }, now)
+    assert recovered["chance_delta"] == 0
+    assert recovered["sentence_until"] is None
 
     print("city systems: ok")
 

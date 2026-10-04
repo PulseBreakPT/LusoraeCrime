@@ -16,7 +16,7 @@ from city_data import (
     BUSINESS_TYPES, RIVAL_ACTIONS, CASINO_MIN_BET, CASINO_MAX_BET,
 )
 from city_systems import (
-    city_snapshot, business_projection, season_info,
+    city_snapshot, business_projection, season_info, boss_status,
 )
 
 router = APIRouter(prefix="/api/game/city", tags=["city"])
@@ -507,10 +507,15 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
         upsert=True,
     )
     consequence = None
-    if rng.random() < 0.08:
-        until = (now_utc() + timedelta(minutes=rng.randint(10, 30))).isoformat()
-        await db.players.update_one({"_id": loser["_id"]}, {"$set": {"boss_hospital_until": until, "boss_health": rng.randint(55, 80)}})
+    loser_fields = {"boss_stress": min(100, int(loser.get("boss_stress", 0) or 0) + 8)}
+    if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:
+        loser_fields["boss_sentence_until"] = (now_utc() + timedelta(minutes=rng.randint(15, 45))).isoformat()
+        consequence = "sentence"
+    elif rng.random() < 0.08:
+        loser_fields["boss_hospital_until"] = (now_utc() + timedelta(minutes=rng.randint(10, 30))).isoformat()
+        loser_fields["boss_health"] = rng.randint(55, 80)
         consequence = "hospital"
+    await db.players.update_one({"_id": loser["_id"]}, {"$set": loser_fields})
     await db.city_pvp_challenges.update_one(
         {"_id": challenge["_id"]},
         {"$set": {
@@ -548,17 +553,25 @@ async def decline_pvp(body: PvpDeclineInput, user: dict = Depends(get_current_us
 async def recover_boss(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     now = now_utc()
-    hospital = player.get("boss_hospital_until")
-    sentence = player.get("boss_sentence_until")
+    status = boss_status(player, now)
+    hospital = status.get("hospital_until")
+    sentence = status.get("sentence_until")
     cost = 0
-    fields = {"boss_health": 100, "boss_stress": max(0, int(player.get("boss_stress", 0)) - 30)}
+    fields = {
+        "boss_health": 100,
+        "boss_stress": max(0, int(player.get("boss_stress", 0)) - 30),
+        "boss_hospital_until": None,
+        "boss_sentence_until": None,
+    }
     if hospital:
         cost += 3500
-        fields["boss_hospital_until"] = None
     if sentence:
         cost += 7500
-        fields["boss_sentence_until"] = None
-    if not hospital and not sentence and int(player.get("boss_health", 100)) >= 100:
+    stress = int(player.get("boss_stress", 0) or 0)
+    health = int(player.get("boss_health", 100) or 100)
+    if stress >= 35 and not hospital and not sentence:
+        cost += 1000
+    if not hospital and not sentence and health >= 100 and stress < 35:
         raise HTTPException(status_code=400, detail="Não há nenhuma consequência ativa para tratar")
     if cost:
         await _change_clean(player, -cost, "Recuperação do chefe", "city_boss_recovery")

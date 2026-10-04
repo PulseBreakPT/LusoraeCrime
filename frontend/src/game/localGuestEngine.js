@@ -1,6 +1,6 @@
 import { LOCAL_CATALOG, LOCAL_GUEST_SAVE_VERSION } from "./localGuestCatalog";
 import { propertyMarketPrice } from "../lib/propertyMarket";
-import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance } from "./livingCity";
+import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance, localBossLeadership } from "./livingCity";
 
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
@@ -912,6 +912,7 @@ const missionChance = (save, opp, team) => {
   const cityWorld=localCityWorld(save);
   chance += Number(cityWorld.modifiers?.chance?.[opp.category]||0);
   chance += localBusinessChance(save,opp.category);
+  chance += Number(localBossLeadership(save).chance_delta||0);
   return clamp(chance,0.08,0.95);
 };
 
@@ -1373,6 +1374,7 @@ const mutateGame=(save,path,payload)=>{
     const cityRewardMult=Number(cityWorld.modifiers?.reward_mult||1);
     const cityTravelMult=Number(cityWorld.modifiers?.travel_mult||1);
     const businessChance=localBusinessChance(save,opp.category);
+    const bossLeadership=localBossLeadership(save);
     const pulse=localWorldPulse();
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
@@ -1382,7 +1384,7 @@ const mutateGame=(save,path,payload)=>{
     return {chance,reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult*cityRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
       repeat_count:repeatCount,repeat_penalty_pct:Math.round((repeatMult-1)*1000)/10,operation_profile:profile.profile,operation_profile_label:profile.label,distance_km:Math.round(opp.dist_km*2*10)/10,
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
-      city_world:cityWorld,business_chance_bonus:businessChance,
+      city_world:cityWorld,business_chance_bonus:businessChance,boss_leadership:bossLeadership,
       fuel_needed:vehicle?Math.max(1,Math.round((opp.dist_km*2*vehicle.cons/100)*10)/10):0,
       eta_s:Math.round((10+opp.dist_km*2)*cityTravelMult),duration_s:opp.duration_s||24,
       breakdown:[
@@ -1390,6 +1392,7 @@ const mutateGame=(save,path,payload)=>{
         {key:"risk",label:"Risco",pct:-(opp.risk||0)/500},{key:"heat",label:"Calor",pct:-save.player.heat/1000},
         {key:"cidade_viva",label:`Cidade Viva: ${cityWorld.weather.name} · ${cityWorld.event.name}`,pct:Number(cityWorld.modifiers?.chance?.[opp.category]||0)},
         ...(businessChance?[{key:"rede_empresarial",label:"Rede empresarial ativa",pct:businessChance}]:[]),
+        ...(bossLeadership.chance_delta?[{key:"chefia",label:`Chefia: ${bossLeadership.label}`,pct:bossLeadership.chance_delta}]:[]),
       ],members:members.length};
   }
   if(path==="dispatch/recommend_team"){

@@ -47,6 +47,12 @@ const ACTIONS = {
   pressure:{cost:9000,cooldown_h:6},truce:{cost:3500,cooldown_h:8},alliance:{cost:12000,cooldown_h:12},
 };
 
+const LOCAL_SEASON_REWARDS = {
+  1:{clean:120000,respect:1600},
+  2:{clean:80000,respect:1000},
+  3:{clean:50000,respect:700},
+};
+
 const hash = (text) => {
   let h=2166136261;
   for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
@@ -127,6 +133,8 @@ export const ensureLocalCity = (save) => {
     territory_pressure:10+(hash(name+"pressure")%25),last_action_at:null,
   }));
   save.city.season ||= {id:null,points:0,respect_checkpoint:Number(save.player?.respect||0),success_checkpoint:Number(save.player?.stats?.missions_success||0)};
+  save.city.claimed_seasons ||= [];
+  if(save.city.last_rival_slot===undefined) save.city.last_rival_slot=null;
   save.city.social ||= {};
   if(save.city.social.pvp_opt_in==null) save.city.social.pvp_opt_in=false;
   if(save.city.social.alliance===undefined) save.city.social.alliance=null;
@@ -141,14 +149,78 @@ export const ensureLocalCity = (save) => {
 export const advanceLocalCity = (save) => {
   ensureLocalCity(save);
   const season=seasonInfo(),s=save.city.season;
-  const respect=Number(save.player.respect||0),success=Number(save.player.stats?.missions_success||0);
+  let respect=Number(save.player.respect||0),success=Number(save.player.stats?.missions_success||0);
+
   if(s.id!==season.id){
+    if(s.id && !save.city.claimed_seasons.includes(s.id)){
+      const oldBoard=npcLeaderboard(save,{id:s.id});
+      const rank=oldBoard.find((x)=>x.is_you)?.rank||oldBoard.length;
+      const reward=LOCAL_SEASON_REWARDS[rank]||{clean:0,respect:0};
+      if(reward.clean){
+        save.player.clean_money=Number(save.player.clean_money||0)+reward.clean;
+        pushTx(save,"city_season_reward",reward.clean,"clean",`Prémio ${s.id} · #${rank}`);
+      }
+      if(reward.respect) save.player.respect=Number(save.player.respect||0)+reward.respect;
+      save.city.last_season_reward={season_id:s.id,rank,points:Number(s.points||0),clean:reward.clean,respect:reward.respect,claimed_at:nowIso()};
+      save.city.claimed_seasons.push(s.id);
+      pushEvent(save,"system",reward.clean||reward.respect
+        ? `Temporada ${s.id} encerrada em #${rank}: +${reward.clean.toLocaleString("pt-PT")} € e +${reward.respect.toLocaleString("pt-PT")} respeito.`
+        : `Temporada ${s.id} encerrada em #${rank}.`);
+      respect=Number(save.player.respect||0);
+    }
     Object.assign(s,{id:season.id,points:0,respect_checkpoint:respect,success_checkpoint:success});
   }else{
     const gain=Math.max(0,respect-Number(s.respect_checkpoint||respect))+Math.max(0,success-Number(s.success_checkpoint||success))*12;
     if(gain>0){s.points+=gain;s.respect_checkpoint=respect;s.success_checkpoint=success;}
   }
-  save.city.boss.health=clamp(Number(save.city.boss.health||100),0,100);
+
+  const rivalSlot=Math.floor(Date.now()/(3*3600000));
+  if(save.city.last_rival_slot==null){
+    // Primeiro contacto: cria a referência temporal sem atacar o jogador.
+    save.city.last_rival_slot=rivalSlot;
+  }else if(rivalSlot>Number(save.city.last_rival_slot)){
+    save.city.last_rival_slot=rivalSlot;
+    const rival=save.city.rivals[hash(`${save.player.id}|${rivalSlot}|rival-auto`)%Math.max(1,save.city.rivals.length)];
+    if(rival){
+      const seed=hash(`${save.player.id}|${rivalSlot}|${rival.name}|action`);
+      const roll=(seed%10000)/10000;
+      if(rival.relation==="allied"){
+        const reduction=1+(seed%3);
+        save.player.heat=Math.max(0,Number(save.player.heat||0)-reduction);
+        pushEvent(save,"system",`${rival.name} partilhou informação útil (-${reduction} calor).`);
+      }else if(rival.relation!=="truce"){
+        if(save.city.businesses.length&&Number(rival.hostility||0)>=45&&roll<.38){
+          const b=save.city.businesses[seed%save.city.businesses.length],security=clamp(Number(b.security||25),0,100);
+          const raw=5+(seed%8),hit=Math.max(2,Math.round(raw*(1-.006*security)));
+          b.condition=Math.max(20,Number(b.condition||100)-hit);
+          rival.hostility=clamp(Number(rival.hostility||0)+2,0,100);
+          rival.last_action_at=nowIso();
+          pushEvent(save,"warning",`${rival.name} sabotou ${b.name} (-${hit}% condição).`);
+        }else if(Number(rival.hostility||0)>=55&&roll<.72){
+          const heatGain=2+(seed%4),stressGain=2+((seed>>>4)%5);
+          save.player.heat=clamp(Number(save.player.heat||0)+heatGain,0,100);
+          save.city.boss.stress=clamp(Number(save.city.boss.stress||0)+stressGain,0,100);
+          rival.intel=Math.min(10,Number(rival.intel||0)+1);rival.last_action_at=nowIso();
+          let suffix="";
+          if(save.player.heat>=88&&((seed>>>8)%100)<12&&!save.city.boss.sentence_until){
+            const minutes=15+((seed>>>10)%31);
+            save.city.boss.sentence_until=new Date(Date.now()+minutes*60000).toISOString();
+            suffix=" O chefe acabou detido temporariamente.";
+          }
+          pushEvent(save,"warning",`${rival.name} fez circular informação contra a organização (+${heatGain} calor).${suffix}`);
+        }else{
+          const pressure=4+(seed%7);
+          rival.territory_pressure=clamp(Number(rival.territory_pressure||20)+pressure,0,100);
+          rival.intel=Math.min(10,Number(rival.intel||0)+1);rival.last_action_at=nowIso();
+          pushEvent(save,"warning",`${rival.name} aumentou a pressão territorial (+${pressure}).`);
+        }
+      }
+    }
+  }
+
+  if(save.city.boss.hospital_until&&Date.parse(save.city.boss.hospital_until)<=Date.now()) save.city.boss.hospital_until=null;
+  if(save.city.boss.sentence_until&&Date.parse(save.city.boss.sentence_until)<=Date.now()) save.city.boss.sentence_until=null;
+  save.city.boss.health=clamp(Number(save.city.boss.health??100),0,100);
   save.city.boss.stress=clamp(Number(save.city.boss.stress||0),0,100);
   return save;
 };
@@ -158,6 +230,25 @@ const businessProjection=(b)=>{
   const hours=clamp((Date.now()-last)/3600000,0,168),level=Math.max(1,Number(b.level||1)),eff=clamp(Number(b.condition??100)/100,.35,1.35);
   return {hours:Number(hours.toFixed(3)),clean:Math.floor((cfg.clean_h||0)*level*hours*eff),dirty:Math.floor((cfg.dirty_h||0)*level*hours*eff),heat:Number(((cfg.heat_h||0)*level*hours).toFixed(2))};
 };
+export const localBossLeadership = (save) => {
+  ensureLocalCity(save);
+  const now=Date.now(),boss=save.city.boss;
+  const hospitalActive=!!boss.hospital_until&&Date.parse(boss.hospital_until)>now;
+  const sentenceActive=!!boss.sentence_until&&Date.parse(boss.sentence_until)>now;
+  let delta=0;const reasons=[];
+  if(sentenceActive){delta-=.05;reasons.push("chefia detida");}
+  else if(hospitalActive){delta-=.03;reasons.push("chefia hospitalizada");}
+  if(Number(boss.stress||0)>35){
+    delta-=Math.min(.025,(Number(boss.stress)-35)/65*.025);
+    reasons.push(`stress ${Math.round(Number(boss.stress))}%`);
+  }
+  if(Number(boss.health??100)<70){
+    delta-=Math.min(.015,(70-Number(boss.health))/70*.015);
+    reasons.push(`saúde ${Math.round(Number(boss.health))}%`);
+  }
+  return {chance_delta:Number(Math.max(-.075,delta).toFixed(4)),label:reasons.join(" · ")||"chefia operacional",health:boss.health,stress:boss.stress,hospital_until:hospitalActive?boss.hospital_until:null,sentence_until:sentenceActive?boss.sentence_until:null};
+};
+
 export const localBusinessChance = (save,category) => {
   ensureLocalCity(save);
   let total=0;
@@ -187,7 +278,7 @@ export const localCitySnapshot = (save) => {
   return {
     world,
     calendar:localCityCalendar(save,5),
-    season:{...season,your_points:Number(save.city.season.points||0),leaderboard:npcLeaderboard(save,season)},
+    season:{...season,your_points:Number(save.city.season.points||0),leaderboard:npcLeaderboard(save,season),last_reward:clone(save.city.last_season_reward||null)},
     news:news.slice(0,12),
     rivals:save.city.rivals.map((r)=>({...clone(r),threat:clamp(Math.round(r.power+r.hostility*.35-playerPower*.35),0,100)})),
     businesses,business_catalog:clone(LOCAL_BUSINESS_TYPES),business_totals:totals,
@@ -269,7 +360,13 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
     const a=Number(save.player.level||1)*12+Number(save.player.respect||0)/350+Number(save.player.stats?.missions_success||0)*.7+Math.random()*22;
     const d=Math.max(1,defender.power/8)*12+defender.power*.5+Math.random()*22;
     const won=a>=d;save.city.season.points=Number(save.city.season.points||0)+(won?80:20);
-    let consequence=null;if(!won&&Math.random()<.08){save.city.boss.hospital_until=new Date(Date.now()+(10+Math.floor(Math.random()*21))*60000).toISOString();save.city.boss.health=55+Math.floor(Math.random()*26);consequence="hospital";}
+    if(!won) save.city.boss.stress=clamp(Number(save.city.boss.stress||0)+8,0,100);
+    let consequence=null;
+    if(!won&&Number(save.player.heat||0)>=75&&Math.random()<.06){
+      save.city.boss.sentence_until=new Date(Date.now()+(15+Math.floor(Math.random()*31))*60000).toISOString();consequence="sentence";
+    }else if(!won&&Math.random()<.08){
+      save.city.boss.hospital_until=new Date(Date.now()+(10+Math.floor(Math.random()*21))*60000).toISOString();save.city.boss.health=55+Math.floor(Math.random()*26);consequence="hospital";
+    }
     pushEvent(save,won?"system":"warning",`Conflito PvP ${won?"vencido":"perdido"} contra ${defender.name}.`);
     return {handled:true,data:{ok:true,winner_id:won?save.player.id:defender.id,winner_name:won?save.player.org_name:defender.name,consequence}};
   }
@@ -279,6 +376,6 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
   if(verb==="post"&&path==="/game/city/social/alliance/create"){if(save.city.social.alliance)fail(409,"Já pertences a uma aliança");const name=String(payload.name||"").trim();if(name.length<3)fail(400,"Nome demasiado curto");save.city.social.alliance={id:uid("alliance"),name,code:"LOCAL"+String(Math.floor(Math.random()*900)+100),leader_id:save.player.id,member_ids:[save.player.id],season_points:0,created_at:nowIso()};return {handled:true,data:{ok:true,code:save.city.social.alliance.code}};}
   if(verb==="post"&&path==="/game/city/social/alliance/join")fail(409,"Entrar numa aliança de outros jogadores requer uma conta online");
   if(verb==="post"&&path==="/game/city/social/alliance/leave"){save.city.social.alliance=null;return {handled:true,data:{ok:true}};}
-  if(verb==="post"&&path==="/game/city/boss/recover"){const b=save.city.boss;if(!b.hospital_until&&!b.sentence_until&&b.health>=100)fail(400,"Não há nenhuma consequência ativa para tratar");const cost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0);if(cost)spend(save,cost,"Recuperação do chefe","city_boss_recovery");Object.assign(b,{health:100,stress:Math.max(0,b.stress-30),hospital_until:null,sentence_until:null});pushEvent(save,"system","O chefe regressou à atividade.");return {handled:true,data:{ok:true,cost}};}
+  if(verb==="post"&&path==="/game/city/boss/recover"){const b=save.city.boss;const stress=Number(b.stress||0),health=Number(b.health??100);if(!b.hospital_until&&!b.sentence_until&&health>=100&&stress<35)fail(400,"Não há nenhuma consequência ativa para tratar");const cost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0)+(!b.hospital_until&&!b.sentence_until&&stress>=35?1000:0);if(cost)spend(save,cost,"Recuperação do chefe","city_boss_recovery");Object.assign(b,{health:100,stress:Math.max(0,stress-30),hospital_until:null,sentence_until:null});pushEvent(save,"system","O chefe regressou à atividade.");return {handled:true,data:{ok:true,cost}};}
   return {handled:false};
 };

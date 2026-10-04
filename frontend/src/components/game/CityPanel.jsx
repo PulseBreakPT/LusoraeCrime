@@ -209,6 +209,11 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Trophy size={13} className="text-amber-400" /> Temporada {season?.number}</p>
                     <span className="font-mono text-[10px] text-zinc-500">{timeLeft(season?.remaining_s)} restantes</span>
                   </div>
+                  {season?.last_reward && (
+                    <div className="mb-2 rounded-md border border-amber-500/15 bg-amber-500/[0.05] px-2 py-1.5 font-mono text-[10px] text-amber-200">
+                      {season.last_reward.season_id} · #{season.last_reward.rank} · +{fmtMoney(season.last_reward.clean)} · +{nfmt(season.last_reward.respect)} respeito
+                    </div>
+                  )}
                   <div className="space-y-1">
                     {(season?.leaderboard || []).slice(0, 8).map((row) => (
                       <div key={row.player_id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 font-mono text-[10px] ${row.is_you ? "bg-red-500/10 text-red-200" : "bg-white/[0.025] text-zinc-400"}`}>
@@ -225,8 +230,10 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     <div>
                       <p className="flex items-center gap-1.5 text-xs font-bold text-white"><HeartPulse size={13} className="text-rose-400" /> Estado do chefe</p>
                       <p className="mt-1 font-mono text-[10px] text-zinc-500">Saúde {city.boss?.health}% · Stress {city.boss?.stress}%</p>
+                      {city.boss?.sentence_until && <p className="mt-1 font-mono text-[10px] text-red-300">Detido até {new Date(city.boss.sentence_until).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" })}</p>}
+                      {city.boss?.hospital_until && <p className="mt-1 font-mono text-[10px] text-amber-300">Hospital até {new Date(city.boss.hospital_until).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" })}</p>}
                     </div>
-                    {(city.boss?.hospital_until || city.boss?.sentence_until || Number(city.boss?.health || 100) < 100) && (
+                    {(city.boss?.hospital_until || city.boss?.sentence_until || Number(city.boss?.health || 100) < 100 || Number(city.boss?.stress || 0) >= 35) && (
                       <ActionButton
                         tone="good"
                         disabled={!!busy}

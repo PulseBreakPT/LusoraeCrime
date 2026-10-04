@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from city_data import (
     WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES,
-    SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO,
+    SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO, SEASON_REWARDS,
 )
 
 LISBON = ZoneInfo("Europe/Lisbon")
@@ -132,6 +132,49 @@ def city_calendar(now=None, region="Portugal", count=4):
     return rows
 
 
+def boss_status(player, now=None):
+    now = now or _utc_now()
+    hospital_raw = player.get("boss_hospital_until")
+    sentence_raw = player.get("boss_sentence_until")
+    hospital_dt = _parse(hospital_raw)
+    sentence_dt = _parse(sentence_raw)
+    raw_health = player.get("boss_health", 100)
+    health = 100 if raw_health is None else int(raw_health)
+    return {
+        "health": max(0, min(100, health)),
+        "stress": max(0, min(100, int(player.get("boss_stress", 0) or 0))),
+        "hospital_until": hospital_raw if hospital_dt and hospital_dt > now else None,
+        "sentence_until": sentence_raw if sentence_dt and sentence_dt > now else None,
+    }
+
+
+def boss_leadership_modifier(player, now=None):
+    status = boss_status(player, now)
+    delta = 0.0
+    reasons = []
+    if status["sentence_until"]:
+        delta -= 0.05
+        reasons.append("chefia detida")
+    elif status["hospital_until"]:
+        delta -= 0.03
+        reasons.append("chefia hospitalizada")
+
+    if status["stress"] > 35:
+        stress_penalty = min(0.025, (status["stress"] - 35) / 65 * 0.025)
+        delta -= stress_penalty
+        reasons.append(f"stress {status['stress']}%")
+    if status["health"] < 70:
+        health_penalty = min(0.015, (70 - status["health"]) / 70 * 0.015)
+        delta -= health_penalty
+        reasons.append(f"saúde {status['health']}%")
+
+    return {
+        "chance_delta": round(max(-0.075, delta), 4),
+        "label": " · ".join(reasons) if reasons else "chefia operacional",
+        **status,
+    }
+
+
 def operation_world_modifier(category, now=None, region="Portugal"):
     ctx = world_context(now, region)
     return {
@@ -175,6 +218,116 @@ async def ensure_rivals(db, player):
     return docs
 
 
+async def advance_rival_world(db, player, rivals, businesses, now=None):
+    """Permite que uma organização rival tome uma iniciativa a cada 3 horas.
+
+    O slot é adquirido atomicamente no documento do jogador; abrir o painel
+    em dois dispositivos não duplica sabotagens, fugas de informação ou apoio.
+    """
+    now = now or _utc_now()
+    slot = int(now.timestamp() // (3 * 3600))
+    pid = str(player["_id"])
+
+    # Primeira sincronização apenas fixa o relógio rival. Não dispara uma
+    # agressão imediatamente após a funcionalidade ser criada/ativada.
+    if player.get("city_rival_slot") is None:
+        grace = await db.players.update_one(
+            {"_id": player["_id"], "city_rival_slot": {"$exists": False}},
+            {"$set": {"city_rival_slot": slot}},
+        )
+        if grace.modified_count == 1:
+            player["city_rival_slot"] = slot
+            return {"kind": "grace", "rival": None, "message": None}
+
+    lock = await db.players.update_one(
+        {"_id": player["_id"], "city_rival_slot": {"$lt": slot}},
+        {"$set": {"city_rival_slot": slot}},
+    )
+    if lock.modified_count != 1 or not rivals:
+        return None
+    player["city_rival_slot"] = slot
+
+    rng = random.Random(_seed_int(pid, slot, "rival-auto"))
+    rival = rivals[rng.randrange(len(rivals))]
+    relation = rival.get("relation", "neutral")
+    name = rival.get("name", "Organização rival")
+
+    if relation == "allied":
+        reduction = rng.randint(1, 3)
+        old_heat = float(player.get("heat", 0) or 0)
+        new_heat = max(0.0, old_heat - reduction)
+        await db.players.update_one({"_id": player["_id"]}, {"$set": {"heat": new_heat}})
+        player["heat"] = new_heat
+        message = f"{name} partilhou informação útil (-{reduction} calor)."
+        await db.events.insert_one({"player_id": pid, "kind": "system", "message": message, "ts": now.isoformat()})
+        return {"kind": "ally_intel", "rival": name, "message": message}
+
+    if relation == "truce":
+        # Uma trégua serve para comprar paz real, não apenas para mudar uma label.
+        return {"kind": "truce", "rival": name, "message": None}
+
+    hostility = int(rival.get("hostility", 40) or 40)
+    roll = rng.random()
+    if businesses and hostility >= 45 and roll < 0.38:
+        business = businesses[rng.randrange(len(businesses))]
+        security = max(0, min(100, int(business.get("security", 25) or 25)))
+        raw_hit = rng.randint(5, 12)
+        hit = max(2, int(round(raw_hit * (1 - 0.006 * security))))
+        condition = max(20.0, float(business.get("condition", 100) or 100) - hit)
+        await db.city_businesses.update_one({"_id": business["_id"]}, {"$set": {"condition": condition}})
+        business["condition"] = condition
+        await db.city_rivals.update_one(
+            {"_id": rival["_id"]},
+            {"$set": {"last_action_at": now.isoformat()}, "$inc": {"hostility": 2}},
+        )
+        rival["hostility"] = min(100, hostility + 2)
+        rival["last_action_at"] = now.isoformat()
+        message = f"{name} sabotou {business.get('name', 'um negócio')} (-{hit}% condição)."
+        await db.events.insert_one({"player_id": pid, "kind": "warning", "message": message, "ts": now.isoformat()})
+        return {"kind": "sabotage", "rival": name, "message": message}
+
+    if hostility >= 55 and roll < 0.72:
+        heat_gain = rng.randint(2, 5)
+        stress_gain = rng.randint(2, 6)
+        new_heat = min(100.0, float(player.get("heat", 0) or 0) + heat_gain)
+        new_stress = min(100, int(player.get("boss_stress", 0) or 0) + stress_gain)
+        fields = {"heat": new_heat, "boss_stress": new_stress}
+        consequence = None
+        if new_heat >= 88 and rng.random() < 0.12 and not player.get("boss_sentence_until"):
+            minutes = rng.randint(15, 45)
+            fields["boss_sentence_until"] = (now + timedelta(minutes=minutes)).isoformat()
+            consequence = "sentence"
+        await db.players.update_one({"_id": player["_id"]}, {"$set": fields})
+        player.update(fields)
+        await db.city_rivals.update_one(
+            {"_id": rival["_id"]},
+            {"$set": {"last_action_at": now.isoformat()}, "$inc": {"intel": 1}},
+        )
+        rival["intel"] = min(10, int(rival.get("intel", 0) or 0) + 1)
+        rival["last_action_at"] = now.isoformat()
+        message = f"{name} fez circular informação contra a organização (+{heat_gain} calor)."
+        if consequence == "sentence":
+            message += " O chefe acabou detido temporariamente."
+        await db.events.insert_one({"player_id": pid, "kind": "warning", "message": message, "ts": now.isoformat()})
+        return {"kind": "leak", "rival": name, "message": message, "consequence": consequence}
+
+    pressure = rng.randint(4, 10)
+    new_pressure = min(100, int(rival.get("territory_pressure", 20) or 20) + pressure)
+    await db.city_rivals.update_one(
+        {"_id": rival["_id"]},
+        {
+            "$set": {"territory_pressure": new_pressure, "last_action_at": now.isoformat()},
+            "$inc": {"intel": 1},
+        },
+    )
+    rival["territory_pressure"] = new_pressure
+    rival["intel"] = min(10, int(rival.get("intel", 0) or 0) + 1)
+    rival["last_action_at"] = now.isoformat()
+    message = f"{name} aumentou a pressão territorial (+{pressure})."
+    await db.events.insert_one({"player_id": pid, "kind": "warning", "message": message, "ts": now.isoformat()})
+    return {"kind": "pressure", "rival": name, "message": message}
+
+
 def business_projection(doc, now=None):
     now = now or _utc_now()
     cfg = BUSINESS_TYPES.get(doc.get("type_key"), {})
@@ -210,21 +363,105 @@ def _serialize(doc):
     return out
 
 
+async def _settle_previous_season(db, player, record):
+    """Entrega uma única vez o prémio da época anterior.
+
+    A marca de claim e o crédito são feitos na mesma atualização do jogador,
+    evitando prémios duplicados quando dois clientes abrem a Cidade ao mesmo tempo.
+    """
+    if not record or not record.get("season_id"):
+        return None
+    pid = str(player["_id"])
+    season_id = record["season_id"]
+    points = int(record.get("points", 0) or 0)
+    ahead = await db.city_season_scores.count_documents({
+        "season_id": season_id,
+        "points": {"$gt": points},
+    })
+    rank = ahead + 1
+    reward = next((x for x in SEASON_REWARDS if int(x.get("rank", -1)) == rank), None) or {
+        "rank": rank, "clean": 0, "respect": 0,
+    }
+    summary = {
+        "season_id": season_id,
+        "rank": rank,
+        "points": points,
+        "clean": int(reward.get("clean", 0) or 0),
+        "respect": int(reward.get("respect", 0) or 0),
+        "claimed_at": _utc_now().isoformat(),
+    }
+    result = await db.players.update_one(
+        {
+            "_id": player["_id"],
+            "city_season_rewards_claimed": {"$ne": season_id},
+        },
+        {
+            "$addToSet": {"city_season_rewards_claimed": season_id},
+            "$set": {"city_last_season_reward": summary},
+            "$inc": {
+                "clean_money": summary["clean"],
+                "respect": summary["respect"],
+            },
+        },
+    )
+    if result.modified_count != 1:
+        return player.get("city_last_season_reward")
+
+    player["clean_money"] = int(player.get("clean_money", 0) or 0) + summary["clean"]
+    player["respect"] = int(player.get("respect", 0) or 0) + summary["respect"]
+    player["city_last_season_reward"] = summary
+    if summary["clean"]:
+        await db.transactions.insert_one({
+            "player_id": pid,
+            "kind": "city_season_reward",
+            "amount": summary["clean"],
+            "currency": "clean",
+            "balance_after": player["clean_money"],
+            "note": f"Prémio {season_id} · #{rank}",
+            "ts": summary["claimed_at"],
+        })
+    await db.events.insert_one({
+        "player_id": pid,
+        "kind": "system",
+        "message": (
+            f"Temporada {season_id} encerrada em #{rank}: "
+            f"+{summary['clean']:,} € e +{summary['respect']:,} respeito."
+            if summary["clean"] or summary["respect"]
+            else f"Temporada {season_id} encerrada em #{rank}."
+        ),
+        "ts": summary["claimed_at"],
+    })
+    return summary
+
+
 async def _season_checkpoint(db, player, season):
     pid = str(player["_id"])
-    record = await db.city_season_scores.find_one({"player_id": pid})
     respect = int(player.get("respect", 0) or 0)
     successes = int((player.get("stats") or {}).get("missions_success", 0) or 0)
-    if not record or record.get("season_id") != season["id"]:
+    record = await db.city_season_scores.find_one({
+        "player_id": pid,
+        "season_id": season["id"],
+    })
+    if not record:
+        previous = await db.city_season_scores.find_one(
+            {"player_id": pid, "season_id": {"$ne": season["id"]}},
+            sort=[("updated_at", -1)],
+        )
+        if previous:
+            await _settle_previous_season(db, player, previous)
         record = {
             "player_id": pid,
             "season_id": season["id"],
             "points": 0,
-            "respect_checkpoint": respect,
+            "respect_checkpoint": int(player.get("respect", respect) or 0),
             "success_checkpoint": successes,
             "updated_at": _utc_now().isoformat(),
         }
-        await db.city_season_scores.update_one({"player_id": pid}, {"$set": record}, upsert=True)
+        await db.city_season_scores.update_one(
+            {"player_id": pid, "season_id": season["id"]},
+            {"$setOnInsert": record},
+            upsert=True,
+        )
         return record
 
     delta_respect = max(0, respect - int(record.get("respect_checkpoint", respect)))
@@ -236,7 +473,7 @@ async def _season_checkpoint(db, player, season):
         record["success_checkpoint"] = successes
         record["updated_at"] = _utc_now().isoformat()
         await db.city_season_scores.update_one(
-            {"player_id": pid},
+            {"player_id": pid, "season_id": season["id"]},
             {"$set": {
                 "points": record["points"],
                 "respect_checkpoint": respect,
@@ -299,6 +536,7 @@ async def city_snapshot(db, player):
     ctx = world_context(now, player.get("region") or "Portugal")
     rivals = await ensure_rivals(db, player)
     businesses = await db.city_businesses.find({"player_id": pid}).sort("bought_at", 1).to_list(50)
+    await advance_rival_world(db, player, rivals, businesses, now)
     projections = [business_projection(b, now) for b in businesses]
     season = season_info(now)
     score = await _season_checkpoint(db, player, season)
@@ -348,7 +586,12 @@ async def city_snapshot(db, player):
     return {
         "world": ctx,
         "calendar": city_calendar(now, player.get("region") or "Portugal", 5),
-        "season": {**season, "your_points": int(score.get("points", 0)), "leaderboard": board},
+        "season": {
+            **season,
+            "your_points": int(score.get("points", 0)),
+            "leaderboard": board,
+            "last_reward": player.get("city_last_season_reward"),
+        },
         "news": news[:12],
         "rivals": rival_out,
         "businesses": business_out,
@@ -381,10 +624,5 @@ async def city_snapshot(db, player):
                 for x in pvp_challenges
             ],
         },
-        "boss": {
-            "health": int(player.get("boss_health", 100) or 100),
-            "stress": int(player.get("boss_stress", 0) or 0),
-            "hospital_until": player.get("boss_hospital_until"),
-            "sentence_until": player.get("boss_sentence_until"),
-        },
+        "boss": boss_status(player, now),
     }
