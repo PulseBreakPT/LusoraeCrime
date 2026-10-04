@@ -218,6 +218,8 @@ export const advanceLocalCity = (save) => {
     }
   }
 
+  if(save.city.boss.hospital_until&&Date.parse(save.city.boss.hospital_until)<=Date.now()) save.city.boss.hospital_until=null;
+  if(save.city.boss.sentence_until&&Date.parse(save.city.boss.sentence_until)<=Date.now()) save.city.boss.sentence_until=null;
   save.city.boss.health=clamp(Number(save.city.boss.health||100),0,100);
   save.city.boss.stress=clamp(Number(save.city.boss.stress||0),0,100);
   return save;
@@ -228,6 +230,25 @@ const businessProjection=(b)=>{
   const hours=clamp((Date.now()-last)/3600000,0,168),level=Math.max(1,Number(b.level||1)),eff=clamp(Number(b.condition??100)/100,.35,1.35);
   return {hours:Number(hours.toFixed(3)),clean:Math.floor((cfg.clean_h||0)*level*hours*eff),dirty:Math.floor((cfg.dirty_h||0)*level*hours*eff),heat:Number(((cfg.heat_h||0)*level*hours).toFixed(2))};
 };
+export const localBossLeadership = (save) => {
+  ensureLocalCity(save);
+  const now=Date.now(),boss=save.city.boss;
+  const hospitalActive=!!boss.hospital_until&&Date.parse(boss.hospital_until)>now;
+  const sentenceActive=!!boss.sentence_until&&Date.parse(boss.sentence_until)>now;
+  let delta=0;const reasons=[];
+  if(sentenceActive){delta-=.05;reasons.push("chefia detida");}
+  else if(hospitalActive){delta-=.03;reasons.push("chefia hospitalizada");}
+  if(Number(boss.stress||0)>35){
+    delta-=Math.min(.025,(Number(boss.stress)-35)/65*.025);
+    reasons.push(`stress ${Math.round(Number(boss.stress))}%`);
+  }
+  if(Number(boss.health||100)<70){
+    delta-=Math.min(.015,(70-Number(boss.health))/70*.015);
+    reasons.push(`saúde ${Math.round(Number(boss.health))}%`);
+  }
+  return {chance_delta:Number(Math.max(-.075,delta).toFixed(4)),label:reasons.join(" · ")||"chefia operacional",health:boss.health,stress:boss.stress,hospital_until:hospitalActive?boss.hospital_until:null,sentence_until:sentenceActive?boss.sentence_until:null};
+};
+
 export const localBusinessChance = (save,category) => {
   ensureLocalCity(save);
   let total=0;
@@ -339,7 +360,13 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
     const a=Number(save.player.level||1)*12+Number(save.player.respect||0)/350+Number(save.player.stats?.missions_success||0)*.7+Math.random()*22;
     const d=Math.max(1,defender.power/8)*12+defender.power*.5+Math.random()*22;
     const won=a>=d;save.city.season.points=Number(save.city.season.points||0)+(won?80:20);
-    let consequence=null;if(!won&&Math.random()<.08){save.city.boss.hospital_until=new Date(Date.now()+(10+Math.floor(Math.random()*21))*60000).toISOString();save.city.boss.health=55+Math.floor(Math.random()*26);consequence="hospital";}
+    if(!won) save.city.boss.stress=clamp(Number(save.city.boss.stress||0)+8,0,100);
+    let consequence=null;
+    if(!won&&Number(save.player.heat||0)>=75&&Math.random()<.06){
+      save.city.boss.sentence_until=new Date(Date.now()+(15+Math.floor(Math.random()*31))*60000).toISOString();consequence="sentence";
+    }else if(!won&&Math.random()<.08){
+      save.city.boss.hospital_until=new Date(Date.now()+(10+Math.floor(Math.random()*21))*60000).toISOString();save.city.boss.health=55+Math.floor(Math.random()*26);consequence="hospital";
+    }
     pushEvent(save,won?"system":"warning",`Conflito PvP ${won?"vencido":"perdido"} contra ${defender.name}.`);
     return {handled:true,data:{ok:true,winner_id:won?save.player.id:defender.id,winner_name:won?save.player.org_name:defender.name,consequence}};
   }
