@@ -31,7 +31,7 @@ const useTick = (active) => {
 const TierChip = ({ tier }) => (
   <Tip tip={`Tier ${tier.label} — classe do imóvel pelo nível de desbloqueio no mercado.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -121,6 +121,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
               data-testid="properties-search"
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
+              aria-label="Pesquisar imóveis"
               placeholder="Pesquisar imóvel..."
               className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
             />
@@ -128,7 +129,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           <Tip tip={canOptimize
             ? `Lança as melhorias com melhor retorno real e preserva ${fmtMoney(reserve)} para o próximo fecho semanal (salários + TSU + frota + imóveis).`
             : props.length === 0 ? "Sem imóveis no património." : "Nenhum imóvel elegível — tudo no nível máximo ou já em obras."}>
-            <button
+            <button type="button"
               data-testid="properties-optimize"
               onClick={() => canOptimize && optimizeProperties()}
               disabled={!canOptimize}

@@ -181,7 +181,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                           </div>
                           {owns ? (
                             cat === "hq_skin" ? (
-                              <button
+                              <button type="button"
                                 data-testid={`shop-equip-hq_skin-${key}`}
                                 onClick={() => equipHqSkin(state.player.hq_skin_key === key ? null : key)}
                                 className={`shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold uppercase ${
@@ -314,7 +314,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
               const can = money >= cost;
               return (
                 <Card key={s.kind} className="h-full min-w-0 flex flex-col items-stretch gap-2 rounded-md border px-2.5 py-2 shadow-none sub-card sm:flex-row sm:items-center sm:gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300">
                     <s.icon size={15} />
                   </span>
                   <div className="min-w-0 flex-1">

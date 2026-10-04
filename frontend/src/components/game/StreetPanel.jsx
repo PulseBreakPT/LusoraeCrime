@@ -36,7 +36,7 @@ const JOB_ICONS = {
   smuggling: BriefcaseBusiness,
 };
 
-const selectClass = "h-9 w-full rounded-md border border-white/10 bg-black/40 px-2 font-mono text-[10px] text-zinc-200 outline-none focus:border-red-500/50";
+const selectClass = "h-11 w-full rounded-md border border-white/10 bg-black/40 px-2 font-mono text-base sm:h-9 sm:text-[10px] text-zinc-200 outline-none focus:border-red-500/50";
 
 const metaByVehicle = (street) => Object.fromEntries(
   (street?.vehicle_meta || []).map((item) => [item.vehicle_id, item])
@@ -311,13 +311,13 @@ const TerritoriesTab = ({ districts, onAction }) => (
             </Badge>
           </div>
           <div className="mt-3">
-            <div className="mb-1 flex justify-between font-mono text-[8px] uppercase text-zinc-600">
+            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase text-zinc-600">
               <span>Influência</span><span>{Math.round(district.influence)}/150</span>
             </div>
             <MiniBar value={(district.influence / 150) * 100} color="#22D3EE" height="h-1" />
           </div>
           <div className="mt-2">
-            <div className="mb-1 flex justify-between font-mono text-[8px] uppercase text-zinc-600">
+            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase text-zinc-600">
               <span>Pressão rival</span><span>{Math.round(district.rival_pressure)}%</span>
             </div>
             <MiniBar value={district.rival_pressure} color={district.rival_pressure >= 70 ? "#EF4444" : "#F59E0B"} height="h-1" />
@@ -375,7 +375,7 @@ const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
             </div>
           </div>
           {contact.key === "mechanic" && contact.unlocked && (
-            <select className={`${selectClass} mt-3`} value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
+            <select aria-label="Selecionar veículo para o mecânico" className={`${selectClass} mt-3`} value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
               {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.name}</option>)}
             </select>
           )}
@@ -514,7 +514,7 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
             {meta.insured && <Badge className="bg-emerald-500/10 text-emerald-300"><ShieldCheck size={10} /> Seguro</Badge>}
           </div>
           <div className="mt-3">
-            <div className="mb-1 flex justify-between font-mono text-[8px] uppercase text-zinc-600">
+            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase text-zinc-600">
               <span>Notoriedade</span><span>{Math.round(meta.notoriety || 0)}%</span>
             </div>
             <MiniBar value={meta.notoriety || 0} color={(meta.notoriety || 0) >= 60 ? "#EF4444" : "#F59E0B"} height="h-1" />
@@ -525,13 +525,13 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
             </p>
           )}
           <div className="mt-3 grid grid-cols-3 gap-1">
-            <Button size="sm" variant="outline" className="h-8 px-1 text-[8px]" disabled={!meta.notoriety} onClick={() => onAction(vehicle.id, "plates")}>
+            <Button size="sm" variant="outline" className="h-8 px-1 text-[9px]" disabled={!meta.notoriety} onClick={() => onAction(vehicle.id, "plates")}>
               Matrículas
             </Button>
-            <Button size="sm" variant="outline" className="h-8 px-1 text-[8px]" disabled={meta.insured} onClick={() => onAction(vehicle.id, "insure")}>
+            <Button size="sm" variant="outline" className="h-8 px-1 text-[9px]" disabled={meta.insured} onClick={() => onAction(vehicle.id, "insure")}>
               Segurar
             </Button>
-            <Button size="sm" variant="outline" className="h-8 px-1 text-[8px]" disabled={!meta.impounded} onClick={() => onAction(vehicle.id, "recover")}>
+            <Button size="sm" variant="outline" className="h-8 px-1 text-[9px]" disabled={!meta.impounded} onClick={() => onAction(vehicle.id, "recover")}>
               Recuperar
             </Button>
           </div>
@@ -627,7 +627,7 @@ const ChoiceCard = ({ item, selected, onClick }) => (
       {selected && <Check size={13} className="text-red-300" />}
     </div>
     <p className="mt-1 text-[10px] text-zinc-500">{item.description}</p>
-    <div className="mt-2 flex gap-3 font-mono text-[8px] uppercase text-zinc-600">
+    <div className="mt-2 flex gap-3 font-mono text-[9px] uppercase text-zinc-600">
       <span>Sucesso {signedPct(item.success)}</span>
       {item.reward_mult != null && <span>Pagamento {signedPct(item.reward_mult - 1)}</span>}
       {item.cost > 0 && <span>Custo {fmtMoney(item.cost)}</span>}
@@ -647,7 +647,7 @@ const Modifier = ({ label, value, pct, inverse }) => {
 
 const Info = ({ label, value, accent }) => (
   <div className="rounded-lg border border-white/10 bg-black/25 p-2">
-    <p className="font-mono text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className={`mt-1 truncate font-mono text-[10px] font-bold ${accent ? "text-cyan-300" : "text-zinc-300"}`}>{value}</p>
   </div>
 );

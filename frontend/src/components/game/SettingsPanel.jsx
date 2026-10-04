@@ -75,10 +75,11 @@ const Row = ({ label, hint, children, testId, hidden = false }) => {
 };
 
 // Slider de volume compacto (0–100%), coerente com o resto do painel.
-const VolumeSlider = ({ value, onChange, disabled, testId }) => (
+const VolumeSlider = ({ value, onChange, disabled, testId, ariaLabel }) => (
   <div className="flex items-center gap-1.5">
     <input
       data-testid={testId}
+      aria-label={ariaLabel}
       type="range"
       min="0"
       max="100"
@@ -91,10 +92,11 @@ const VolumeSlider = ({ value, onChange, disabled, testId }) => (
   </div>
 );
 
-const ThresholdInput = ({ value, onChange, disabled, testId }) => (
+const ThresholdInput = ({ value, onChange, disabled, testId, ariaLabel }) => (
   <div className="flex items-center gap-1">
     <Input
       data-testid={testId}
+      aria-label={ariaLabel}
       type="number"
       min="1"
       max="99"
@@ -168,21 +170,24 @@ const ChangePasswordForm = () => {
       <CollapsibleContent className="mt-2 space-y-2">
         <Input
           data-testid="settings-current-password-input"
+          aria-label="Palavra-passe atual"
           type="password" placeholder="Palavra-passe atual" value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
+          className="border-white/10 bg-white/5 font-mono text-base text-white placeholder:text-zinc-600"
         />
         <Input
           data-testid="settings-new-password-input"
+          aria-label="Nova palavra-passe"
           type="password" placeholder="Nova palavra-passe" value={next}
           onChange={(e) => setNext(e.target.value)}
-          className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
+          className="border-white/10 bg-white/5 font-mono text-base text-white placeholder:text-zinc-600"
         />
         <Input
           data-testid="settings-confirm-password-input"
+          aria-label="Confirmar nova palavra-passe"
           type="password" placeholder="Confirmar nova palavra-passe" value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          className="border-white/10 bg-white/5 font-mono text-xs text-white placeholder:text-zinc-600"
+          className="border-white/10 bg-white/5 font-mono text-base text-white placeholder:text-zinc-600"
         />
         {error && <p className="text-[10px] text-red-400">{error}</p>}
         {done && <p className="text-[10px] text-emerald-400">Palavra-passe alterada com sucesso.</p>}
@@ -271,11 +276,12 @@ const DeleteAccountForm = () => {
       {needsPassword && (
         <Input
           data-testid="settings-delete-password-input"
+          aria-label="Palavra-passe para confirmar eliminação da conta"
           type="password"
           placeholder="Palavra-passe para confirmar"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mt-2 border-red-500/20 bg-black/40 font-mono text-xs text-white placeholder:text-zinc-600"
+          className="mt-2 border-red-500/20 bg-black/40 font-mono text-base text-white placeholder:text-zinc-600"
         />
       )}
       {error && <p className="mt-1 text-[10px] text-red-400">{error}</p>}
@@ -471,6 +477,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success" hidden={!advancedOpen}>
             <Input
               data-testid="settings-low-success-input"
+              aria-label="Limiar de probabilidade baixa"
               type="number" min="10" max="95" step="5"
               value={Math.round(lowSuccessThreshold * 100)}
               onChange={(e) => setLowSuccessThreshold(Math.max(0.10, Math.min(0.95, (parseInt(e.target.value, 10) || 70) / 100)))}
@@ -484,6 +491,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <div className="flex items-center gap-2">
               <ThresholdInput
                 testId="settings-auto-repair-threshold"
+                ariaLabel="Durabilidade mínima para reparação automática"
                 value={settings.auto_repair_threshold ?? 30}
                 disabled={!settings.auto_repair_enabled}
                 onChange={(v) => patchAutomation({ auto_repair_threshold: v })}
@@ -499,6 +507,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <div className="flex items-center gap-2">
               <ThresholdInput
                 testId="settings-auto-refuel-threshold"
+                ariaLabel="Combustível mínimo para abastecimento automático"
                 value={settings.auto_refuel_threshold ?? 20}
                 disabled={!settings.auto_refuel_enabled}
                 onChange={(v) => patchAutomation({ auto_refuel_threshold: v })}
@@ -514,6 +523,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <div className="flex items-center gap-2">
               <ThresholdInput
                 testId="settings-auto-rest-threshold"
+                ariaLabel="Energia mínima para descanso automático"
                 value={settings.auto_rest_threshold ?? 20}
                 disabled={!settings.auto_rest_enabled}
                 onChange={(v) => patchAutomation({ auto_rest_threshold: v })}
@@ -550,6 +560,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <div className="flex items-center gap-2">
               <VolumeSlider
                 testId="settings-music-volume"
+                ariaLabel="Volume da música ambiente"
                 value={musicVolume}
                 disabled={!soundEnabled || !musicEnabled}
                 onChange={setMusicVolume}
@@ -566,6 +577,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <div className="flex items-center gap-2">
               <VolumeSlider
                 testId="settings-sfx-volume"
+                ariaLabel="Volume dos efeitos sonoros"
                 value={sfxVolume}
                 disabled={!soundEnabled || !sfxEnabled}
                 onChange={setSfxVolume}

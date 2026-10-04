@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContextV2";
 import { api } from "../../lib/api";
 import { Button } from "../ui/button";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "../ui/alert-dialog";
 import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2, Hourglass } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -66,10 +67,8 @@ export function DisclaimerModal() {
     return () => clearInterval(id);
   }, [visible, locked]);
 
-  // Barra de progresso fluida — em vez de saltar a cada segundo (re-render),
-  // é o próprio CSS que interpola a largura linearmente até ao prazo: parte da
-  // fração já decorrida (importante ao voltar do ecrã de recusa a meio) e
-  // anima até 100% no tempo restante exato, a 60fps e sem re-renders.
+  // Barra de progresso via transform: evita reflow e mantém a animação
+  // confinada à camada de composição.
   useEffect(() => {
     if (!visible || !locked || stage !== "notice") return;
     const el = barRef.current;
@@ -78,10 +77,12 @@ export function DisclaimerModal() {
     const leftMs = Math.max(0, deadlineRef.current - Date.now());
     const startPct = Math.min(100, ((totalMs - leftMs) / totalMs) * 100);
     el.style.transition = "none";
-    el.style.width = `${startPct}%`;
-    void el.offsetWidth; // reflow: fixa o ponto de partida antes de animar
-    el.style.transition = `width ${leftMs}ms linear`;
-    el.style.width = "100%";
+    el.style.transform = `scaleX(${startPct / 100})`;
+    const id = requestAnimationFrame(() => {
+      el.style.transition = `transform ${leftMs}ms linear`;
+      el.style.transform = "scaleX(1)";
+    });
+    return () => cancelAnimationFrame(id);
   }, [visible, locked, stage]);
 
   // Foco no botão de compromisso assim que desbloqueia (acessibilidade em
@@ -121,28 +122,16 @@ export function DisclaimerModal() {
   };
 
   return (
-    <div
-      data-testid="disclaimer-overlay"
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="disclaimer-title"
-      aria-describedby="disclaimer-body"
-      className={`pointer-events-auto fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-black/85 px-4 py-6 backdrop-blur-md ${
-        leaving ? "animate-out fade-out-0 duration-300 fill-mode-forwards" : "animate-in fade-in-0 duration-300"
-      }`}
-    >
-      <div
-        className={`relative my-auto w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950/95 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_80px_rgba(0,0,0,0.85),0_0_60px_rgba(220,38,38,0.12)] ${
-          leaving
-            ? "animate-out fade-out-0 zoom-out-95 duration-300 fill-mode-forwards"
-            : "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300"
-        }`}
+    <AlertDialog open={visible}>
+      <AlertDialogContent
+        data-testid="disclaimer-overlay"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        className={`max-h-[calc(100dvh-1rem)] overflow-y-auto p-0 ${leaving ? "opacity-0" : "opacity-100"}`}
       >
-        {/* Cantos HUD, coerentes com a moldura do jogo */}
-        <span aria-hidden="true" className="absolute -left-px -top-px h-4 w-4 rounded-tl-2xl border-l-2 border-t-2 border-red-500/70" />
-        <span aria-hidden="true" className="absolute -right-px -top-px h-4 w-4 rounded-tr-2xl border-r-2 border-t-2 border-red-500/70" />
-        <span aria-hidden="true" className="absolute -bottom-px -left-px h-4 w-4 rounded-bl-2xl border-b-2 border-l-2 border-red-500/70" />
-        <span aria-hidden="true" className="absolute -bottom-px -right-px h-4 w-4 rounded-br-2xl border-b-2 border-r-2 border-red-500/70" />
+        <AlertDialogTitle className="sr-only">Aviso de ficção do SUBMUNDO</AlertDialogTitle>
+        <AlertDialogDescription className="sr-only">
+          Lê o aviso e confirma que entendes que o SUBMUNDO é uma obra de ficção antes de continuar.
+        </AlertDialogDescription>
 
         {stage === "notice" ? (
           <div className="p-6 md:p-7">
@@ -189,8 +178,7 @@ export function DisclaimerModal() {
                   <div className="h-1 overflow-hidden rounded-full bg-white/10">
                     <div
                       ref={barRef}
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400"
-                      style={{ width: "0%" }}
+                      className="h-full w-full origin-left scale-x-0 rounded-full bg-emerald-500"
                     />
                   </div>
                   <p className="mt-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
@@ -291,7 +279,7 @@ export function DisclaimerModal() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

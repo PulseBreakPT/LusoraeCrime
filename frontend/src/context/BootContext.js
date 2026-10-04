@@ -57,7 +57,7 @@ export function BootProvider({ children }) {
     const entry = { timestamp, phase, type, message, details };
     logsRef.current.push(entry);
     if (type === "error") console.error(`[${phase}] ${message}`, details);
-    else console.log(`[${phase}] ${message}`, details);
+    else if (process.env.NODE_ENV === "development") console.debug(`[${phase}] ${message}`, details);
   };
 
   // Set boot ready
@@ -91,7 +91,6 @@ export function BootProvider({ children }) {
 
   const startBoot = async (bootFn) => {
     if (stateRef.current !== BOOT_STATES.IDLE) {
-      console.warn("Boot já está em progresso");
       return;
     }
 

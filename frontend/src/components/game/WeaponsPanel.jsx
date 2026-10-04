@@ -30,7 +30,7 @@ const useTick = (active) => {
 const TierChip = ({ tier }) => (
   <Tip tip={`Tier ${tier.label} — classe de equipamento pelo nível de desbloqueio no mercado.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -48,7 +48,7 @@ const StatGrid = ({ model }) => (
       return (
         <Tip key={s.key} tip={s.tip} block>
           <div>
-            <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+            <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
               <span>{s.label}</span>
               <span className="text-zinc-300">{display}</span>
             </div>
@@ -73,7 +73,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-            <p className={cn("truncate text-center font-mono text-[8px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+            <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
               {c.label.slice(0, 3)}
             </p>
             <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
@@ -199,6 +199,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
               data-testid="weapons-search"
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
+              aria-label="Pesquisar armamento"
               placeholder="Pesquisar arma..."
               className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
             />
@@ -206,7 +207,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
           <Tip tip={canOptimize
             ? `Distribui o arsenal pelos ${idleCount} operacionais disponíveis, procurando a melhor combinação para cada um.`
             : weapons.length === 0 ? "Sem armas no arsenal." : "Nenhum operacional disponível para equipar."}>
-            <button
+            <button type="button"
               data-testid="weapons-optimize"
               onClick={() => canOptimize && optimizeWeapons()}
               disabled={!canOptimize}
@@ -246,7 +247,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             </p>
           )}
           {weapons.some((w) => !w.employee_id) && state.employees.length === 0 && (
-            <button
+            <button type="button"
               data-testid="weapons-nav-employees"
               onClick={() => onNavigate && onNavigate("employees")}
               className="col-span-full w-full rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-center font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
@@ -338,7 +339,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <div className="mt-1 grid grid-cols-2 gap-x-3">
                       <Tip tip={`A arma certa na mão errada rende pouco: a eficácia escala com ${ATTR_FULL[skill.attr] || skill.attr} (${skill.value}/${meta.skill_attr_cap ?? 8}) — este portador extrai ${Math.round(skill.factor * 100)}% do potencial.`} block>
                         <div>
-                          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+                          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
                             <span>Mão · {ATTR_FULL[skill.attr] || skill.attr}</span>
                             <span className={skill.factor >= 0.9 ? "text-emerald-400" : skill.factor >= 0.75 ? "text-zinc-300" : "text-amber-400"}>{Math.round(skill.factor * 100)}%</span>
                           </div>
@@ -347,7 +348,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                       </Tip>
                       <Tip tip={`Proficiência com armas ${catalog?.weapon_categories?.[model.category]?.name || model.category}: ${Math.round(prof)}/${profMax} (+${(meta.proficiency_gain_per_mission ?? 4)} por missão). Bónus de chance atual: +${(profBonus * 100).toFixed(1)}% (máx. +${Math.round((meta.proficiency_bonus_max_pct ?? 0.08) * 100)}%).`} block>
                         <div>
-                          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+                          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
                             <span>Proficiência</span>
                             <span className="text-cyan-400">+{(profBonus * 100).toFixed(1)}%</span>
                           </div>
@@ -381,7 +382,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                   </SelectContent>
                 </Select>
                 {!w.employee_id && (
-                  <button
+                  <button type="button"
                     data-testid={`weapon-auto-assign-${w.id}`}
                     onClick={() => autoAssignWeapon(w.id)}
                     className="relative z-[1] mt-1 flex items-center gap-1 font-mono text-[10px] text-cyan-400 underline-offset-2 hover:underline"

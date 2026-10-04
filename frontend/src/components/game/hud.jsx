@@ -190,6 +190,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
       <span className="flex min-w-0 flex-1 items-center gap-1">
         <Input
           data-testid={testId && `${testId}-input`}
+          aria-label="Novo nome"
           autoFocus
           value={draft}
           maxLength={maxLength}
@@ -277,7 +278,7 @@ export const ConfirmButton = ({
   }, [armed, armMs]);
   return (
     <Tip tip={armed ? "Clica outra vez para confirmar — ação irreversível." : tip} block className={className}>
-      <button
+      <button type="button"
         data-testid={testId}
         onClick={() => { if (skipArm) { onConfirm(); return; } if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
         disabled={disabled}
@@ -336,7 +337,7 @@ export const PurchaseButton = ({
   };
   return (
     <Tip tip={tip} block className={className}>
-      <button
+      <button type="button"
         data-testid={testId}
         onClick={handleClick}
         disabled={!can || pending}

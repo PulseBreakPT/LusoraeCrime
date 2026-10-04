@@ -239,7 +239,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
             block
           >
             <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-              <p className={cn("truncate text-center font-mono text-[8px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+              <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
                 {c.label.slice(0, 3)}
               </p>
               <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
@@ -300,7 +300,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
                 <span style={{ color: conditionBand(weapon.condition).color }}>{Math.round(weapon.condition)}%</span>
               </p>
             </Tip>
-            <button
+            <button type="button"
               data-testid={`emp-unassign-weapon-${e.id}`}
               onClick={() => unassignWeapon(e.id)}
               disabled={!idle}
@@ -319,7 +319,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
           )}
         </div>
       ) : (
-        <button
+        <button type="button"
           data-testid={`emp-nav-weapons-${e.id}`}
           onClick={() => onNavigate && onNavigate("weapons")}
           className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-white hover:underline"
@@ -343,7 +343,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
         </div>
       )}
 
-      <button
+      <button type="button"
         data-testid={`emp-manage-toggle-${e.id}`}
         onClick={() => setManage(!manage)}
         className="mt-2 flex w-full items-center justify-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
@@ -422,7 +422,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
           {(e.history || []).length > 0 && (
             <div>
-              <button
+              <button type="button"
                 data-testid={`emp-history-toggle-${e.id}`}
                 onClick={() => setShowHistory(!showHistory)}
                 className="flex items-center gap-1 font-mono text-[10px] uppercase text-zinc-500 hover:text-white"
@@ -655,10 +655,10 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
         {capFull && (
           <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none" data-testid="hr-cap-full">
             <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
-            <button
+            <button type="button"
               data-testid="hr-nav-properties"
               onClick={() => onNavigate && onNavigate("properties")}
-              className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+              className="font-mono text-[10px] text-amber-300 underline-offset-2 hover:underline"
             >
               {canBuyHideout ? `Abrir Imóveis · esconderijo desde ${fmtMoney(hideout.price)}` : "Ver Imóveis"}
             </button>
@@ -694,6 +694,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid="employees-search"
                       value={query}
                       onChange={(ev) => setQuery(ev.target.value)}
+                      aria-label="Pesquisar operacionais"
                       placeholder="Pesquisar operacional..."
                       className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
                     />
@@ -701,7 +702,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                   <Tip tip={canOptimize
                     ? `Distribui os ${freeIdleCount} operacionais sem equipa pelas ${openTeamsCount} equipas com vagas, procurando a melhor especialização. Não move membros que já estejam numa equipa.`
                     : freeIdleCount === 0 ? "Nenhum operacional disponível sem equipa para colocar." : "Nenhuma equipa disponível com vagas."}>
-                    <button
+                    <button type="button"
                       data-testid="employees-optimize"
                       onClick={() => canOptimize && optimizeEmployees()}
                       disabled={!canOptimize}
@@ -732,7 +733,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                         data-testid="employees-rest-all"
                         variant="outline"
                         onClick={restAll}
-                        className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-purple-300 hover:bg-white/5"
+                        className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-300 hover:bg-white/5"
                       >
                         <BedDouble size={11} /> {restAllIds.length}
                       </Button>

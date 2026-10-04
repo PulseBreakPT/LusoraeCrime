@@ -58,9 +58,9 @@ Cor sem significado funcional deve ser exceção.
 
 ## 4. Tipografia
 
-Famílias já presentes no produto:
+Famílias autoritativas do produto:
 
-- Corpo: **Inter**
+- Corpo: **IBM Plex Sans**
 - Display/títulos: **Rajdhani**, fallback IBM Plex Sans
 - Dados: **JetBrains Mono**
 

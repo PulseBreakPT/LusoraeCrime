@@ -17,7 +17,7 @@ import {
 
 const VStat = ({ label, value }) => (
   <Card className="rounded bg-black/40 px-1.5 py-1 text-center shadow-none">
-    <p className="text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="text-[9px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className="font-mono text-[10px] font-bold text-white">{value}</p>
   </Card>
 );
@@ -36,7 +36,7 @@ const useTick = (active) => {
 const TierChip = ({ tier }) => (
   <Tip tip={`Tier ${tier.label} — classe do veículo pelo nível de desbloqueio no stand.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -57,7 +57,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-            <p className={cn("truncate text-center font-mono text-[8px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+            <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
               {c.label.slice(0, 3)}
             </p>
             <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
@@ -165,6 +165,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               data-testid="fleet-search"
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
+              aria-label="Pesquisar frota"
               placeholder="Pesquisar veículo..."
               className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
             />
@@ -172,7 +173,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
           <Tip tip={canOptimize
             ? `Redistribui os veículos disponíveis pelas ${idleTeamsCount} equipas livres, escolhendo os mais adequados e garantindo lugares para todos os membros.`
             : state.vehicles.length === 0 ? "Sem veículos na frota." : "Nenhuma equipa disponível para receber veículos."}>
-            <button
+            <button type="button"
               data-testid="fleet-optimize"
               onClick={() => canOptimize && optimizeVehicles()}
               disabled={!canOptimize}
@@ -264,7 +265,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       )}
                       {model?.luxury && (
                         <Tip tip="Veículo de luxo — chama mais a atenção e aumenta o calor gerado em operações discretas.">
-                          <span className="mr-1.5 inline-flex items-center gap-0.5 text-purple-300">
+                          <span className="mr-1.5 inline-flex items-center gap-0.5 text-amber-300">
                             <Gem size={9} /> luxo
                           </span>
                         </Tip>
@@ -321,7 +322,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     {teamFit != null && (
                       <Tip tip={`Adequação à especialização ${SPEC_LABELS[team.spec] || team.spec}: ${Math.round(teamFit * 100)}%${teamBest ? " — modelo ideal para esta equipa." : "."}`} block>
                         <div className="mt-1">
-                          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+                          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
                             <span>Match · {SPEC_LABELS[team.spec] || team.spec}</span>
                             <span className={teamBest ? "text-emerald-400" : teamFit >= 0.5 ? "text-zinc-300" : "text-amber-400"}>{Math.round(teamFit * 100)}%{teamBest ? " ★" : ""}</span>
                           </div>
@@ -403,7 +404,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   </SelectContent>
                 </Select>
                 {v.team_id && teamMembers(v.team_id) === 0 && (
-                  <button
+                  <button type="button"
                     data-testid={`vehicle-team-empty-${v.id}`}
                     onClick={() => onNavigate && onNavigate("employees")}
                     className="relative z-[1] mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
@@ -467,7 +468,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                   />
                 </div>
 
-                <button
+                <button type="button"
                   data-testid={`vehicle-stats-toggle-${v.id}`}
                   onClick={() => setStatsOpen(statsOpen === v.id ? null : v.id)}
                   className="relative z-[1] mt-2 flex w-full items-center justify-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
@@ -514,7 +515,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           )}
                           {m.luxury && (
                             <Tip tip="Veículo de luxo — chama mais a atenção e aumenta o calor gerado em operações discretas.">
-                              <span className="mr-1.5 inline-flex items-center gap-0.5 text-purple-300">
+                              <span className="mr-1.5 inline-flex items-center gap-0.5 text-amber-300">
                                 <Gem size={9} /> luxo
                               </span>
                             </Tip>
@@ -572,10 +573,10 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             return (
               <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none">
                 <p className="font-mono text-[10px] text-amber-400">Garagem cheia</p>
-                <button
+                <button type="button"
                   data-testid="fleet-nav-properties"
                   onClick={() => onNavigate && onNavigate("properties")}
-                  className="font-mono text-[10px] text-purple-300 underline-offset-2 hover:underline"
+                  className="font-mono text-[10px] text-amber-300 underline-offset-2 hover:underline"
                 >
                   {canBuy ? `Abrir Imóveis · garagem desde ${fmtMoney(garagem.price)}` : "Ver Imóveis"}
                 </button>

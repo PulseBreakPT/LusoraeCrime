@@ -58,13 +58,13 @@ export class ErrorBoundary extends Component {
           )}
 
           <div className="space-y-2">
-            <button
+            <button type="button"
               onClick={() => window.location.reload()}
               className="flex w-full items-center justify-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
             >
               <RotateCcw className="h-4 w-4" /> Recarregar
             </button>
-            <button
+            <button type="button"
               onClick={this.handleLogout}
               className="flex w-full items-center justify-center gap-2 rounded border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900"
             >

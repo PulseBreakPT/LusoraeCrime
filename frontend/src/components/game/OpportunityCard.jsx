@@ -105,7 +105,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
   // sempre escolher outra equipa manualmente clicando numa linha diferente.
   // Toque de abertura ao selecionar uma operação no mapa — os marcadores do
-  // Leaflet não são <button>, por isso o som global de interface não os cobre.
+  // Leaflet não são <button type="button">, por isso o som global de interface não os cobre.
   useEffect(() => {
     audio.sfx.notify();
   }, [opp.id]);
@@ -439,7 +439,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <p className="flex items-center gap-1.5 truncate text-xs font-semibold text-white">
                     {selectedTeam.name}
                     {selectedTeam.id === recommendedTeamId && (
-                      <Badge variant="outline" className="gap-0.5 border-emerald-500/20 bg-emerald-500/10 px-1 py-0 font-mono text-[8px] font-normal uppercase text-emerald-300">
+                      <Badge variant="outline" className="gap-0.5 border-emerald-500/20 bg-emerald-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-emerald-300">
                         <Sparkles size={8} /> automático
                       </Badge>
                     )}
@@ -602,7 +602,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <div className="flex items-center gap-1.5">
                     <Badge
                       variant="outline"
-                      className="rounded border-transparent px-1.5 py-0 font-mono text-[8px] font-bold uppercase tracking-wider"
+                      className="rounded border-transparent px-1.5 py-0 font-mono text-[9px] font-bold uppercase tracking-wider"
                       style={{ color: quality.color, background: `${quality.color}1a` }}
                     >
                       {quality.label}
@@ -651,7 +651,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 </p>
 
                 {modifiers.length > 0 && (
-                  <button
+                  <button type="button"
                     data-testid="dispatch-preview-toggle-details"
                     onClick={() => setShowDetails((v) => !v)}
                     className="mt-1.5 flex w-full items-center justify-center gap-1 border-t border-white/5 pt-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500 transition-colors hover:text-white"

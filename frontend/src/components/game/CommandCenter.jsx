@@ -294,6 +294,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
           <Input
             autoFocus
             data-testid="command-search"
+            aria-label="Pesquisar no SUBMUNDO"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Pesquisar área, veículo ou operação…"

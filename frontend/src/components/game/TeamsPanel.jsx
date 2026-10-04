@@ -37,7 +37,7 @@ const useTick = (active) => {
 const TierChip = ({ tier, missions }) => (
   <Tip tip={`Unidade ${tier.label}: ${missions} operações concluídas. A experiência melhora o entrosamento e a mestria da equipa.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -51,7 +51,7 @@ const RoleChip = ({ icon: Icon, label, on, detail, tip, tone = "#34D399" }) => (
   <Tip tip={tip}>
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-wide",
+        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide",
         !on && "border-white/5 bg-black/30 text-zinc-600"
       )}
       style={on ? { borderColor: `${tone}44`, color: tone, backgroundColor: `${tone}12` } : undefined}
@@ -104,7 +104,7 @@ const CohesionBar = ({ team, meta, nowMs, testId }) => {
       block
     >
       <div data-testid={testId}>
-        <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+        <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
           <span className="inline-flex items-center gap-1"><Link2 size={9} /> Entrosamento</span>
           <span className={frac >= 0.999 ? "text-emerald-400" : "text-cyan-400"}>+{(co.pct * 100).toFixed(1)}%</span>
         </div>
@@ -129,7 +129,7 @@ const FamiliarityRow = ({ team, meta, testId }) => (
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", isSpec ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-            <p className={cn("truncate text-center font-mono text-[8px] uppercase tracking-wide", fam.mastery ? "text-amber-400" : isSpec ? "text-emerald-400" : "text-zinc-600")}>
+            <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", fam.mastery ? "text-amber-400" : isSpec ? "text-emerald-400" : "text-zinc-600")}>
               {(SPEC_LABELS[cat] || cat).slice(0, 3)}{fam.mastery ? " ★" : ""}
             </p>
             <MiniBar value={fam.frac * 100} color={color} className="mt-0.5" />
@@ -151,7 +151,7 @@ const VitalsRow = ({ members, meta, testId }) => {
     <div data-testid={testId} className="grid grid-cols-3 gap-x-3">
       <Tip tip={`Moral média ${morale}%. Moral baixa reduz o desempenho; bónus e vitórias ajudam a recuperar.`} block>
         <div>
-          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             <span>Moral</span><span style={{ color: goodBarColor(morale) }}>{morale}%</span>
           </div>
           <MiniBar value={morale} color={goodBarColor(morale)} className="mt-0.5" />
@@ -159,7 +159,7 @@ const VitalsRow = ({ members, meta, testId }) => {
       </Tip>
       <Tip tip={`Lealdade média ${loyalty}% — acima de 70 dá até +${Math.round((meta.loyalty_bonus_max ?? 0.04) * 100)}% de chance; abaixo penaliza até −${Math.round((meta.loyalty_penalty_max ?? 0.06) * 100)}% e aumenta o risco de traições. Promoções e bónus sobem a lealdade.`} block>
         <div>
-          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             <span>Lealdade</span><span style={{ color: goodBarColor(loyalty) }}>{loyalty}%</span>
           </div>
           <MiniBar value={loyalty} color={goodBarColor(loyalty)} className="mt-0.5" />
@@ -167,7 +167,7 @@ const VitalsRow = ({ members, meta, testId }) => {
       </Tip>
       <Tip tip={`Fadiga média ${fatigue}% — acima de 30% penaliza em curva convexa (exp. ${meta.fatigue_curve_exp ?? 1.35}): moderada custa pouco, extrema é um perigo real. A 90%+ o membro fica indisponível.`} block>
         <div>
-          <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             <span>Fadiga</span><span style={{ color: fatigueColor(fatigue) }}>{fatigue}%</span>
           </div>
           <MiniBar value={fatigue} color={fatigueColor(fatigue)} className="mt-0.5" />
@@ -336,7 +336,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
             block
             tip="Despacho automático: envia cada equipa livre para a melhor oportunidade que o servidor recomendar — só missões cujos requisitos (membros, veículo, combustível, nível) a equipa cumpre mesmo."
           >
-            <button
+            <button type="button"
               data-testid="teams-auto-dispatch"
               onClick={() => !autoBusy && readyIds.length > 0 && autoDispatchAll()}
               disabled={autoBusy || readyIds.length === 0}
@@ -436,7 +436,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Tip tip={t.status === "idle" ? "Na base — pronta a receber ordens." : "Em operação — volta a estar disponível quando regressar ao QG."} align="end">
                         <Badge
                           variant="outline"
-                          className="ml-1.5 rounded-full border-transparent px-1.5 py-0 font-mono text-[8.5px] font-bold uppercase"
+                          className="ml-1.5 rounded-full border-transparent px-1.5 py-0 font-mono text-[9px] font-bold uppercase"
                           style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
                         >
                           {STATUS_LABELS[t.status]}
@@ -536,7 +536,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       </span>
                     </Tip>
                     {members.length === 0 && freeEmployees.length === 0 ? (
-                      <button
+                      <button type="button"
                         data-testid={`team-nav-rh-${t.id}`}
                         onClick={() => nav("employees")}
                         className="flex items-center gap-1 font-mono text-[10px] text-red-400 underline-offset-2 hover:underline"
@@ -549,7 +549,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                           <span key={m.id} className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
                             {m.name.split(" ")[0]} <span style={{ color: fatigueColor(m.fatigue) }}>{Math.round(m.fatigue)}%</span>
                             {m.status === "idle" && (
-                              <button
+                              <button type="button"
                                 data-testid={`team-member-remove-${m.id}`}
                                 title="Remover da equipa"
                                 onClick={() => assignEmployee(m.id, null)}
@@ -625,7 +625,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     </Tip>
                   )}
                   {!vehicle && freeVehicles.length === 0 && (
-                    <button
+                    <button type="button"
                       data-testid={`team-nav-fleet-${t.id}`}
                       onClick={() => nav("fleet")}
                       className="shrink-0 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"

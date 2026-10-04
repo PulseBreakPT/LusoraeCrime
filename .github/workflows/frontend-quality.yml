@@ -37,6 +37,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Upload frontend source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-source-snapshot
+          path: frontend/src
+          retention-days: 2
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -54,6 +61,45 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
         run: yarn install --prefer-offline --non-interactive
+
+      - name: Run Impeccable detector
+        id: impeccable
+        shell: bash
+        run: |
+          set +e
+          npx -y impeccable detect --json src/ > ../impeccable-findings.json
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat ../impeccable-findings.json
+          if [[ "$code" -ne 0 ]]; then
+            exit "$code"
+          fi
+
+      - name: Upload Impeccable findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: impeccable-findings
+          path: impeccable-findings.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Run SUBMUNDO static UI audit
+        run: |
+          set +e
+          node scripts/ui-quality-audit.mjs > ../ui-quality-audit.json
+          code=$?
+          cat ../ui-quality-audit.json
+          exit "$code"
+
+      - name: Upload SUBMUNDO UI audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: submundo-ui-audit
+          path: ui-quality-audit.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Run frontend regression tests
         env:
