@@ -1032,12 +1032,24 @@ async def buy_protection(body: MutationInput, user: dict = Depends(get_current_u
         raise HTTPException(status_code=400, detail="Rede de proteção desbloqueia no nível 5")
     await _debit(player, cost, stat="protection_payments")
     until = (now_utc() + timedelta(days=30)).isoformat()
+    governance = dict(player.get("governance") or {})
+    renewals = int(governance.get("renewals", 0) or 0) + 1
+    trust = min(100.0, float(governance.get("trust", 0) or 0) + (12 if renewals == 1 else 7))
+    exposure = min(100.0, float(governance.get("exposure", 0) or 0) + (6 if renewals == 1 else 9))
+    paid_at = now_utc().isoformat()
     await db.players.update_one({"_id": player["_id"]}, {"$set": {
         "governance.protection_until": until,
         "governance.last_cost": cost,
+        "governance.last_payment_at": paid_at,
+        "governance.renewals": renewals,
+        "governance.trust": trust,
+        "governance.exposure": exposure,
     }})
     await record_tx(db, pid, "protection", -cost, "clean", player["clean_money"], "Rede de proteção — 30 dias")
-    return {"ok": True, "cost": cost, "protection_until": until}
+    return {
+        "ok": True, "cost": cost, "protection_until": until,
+        "trust": trust, "exposure": exposure, "renewals": renewals,
+    }
 
 
 @router.get("/finance/summary")
