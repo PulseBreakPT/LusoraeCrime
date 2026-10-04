@@ -4838,7 +4838,7 @@ html.sub-focus-mode .sub-optional-hud {
     }
 
     .sub-resource-label {
-        font-size: 7px !important;
+        font-size: 9px !important;
         letter-spacing: 0.06em !important;
     }
 }
@@ -4981,7 +4981,7 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 .sub-resource-label {
-    font-size: 7px !important;
+    font-size: 9px !important;
     letter-spacing: 0.07em !important;
 }
 
