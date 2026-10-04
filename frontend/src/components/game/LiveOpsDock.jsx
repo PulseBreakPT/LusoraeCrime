@@ -57,7 +57,7 @@ export const fmtMMSS = (ms) => {
 const fmtHMS = (iso) =>
   new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-export function LiveOpsPanel({ state, serverNow }) {
+export function LiveOpsPanel({ state, serverNow, onDecision }) {
   const missions = useMemo(
     () => (state.missions || []).filter((m) => m.phase !== "done"),
     [state.missions]
@@ -65,6 +65,7 @@ export function LiveOpsPanel({ state, serverNow }) {
   const [selectedId, setSelectedId] = useState(null);
   const [now, setNow] = useState(() => serverNow());
   const [finished, setFinished] = useState(null); // snapshot da última operação concluída
+  const [decisionBusy, setDecisionBusy] = useState(false);
   const prevIdsRef = useRef(new Set());
   const snapshotsRef = useRef(new Map());
   const feedRef = useRef(null);
@@ -104,6 +105,10 @@ export function LiveOpsPanel({ state, serverNow }) {
   }, [finished]);
 
   const sel = missions.find((m) => m.id === selectedId) || missions[missions.length - 1] || null;
+
+  useEffect(() => {
+    setDecisionBusy(false);
+  }, [selectedId]);
 
   const log = sel?.live_log || [];
   const revealed = useMemo(() => log.filter((e) => Date.parse(e.at) <= now), [log, now]);
@@ -160,6 +165,20 @@ export function LiveOpsPanel({ state, serverNow }) {
   }
 
   const ph = phaseInfo(sel, now);
+  const decision = sel.decision || null;
+  const decisionOpensAt = decision?.opens_at ? Date.parse(decision.opens_at) : null;
+  const decisionExpiresAt = decision?.expires_at ? Date.parse(decision.expires_at) : null;
+  const decisionPending = decision?.status === "pending";
+  const decisionOpen = decisionPending
+    && ph.key === "operating"
+    && decisionOpensAt != null
+    && decisionExpiresAt != null
+    && now >= decisionOpensAt
+    && now <= decisionExpiresAt;
+  const decisionWaiting = decisionPending
+    && decisionOpensAt != null
+    && now < decisionOpensAt;
+  const decisionRemaining = decisionExpiresAt != null ? Math.max(0, decisionExpiresAt - now) : 0;
   const compDelta = revealed.reduce((s, e) => s + (e.pct || 0), 0);
   const liveChance = clamp((sel.success_chance ?? 0.5) + compDelta, 0.02, 0.98);
   const chanceCol = chanceColor(liveChance);
@@ -267,6 +286,101 @@ export function LiveOpsPanel({ state, serverNow }) {
           )}
         </div>
       </div>
+
+      {/* Decisão tática — substitui tempo morto por uma escolha transparente.
+          Ignorar é sempre neutro; não há penalização escondida. */}
+      {decision && (
+        <div
+          className="mx-3 mb-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2.5"
+          data-testid="liveops-decision"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300">
+                Decisão tática
+              </p>
+              <p className="mt-1 text-[11px] font-semibold leading-snug text-white">
+                {decision.title}
+              </p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-500">
+                {decision.description}
+              </p>
+            </div>
+            {decisionOpen && (
+              <span className="shrink-0 rounded-full border border-amber-500/25 bg-amber-500/[0.08] px-2 py-1 font-mono text-[10px] font-bold tabular-nums text-amber-300">
+                {fmtMMSS(decisionRemaining)}
+              </span>
+            )}
+          </div>
+
+          {decisionWaiting && (
+            <p className="mt-2 rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5 font-mono text-[10px] text-zinc-500">
+              Janela abre em {fmtMMSS(decisionOpensAt - now)}. Até lá, a equipa mantém o plano.
+            </p>
+          )}
+
+          {decisionOpen && (
+            <>
+              <div className="mt-2 grid grid-cols-1 gap-1.5">
+                {(decision.options || []).map((option) => {
+                  const chance = Math.round(Number(option.chance_delta || 0) * 100);
+                  const reward = Math.round((Number(option.reward_mult || 1) - 1) * 100);
+                  const heat = Math.round(Number(option.heat_delta || 0));
+                  const effects = [
+                    chance ? `${chance > 0 ? "+" : ""}${chance}% chance` : null,
+                    reward ? `${reward > 0 ? "+" : ""}${reward}% recompensa` : null,
+                    heat ? `${heat > 0 ? "+" : ""}${heat} calor` : null,
+                  ].filter(Boolean);
+                  const neutral = effects.length === 0;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      data-testid={`liveops-decision-${option.id}`}
+                      disabled={decisionBusy || !onDecision}
+                      onClick={async () => {
+                        if (!onDecision || decisionBusy) return;
+                        setDecisionBusy(true);
+                        try {
+                          await onDecision(sel.id, option.id);
+                        } finally {
+                          setDecisionBusy(false);
+                        }
+                      }}
+                      className="min-h-12 w-full rounded-md border border-white/[0.08] bg-black/20 px-2.5 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-white">{option.label}</span>
+                        <span className={`shrink-0 font-mono text-[10px] font-bold ${neutral ? "text-zinc-500" : chance >= 0 && heat <= 0 ? "text-emerald-400" : "text-amber-300"}`}>
+                          {neutral ? "NEUTRO" : effects.join(" · ")}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 font-mono text-[10px] text-zinc-600">
+                Não escolher nada mantém o plano original sem penalização.
+              </p>
+            </>
+          )}
+
+          {decision.status === "resolved" && (
+            <p className="mt-2 rounded-md border border-emerald-500/15 bg-emerald-500/[0.05] px-2 py-1.5 font-mono text-[10px] text-emerald-300">
+              Ordem executada: {decision.choice_label || decision.choice}
+            </p>
+          )}
+
+          {decision.status === "expired" && (
+            <p className="mt-2 font-mono text-[10px] text-zinc-500">
+              Janela encerrada · a equipa manteve o plano original.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Faixa de desfecho / perseguição */}
       {om && (
