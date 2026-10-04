@@ -8,6 +8,7 @@ import {
 import { cn } from "../../lib/utils";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -523,7 +524,7 @@ const CandidateCard = ({ c }) => {
   );
 };
 
-export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
+export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const { state, catalog, serverNow, refreshPool, restEmployee, restAllEligible, favoriteEmployeeIds, optimizeEmployees } = useGame();
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
@@ -531,6 +532,13 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   const [restAllBusy, setRestAllBusy] = useState(false);
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
   useTick(open);
+  usePanelFocus(open, focusTarget);
+  useEffect(() => {
+    if (!open || !focusTarget?.testId?.startsWith("employee-card-")) return;
+    setQuery("");
+    setTab("roster");
+    setHideUnavailable(false);
+  }, [open, focusTarget?.token, focusTarget?.testId, setHideUnavailable, setTab]);
   if (!state || !catalog) return null;
 
   const caps = state.caps.employees;
@@ -607,7 +615,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
           </Alert>
         )}
 
-        <Card className="mt-3 flex items-center justify-between sub-card px-3 py-2 shadow-none">
+        <Card data-testid="employee-payroll-card" className="mt-3 flex items-center justify-between sub-card px-3 py-2 shadow-none">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-zinc-500">Fecho semanal</p>
             <Tip tip={`Salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)} + TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)} + frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} + imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}.`}>

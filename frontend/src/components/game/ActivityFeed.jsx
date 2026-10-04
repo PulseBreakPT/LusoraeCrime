@@ -6,7 +6,7 @@ import {
   Send, Users, Car, Crosshair, Building2, Banknote, Siren, CheckCircle2,
   Cpu, Radar, Target, ChevronDown, Maximize2, Minimize2, Bell,
 } from "lucide-react";
-import { parseActivityMessage, classifyEvent } from "../../lib/game";
+import { parseActivityMessage, classifyEvent, resolveEventNavigation } from "../../lib/game";
 import { useFlash } from "./hud";
 import { LiveOpsPanel, phaseInfo } from "./LiveOpsDock";
 
@@ -111,14 +111,14 @@ const timeGroup = (ts, nowMs) => {
 const GROUP_LABELS = { now: "Agora", "10m": "Últimos 10 min", "1h": "Última hora", "24h": "Últimas 24 h", old: "Anterior" };
 
 // ---------- Dados do feed: enriquecer + contar + filtrar + colapsar repetidos ----------
-function useFeedData(events, filter, nowMs) {
+function useFeedData(events, filter, nowMs, state) {
   return useMemo(() => {
     // Ordena defensivamente do mais recente para o mais antigo — não assume a
     // ordem do backend (o agrupamento por tempo, o colapso de repetidos e o
     // "mais recente" dependem disto).
     const ordered = [...(events || [])].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
     const enriched = ordered.map((e) => {
-      const dest = classifyEvent(e.kind, e.message);
+      const dest = resolveEventNavigation(state, e);
       return { ...e, dest, cat: eventCategory(e, dest), sev: severityOf(dest.color) };
     });
     const counts = { all: enriched.length };
@@ -132,7 +132,7 @@ function useFeedData(events, filter, nowMs) {
       rows.push({ ...e, count: 1, group: timeGroup(e.ts, nowMs) });
     });
     return { rows, counts };
-  }, [events, filter, nowMs]);
+  }, [events, filter, nowMs, state]);
 }
 
 // ---------- Não lidos: último ts visto guardado por jogador ----------
@@ -309,7 +309,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   });
   const [expanded, setExpanded] = useState(false);
   const nowMs = serverNow();
-  const { rows, counts } = useFeedData(events, filter, nowMs);
+  const { rows, counts } = useFeedData(events, filter, nowMs, state);
   const { unread, markSeen } = useUnread(events, state?.player?.id);
   // Nova operação no terreno → a central muda sozinha para OPERAÇÕES e abre-se.
   const liveMissions = useLiveOps(state, () => { setTab("live"); setCollapsed(false); });
@@ -429,7 +429,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
   const events = state?.events || [];
   const firstId = events[0]?.id;
   const nowMs = serverNow();
-  const { rows, counts } = useFeedData(events, filter, nowMs);
+  const { rows, counts } = useFeedData(events, filter, nowMs, state);
   const { unread, markSeen } = useUnread(events, state?.player?.id);
   const liveMissions = useLiveOps(state, () => setTab("live"));
   const liveCount = liveMissions.length;
@@ -469,7 +469,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
   if (!state || suppressed || (events.length === 0 && liveCount === 0)) return null;
 
   const latest = events[0];
-  const latestDest = latest ? classifyEvent(latest.kind, latest.message) : null;
+  const latestDest = latest ? resolveEventNavigation(state, latest) : null;
   const LatestIcon = latest ? iconFor(latest, latestDest) : Radar;
   const visible = rows.slice(0, 14);
 

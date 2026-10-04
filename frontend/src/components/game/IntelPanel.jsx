@@ -2,7 +2,6 @@ import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -11,107 +10,124 @@ import { BrainCircuit, Lightbulb, ArrowRight } from "lucide-react";
 const OUTCOME_LABELS = { success: "Sucesso", partial: "Parcial", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
 const OUTCOME_COLORS = { success: "#34D399", partial: "#38BDF8", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
 
+const questTabFor = (quest) => {
+  if (quest?.type === "principal") return "historia";
+  if (quest?.type === "diaria") return "diarias";
+  if (quest?.type === "semanal") return "semanais";
+  return "alertas";
+};
+
 const RecommendedActions = ({ onNavigate }) => {
   const { state } = useGame();
   const p = state.player;
   const recs = [];
+  const go = (panel, testId, extra = {}) =>
+    onNavigate && onNavigate(panel, { ...extra, focusTestId: testId });
 
-  // SSS: uma recomendação por destino. Antes podiam aparecer 3–4 botões
-  // "Abrir Operacionais" ou "Abrir Frota" ao mesmo tempo e ainda executar
-  // lavagem/suborno diretamente fora do painel canónico do Império.
-  const empireIssues = [];
   const bribeCost = Math.max(1000, Math.round(p.heat * 150));
   if (p.heat >= 40) {
-    empireIssues.push(`calor ${Math.round(p.heat)}% · suborno ${fmtMoney(bribeCost)}`);
+    recs.push({
+      id: "empire-heat",
+      text: `Calor a ${Math.round(p.heat)}% — suborno estimado em ${fmtMoney(bribeCost)}.`,
+      action: "Ir ao suborno",
+      run: () => go("empire", "bribe-police-button"),
+      can: true,
+    });
   }
+
   const dirtyCap = state.caps?.dirty_money?.max || 0;
   const dirtyNearCap = dirtyCap > 0 && p.dirty_money >= dirtyCap * 0.9;
-  if (dirtyNearCap) {
-    empireIssues.push(`cofre de sujo a ${Math.round((p.dirty_money / dirtyCap) * 100)}%`);
-  } else if (p.dirty_money >= 15000) {
-    empireIssues.push(`${fmtMoney(p.dirty_money)} sujos por gerir`);
-  }
-  if (empireIssues.length) {
+  if (dirtyNearCap || p.dirty_money >= 15000) {
     recs.push({
-      id: "empire",
-      text: empireIssues.join(" · "),
-      action: "Abrir Império",
-      run: () => onNavigate && onNavigate("empire"),
+      id: "empire-dirty",
+      text: dirtyNearCap
+        ? `Cofre de dinheiro sujo a ${Math.round((p.dirty_money / dirtyCap) * 100)}% — lava antes de atingir o limite.`
+        : `${fmtMoney(p.dirty_money)} em dinheiro sujo por gerir.`,
+      action: "Ir à lavagem",
+      run: () => go("empire", "launder-amount-input"),
       can: true,
     });
   }
 
-  const fleetIssues = [];
-  const damaged = state.vehicles.filter((v) => v.condition < 50).length;
-  const lowFuel = state.vehicles.filter((v) => v.fuel_l < v.tank_l * 0.25).length;
-  if (damaged) fleetIssues.push(`${damaged} em mau estado`);
-  if (lowFuel) fleetIssues.push(`${lowFuel} com pouco combustível`);
-  if (fleetIssues.length) {
+  state.vehicles.forEach((vehicle) => {
+    const issues = [];
+    if (vehicle.condition < 50) issues.push(`condição ${Math.round(vehicle.condition)}%`);
+    if (vehicle.fuel_l < vehicle.tank_l * 0.25) {
+      issues.push(`combustível ${Math.round((vehicle.fuel_l / Math.max(1, vehicle.tank_l)) * 100)}%`);
+    }
+    if (!issues.length) return;
     recs.push({
-      id: "fleet",
-      text: `Frota: ${fleetIssues.join(" · ")}`,
-      action: "Abrir Frota",
-      run: () => onNavigate && onNavigate("fleet"),
+      id: `fleet-${vehicle.id}`,
+      text: `${vehicle.name}: ${issues.join(" · ")}.`,
+      action: "Ver veículo",
+      run: () => go("fleet", `vehicle-card-${vehicle.id}`),
       can: true,
     });
-  }
+  });
 
-  const employeeIssues = [];
-  const tired = state.employees.filter((e) => e.fatigue > 60).length;
-  const troubled = state.employees.filter((e) => e.status === "injured" || e.status === "arrested").length;
-  const disloyal = state.employees.filter((e) => (e.betrayal_risk || 0) >= 25).length;
-  if (tired) employeeIssues.push(`${tired} exausto(s)`);
-  if (troubled) employeeIssues.push(`${troubled} ferido(s)/preso(s)`);
-  if (disloyal) employeeIssues.push(`${disloyal} com risco de traição`);
+  state.employees.forEach((employee) => {
+    const issues = [];
+    if (employee.fatigue > 60) issues.push(`fadiga ${Math.round(employee.fatigue)}%`);
+    if (employee.status === "injured") issues.push("ferido");
+    if (employee.status === "arrested") issues.push("preso");
+    if ((employee.betrayal_risk || 0) >= 25) issues.push(`risco de traição ${Math.round(employee.betrayal_risk)}%`);
+    if (!issues.length) return;
+    recs.push({
+      id: `employee-${employee.id}`,
+      text: `${employee.name}: ${issues.join(" · ")}.`,
+      action: "Ver operacional",
+      run: () => go("employees", `employee-card-${employee.id}`),
+      can: true,
+    });
+  });
+
   if (state.salary_total > 0 && p.clean_money < state.salary_total) {
-    employeeIssues.push(`reserva salarial curta: ${fmtMoney(state.salary_total)}`);
-  }
-  if (employeeIssues.length) {
     recs.push({
-      id: "employees",
-      text: `Operacionais: ${employeeIssues.join(" · ")}`,
-      action: "Abrir Operacionais",
-      run: () => onNavigate && onNavigate("employees"),
+      id: "employees-payroll",
+      text: `Reserva salarial curta — precisas de ${fmtMoney(state.salary_total)} para os salários atuais.`,
+      action: "Ver fecho",
+      run: () => go("employees", "employee-payroll-card"),
       can: true,
     });
   }
 
-  const teamIssues = [];
-  const teamsNoVehicle = state.teams.filter((t) => !t.vehicle_id).length;
-  const teamsNoMembers = state.teams.filter((t) => state.employees.every((e) => e.team_id !== t.id)).length;
-  if (teamsNoVehicle) teamIssues.push(`${teamsNoVehicle} sem veículo`);
-  if (teamsNoMembers) teamIssues.push(`${teamsNoMembers} sem membros`);
-  if (teamIssues.length) {
+  state.teams.forEach((team) => {
+    const issues = [];
+    if (!team.vehicle_id) issues.push("sem veículo");
+    if (state.employees.every((employee) => employee.team_id !== team.id)) issues.push("sem membros");
+    if (!issues.length) return;
     recs.push({
-      id: "teams",
-      text: `Equipas: ${teamIssues.join(" · ")}`,
-      action: "Abrir Equipas",
-      run: () => onNavigate && onNavigate("teams"),
+      id: `team-${team.id}`,
+      text: `${team.name}: ${issues.join(" · ")}.`,
+      action: "Ver equipa",
+      run: () => go("teams", `team-card-${team.id}`),
       can: true,
     });
-  }
+  });
 
-  const claimable = (state.quests || []).filter((q) => q.status === "completed").length;
-  if (claimable) {
+  (state.quests || []).filter((quest) => quest.status === "completed").forEach((quest) => {
     recs.push({
-      id: "quests",
-      text: `${claimable} recompensa(s) de objetivo por reclamar`,
-      action: "Abrir Objetivos",
-      run: () => onNavigate && onNavigate("quests"),
+      id: `quest-${quest.id || quest.quest_key}`,
+      text: `${quest.name || "Objetivo concluído"} — recompensa pronta a reclamar.`,
+      action: "Ver objetivo",
+      run: () => go(
+        "quests",
+        `quest-card-${quest.id || quest.quest_key}`,
+        { tab: questTabFor(quest) }
+      ),
       can: true,
     });
-  }
+  });
 
-  const degraded = (state.properties || []).filter((pr) => (pr.condition ?? 100) < 50).length;
-  if (degraded) {
+  (state.properties || []).filter((property) => (property.condition ?? 100) < 50).forEach((property) => {
     recs.push({
-      id: "properties",
-      text: `${degraded} imóvel(is) degradado(s) — manutenção em atraso`,
-      action: "Abrir Imóveis",
-      run: () => onNavigate && onNavigate("properties"),
+      id: `property-${property.id}`,
+      text: `${property.name}: condição ${Math.round(property.condition ?? 100)}% — manutenção em atraso.`,
+      action: "Ver imóvel",
+      run: () => go("properties", `property-card-${property.id}`),
       can: true,
     });
-  }
+  });
 
   return (
     <div className="mt-4" data-testid="intel-recommendations">
@@ -125,18 +141,24 @@ const RecommendedActions = ({ onNavigate }) => {
       ) : (
         <div className="sub-action-list overflow-hidden rounded-xl border border-white/[0.065]">
           {recs.map((r) => (
-            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="sub-action-row flex items-center justify-between gap-2 rounded-none border-0 px-3 py-2.5 shadow-none">
-              <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
-              <Button
+            <button
+              key={r.id}
+              type="button"
+              data-testid={`intel-rec-${r.id}`}
+              onClick={r.run}
+              disabled={!r.can}
+              aria-label={`${r.action}: ${r.text}`}
+              title={`${r.action}: ${r.text}`}
+              className="sub-action-row flex w-full items-center justify-between gap-2 rounded-none border-0 px-3 py-2.5 text-left shadow-none transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500/45 disabled:opacity-45"
+            >
+              <span className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</span>
+              <span
                 data-testid={`intel-rec-action-${r.id}`}
-                variant="outline" size="sm"
-                onClick={r.run}
-                disabled={!r.can}
-                className="h-auto shrink-0 gap-1 border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-cyan-300 hover:bg-white/10"
+                className="flex shrink-0 items-center gap-1 font-mono text-[10px] font-bold text-cyan-300"
               >
                 {r.action} <ArrowRight size={10} />
-              </Button>
-            </Card>
+              </span>
+            </button>
           ))}
         </div>
       )}
@@ -252,27 +274,39 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
               const outcome = m.chase_outcome === "caught" ? "police" : m.outcome;
               const paidReward = Number(m.pending_reward || 0);
               return (
-                <Card key={m.id} className="flex items-center justify-between sub-card px-2.5 py-1.5 shadow-none">
-                  <div>
-                    <p className="text-xs font-semibold text-white">
-                      {m.opportunity.name} <span className="font-mono text-[10px] text-zinc-500">{m.opportunity.district}</span>
-                    </p>
-                    <p className="font-mono text-[10px] text-zinc-500">
-                      {m.team_name}
-                      {m.success_chance != null && <> · prob. {Math.round(m.success_chance * 100)}%</>}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-mono text-[10px] font-bold uppercase" style={{ color: OUTCOME_COLORS[outcome] || "#8E8E93" }}>
-                      {OUTCOME_LABELS[outcome] || outcome}
-                    </p>
-                    {(outcome === "success" || outcome === "partial") && paidReward > 0 && (
-                      <p className={`font-mono text-[10px] ${outcome === "success" ? "text-emerald-400" : "text-sky-400"}`}>
-                        +{fmtMoney(paidReward)}
+                <button
+                  key={m.id}
+                  type="button"
+                  data-testid={`intel-history-row-${m.id}`}
+                  onClick={() => onNavigate && onNavigate("teams", { focusTestId: `team-card-${m.team_id}` })}
+                  title={`Abrir ${m.team_name} e destacar a equipa deste relatório`}
+                  className="block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
+                >
+                  <Card className="flex items-center justify-between sub-card px-2.5 py-1.5 shadow-none transition-colors hover:border-white/20 hover:bg-white/[0.035]">
+                    <div>
+                      <p className="text-xs font-semibold text-white">
+                        {m.opportunity.name} <span className="font-mono text-[10px] text-zinc-500">{m.opportunity.district}</span>
                       </p>
-                    )}
-                  </div>
-                </Card>
+                      <p className="font-mono text-[10px] text-zinc-500">
+                        {m.team_name}
+                        {m.success_chance != null && <> · prob. {Math.round(m.success_chance * 100)}%</>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-right">
+                      <div>
+                        <p className="font-mono text-[10px] font-bold uppercase" style={{ color: OUTCOME_COLORS[outcome] || "#8E8E93" }}>
+                          {OUTCOME_LABELS[outcome] || outcome}
+                        </p>
+                        {(outcome === "success" || outcome === "partial") && paidReward > 0 && (
+                          <p className={`font-mono text-[10px] ${outcome === "success" ? "text-emerald-400" : "text-sky-400"}`}>
+                            +{fmtMoney(paidReward)}
+                          </p>
+                        )}
+                      </div>
+                      <ArrowRight size={12} className="shrink-0 text-zinc-600" />
+                    </div>
+                  </Card>
+                </button>
               );
             })}
           </div>

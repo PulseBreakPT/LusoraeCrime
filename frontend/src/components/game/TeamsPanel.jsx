@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import { useSettings } from "../../context/SettingsContext";
 import { cn } from "../../lib/utils";
 import {
@@ -176,7 +177,7 @@ const VitalsRow = ({ members, meta, testId }) => {
   );
 };
 
-export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
+export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
     state, catalog, serverNow, createTeam, assignEmployee, assignVehicle,
     dispatchTeam, recommendOpportunityForTeam, recommendRepeatForTeam,
@@ -187,6 +188,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
   const [repeatRecs, setRepeatRecs] = useState({});
   const [autoBusy, setAutoBusy] = useState(false);
   useTick(open);
+  usePanelFocus(open, focusTarget);
 
   // Despacho automático: envia cada equipa livre para a melhor oportunidade
   // que o servidor recomendar (a recomendação já valida todos os requisitos).

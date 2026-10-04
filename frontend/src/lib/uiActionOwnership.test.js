@@ -13,6 +13,7 @@ describe("UI action ownership", () => {
   const opportunity = read("components/game/OpportunityCard.jsx");
   const weapons = read("components/game/WeaponsPanel.jsx");
   const gamePage = read("pages/GamePage.jsx");
+  const focusHook = read("hooks/usePanelFocus.js");
 
   test("team management does not duplicate recovery or fleet maintenance mutations", () => {
     for (const forbidden of [
@@ -73,4 +74,24 @@ describe("UI action ownership", () => {
     const wantedBlock = gamePage.slice(start, end + "</div>".length);
     expect(wantedBlock).not.toContain("onClick=");
   });
+  test("recommendations and reports deep-link to exact entities", () => {
+    for (const target of [
+      "vehicle-card-${vehicle.id}",
+      "employee-card-${employee.id}",
+      "team-card-${team.id}",
+      "quest-card-${quest.id || quest.quest_key}",
+      "property-card-${property.id}",
+    ]) {
+      expect(intel).toContain(target);
+    }
+    expect(intel).toContain('focusTestId: `team-card-${m.team_id}`');
+    expect(gamePage).toContain("focusTarget?.panel");
+  });
+
+  test("contextual navigation scrolls and briefly highlights the exact target", () => {
+    expect(focusHook).toContain('scrollIntoView({ behavior: "smooth", block: "center"');
+    expect(focusHook).toContain('classList.add("sub-nav-focus-flash")');
+    expect(focusHook).toContain("2600");
+  });
+
 });

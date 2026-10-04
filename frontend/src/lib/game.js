@@ -1121,6 +1121,8 @@ export function classifyEvent(kind, message) {
     case "success":
       if (/despistou/i.test(msg)) return { panel: "teams", color: "#34D399" };
       return { panel: "quests", color: "#FBBF24" };
+    case "failure":
+      return { panel: "teams", color: "#F59E0B" };
     case "system": {
       if (/ciclo salarial pago/i.test(msg)) return { panel: "employees", color: "#F59E0B" };
       if (/sem pessoal e sem fundos/i.test(msg)) return { panel: "employees", color: "#34D399" };
@@ -1130,6 +1132,135 @@ export function classifyEvent(kind, message) {
     default:
       return { panel: "intel", color: "#FBBF24" };
   }
+}
+
+
+const focusPrefixByEntity = {
+  employee: "employee-card",
+  team: "team-card",
+  vehicle: "vehicle-card",
+  weapon: "weapon-card",
+  property: "property-card",
+  quest: "quest-card",
+};
+
+const questTabFor = (quest) => {
+  if (quest?.type === "principal") return "historia";
+  if (quest?.type === "diaria") return "diarias";
+  if (quest?.type === "semanal") return "semanais";
+  return "alertas";
+};
+
+const longestNamedMatch = (message, items, labels) => {
+  const haystack = String(message || "").toLocaleLowerCase("pt-PT");
+  return [...(items || [])]
+    .map((item) => ({
+      item,
+      names: labels(item)
+        .filter(Boolean)
+        .map((name) => String(name).trim())
+        .filter((name) => name.length >= 2),
+    }))
+    .map((entry) => ({
+      ...entry,
+      hit: entry.names
+        .filter((name) => haystack.includes(name.toLocaleLowerCase("pt-PT")))
+        .sort((a, b) => b.length - a.length)[0],
+    }))
+    .filter((entry) => entry.hit)
+    .sort((a, b) => b.hit.length - a.hit.length)[0]?.item || null;
+};
+
+// Enriches classifyEvent with the concrete object that originated the event.
+// Newer events may carry explicit target metadata; legacy events fall back to
+// exact entity-name matching so old notifications also become actionable.
+export function resolveEventNavigation(state, event) {
+  const base = classifyEvent(event?.kind, event?.message);
+  if (!state || !event) return base;
+
+  const direct = event.target || (
+    event.target_type && event.target_id
+      ? { type: event.target_type, id: event.target_id }
+      : null
+  );
+  if (direct?.test_id) return { ...base, focusTestId: direct.test_id };
+  if (direct?.type && direct?.id && focusPrefixByEntity[direct.type]) {
+    return {
+      ...base,
+      focusTestId: `${focusPrefixByEntity[direct.type]}-${direct.id}`,
+      ...(direct.type === "quest"
+        ? { tab: questTabFor((state.quests || []).find((q) => q.id === direct.id || q.quest_key === direct.id)) }
+        : {}),
+    };
+  }
+
+  const msg = event.message || "";
+  let item = null;
+
+  // Mission lifecycle notifications often use generic success/failure/police
+  // kinds. If the message names a current team, the team is the concrete source
+  // and wins over a broad destination such as Objectives or Reports.
+  if (["dispatch", "success", "failure", "police"].includes(event.kind)) {
+    const namedTeam = longestNamedMatch(msg, state.teams, (team) => [team.name]);
+    if (namedTeam && !/RUSGA/i.test(msg)) {
+      return { ...base, panel: "teams", focusTestId: `team-card-${namedTeam.id}` };
+    }
+  }
+
+  if (base.panel === "employees") {
+    item = longestNamedMatch(msg, state.employees, (e) => [e.name]);
+    if (item) return { ...base, focusTestId: `employee-card-${item.id}` };
+    if (/salári|fecho semanal|reserva salarial/i.test(msg)) {
+      return { ...base, focusTestId: "employee-payroll-card" };
+    }
+  }
+
+  if (base.panel === "teams") {
+    item = longestNamedMatch(msg, state.teams, (t) => [t.name]);
+    if (item) return { ...base, focusTestId: `team-card-${item.id}` };
+  }
+
+  if (base.panel === "fleet") {
+    item = longestNamedMatch(msg, state.vehicles, (v) => [v.name]);
+    if (item) return { ...base, focusTestId: `vehicle-card-${item.id}` };
+  }
+
+  if (base.panel === "weapons") {
+    item = longestNamedMatch(msg, state.weapons, (w) => [w.name]);
+    if (item) return { ...base, focusTestId: `weapon-card-${item.id}` };
+  }
+
+  if (base.panel === "properties") {
+    item = longestNamedMatch(msg, state.properties, (p) => [p.name]);
+    if (item) return { ...base, focusTestId: `property-card-${item.id}` };
+  }
+
+  if (base.panel === "quests") {
+    item = longestNamedMatch(msg, state.quests, (q) => [
+      q.title,
+      q.name,
+      q.quest_key,
+    ]);
+    if (!item && /^DECISÃO:|^EVENTO:/i.test(msg)) {
+      item = [...(state.quests || [])]
+        .filter((q) => ["dinamica", "evento", "decisao"].includes(q.type))
+        .sort((a, b) => Date.parse(b.activated_at || 0) - Date.parse(a.activated_at || 0))[0];
+    }
+    if (item) {
+      return {
+        ...base,
+        tab: questTabFor(item),
+        focusTestId: `quest-card-${item.id || item.quest_key}`,
+      };
+    }
+  }
+
+  if (base.panel === "empire") {
+    if (/suborno|calor|polícia/i.test(msg)) return { ...base, focusTestId: "bribe-police-button" };
+    if (/dinheiro sujo|lavagem|lavado|lavar/i.test(msg)) return { ...base, focusTestId: "launder-amount-input" };
+  }
+
+  return base;
 }
 
 export function formatApiErrorDetail(detail) {

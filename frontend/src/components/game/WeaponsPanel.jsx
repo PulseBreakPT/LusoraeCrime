@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import { cn } from "../../lib/utils";
 import {
   fmtMoney, SPEC_LABELS, ATTR_FULL, conditionBand, weaponCompatibility, matchesSearch, LARGE_PURCHASE_THRESHOLD,
@@ -115,13 +116,17 @@ const JamChip = ({ model, condition, meta, testId }) => {
   );
 };
 
-export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
+export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
     state, catalog, buyWeapon, sellWeapon, repairWeapon, assignWeapon, unassignWeapon, autoAssignWeapon,
     optimizeWeapons, repairWeaponsAll,
   } = useGame();
   const [query, setQuery] = useState("");
   useTick(open);
+  usePanelFocus(open, focusTarget);
+  useEffect(() => {
+    if (open && focusTarget?.testId?.startsWith("weapon-card-")) setQuery("");
+  }, [open, focusTarget?.token, focusTarget?.testId]);
   if (!state) return null;
 
   const meta = catalog?.weapon_meta || {};
