@@ -118,7 +118,7 @@ from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
     VEHICLE_LIFECYCLE, INJURY_SEVERITIES, ensure_employee_profile,
-    prestige_effects, department_level, property_operations_factor,
+    prestige_effects, department_level, property_operations_factor, rival_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -3339,9 +3339,18 @@ async def advance(db, player):
             tier = max(1, int(data.get("tier", 1) or 1))
             pressure = float(data.get("pressure", 0) or 0)
             defense = float(data.get("defense", 100) or 0)
+            rival = dict(data.get("rival") or rival_profile(district))
+            data["rival"] = {
+                "key": rival.get("key"), "name": rival.get("name"), "style": rival.get("style"),
+                "strength": max(20, min(100, int(rival.get("strength", 50) or 50))),
+            }
+            rival_strength = float(data["rival"]["strength"])
+            rival_pressure_mult = float(rival.get("pressure_mult", 1.0) or 1.0)
+            rival_defense_mult = float(rival.get("defense_mult", 1.0) or 1.0)
             pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
+            pressure_gain *= (0.72 + rival_strength / 180.0) * rival_pressure_mult
             pressure_gain *= 1.0 + max(0.0, 55.0 - defense) / 140.0
-            defense_loss = minutes * 0.018 * (1.0 + pressure / 140.0)
+            defense_loss = minutes * 0.018 * (1.0 + pressure / 140.0) * rival_defense_mult
             pressure = min(100.0, pressure + pressure_gain)
             defense = max(0.0, defense - defense_loss)
             if pressure >= 96 and defense <= 8:
