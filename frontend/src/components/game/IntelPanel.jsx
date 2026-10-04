@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
-import { BrainCircuit, Lightbulb, ArrowRight } from "lucide-react";
+import { BrainCircuit, Lightbulb, ArrowRight, Crosshair, Trophy } from "lucide-react";
 
 const OUTCOME_LABELS = { success: "Sucesso", partial: "Parcial", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
 const OUTCOME_COLORS = { success: "#34D399", partial: "#38BDF8", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
@@ -15,6 +15,82 @@ const questTabFor = (quest) => {
   if (quest?.type === "diaria") return "diarias";
   if (quest?.type === "semanal") return "semanais";
   return "alertas";
+};
+
+const RetentionRoadmap = ({ onNavigate }) => {
+  const { state } = useGame();
+  const moves = state?.retention?.next_moves || [];
+  if (!moves.length) return null;
+
+  const horizonLabel = {
+    agora: "AGORA",
+    sessao: "ESTA SESSÃO",
+    plano: "PRÓXIMO PASSO",
+  };
+
+  return (
+    <div className="mt-4" data-testid="retention-roadmap">
+      <SectionHeader icon={Crosshair} title="Próximos movimentos" meta="3 horizontes" />
+      <div className="space-y-1.5">
+        {moves.map((move) => {
+          const pct = Math.max(0, Math.min(100, Number(move.progress?.pct || 0)));
+          return (
+            <button
+              key={move.id}
+              type="button"
+              data-testid={`retention-move-${move.id}`}
+              onClick={() => onNavigate && onNavigate(move.panel, move.focus_test_id ? { focusTestId: move.focus_test_id } : undefined)}
+              className="block min-h-16 w-full rounded-lg border border-white/[0.07] bg-black/20 p-2.5 text-left transition-colors hover:border-white/15 hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                  {horizonLabel[move.horizon] || move.horizon}
+                </span>
+                <span className="font-mono text-[10px] tabular-nums text-zinc-600">
+                  {Math.round(pct)}%
+                </span>
+              </span>
+              <span className="mt-1 block text-[11px] font-bold text-white">{move.title}</span>
+              <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">{move.description}</span>
+              <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/[0.06]" aria-hidden="true">
+                <span
+                  className="block h-full rounded-full bg-red-500/75 transition-[width]"
+                  style={{ width: `${pct}%` }}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const OrganizationRecords = () => {
+  const { state } = useGame();
+  const records = state?.retention?.records || [];
+  if (!records.length) return null;
+
+  const valueOf = (record) => {
+    if (record.key === "best_mission") return fmtMoney(record.value);
+    if (record.key === "road_car") return `${Number(record.value || 0).toLocaleString("pt-PT")} km`;
+    return Number(record.value || 0).toLocaleString("pt-PT");
+  };
+
+  return (
+    <div className="mt-5" data-testid="organization-records">
+      <SectionHeader icon={Trophy} title="Marcas da organização" meta={records.length} />
+      <div className="grid grid-cols-2 gap-1.5">
+        {records.map((record) => (
+          <Card key={record.key} className="sub-card min-w-0 p-2.5 shadow-none">
+            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-zinc-600">{record.label}</p>
+            <p className="mt-1 truncate font-mono text-sm font-bold text-white">{valueOf(record)}</p>
+            <p className="mt-0.5 truncate text-[10px] text-zinc-500">{record.detail}</p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const RecommendedActions = ({ onNavigate }) => {
@@ -221,6 +297,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
           <SheetDescription className="text-zinc-500">Alertas acionáveis, resumo essencial e histórico da organização.</SheetDescription>
         </SheetHeader>
 
+        <RetentionRoadmap onNavigate={onNavigate} />
         <RecommendedActions onNavigate={onNavigate} />
 
         <Section title="Resumo de operações" testId="intel-operations">
@@ -338,6 +415,8 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             })}
           </div>
         </Section>
+        <OrganizationRecords />
+
       </SheetContent>
     </Sheet>
   );
