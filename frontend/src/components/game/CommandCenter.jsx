@@ -302,7 +302,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
           />
         </div>
 
-        <ScrollArea className="h-[min(55vh,430px)]">
+        <ScrollArea className="min-h-0 flex-1">
           <div className="p-2" role="listbox" aria-label="Resultados de pesquisa">
             {!query && recentIds.length > 0 && (
               <p className="px-2 pb-1 pt-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">
