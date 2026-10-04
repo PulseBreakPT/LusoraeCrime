@@ -155,7 +155,7 @@ def next_threshold(level):
     return LEVEL_THRESHOLDS[level] if level < len(LEVEL_THRESHOLDS) else None
 
 
-MISSION_STATS_VERSION = 5
+MISSION_STATS_VERSION = 6
 
 
 def default_stats():
@@ -217,6 +217,8 @@ async def reconcile_mission_stats(db, player):
     by_category = {}
     success_by_category = {}
     target_fines = 0
+    historical_best = None
+    historical_clutch = None
 
     for mission in missions:
         raw_outcome = mission.get("outcome")
@@ -240,6 +242,24 @@ async def reconcile_mission_stats(db, player):
                 mission_earned_clean += reward
             elif pays == "dirty":
                 mission_earned_dirty += reward
+            if historical_best is None or reward > historical_best["value"]:
+                historical_best = {
+                    "value": reward,
+                    "team_name": mission.get("team_name", "Equipa"),
+                    "operation": (mission.get("opportunity") or {}).get("name", "Operação"),
+                    "district": (mission.get("opportunity") or {}).get("district"),
+                    "chance": round(float(mission.get("final_chance", mission.get("success_chance", 0)) or 0), 3),
+                    "at": mission.get("return_at") or mission.get("finish_at"),
+                }
+            chance = float(mission.get("final_chance", mission.get("success_chance", 1)) or 1)
+            if outcome == "success" and (historical_clutch is None or chance < historical_clutch["chance"]):
+                historical_clutch = {
+                    "chance": round(chance, 3),
+                    "team_name": mission.get("team_name", "Equipa"),
+                    "operation": (mission.get("opportunity") or {}).get("name", "Operação"),
+                    "reward": reward,
+                    "at": mission.get("return_at") or mission.get("finish_at"),
+                }
 
         if outcome == "success":
             success += 1
@@ -314,9 +334,20 @@ async def reconcile_mission_stats(db, player):
     mission_docs = await db.missions.count_documents({"player_id": pid})
     _max_stat(stats, "ops_dispatched", mission_docs)
 
+    records = player.setdefault("records", {})
+    current_best = records.get("best_mission") or {}
+    if historical_best and int(historical_best["value"]) > int(current_best.get("value", 0) or 0):
+        records["best_mission"] = historical_best
+    current_clutch = records.get("lowest_chance_success") or {}
+    if historical_clutch and float(historical_clutch["chance"]) < float(current_clutch.get("chance", 1.01) or 1.01):
+        records["lowest_chance_success"] = historical_clutch
+
     stats["_mission_outcome_version"] = MISSION_STATS_VERSION
     player["stats"] = stats
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {"stats": stats}})
+    await db.players.update_one(
+        {"_id": player["_id"]},
+        {"$set": {"stats": stats, "records": records}},
+    )
     return stats
 
 
