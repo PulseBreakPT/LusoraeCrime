@@ -28,7 +28,7 @@ from organization_systems import (
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
     PRESTIGE_CATALOG, protection_cost, fixed_cost_multiplier, territory_weekly_cost,
-    logistics_cost_multiplier, supply_cost_multiplier, rival_profile,
+    logistics_cost_multiplier, supply_cost_multiplier, rival_profile, property_staff_profile,
 )
 
 router = APIRouter(prefix="/api/game/org", tags=["organization"])
@@ -49,32 +49,7 @@ def _oid(value: str, label: str):
 
 
 def _property_staff_profile(employees: list[dict]) -> tuple[dict[str, str], float]:
-    """Assign people to the role where their real attributes add most value."""
-    role_attrs = {
-        "security": ("forca", "tiro", "sangue_frio"),
-        "operations": ("inteligencia", "discricao", "sangue_frio"),
-        "logistics": ("conducao", "inteligencia", "discricao"),
-        "management": ("negociacao", "inteligencia", "sangue_frio"),
-    }
-    remaining = set(role_attrs)
-    roles: dict[str, str] = {}
-    scores = []
-    for emp in sorted(employees, key=lambda e: float(e.get("level", 1) or 1), reverse=True):
-        attrs = emp.get("attrs") or {}
-        choices = remaining or set(role_attrs)
-        best_role = max(
-            choices,
-            key=lambda role: sum(float(attrs.get(key, 0) or 0) for key in role_attrs[role]),
-        )
-        raw = sum(float(attrs.get(key, 0) or 0) for key in role_attrs[best_role]) / (10 * len(role_attrs[best_role]))
-        morale = max(0.4, min(1.0, float(emp.get("morale", 70) or 70) / 100))
-        fatigue = max(0.45, 1.0 - float(emp.get("fatigue", 0) or 0) / 140)
-        score = max(0.0, min(1.0, raw * morale * fatigue))
-        roles[str(emp["_id"])] = best_role
-        scores.append(score)
-        remaining.discard(best_role)
-    effectiveness = sum(scores) / len(scores) if scores else 0.0
-    return roles, round(effectiveness, 3)
+    return property_staff_profile(employees)
 
 
 async def _debit(player: dict, amount: int, *, stat: str | None = None) -> dict:
