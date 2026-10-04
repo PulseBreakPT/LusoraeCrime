@@ -30,6 +30,13 @@ DEFAULT_ORG_POLICY = {
     "reserve_cash": 25000,
     "max_single_spend_pct": 0.35,
     "stock_targets": {},
+    "weekly_budgets": {
+        "supplies": 0,
+        "fleet": 0,
+        "infrastructure": 0,
+        "territory": 0,
+        "people": 0,
+    },
     "automation": {
         "enabled": False,
         "auto_restock": False,
@@ -61,10 +68,15 @@ def organization_policy(player: dict) -> dict:
         for key, value in (raw.get("stock_targets") or {}).items()
         if key in SUPPLY_CATALOG
     }
+    budgets = {
+        key: max(0, min(100_000_000, int((raw.get("weekly_budgets") or {}).get(key, 0) or 0)))
+        for key in DEFAULT_ORG_POLICY["weekly_budgets"]
+    }
     return {
         "reserve_cash": max(0, int(raw.get("reserve_cash", DEFAULT_ORG_POLICY["reserve_cash"]) or 0)),
         "max_single_spend_pct": max(0.05, min(1.0, float(raw.get("max_single_spend_pct", DEFAULT_ORG_POLICY["max_single_spend_pct"]) or 0.35))),
         "stock_targets": targets,
+        "weekly_budgets": budgets,
         "automation": {key: bool(auto.get(key, False)) for key in DEFAULT_ORG_POLICY["automation"]},
     }
 
@@ -77,6 +89,46 @@ def _transaction_window(transactions: list[dict], now: datetime, days: int = 28)
         if dt and dt.timestamp() >= cutoff:
             out.append(tx)
     return out
+
+
+BUDGET_KIND_MAP = {
+    "supply_buy": "supplies",
+    "automation_restock": "supplies",
+    "vehicle_service": "fleet",
+    "vehicle_tires": "fleet",
+    "vehicle_insurance": "fleet",
+    "vehicle_inspection": "fleet",
+    "automation_insurance": "fleet",
+    "automation_service": "fleet",
+    "property_module": "infrastructure",
+    "department_upgrade": "infrastructure",
+    "prestige": "infrastructure",
+    "territory_claim": "territory",
+    "territory_consolidate": "territory",
+    "territory_defend": "territory",
+    "protection": "people",
+    "organization_event": "people",
+    "recruit": "people",
+    "training": "people",
+    "bonus": "people",
+}
+
+
+def weekly_budget_spend(transactions: list[dict], now: datetime | None = None) -> dict[str, int]:
+    now = now or datetime.now(timezone.utc)
+    cutoff = now.timestamp() - 7 * 86400
+    totals = {key: 0 for key in DEFAULT_ORG_POLICY["weekly_budgets"]}
+    for tx in transactions:
+        dt = parse_dt(tx.get("ts"))
+        if not dt or dt.timestamp() < cutoff:
+            continue
+        category = BUDGET_KIND_MAP.get(tx.get("kind"))
+        if not category:
+            continue
+        amount = float(tx.get("amount", 0) or 0)
+        if amount < 0:
+            totals[category] += round(abs(amount))
+    return totals
 
 
 def _stock_targets(player: dict, teams: list[dict]) -> tuple[dict[str, int], dict[str, int]]:
@@ -189,6 +241,16 @@ def build_organization_intelligence(
     policy = organization_policy(player)
     targets, reserved = _stock_targets(player, teams)
     recent = _transaction_window(transactions, now, 28)
+    weekly_spend = weekly_budget_spend(transactions, now)
+    budgets = []
+    for key, limit in policy["weekly_budgets"].items():
+        spent = int(weekly_spend.get(key, 0) or 0)
+        pct = None if limit <= 0 else round(spent / max(1, limit) * 100, 1)
+        budgets.append({
+            "key": key, "limit": int(limit), "spent": spent,
+            "remaining": None if limit <= 0 else max(0, int(limit) - spent),
+            "pct": pct, "status": "unlimited" if limit <= 0 else ("over" if spent > limit else "warning" if spent >= limit * 0.80 else "ok"),
+        })
     income_28 = sum(max(0.0, float(tx.get("amount", 0) or 0)) for tx in recent)
     expenses_28 = sum(abs(min(0.0, float(tx.get("amount", 0) or 0))) for tx in recent)
     historic_weekly_spend = expenses_28 / 4 if expenses_28 else 0
@@ -340,6 +402,12 @@ def build_organization_intelligence(
             "title": title, "detail": detail, "tab": tab, "entity_id": entity_id,
         })
 
+    for budget in budgets:
+        if budget["status"] == "over":
+            add_alert("critical", f"budget:{budget['key']}", f"Orçamento {budget['key']} ultrapassado", f"Gasto {budget['spent']:,} € / limite {budget['limit']:,} €.", "centro")
+        elif budget["status"] == "warning":
+            add_alert("warning", f"budget:{budget['key']}", f"Orçamento {budget['key']} perto do limite", f"Gasto {budget['spent']:,} € / limite {budget['limit']:,} €.", "centro")
+
     if runway < 1.25:
         add_alert("critical", "cash_runway", "Caixa em risco", f"Runway de apenas {runway:.1f} semanas ao ritmo atual.", "centro")
     elif runway < 3:
@@ -435,6 +503,7 @@ def build_organization_intelligence(
             "cash": cash, "weekly_burn": round(weekly_burn), "runway_weeks": round(runway, 1),
             "income_28d": round(income_28), "expenses_28d": round(expenses_28),
             "reserve_cash": policy["reserve_cash"], "available_above_reserve": max(0, cash - policy["reserve_cash"]),
+            "budgets": budgets,
         },
         "organization": {"score": org_power, "level": org_level, "progression": progression, "dimensions": dimensions},
         "quotes": {
