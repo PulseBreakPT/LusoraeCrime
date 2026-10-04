@@ -29,7 +29,8 @@ const TABS = [
 
 const LOADOUT_KEYS = [
   "medical_kit", "body_armor", "disguise_kit", "entry_tools",
-  "electronics_kit", "surveillance_kit", "burner_phones", "evidence_cleanup",
+  "electronics_kit", "surveillance_kit", "burner_phones", "signal_kit",
+  "fake_docs", "evidence_cleanup",
 ];
 
 const pct = (v) => Math.max(0, Math.min(100, Number(v || 0)));
@@ -208,10 +209,18 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
     if (result?.ok) setPolicyDirty(false);
   };
   const runAutomation = async () => {
+    if (policyDirty && policyDraft) {
+      const saved = await setOrganizationPolicy(policyDraft);
+      if (!saved?.ok) return;
+      setPolicyDirty(false);
+    }
     const result = await runOrganizationAutomation();
     if (result?.ok) {
       const fresh = await fetchOrganizationIntelligence();
-      if (fresh.ok) setIntelligence(fresh.data);
+      if (fresh.ok) {
+        setIntelligence(fresh.data);
+        setPolicyDraft(fresh.data.policy);
+      }
     }
   };
 
