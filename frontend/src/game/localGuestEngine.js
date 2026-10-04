@@ -125,8 +125,8 @@ const makeVehicle = (modelKey, teamId = null) => {
     id: uid("veh"), name: model.name, model_key: modelKey, team_id: teamId, property_id: null,
     price: model.price, speed: model.speed, condition: 100, fuel_type: model.fuel_type,
     tank_l: model.tank_l, fuel_l: model.tank_l, cons: model.cons, km: 0,
-    status: "idle", transfer: null, refueling_until: null, impounded_until: null,
-    paint_key: null, insured: false, cold_plates: false, notoriety: 0,
+    status: "idle", transfer: null, refueling_until: null,
+    paint_key: null,
   };
 };
 
@@ -651,7 +651,6 @@ const finalizeMission = (save, mission) => {
     vehicle.condition=clamp(vehicle.condition-(success?2.5:6),0,100);
     vehicle.fuel_l=clamp(vehicle.fuel_l-mission.fuel_needed,0,vehicle.tank_l);
     vehicle.km=(vehicle.km||0)+mission.distance_km*2;
-    vehicle.notoriety=clamp((vehicle.notoriety||0)+(success?2:6),0,100);
   }
   mission.phase="done"; mission.outcome=success?"success":"failure"; mission.return_at=nowIso();
   save.opportunities = save.opportunities.filter((o) => o.id !== mission.opportunity_id);
