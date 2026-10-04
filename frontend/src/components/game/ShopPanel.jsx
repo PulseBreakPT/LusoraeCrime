@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, PurchaseButton, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, Kpi, SummaryStrip, PurchaseButton, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Card } from "../ui/card";
@@ -99,7 +99,6 @@ export const ShopPanel = ({ open, onOpenChange }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="shop-panel">
         <SheetHeader>
           <PanelWatermark icon={ShoppingBag} />
-          <PanelKicker>Base · Operações</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <ShoppingBag size={18} className="text-primary" /> Loja
           </SheetTitle>
