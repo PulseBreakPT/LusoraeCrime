@@ -138,8 +138,10 @@ def boss_status(player, now=None):
     sentence_raw = player.get("boss_sentence_until")
     hospital_dt = _parse(hospital_raw)
     sentence_dt = _parse(sentence_raw)
+    raw_health = player.get("boss_health", 100)
+    health = 100 if raw_health is None else int(raw_health)
     return {
-        "health": max(0, min(100, int(player.get("boss_health", 100) or 100))),
+        "health": max(0, min(100, health)),
         "stress": max(0, min(100, int(player.get("boss_stress", 0) or 0))),
         "hospital_until": hospital_raw if hospital_dt and hospital_dt > now else None,
         "sentence_until": sentence_raw if sentence_dt and sentence_dt > now else None,
