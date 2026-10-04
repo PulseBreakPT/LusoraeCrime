@@ -366,7 +366,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
           <div className="mt-3 space-y-3" data-testid="hq-tab-prioridades-content">
             <div>
               <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                <SlidersHorizontal size={12} /> Prioridade global da organização
+                <SlidersHorizontal size={12} /> Prioridade da organização
               </h3>
               <div className="grid grid-cols-2 gap-1.5" data-testid="hq-priority-options">
                 {Object.entries(catalog.hq_priorities || {}).map(([key, label]) => (
