@@ -414,7 +414,12 @@ async def assign_property_staff(body: PropertyStaffInput, user: dict = Depends(g
         employees = await db.employees.find({"_id": {"$in": oid_list}, "player_id": pid}).to_list(10)
         if len(employees) != len(ids):
             raise HTTPException(status_code=400, detail="Um ou mais operacionais são inválidos")
-        blocked = [e["name"] for e in employees if e.get("status") != "idle" or e.get("team_id")]
+        blocked = [
+            e["name"] for e in employees
+            if e.get("status") != "idle"
+            or e.get("team_id")
+            or (e.get("stationed_property_id") and e.get("stationed_property_id") != body.property_id)
+        ]
         if blocked:
             raise HTTPException(status_code=400, detail="Só podes destacar operacionais livres: " + ", ".join(blocked))
     old_ids = list(prop.get("staff_employee_ids") or [])
