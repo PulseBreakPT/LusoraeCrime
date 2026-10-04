@@ -41,3 +41,6 @@ jobs:
 
       - name: Test organization systems
         run: PYTHONPATH=backend python backend/tests/test_organization_systems.py
+
+      - name: Test core audit regressions
+        run: PYTHONPATH=backend python backend/tests/test_core_audit_regressions.py

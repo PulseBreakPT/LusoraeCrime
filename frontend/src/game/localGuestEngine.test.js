@@ -311,4 +311,31 @@ describe("offline guest engine", () => {
     expect(after.player.clean_money).toBe(before - 71500);
   });
 
+  test("applies operation profiles and consecutive-repeat anti-farm in guest mode", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223,
+      lng: -9.1393,
+    });
+
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    const team = state.teams[0];
+    const opportunity = state.opportunities[0];
+    expect(opportunity.profile).toBeTruthy();
+
+    const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
+    raw.teams[0].last_type_key = opportunity.type_key;
+    raw.teams[0].repeat_type_count = 1;
+    localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
+
+    const preview = await localGuestRequest("post", "/game/dispatch/preview", {
+      team_id: team.id,
+      opportunity_id: opportunity.id,
+    });
+    expect(preview.data.repeat_count).toBe(2);
+    expect(preview.data.repeat_penalty_pct).toBeLessThan(0);
+    expect(preview.data.operation_profile).toBeTruthy();
+    expect(preview.data.operation_profile_label).toBeTruthy();
+  });
+
 });
