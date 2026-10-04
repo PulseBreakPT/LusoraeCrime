@@ -290,6 +290,8 @@ def _blackjack(rng):
 async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     bet = int(body.bet)
+    if body.game not in {"roulette", "blackjack"}:
+        raise HTTPException(status_code=400, detail="Jogo de casino inválido")
     if int(player.get("clean_money", 0)) < bet:
         raise HTTPException(status_code=400, detail="Saldo insuficiente")
     rng = random.SystemRandom()
@@ -314,9 +316,6 @@ async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_us
         elif outcome == "win":
             payout = int(bet * (2.5 if natural else 2))
         detail = {"outcome": outcome, "player": hand, "dealer": dealer, "player_value": pv, "dealer_value": dv, "natural": natural}
-    else:
-        raise HTTPException(status_code=400, detail="Jogo de casino inválido")
-
     if payout:
         await _change_clean(player, payout, f"Prémio: {body.game}", "city_casino_payout")
     net = payout - bet
