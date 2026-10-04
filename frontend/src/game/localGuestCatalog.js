@@ -256,6 +256,13 @@ export const LOCAL_CATALOG = {
       auto_use_medical:{name:"Usar kit médico",default:true},
       auto_use_armor:{name:"Usar proteção",default:true},
     },
+    team_presets:{
+      balanced:{name:"Equilíbrio",doctrine:"balanced",policies:{abort_below_pct:25,protect_injured:true,auto_use_medical:true,auto_use_armor:true},loadout:["medical_kit","burner_phones","surveillance_kit"],desc:"Configuração versátil."},
+      assault:{name:"Impacto",doctrine:"aggressive",policies:{abort_below_pct:18,protect_injured:true,auto_use_medical:true,auto_use_armor:true},loadout:["body_armor","medical_kit","entry_tools","burner_phones"],desc:"Confronto e proteção."},
+      stealth:{name:"Furtivo",doctrine:"stealth",policies:{abort_below_pct:35,protect_injured:true,auto_use_medical:true,auto_use_armor:false},loadout:["disguise_kit","surveillance_kit","burner_phones","fake_docs","evidence_cleanup"],desc:"Discrição e cobertura."},
+      technical:{name:"Técnico",doctrine:"cautious",policies:{abort_below_pct:32,protect_injured:true,auto_use_medical:true,auto_use_armor:false},loadout:["electronics_kit","signal_kit","surveillance_kit","burner_phones"],desc:"Preparação eletrónica."},
+      logistics:{name:"Logístico",doctrine:"balanced",policies:{abort_below_pct:28,protect_injured:true,auto_use_medical:true,auto_use_armor:false},loadout:["fake_docs","signal_kit","burner_phones","medical_kit"],desc:"Mobilidade e continuidade."},
+    },
     departments:{
       financeiro:{name:"Gabinete Financeiro",unlock_hq:3,base_cost:18000,max_level:5,desc:"Reduz custos fixos não salariais."},
       rh:{name:"Recursos Humanos",unlock_hq:4,base_cost:22000,max_level:5,desc:"Melhora recrutamento, treino e estabilidade."},
