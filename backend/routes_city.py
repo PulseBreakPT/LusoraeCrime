@@ -6,11 +6,12 @@ from datetime import timedelta
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from pymongo import ReturnDocument
 
 from auth import get_current_user
 from db import db
 from engine import add_event, now_utc, record_tx
-from routes_game import get_player, MutationInput
+from routes_game import get_player, MutationInput, idempotent
 from city_data import (
     BUSINESS_TYPES, RIVAL_ACTIONS, CASINO_MIN_BET, CASINO_MAX_BET,
 )
@@ -75,20 +76,36 @@ def _oid(value, label="ID"):
 
 
 async def _change_clean(player, amount, note, kind):
-    balance = int(player.get("clean_money", 0)) + int(amount)
-    if balance < 0:
+    amount = int(amount)
+    query = {"_id": player["_id"]}
+    if amount < 0:
+        query["clean_money"] = {"$gte": -amount}
+    fresh = await db.players.find_one_and_update(
+        query,
+        {"$inc": {"clean_money": amount}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {"clean_money": balance}})
+    balance = int(fresh.get("clean_money", 0))
     await record_tx(db, str(player["_id"]), kind, amount, "clean", balance, note)
     player["clean_money"] = balance
     return balance
 
 
 async def _change_dirty(player, amount, note, kind):
-    balance = int(player.get("dirty_money", 0)) + int(amount)
-    if balance < 0:
+    amount = int(amount)
+    query = {"_id": player["_id"]}
+    if amount < 0:
+        query["dirty_money"] = {"$gte": -amount}
+    fresh = await db.players.find_one_and_update(
+        query,
+        {"$inc": {"dirty_money": amount}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
         raise HTTPException(status_code=400, detail="Dinheiro sujo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {"dirty_money": balance}})
+    balance = int(fresh.get("dirty_money", 0))
     await record_tx(db, str(player["_id"]), kind, amount, "dirty", balance, note)
     player["dirty_money"] = balance
     return balance
@@ -101,6 +118,7 @@ async def get_city_state(user: dict = Depends(get_current_user)):
 
 
 @router.post("/businesses/buy")
+@idempotent("city_business_buy")
 async def buy_business(body: BusinessBuyInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     cfg = BUSINESS_TYPES.get(body.type_key)
@@ -131,6 +149,7 @@ async def buy_business(body: BusinessBuyInput, user: dict = Depends(get_current_
 
 
 @router.post("/businesses/upgrade")
+@idempotent("city_business_upgrade")
 async def upgrade_business(body: BusinessIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -156,6 +175,7 @@ async def upgrade_business(body: BusinessIdInput, user: dict = Depends(get_curre
 
 
 @router.post("/businesses/collect")
+@idempotent("city_business_collect")
 async def collect_businesses(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -167,14 +187,17 @@ async def collect_businesses(body: MutationInput, user: dict = Depends(get_curre
     total_heat = 0.0
     for business in businesses:
         projection = business_projection(business, now)
-        total_clean += projection["clean"]
-        total_dirty += projection["dirty"]
-        total_heat += projection["heat"]
-        await db.city_businesses.update_one(
-            {"_id": business["_id"]},
+        claim = await db.city_businesses.update_one(
+            {"_id": business["_id"], "last_collect_at": business.get("last_collect_at")},
             {"$set": {"last_collect_at": now.isoformat()},
              "$inc": {"total_clean": projection["clean"], "total_dirty": projection["dirty"]}},
         )
+        # Outro pedido pode ter reclamado este mesmo período milissegundos antes.
+        if claim.modified_count != 1:
+            continue
+        total_clean += projection["clean"]
+        total_dirty += projection["dirty"]
+        total_heat += projection["heat"]
     if total_clean:
         await _change_clean(player, total_clean, "Receitas da rede empresarial", "city_business_income")
     if total_dirty:
@@ -189,6 +212,7 @@ async def collect_businesses(body: MutationInput, user: dict = Depends(get_curre
 
 
 @router.post("/rivals/action")
+@idempotent("city_rival_action")
 async def rival_action(body: RivalActionInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -291,6 +315,7 @@ def _blackjack(rng):
 
 
 @router.post("/casino/play")
+@idempotent("city_casino_play")
 async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     bet = int(body.bet)
@@ -328,6 +353,7 @@ async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_us
 
 
 @router.post("/social/pvp")
+@idempotent("city_pvp_toggle")
 async def toggle_pvp(body: TogglePvpInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"pvp_opt_in": bool(body.enabled)}})
@@ -335,6 +361,7 @@ async def toggle_pvp(body: TogglePvpInput, user: dict = Depends(get_current_user
 
 
 @router.post("/social/chat")
+@idempotent("city_chat")
 async def post_chat(body: ChatInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -360,6 +387,7 @@ def _alliance_code():
 
 
 @router.post("/social/alliance/create")
+@idempotent("city_alliance_create")
 async def create_alliance(body: AllianceCreateInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -381,6 +409,7 @@ async def create_alliance(body: AllianceCreateInput, user: dict = Depends(get_cu
 
 
 @router.post("/social/alliance/join")
+@idempotent("city_alliance_join")
 async def join_alliance(body: AllianceJoinInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -396,6 +425,7 @@ async def join_alliance(body: AllianceJoinInput, user: dict = Depends(get_curren
 
 
 @router.post("/social/alliance/leave")
+@idempotent("city_alliance_leave")
 async def leave_alliance(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -413,6 +443,7 @@ async def leave_alliance(body: MutationInput, user: dict = Depends(get_current_u
 
 
 @router.post("/social/pvp/challenge")
+@idempotent("city_pvp_challenge")
 async def challenge_pvp(body: PvpChallengeInput, user: dict = Depends(get_current_user)):
     attacker = await get_player(user)
     if not attacker.get("pvp_opt_in"):
@@ -439,6 +470,7 @@ async def challenge_pvp(body: PvpChallengeInput, user: dict = Depends(get_curren
 
 
 @router.post("/social/pvp/accept")
+@idempotent("city_pvp_accept")
 async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user)):
     defender = await get_player(user)
     challenge = await db.city_pvp_challenges.find_one({
@@ -494,6 +526,7 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
 
 
 @router.post("/social/pvp/decline")
+@idempotent("city_pvp_decline")
 async def decline_pvp(body: PvpDeclineInput, user: dict = Depends(get_current_user)):
     defender = await get_player(user)
     challenge = await db.city_pvp_challenges.find_one({
@@ -511,6 +544,7 @@ async def decline_pvp(body: PvpDeclineInput, user: dict = Depends(get_current_us
 
 
 @router.post("/boss/recover")
+@idempotent("city_boss_recover")
 async def recover_boss(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     now = now_utc()
