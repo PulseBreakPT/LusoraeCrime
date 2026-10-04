@@ -7,7 +7,7 @@ import {
   chanceColor, goodBarColor, teamsReadiness, teamReadiness, vehicleRangeKm,
   teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
 import { TeamGlyph } from "./TeamGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -303,7 +303,6 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Users} />
-          <PanelKicker>Comando · Operações</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Users size={18} className="text-primary" /> Equipas
           </SheetTitle>
