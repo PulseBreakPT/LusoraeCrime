@@ -565,11 +565,13 @@ async def recover_boss(body: MutationInput, user: dict = Depends(get_current_use
     }
     if hospital:
         cost += 3500
-        fields["boss_hospital_until"] = None
     if sentence:
         cost += 7500
-        fields["boss_sentence_until"] = None
-    if not hospital and not sentence and int(player.get("boss_health", 100)) >= 100:
+    stress = int(player.get("boss_stress", 0) or 0)
+    health = int(player.get("boss_health", 100) or 100)
+    if stress >= 35 and not hospital and not sentence:
+        cost += 1000
+    if not hospital and not sentence and health >= 100 and stress < 35:
         raise HTTPException(status_code=400, detail="Não há nenhuma consequência ativa para tratar")
     if cost:
         await _change_clean(player, -cost, "Recuperação do chefe", "city_boss_recovery")
