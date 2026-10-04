@@ -368,6 +368,35 @@ const EmployeeCard = ({ e, onNavigate }) => {
                 </Tip>
               ))}
             </div>
+            <div className="mt-2 rounded-md border border-white/[0.06] bg-black/20 p-2">
+              <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
+                <span className="uppercase text-zinc-500">Stress</span>
+                <span className={Number(e.stress || 0) >= 70 ? "text-red-300" : "text-zinc-300"}>{Math.round(e.stress || 0)}%</span>
+              </div>
+              <MiniBar value={e.stress || 0} color={Number(e.stress || 0) >= 70 ? "#EF4444" : "#F59E0B"} className="mt-1" />
+              {(e.traits || []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {(e.traits || []).map((trait) => (
+                    <span key={trait} className="rounded border border-sky-500/15 bg-sky-500/[0.05] px-1.5 py-0.5 font-mono text-[9px] uppercase text-sky-300">
+                      {trait.replaceAll("_", " ")}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {e.injury && (
+                <p className="mt-2 font-mono text-[9px] text-red-300">
+                  Ferimento {e.injury.severity || "registado"} · {e.injury.source || "operação"}
+                </p>
+              )}
+              {e.sentence && (
+                <p className="mt-2 font-mono text-[9px] text-amber-300">
+                  Processo ativo · {e.sentence.reason || "detenção"}
+                </p>
+              )}
+              {e.stationed_property_id && (
+                <p className="mt-2 font-mono text-[9px] text-cyan-300">Destacado numa instalação da organização</p>
+              )}
+            </div>
           </div>
 
           <div>
