@@ -42,5 +42,14 @@ jobs:
       - name: Test organization systems
         run: PYTHONPATH=backend python backend/tests/test_organization_systems.py
 
-      - name: Test core audit regressions
-        run: PYTHONPATH=backend python backend/tests/test_core_audit_regressions.py
+      - name: Test Portugal operation hours
+        run: PYTHONPATH=backend python -c "import runpy; ns=runpy.run_path('backend/tests/test_core_audit_regressions.py'); ns['test_operation_hours_follow_portugal_local_time']()"
+
+      - name: Test road mission metrics
+        run: PYTHONPATH=backend python -c "import runpy; ns=runpy.run_path('backend/tests/test_core_audit_regressions.py'); ns['test_road_metrics_use_real_out_and_return_distances']()"
+
+      - name: Test operation mechanical profiles
+        run: PYTHONPATH=backend python -c "import runpy; ns=runpy.run_path('backend/tests/test_core_audit_regressions.py'); ns['test_operation_profiles_create_real_mechanical_families']()"
+
+      - name: Test repeat and rare reward direction
+        run: PYTHONPATH=backend python -c "import runpy; ns=runpy.run_path('backend/tests/test_core_audit_regressions.py'); ns['test_repeat_penalty_and_rare_bonus_have_correct_direction']()"
