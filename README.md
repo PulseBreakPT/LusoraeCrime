@@ -28,7 +28,7 @@ O mapa é o centro da experiência. O mundo nasce à volta do Quartel-General es
 | Sistema de autenticação | Continua implementado no código |
 | Backend completo | FastAPI + MongoDB, destinado à stack Docker/VPS |
 | Deploy de produção | Docker Compose + Caddy + HTTPS automático |
-| Modo atual | Single-player persistente; multiplayer está documentado como evolução futura |
+| Modo atual | Single-player local + backend persistente com camada social/multiplayer opt-in |
 
 **Compatibilidade de deployment:** o caminho `LusoraeCrime` que ainda aparece no URL do GitHub Pages é apenas o identificador legado do repositório/deploy atual; a marca do produto é exclusivamente **SUBMUNDO**.
 
@@ -450,9 +450,9 @@ O sistema suporta:
 
 ---
 
-## Organização, território e cidade
+## Cidade Viva
 
-O núcleo urbano atual está integrado diretamente no estado principal do jogador.
+O núcleo urbano está integrado no estado do jogador e influencia diretamente operações, economia e competição. A simulação usa o horário de Lisboa e janelas globais partilhadas, para que clima e acontecimentos sejam previsíveis e não um bónus escondido lançado por missão.
 
 ### Sistemas implementados
 
@@ -468,9 +468,24 @@ O núcleo urbano atual está integrado diretamente no estado principal do jogado
 - notoriedade persistente por veículo;
 - pneus, revisões, seguro e inspeção;
 - apreensão temporária de veículos com recuperação mais rápida quando segurados;
-- doutrinas de equipa: Equilibrada, Segurança Máxima, Baixo Perfil e Impacto.
+- doutrinas de equipa: Equilibrada, Segurança Máxima, Baixo Perfil e Impacto;
+- **clima global persistente** em janelas de 2 horas, com efeitos em deslocação, calor, recompensa e chance;
+- **ciclo horário** madrugada/manhã/tarde/noite ligado a trânsito, polícia e operações;
+- **eventos urbanos globais** em janelas de 6 horas e calendário dos próximos acontecimentos;
+- notícias automáticas construídas a partir do estado da cidade e dos eventos reais da organização;
+- **10 tipos de negócios urbanos** com compra, níveis, condição, segurança, rendimento limpo/sujo e calor;
+- bónus sistémicos da rede empresarial aplicados às categorias de operação relevantes;
+- **5 organizações rivais NPC** persistentes com poder, hostilidade, inteligência e pressão territorial;
+- reconhecimento, sabotagem, pressão, tréguas e acordos com rivais, com custos e cooldowns;
+- temporadas de **30 dias** e leaderboard de pontos;
+- PvP **opt-in**, desafios com consentimento e consequências persistentes;
+- alianças entre jogadores por código de convite;
+- chat/frequência da cidade com limitação de spam;
+- casino clandestino com roleta e blackjack, usando exclusivamente moeda do jogo;
+- saúde/stress do chefe e consequências como hospitalização;
+- modo convidado local com uma simulação equivalente de Cidade Viva para o GitHub Pages.
 
-Contactos de rua, corridas, apostas e outras atividades urbanas descritas em propostas antigas **não são anunciadas como implementadas enquanto não tiverem ciclo backend → estado → UI completo**.
+A Cidade Viva não substitui a preparação das equipas: os seus multiplicadores são deliberadamente limitados e ficam visíveis no preview do despacho.
 
 ---
 
@@ -1182,14 +1197,12 @@ A ativação efetiva do Google Sign-In requer configurar o Web OAuth Client ID e
 
 Itens ainda documentados como evolução possível:
 
-- multiplayer;
-- jogadores visíveis no mapa;
-- alianças;
-- PvP;
-- temporadas e eventos;
-- leaderboards;
+- jogadores e alianças visíveis diretamente no mapa;
+- guerras PvP territoriais assíncronas com temporadas dedicadas;
+- mercado entre organizações com ordens, contratos e reputação;
 - árvore de tecnologia/investigação;
 - polícia e investigações ainda mais profundas;
+- eventos comunitários cooperativos de servidor;
 - PWA/Capacitor para Android/iOS;
 - modularização adicional de rotas e motor à medida que o projeto cresce.
 
