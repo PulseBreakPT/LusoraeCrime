@@ -119,7 +119,7 @@ from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
     VEHICLE_LIFECYCLE, INJURY_SEVERITIES, ensure_employee_profile,
-    prestige_effects, department_level, property_operations_factor, rival_profile,
+    prestige_effects, department_level, property_operations_factor, rival_profile, property_staff_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -3303,6 +3303,25 @@ async def advance(db, player):
     await _refresh_recruitment_pool(db, player, now)
 
     props = await db.properties.find({"player_id": pid}).to_list(200)
+
+    # A aptidão do staff é recalculada a partir do estado vivo dos operacionais
+    # (nível, atributos, moral, fadiga e ferimentos), não fica congelada no
+    # momento em que foram destacados.
+    employee_by_id = {str(emp["_id"]): emp for emp in employees}
+    for prop in props:
+        staff_ids = list(prop.get("staff_employee_ids") or [])
+        if not staff_ids:
+            continue
+        staff = [employee_by_id[eid] for eid in staff_ids if eid in employee_by_id]
+        roles, effectiveness = property_staff_profile(staff)
+        if roles != (prop.get("staff_roles") or {}) or abs(effectiveness - float(prop.get("staff_effectiveness", 0) or 0)) >= 0.005:
+            prop["staff_roles"] = roles
+            prop["staff_effectiveness"] = effectiveness
+            await db.properties.update_one(
+                {"_id": prop["_id"]},
+                {"$set": {"staff_roles": roles, "staff_effectiveness": effectiveness}},
+            )
+
     previous_event_id = (player.get("organization_event") or {}).get("id")
     event = maybe_spawn_organization_event(
         player,
