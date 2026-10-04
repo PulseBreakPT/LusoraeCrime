@@ -16,7 +16,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
+      "fixed inset-0 z-50 bg-black/35 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
       className
     )}
     {...props}
@@ -37,7 +37,7 @@ const sheetVariants = cva(
           "inset-x-0 bottom-0 border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
         left: "inset-y-0 left-0 h-full w-full border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
         right:
-          "inset-y-0 right-0 h-full w-full border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
+          "inset-x-2 bottom-[4.9rem] max-h-[calc(100dvh-6rem)] w-auto rounded-2xl border data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-3 sm:inset-x-auto sm:left-1/2 sm:right-auto sm:bottom-[4.9rem] sm:h-auto sm:max-h-[min(76vh,46rem)] sm:w-[min(34rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:border",
       },
     },
     defaultVariants: {
@@ -49,7 +49,7 @@ const sheetVariants = cva(
 const SheetContent = React.forwardRef(({ side = "right", className, children, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
-    <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+    <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), side === "right" && "sub-sheet-panel", className)} {...props}>
       <SheetPrimitive.Close
         className="absolute right-3.5 top-3.5 z-30 flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-[#151519] p-0 text-zinc-500 transition-colors hover:border-white/15 hover:bg-[#1b1b20] hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/40 disabled:pointer-events-none sm:right-4">
         <X className="h-4 w-4" />
