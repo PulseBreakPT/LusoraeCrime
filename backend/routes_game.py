@@ -958,8 +958,9 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     # Organização integrada: doutrina, loadout e território afetam exatamente
     # o preview que será persistido na missão.
     doctrine = doctrine_effect(team, opp["category"])
+    policies = {**default_team_policies(), **(team.get("policies") or {})}
     loadout = dict(team.get("loadout") or {})
-    loadout_fx = loadout_effect(loadout, opp["category"])
+    loadout_fx = loadout_effect(loadout, opp["category"], policies)
     doctrine_delta = float(doctrine.get("chance", 0.0))
     loadout_delta = float(loadout_fx.get("chance", 0.0))
     if doctrine_delta:
@@ -1105,7 +1106,11 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
         "doctrine_heat_mult": float(doctrine.get("heat", 1.0)) * float(loadout_fx.get("heat", 1.0)),
         "doctrine_fatigue_mult": float(doctrine.get("fatigue", 1.0)),
         "loadout": loadout,
+        "team_policies": policies,
         "loadout_injury_mult": float(loadout_fx.get("injury", 1.0)),
+        "protect_injured": bool(loadout_fx.get("protect_injured", True)),
+        "auto_use_medical": bool(loadout_fx.get("auto_use_medical", True)),
+        "auto_use_armor": bool(loadout_fx.get("auto_use_armor", True)),
         "territory_bonus": territory_bonus,
         "prestige_reward_bonus": prestige_reward,
     }
@@ -1170,7 +1175,11 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "doctrine_heat_mult": prep.get("doctrine_heat_mult", 1.0),
         "doctrine_fatigue_mult": prep.get("doctrine_fatigue_mult", 1.0),
         "loadout": prep.get("loadout", {}),
+        "team_policies": prep.get("team_policies", {}),
         "loadout_injury_mult": prep.get("loadout_injury_mult", 1.0),
+        "protect_injured": prep.get("protect_injured", True),
+        "auto_use_medical": prep.get("auto_use_medical", True),
+        "auto_use_armor": prep.get("auto_use_armor", True),
     }
 
 
@@ -1276,6 +1285,14 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         # poder de fogo médio (intimidação na fuga).
         "weapon_jam_profile": prep.get("weapon_jam_profile", []),
         "weapon_power_avg": prep.get("weapon_power_avg", 0.0),
+        "doctrine": prep.get("doctrine", "balanced"),
+        "doctrine_fatigue_mult": prep.get("doctrine_fatigue_mult", 1.0),
+        "loadout": prep.get("loadout", {}),
+        "loadout_injury_mult": prep.get("loadout_injury_mult", 1.0),
+        "team_policies": prep.get("team_policies", {}),
+        "protect_injured": prep.get("protect_injured", True),
+        "auto_use_medical": prep.get("auto_use_medical", True),
+        "auto_use_armor": prep.get("auto_use_armor", True),
         "opportunity_id": str(opp["_id"]),
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
