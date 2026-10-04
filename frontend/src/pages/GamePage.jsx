@@ -119,6 +119,19 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenReportSignal]);
 
+  useEffect(() => {
+    const group =
+      ["operations", "quests", "mastermind"].includes(openPanel) ? "operations" :
+      ["teams", "employees"].includes(openPanel) ? "crew" :
+      ["fleet", "weapons"].includes(openPanel) ? "equipment" :
+      ["empire", "properties", "hq"].includes(openPanel) ? "empire" :
+      ["street", "intel", "shop", "settings"].includes(openPanel) ? "menu" :
+      "";
+    if (group) document.documentElement.dataset.subPanelOrigin = group;
+    else delete document.documentElement.dataset.subPanelOrigin;
+    return () => { delete document.documentElement.dataset.subPanelOrigin; };
+  }, [openPanel]);
+
   if (!state) {
     if (stateError) {
       return (
@@ -175,19 +188,6 @@ export default function GamePage() {
     : levelSafeState;
 
   const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || navGroup || mapLegendOpen);
-
-  useEffect(() => {
-    const group =
-      ["operations", "quests", "mastermind"].includes(openPanel) ? "operations" :
-      ["teams", "employees"].includes(openPanel) ? "crew" :
-      ["fleet", "weapons"].includes(openPanel) ? "equipment" :
-      ["empire", "properties", "hq"].includes(openPanel) ? "empire" :
-      ["street", "intel", "shop", "settings"].includes(openPanel) ? "menu" :
-      "";
-    if (group) document.documentElement.dataset.subPanelOrigin = group;
-    else delete document.documentElement.dataset.subPanelOrigin;
-    return () => { delete document.documentElement.dataset.subPanelOrigin; };
-  }, [openPanel]);
 
   return (
     <div
