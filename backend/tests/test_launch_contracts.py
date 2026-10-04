@@ -45,7 +45,8 @@ def run():
         "/businesses/buy", "/businesses/upgrade", "/businesses/collect",
         "/rivals/action", "/casino/play", "/social/pvp",
         "/social/alliance/create", "/social/alliance/join",
-        "/social/alliance/leave", "/social/pvp/challenge",
+        "/social/alliance/leave", "/social/alliance/transfer", "/social/alliance/kick",
+        "/social/pvp/challenge",
         "/social/pvp/accept", "/social/pvp/decline", "/boss/recover",
         "/social/chat/report", "/social/chat/block",
     ):
