@@ -199,10 +199,6 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
         {tab === "geral" && (
           <div className="mt-3 space-y-3" data-testid="hq-tab-geral-content">
-            <p className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.04] px-2.5 py-2 font-mono text-[10px] text-emerald-400">
-              {hqBenefitDesc(currentTier)}
-            </p>
-
             <div>
               <SectionHeader icon={Lightbulb} title="Recomendações do consultor" />
               {tips.length === 0 ? (
@@ -239,6 +235,11 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                 </div>
               )}
             </div>
+
+            <p className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.04] px-2.5 py-2 font-mono text-[10px] text-emerald-400">
+              {hqBenefitDesc(currentTier)}
+            </p>
+
           </div>
         )}
 
