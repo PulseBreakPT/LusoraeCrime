@@ -64,6 +64,10 @@ class PvpAcceptInput(MutationInput):
     challenge_id: str
 
 
+class PvpDeclineInput(MutationInput):
+    challenge_id: str
+
+
 def _oid(value, label="ID"):
     if not ObjectId.is_valid(value):
         raise HTTPException(status_code=400, detail=f"{label} inválido")
@@ -487,6 +491,23 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
     await add_event(db, str(winner["_id"]), "system", f"Conflito PvP vencido contra {loser.get('org_name', 'rival')}.")
     await add_event(db, str(loser["_id"]), "warning", f"Conflito PvP perdido contra {winner.get('org_name', 'rival')}.")
     return {"ok": True, "winner_id": str(winner["_id"]), "winner_name": winner.get("org_name"), "consequence": consequence}
+
+
+@router.post("/social/pvp/decline")
+async def decline_pvp(body: PvpDeclineInput, user: dict = Depends(get_current_user)):
+    defender = await get_player(user)
+    challenge = await db.city_pvp_challenges.find_one({
+        "_id": _oid(body.challenge_id, "Desafio"),
+        "defender_id": str(defender["_id"]),
+        "status": "pending",
+    })
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Desafio PvP não encontrado")
+    await db.city_pvp_challenges.update_one(
+        {"_id": challenge["_id"]},
+        {"$set": {"status": "declined", "resolved_at": now_utc().isoformat()}},
+    )
+    return {"ok": True}
 
 
 @router.post("/boss/recover")
