@@ -1569,6 +1569,61 @@ const mutateGame=(save,path,payload)=>{
     const org = LOCAL_CATALOG.organization || {};
     const inventory = save.player.inventory;
 
+    if(path==="org/policy"){
+      const allowedAuto=["enabled","auto_restock","renew_insurance","preventive_service"];
+      save.player.organization_policy={
+        reserve_cash:Math.max(0,Math.min(100000000,Number(p.reserve_cash??25000))),
+        max_single_spend_pct:clamp(Number(p.max_single_spend_pct??.35),.05,1),
+        stock_targets:Object.fromEntries(Object.entries(p.stock_targets||{}).filter(([key])=>org.supplies?.[key]).map(([key,value])=>[key,Math.max(0,Math.min(10000,Number(value||0)))])),
+        automation:Object.fromEntries(allowedAuto.map((key)=>[key,!!p.automation?.[key]])),
+      };
+      return {ok:true,policy:guestOrgPolicy(save)};
+    }
+
+    if(path==="org/automation/run"){
+      const policy=guestOrgPolicy(save),actions=[],reserve=Number(policy.reserve_cash||0);
+      const intel=guestOrgIntelligence(save);
+      const canSpend=(cost)=>Number(save.player.clean_money||0)-cost>=reserve;
+      if(policy.automation.auto_restock){
+        for(const row of intel.stock){
+          if(row.reorder_packs<=0)continue;
+          const cfg=org.supplies[row.key],packs=row.reorder_packs,units=Number(cfg.pack||1)*packs;
+          const cost=Math.max(1,Math.trunc(Number(cfg.price||0)*packs*guestLogisticsMult(save)));
+          const projected={...inventory,[row.key]:Number(inventory[row.key]||0)+units};
+          if(!canSpend(cost)||orgInventoryUsed({...save,player:{...save.player,inventory:projected}})>orgInventoryCapacity(save))continue;
+          save.player.clean_money-=cost;inventory[row.key]=projected[row.key];tx(save,"automation_restock",-cost,"clean",`Auto-stock — ${cfg.name}`);actions.push({type:"restock",item_key:row.key,units,cost});
+        }
+      }
+      if(policy.automation.renew_insurance){
+        for(const v of save.vehicles||[]){
+          if(v.insurance_until&&Date.parse(v.insurance_until)-Date.now()>3*86400000)continue;
+          const lc=org.vehicle_lifecycle||{},cost=Math.max(80,Math.trunc(Number(v.price||0)*Number(lc.insurance_week_pct||.0012)*4));
+          if(!canSpend(cost))continue;
+          save.player.clean_money-=cost;v.insurance_until=new Date(Date.now()+Number(lc.insurance_days||28)*86400000).toISOString();
+          tx(save,"automation_insurance",-cost,"clean",`Auto-seguro — ${v.name}`);actions.push({type:"insurance",vehicle_id:v.id,cost});
+        }
+      }
+      if(policy.automation.preventive_service){
+        for(const v of save.vehicles||[]){
+          const assigned=v.team_id?save.teams.find(t=>t.id===v.team_id):null;
+          const since=Number(v.km_total||0)-Number(v.last_service_km||0);
+          if(assigned&&assigned.status!=="idle")continue;
+          if(Number(v.condition||0)>=65&&since<Number(org.vehicle_lifecycle?.service_interval_km||5000)-500)continue;
+          const missing=Math.max(0,100-Number(v.condition||0));
+          const base=Math.max(120,Math.trunc(Number(v.price||0)*Number(org.vehicle_lifecycle?.service_base_pct||.018)+missing*8));
+          const useFluids=Number(inventory.service_fluids||0)>0,useParts=missing>=20&&Number(inventory.vehicle_parts||0)>0;
+          const material=(useFluids?Number(org.supplies?.service_fluids?.price||0):0)+(useParts?Number(org.supplies?.vehicle_parts?.price||0):0);
+          const cost=Math.max(60,base-Math.trunc(material*.70));
+          if(!canSpend(cost))continue;
+          save.player.clean_money-=cost;if(useFluids)inventory.service_fluids-=1;if(useParts)inventory.vehicle_parts-=1;
+          v.condition=Math.min(100,Number(v.condition||0)+18);v.last_service_km=Number(v.km_total||0);v.missions_since_repair=0;
+          tx(save,"automation_service",-cost,"clean",`Auto-revisão — ${v.name}`);actions.push({type:"service",vehicle_id:v.id,cost});
+        }
+      }
+      save.player.organization_automation_last_at=nowIso();
+      return {ok:true,actions,cash_after:save.player.clean_money,reserve_cash:reserve};
+    }
+
     if(path==="org/inventory/buy"){
       const cfg=org.supplies?.[p.item_key]; const packs=Math.max(1,Math.min(25,Number(p.packs||1)));
       if(!cfg)fail(400,"Item inválido");
@@ -1576,7 +1631,7 @@ const mutateGame=(save,path,payload)=>{
       const quantity=Number(cfg.pack||1)*packs;
       const needed=Number(cfg.space||0)*quantity;
       if(orgInventoryUsed(save)+needed>orgInventoryCapacity(save)+1e-9)fail(400,"Armazenamento insuficiente");
-      const cost=Number(cfg.price||0)*packs;
+      const cost=Math.max(1,Math.trunc(Number(cfg.price||0)*packs*guestLogisticsMult(save)));
       chargeClean(save,cost,`Abastecimento — ${cfg.name}`);
       inventory[p.item_key]=Number(inventory[p.item_key]||0)+quantity;
       return {ok:true,cost,quantity};
@@ -1658,9 +1713,13 @@ const mutateGame=(save,path,payload)=>{
       const assigned=vehicle.team_id?save.teams.find((t)=>t.id===vehicle.team_id):null;
       if(assigned&&assigned.status!=="idle")fail(400,"Veículo em operação");
       const lc=org.vehicle_lifecycle||{}, missing=Math.max(0,100-Number(vehicle.condition||0));
-      const cost=Math.max(120,Math.trunc(Number(vehicle.price||LOCAL_CATALOG.vehicle_models?.[vehicle.model_key]?.price||0)*Number(lc.service_base_pct||.018)+missing*8));
-      chargeClean(save,cost,"Revisão de veículo"); vehicle.condition=Math.min(100,Number(vehicle.condition||0)+18); vehicle.last_service_km=Number(vehicle.km_total??vehicle.km??0);
-      vehicle.notoriety=Math.max(0,Number(vehicle.notoriety||0)-10); return {ok:true,cost};
+      const baseCost=Math.max(120,Math.trunc(Number(vehicle.price||LOCAL_CATALOG.vehicle_models?.[vehicle.model_key]?.price||0)*Number(lc.service_base_pct||.018)+missing*8));
+      const useFluids=Number(inventory.service_fluids||0)>0,useParts=missing>=20&&Number(inventory.vehicle_parts||0)>0;
+      const material=(useFluids?Number(org.supplies?.service_fluids?.price||0):0)+(useParts?Number(org.supplies?.vehicle_parts?.price||0):0);
+      const cost=Math.max(60,baseCost-Math.trunc(material*.70));
+      chargeClean(save,cost,"Revisão de veículo");if(useFluids)inventory.service_fluids-=1;if(useParts)inventory.vehicle_parts-=1;
+      vehicle.condition=Math.min(100,Number(vehicle.condition||0)+18); vehicle.last_service_km=Number(vehicle.km_total??vehicle.km??0);
+      vehicle.notoriety=Math.max(0,Number(vehicle.notoriety||0)-10); return {ok:true,cost,base_cost:baseCost,used_stock:[...(useFluids?["consumíveis"]:[]),...(useParts?["peças"]:[])]};
     }
     if(path==="org/vehicles/tires"){
       if(!vehicle)fail(404,"Veículo não encontrado");
@@ -1699,7 +1758,18 @@ const mutateGame=(save,path,payload)=>{
       if(selected.some((e)=>!e))fail(404,"Operacional não encontrado");
       if(selected.some((e)=>e.status!=="idle"||e.team_id||(e.stationed_property_id&&e.stationed_property_id!==property.id)))fail(400,"Operacional indisponível");
       save.employees.forEach((e)=>{if(e.stationed_property_id===property.id&&!ids.includes(e.id))e.stationed_property_id=null;});
-      selected.forEach((e)=>{e.stationed_property_id=property.id;}); property.staff_employee_ids=ids; return {ok:true};
+      selected.forEach((e)=>{e.stationed_property_id=property.id;});
+      const roleAttrs={security:["forca","tiro","sangue_frio"],operations:["inteligencia","discricao","sangue_frio"],logistics:["conducao","inteligencia","discricao"],management:["negociacao","inteligencia","sangue_frio"]};
+      const remaining=new Set(Object.keys(roleAttrs)),roles={},scores=[];
+      [...selected].sort((a,b)=>Number(b.level||1)-Number(a.level||1)).forEach((e)=>{
+        const choices=remaining.size?[...remaining]:Object.keys(roleAttrs);
+        const role=choices.sort((a,b)=>roleAttrs[b].reduce((sum,k)=>sum+Number(e.attrs?.[k]||0),0)-roleAttrs[a].reduce((sum,k)=>sum+Number(e.attrs?.[k]||0),0))[0];
+        const raw=roleAttrs[role].reduce((sum,k)=>sum+Number(e.attrs?.[k]||0),0)/(10*roleAttrs[role].length);
+        const score=clamp(raw*clamp(Number(e.morale||70)/100,.4,1)*clamp(1-Number(e.fatigue||0)/140,.45,1),0,1);
+        roles[e.id]=role;scores.push(score);remaining.delete(role);
+      });
+      property.staff_employee_ids=ids;property.staff_roles=roles;property.staff_effectiveness=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
+      return {ok:true,staff_employee_ids:ids,staff_roles:roles,staff_effectiveness:property.staff_effectiveness};
     }
 
     if(path==="org/departments/upgrade"){
