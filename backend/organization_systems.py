@@ -275,6 +275,22 @@ def logistics_cost_multiplier(player: dict) -> float:
     return max(0.70, 1.0 - department_level(player, "logistica") * 0.06)
 
 
+def supply_cost_multiplier(player: dict, now: datetime | None = None) -> float:
+    """Logistics savings plus temporary supplier-market shocks."""
+    mult = logistics_cost_multiplier(player)
+    until = (player.get("organization_modifiers") or {}).get("supply_surcharge_until")
+    if until:
+        try:
+            dt = datetime.fromisoformat(until)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if dt > (now or datetime.now(timezone.utc)):
+                mult *= 1.12
+        except (TypeError, ValueError):
+            pass
+    return max(0.70, mult)
+
+
 def raid_risk_multiplier(player: dict, properties: list[dict]) -> float:
     investigation = max(0.50, 1.0 - department_level(player, "investigacao") * 0.10)
     protection = 0.72 if protection_active(player) else 1.0
