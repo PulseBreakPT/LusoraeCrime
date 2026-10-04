@@ -172,7 +172,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
           <TabsList className="flex h-auto w-full gap-1 overflow-x-auto bg-black/40 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map(({ key, label, icon: Icon }) => (
-              <TabsTrigger key={key} value={key} className="min-h-8 min-w-[78px] flex-1 gap-1 whitespace-nowrap px-2 font-mono text-[9px] uppercase data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger key={key} value={key} className="min-h-8 min-w-[78px] flex-1 gap-1 whitespace-nowrap px-2 font-mono text-[10px] uppercase data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Icon size={11} /> {label}
               </TabsTrigger>
             ))}
