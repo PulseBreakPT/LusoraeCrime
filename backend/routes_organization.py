@@ -27,7 +27,7 @@ from organization_systems import (
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
     PRESTIGE_CATALOG, protection_cost, fixed_cost_multiplier, territory_weekly_cost,
-    logistics_cost_multiplier,
+    logistics_cost_multiplier, rival_profile,
 )
 
 router = APIRouter(prefix="/api/game/org", tags=["organization"])
@@ -769,7 +769,12 @@ async def claim_territory(body: TerritoryInput, user: dict = Depends(get_current
         raise HTTPException(status_code=400, detail="Já tens presença nesta zona")
     cfg = TERRITORY_TIERS[1]
     await _debit(player, cfg["cost"], stat="territories_claimed")
-    info = {"tier": 1, "pressure": 10.0, "defense": 70.0, "claimed_at": now_utc().isoformat()}
+    rival = rival_profile(body.district)
+    info = {
+        "tier": 1, "pressure": 10.0, "defense": 70.0,
+        "claimed_at": now_utc().isoformat(),
+        "rival": {"key": rival["key"], "name": rival["name"], "style": rival["style"], "strength": rival["strength"]},
+    }
     await db.players.update_one({"_id": player["_id"]}, {"$set": {f"territories.{body.district}": info}})
     await record_tx(db, str(player["_id"]), "territory_claim", -cfg["cost"], "clean", player["clean_money"], f"Presença territorial: {body.district}")
     return {"ok": True, "territory": info}
