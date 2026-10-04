@@ -231,6 +231,42 @@ def build_retention_snapshot(
                 "progress": _progress(ready_teams, max(1, ready_teams)),
                 "tone": "cyan",
             })
+        elif not teams:
+            moves.append({
+                "id": "build-first-team",
+                "horizon": "agora",
+                "priority": 88,
+                "title": "Monta uma equipa operacional",
+                "description": "Sem uma equipa não consegues transformar oportunidades em progresso.",
+                "panel": "teams",
+                "focus_test_id": "team-builder",
+                "progress": _progress(0, 1),
+                "tone": "cyan",
+            })
+        elif ready_teams == 0:
+            moves.append({
+                "id": "restore-readiness",
+                "horizon": "agora",
+                "priority": 86,
+                "title": "Põe uma equipa pronta",
+                "description": "Há equipas, mas nenhuma está em condições de receber uma nova ordem.",
+                "panel": "teams",
+                "focus_test_id": None,
+                "progress": _progress(0, max(1, len(teams))),
+                "tone": "amber",
+            })
+        else:
+            moves.append({
+                "id": "scan-opportunities",
+                "horizon": "agora",
+                "priority": 72,
+                "title": "Lê o terreno",
+                "description": "As equipas estão prontas. Verifica a próxima janela operacional no mapa.",
+                "panel": "operations",
+                "focus_test_id": None,
+                "progress": _progress(0, 1),
+                "tone": "cyan",
+            })
 
     tired = [e for e in employees if float(e.get("fatigue", 0) or 0) >= 65]
     damaged = [v for v in vehicles if float(v.get("condition", 100) or 100) < 45]
