@@ -103,6 +103,23 @@ TERRITORY_TIERS = {
     3: {"name": "Dominante", "cost": 155000, "income_h": 850, "reward_bonus": 0.05, "defense_weekly": 4800},
 }
 
+RIVAL_ARCHETYPES = [
+    {"key": "vibora", "name": "Víbora", "style": "agressiva", "pressure_mult": 1.18, "defense_mult": 0.96},
+    {"key": "consorcio", "name": "Consórcio", "style": "financeira", "pressure_mult": 1.04, "defense_mult": 1.12},
+    {"key": "fantasmas", "name": "Fantasmas", "style": "furtiva", "pressure_mult": 1.10, "defense_mult": 1.05},
+    {"key": "linha_vermelha", "name": "Linha Vermelha", "style": "territorial", "pressure_mult": 1.14, "defense_mult": 1.08},
+    {"key": "atlas", "name": "Atlas", "style": "logística", "pressure_mult": 1.07, "defense_mult": 1.15},
+]
+
+
+def rival_profile(district: str) -> dict:
+    """Deterministic single-player rival for a district; stable across restarts."""
+    seed = sum((index + 1) * ord(ch) for index, ch in enumerate(str(district or "zona")))
+    base = RIVAL_ARCHETYPES[seed % len(RIVAL_ARCHETYPES)]
+    strength = 42 + (seed % 37)
+    return {**base, "strength": strength}
+
+
 PROPERTY_MODULES = {
     "security": {"name": "Segurança", "base_cost": 12000, "max_level": 3, "desc": "Reduz risco de rusga e perdas."},
     "storage": {"name": "Armazenamento", "base_cost": 9000, "max_level": 3, "desc": "Aumenta a capacidade logística desta base."},
