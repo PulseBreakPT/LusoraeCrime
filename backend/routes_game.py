@@ -3091,7 +3091,7 @@ async def optimize_properties(body: Optional[MutationInput] = None, user: dict =
 HQ_MIN_INLAND_M = 120.0
 
 
-class HqPlaceInput(BaseModel):
+class HqPlaceInput(MutationInput):
     lat: float
     lng: float
 
@@ -3132,6 +3132,7 @@ async def validate_hq_spot(body: HqPlaceInput, user: dict = Depends(get_current_
 
 
 @router.post("/hq/place")
+@idempotent("hq.place")
 async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
     """Coloca o PRIMEIRO Quartel-General (onboarding de conta nova). Regras
     estritas: só uma vez; só em terra firme portuguesa — o mar é estritamente
@@ -3157,13 +3158,22 @@ async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
     now_iso = now_utc().isoformat()
     hq = {"name": hq_name, "lat": lat, "lng": lng, "level": 1,
           "upgrading_until": None, "upgrade_history": []}
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "hq": hq, "districts": districts, "region": region,
-        "hq_placed_at": now_iso,
-        # Reset do relógio do motor: o tempo parado no onboarding não conta
-        # como tempo de jogo (salários, decaimentos, spawns).
-        "last_tick": now_iso,
-    }})
+    claimed = await db.players.find_one_and_update(
+        {
+            "_id": player["_id"],
+            "$or": [{"hq": None}, {"hq": {"$exists": False}}],
+        },
+        {"$set": {
+            "hq": hq, "districts": districts, "region": region,
+            "hq_placed_at": now_iso,
+            # Reset do relógio do motor: o tempo parado no onboarding não conta
+            # como tempo de jogo (salários, decaimentos, spawns).
+            "last_tick": now_iso,
+        }},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="O Quartel-General acabou de ser estabelecido noutra sessão.")
     pid = str(player["_id"])
     where = label or f"{lat:.4f}, {lng:.4f}"
     suffix = f" ({region})" if region and region not in where else ""
