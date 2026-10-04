@@ -299,7 +299,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTar
             )}
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            Lisboa paga bem a quem cumpre — reclama o que é teu.
+            A rede recompensa quem cumpre — reclama o que é teu.
           </SheetDescription>
         </SheetHeader>
 
@@ -355,7 +355,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTar
             icon={Zap}
             label="Multiplicador"
             value={`até ×${bestMult.toFixed(2)}`}
-            sub={`nível ×${(1 + 0.15 * Math.max(0, (state.player.level || 1) - 1)).toFixed(2)} base`}
+            sub={`nível ${state.player.level}/${catalog?.max_org_level || 100} · progressão ativa`}
             color={bestMult > 1.01 ? "#F59E0B" : "#A1A1AA"}
             tip="Cada contrato mostra o multiplicador real aplicado às recompensas: nível × dificuldade × tier × série × execução rápida (concluir na 1.ª metade do prazo dá +10%). Máximo ×4."
           />
