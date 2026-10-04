@@ -339,7 +339,8 @@ async def set_organization_policy(body: OrganizationPolicyInput, user: dict = De
 
 
 @router.post("/automation/run")
-async def run_automation_now(user: dict = Depends(get_current_user)):
+@idempotent("automation.run")
+async def run_automation_now(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     return await run_organization_automation(
         db, player, now=now_utc(), add_event=add_event, record_tx=record_tx, force=True,
