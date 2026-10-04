@@ -58,7 +58,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
     claimTerritory, consolidateTerritory, defendTerritory,
     buyPrestige, buyProtection, fetchFinanceSummary,
     fetchOrganizationIntelligence, fetchOrganizationAudit,
-    setOrganizationPolicy, runOrganizationAutomation,
+    setOrganizationPolicy, runOrganizationAutomation, resolveOrganizationEvent,
   } = useGame();
   const [tab, setTab] = useState("centro");
   const [finance, setFinance] = useState(null);
@@ -257,7 +257,20 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
 
             {intelligence && (
               <Card className="sub-card p-3">
-                <SectionHeader icon={Activity} title="Inteligência operacional" meta={`${intelligence.organization.score} poder organizacional`} />
+                <SectionHeader
+                  icon={Activity}
+                  title="Inteligência operacional"
+                  meta={`Org N${intelligence.organization.level || 1} · ${intelligence.organization.score} poder`}
+                />
+                {intelligence.organization.progression && (
+                  <div className="mb-3">
+                    <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-zinc-500">
+                      <span>Progressão da organização</span>
+                      <span>{intelligence.organization.progression.progress_pct}%</span>
+                    </div>
+                    <MiniBar value={intelligence.organization.progression.progress_pct} color="#22D3EE" />
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {[
                     ["Finanças", intelligence.health.finance],
@@ -311,6 +324,36 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                 </div>
               </button>
             ))}
+
+            {intelligence?.event && (
+              <Card className="sub-card border-amber-500/20 bg-amber-500/[0.04] p-3">
+                <SectionHeader
+                  icon={AlertTriangle}
+                  title={intelligence.event.title}
+                  meta="decisão pendente"
+                />
+                <p className="text-[11px] leading-relaxed text-zinc-400">{intelligence.event.description}</p>
+                <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {(intelligence.event.options || []).map((option) => (
+                    <button
+                      type="button"
+                      key={option.key}
+                      onClick={async () => {
+                        const result = await resolveOrganizationEvent(intelligence.event.id, option.key);
+                        if (result?.ok) {
+                          const fresh = await fetchOrganizationIntelligence();
+                          if (fresh.ok) setIntelligence(fresh.data);
+                        }
+                      }}
+                      className="rounded-md border border-amber-400/15 bg-black/20 px-2.5 py-2 text-left transition hover:bg-amber-400/[0.06]"
+                    >
+                      <p className="text-[11px] font-semibold text-amber-100">{option.label}</p>
+                      <p className="mt-0.5 text-[10px] text-amber-100/50">{option.hint}</p>
+                    </button>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             <Card className="sub-card p-3">
               <SectionHeader icon={Bot} title="Política e automação" meta="guard rails financeiros" />
