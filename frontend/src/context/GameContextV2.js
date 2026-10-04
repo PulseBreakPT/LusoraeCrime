@@ -483,41 +483,35 @@ export function GameProvider({ children }) {
 
   // All game actions
   const dispatchTeam = async (opportunityId, teamId) => {
-    // Regra do 112i: calcula/valida as duas rotas ANTES de alterar o jogo.
-    // Assim uma missão nunca nasce sem o percurso que o veículo vai seguir.
-    const opp = state?.opportunities?.find((item) => item.id === opportunityId);
-    const team = state?.teams?.find((item) => item.id === teamId);
-    const vehicle = state?.vehicles?.find((item) => item.id === team?.vehicle_id);
-    const property = vehicle?.property_id
-      ? state?.properties?.find((item) => item.id === vehicle.property_id)
-      : null;
-    const originSource = property || state?.player?.hq;
-    const origin = originSource ? { lat: Number(originSource.lat), lng: Number(originSource.lng) } : null;
-    const target = opp ? { lat: Number(opp.lat), lng: Number(opp.lng) } : null;
-
-    let roadOutward = null;
-    let roadInward = null;
-    if (origin && target && [origin.lat, origin.lng, target.lat, target.lng].every(Number.isFinite)) {
-      [roadOutward, roadInward] = await Promise.all([
-        fetchRoute(origin, target),
-        fetchRoute(target, origin),
-      ]);
-      if (roadOutward?.unavailable || roadInward?.unavailable) {
-        const reason = roadOutward?.reason || roadInward?.reason;
-        toast.error(reason
-          ? `Percurso indisponível: ${reason}. A equipa não foi despachada.`
-          : "Não foi possível calcular um percurso rodoviário válido. A equipa não foi despachada.");
-        haptics.error();
-        return { ok: false };
-      }
-    }
-
     const payload = { opportunity_id: opportunityId, team_id: teamId };
-    if (roadOutward && roadInward && !roadOutward.unavailable && !roadInward.unavailable) {
-      // Envia também os planos já obtidos. Backends novos validam e persistem
-      // a geometria; backends antigos ignoram estes campos sem quebrar.
-      payload.route_outward = roadOutward;
-      payload.route_inward = roadInward;
+
+    // Produção: routing/economia são autoritativos no backend. O modo convidado
+    // é offline, por isso precisa de obter a geometria no browser.
+    if (isLocalGuestMode()) {
+      const opp = state?.opportunities?.find((item) => item.id === opportunityId);
+      const team = state?.teams?.find((item) => item.id === teamId);
+      const vehicle = state?.vehicles?.find((item) => item.id === team?.vehicle_id);
+      const property = vehicle?.property_id
+        ? state?.properties?.find((item) => item.id === vehicle.property_id)
+        : null;
+      const originSource = property || state?.player?.hq;
+      const origin = originSource ? { lat: Number(originSource.lat), lng: Number(originSource.lng) } : null;
+      const target = opp ? { lat: Number(opp.lat), lng: Number(opp.lng) } : null;
+      if (origin && target && [origin.lat, origin.lng, target.lat, target.lng].every(Number.isFinite)) {
+        const [roadOutward, roadInward] = await Promise.all([
+          fetchRoute(origin, target), fetchRoute(target, origin),
+        ]);
+        if (roadOutward?.unavailable || roadInward?.unavailable) {
+          const reason = roadOutward?.reason || roadInward?.reason;
+          toast.error(reason
+            ? `Percurso indisponível: ${reason}. A equipa não foi despachada.`
+            : "Não foi possível calcular um percurso rodoviário válido. A equipa não foi despachada.");
+          haptics.error();
+          return { ok: false };
+        }
+        payload.route_outward = roadOutward;
+        payload.route_inward = roadInward;
+      }
     }
     return action("dispatch", payload, "Equipa destacada");
   };
@@ -527,10 +521,28 @@ export function GameProvider({ children }) {
     action("missions/decision", { mission_id: missionId, option_id: optionId });
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
-      const { data } = await api.post("/game/dispatch/preview", {
-        opportunity_id: opportunityId,
-        team_id: teamId,
-      });
+      const payload = { opportunity_id: opportunityId, team_id: teamId };
+      if (isLocalGuestMode()) {
+        const opp = state?.opportunities?.find((item) => item.id === opportunityId);
+        const team = state?.teams?.find((item) => item.id === teamId);
+        const vehicle = state?.vehicles?.find((item) => item.id === team?.vehicle_id);
+        const property = vehicle?.property_id
+          ? state?.properties?.find((item) => item.id === vehicle.property_id)
+          : null;
+        const source = property || state?.player?.hq;
+        const origin = source ? { lat: Number(source.lat), lng: Number(source.lng) } : null;
+        const target = opp ? { lat: Number(opp.lat), lng: Number(opp.lng) } : null;
+        if (origin && target && [origin.lat, origin.lng, target.lat, target.lng].every(Number.isFinite)) {
+          const [roadOutward, roadInward] = await Promise.all([
+            fetchRoute(origin, target), fetchRoute(target, origin),
+          ]);
+          if (!roadOutward?.unavailable && !roadInward?.unavailable) {
+            payload.route_outward = roadOutward;
+            payload.route_inward = roadInward;
+          }
+        }
+      }
+      const { data } = await api.post("/game/dispatch/preview", payload);
       return { ok: true, data };
     } catch (e) {
       return {
@@ -538,7 +550,7 @@ export function GameProvider({ children }) {
         error: formatApiErrorDetail(e.response?.data?.detail) || e.message,
       };
     }
-  }, []);
+  }, [state]);
   const recommendOpportunityForTeam = useCallback(async (teamId) => {
     try {
       const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId });

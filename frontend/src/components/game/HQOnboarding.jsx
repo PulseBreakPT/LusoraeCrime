@@ -84,7 +84,14 @@ export default function HQOnboarding() {
     if (!point || verdict.status !== "valid" || placing) return;
     setPlacing(true);
     try {
-      const { data } = await api.post("/game/hq/place", { lat: point.lat, lng: point.lng }, { timeout: 20000 });
+      const requestId = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const { data } = await api.post(
+        "/game/hq/place",
+        { lat: point.lat, lng: point.lng, request_id: requestId },
+        { timeout: 20000 }
+      );
       const where = data?.hq?.name || "novo território";
       toast.success(`${where} estabelecido.`);
       await refresh();

@@ -211,6 +211,8 @@ export const LOCAL_CATALOG = {
       org_level_per_level:.12,
       category_mult:{assalto:1.05,logistica:.95,tecnica:1.10,influencia:.90,especial:1.25},
       rare_mult:1.6,
+      repeat_mult:.88,
+      repeat_reset_min:60,
     },
   },
   shop:{

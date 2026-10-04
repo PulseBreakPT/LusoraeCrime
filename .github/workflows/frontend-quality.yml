@@ -1,6 +1,21 @@
 name: Frontend quality gate
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/src/**"
+      - "frontend/scripts/**"
+      - "frontend/public/**"
+      - "frontend/package.json"
+      - "frontend/yarn.lock"
+      - "frontend/craco.config.js"
+      - "frontend/tailwind.config.js"
+      - "frontend/postcss.config.js"
+      - "design_guidelines.json"
+      - "PRODUCT.md"
+      - "DESIGN.md"
+      - ".github/workflows/frontend-quality.yml"
   pull_request:
     branches: [main]
     paths:

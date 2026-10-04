@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate Python syntax
-        run: python -m py_compile backend/engine.py backend/routes_game.py backend/routes_organization.py backend/organization_systems.py backend/models.py backend/retention_engine.py backend/road_routing.py backend/auth.py backend/reward_engine.py backend/server.py
+        run: python -m py_compile backend/engine.py backend/routes_game.py backend/routes_organization.py backend/organization_systems.py backend/models.py backend/retention_engine.py backend/road_routing.py backend/travel_metrics.py backend/time_rules.py backend/auth.py backend/reward_engine.py backend/server.py
 
       - name: Test Portugal economy
         run: python backend/tests/test_economy_portugal_2026.py
@@ -41,3 +41,15 @@ jobs:
 
       - name: Test organization systems
         run: PYTHONPATH=backend python backend/tests/test_organization_systems.py
+
+      - name: Test Portugal operation hours
+        run: PYTHONPATH=backend python -c "from datetime import datetime,timezone; from time_rules import portugal_hour_allowed; assert portugal_hour_allowed((22,5), datetime(2026,7,1,21,30,tzinfo=timezone.utc)); assert not portugal_hour_allowed((22,5), datetime(2026,7,1,20,30,tzinfo=timezone.utc))"
+
+      - name: Test road mission metrics
+        run: PYTHONPATH=backend python -c "from travel_metrics import road_mission_metrics; m=road_mission_metrics({'distance':12000},{'distance':14000},{'cons':8.0},10.0); assert m['round_km']==26 and abs(m['fuel_needed']-2.08)<1e-9 and m['travel_s']==1200 and m['return_travel_s']==1400"
+
+      - name: Test operation mechanical profiles
+        run: PYTHONPATH=backend python -c "from game_data import operation_profile_of; assert operation_profile_of('ciberataque_bancario','tecnica')=='digital'; assert operation_profile_of('rota_internacional','logistica')=='mobility'; assert operation_profile_of('operacao_fantasma','especial')=='stealth'; assert operation_profile_of('chantagem_politico','influencia')=='influence'; assert operation_profile_of('assalto_blindado','assalto')=='confrontation'"
+
+      - name: Test repeat and rare reward direction
+        run: PYTHONPATH=backend python -c "from reward_engine import calculate_money_reward as f; kw=dict(difficulty_score=1.2,risk=3,org_level=3,category='assalto',multiplier_stack=1.0); common=f(is_rare_mission=False,repeat_count=0,**kw); repeated=f(is_rare_mission=False,repeat_count=1,**kw); rare=f(is_rare_mission=True,repeat_count=0,**kw); assert repeated < common < rare"

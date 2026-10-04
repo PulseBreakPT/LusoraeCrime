@@ -110,6 +110,9 @@ from economy_constants import (
     PROPERTY_CONDITION_RECOVERY_PER_WEEK, PROPERTY_CONDITION_DECAY_MISSED_WEEK,
 )
 from economy_calendar import next_weekly_settlement, is_weekly_settlement
+from game_data import operation_profile_of
+from time_rules import portugal_hour_allowed
+
 from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
@@ -756,15 +759,8 @@ def duration_reward_mult(duration_s):
 
 
 def hour_allowed(type_key, now):
-    """Algumas oportunidades só aparecem em certas horas do dia (UTC)."""
-    hours = OPPORTUNITY_TYPES[type_key].get("hours")
-    if not hours:
-        return True
-    start, end = hours
-    h = now.hour
-    if start <= end:
-        return start <= h < end
-    return h >= start or h < end  # intervalo que atravessa a meia-noite
+    """Algumas oportunidades só aparecem nas horas locais configuradas para Portugal."""
+    return portugal_hour_allowed(OPPORTUNITY_TYPES[type_key].get("hours"), now)
 
 
 def age_decay_mult(age_s):
@@ -1003,7 +999,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
         return {
             "player_id": pid, "type_key": key,
             "name": (f"Golpe de Oportunidade: {t['name']}" if special else t["name"]),
-            "category": t["category"], "district": spot["name"],
+            "category": t["category"], "profile": operation_profile_of(key, t["category"]), "district": spot["name"],
             "lat": lat,
             "lng": lng,
             "dist_km": round(dist_km, 2),
