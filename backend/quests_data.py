@@ -11,7 +11,7 @@ QUEST_DEFS = {
     },
     "c1_first_dispatch": {
         "name": "Primeira Viagem", "type": "principal", "category": "operacao", "chapter": 1, "difficulty": "facil",
-        "desc": "Envia uma equipa com veículo para uma oportunidade no mapa. Lisboa está cheia de trabalho.",
+        "desc": "Envia uma equipa com veículo para uma oportunidade no mapa. Portugal está cheia de trabalho.",
         "objective": {"kind": "counter", "metric": "ops_dispatched", "target": 1, "label": "Despachar 1 operação"},
         "requires": ["c1_base"], "rewards": {"dirty": 1500, "respect": 30},
     },
@@ -45,7 +45,7 @@ QUEST_DEFS = {
     },
     "c2_fleet2": {
         "name": "Frota em Crescimento", "type": "principal", "category": "frota", "chapter": 2, "difficulty": "normal",
-        "desc": "Um veículo não chega para dominar Lisboa. Tem pelo menos 2 veículos na frota.",
+        "desc": "Um veículo não chega para dominar Portugal. Tem pelo menos 2 veículos na frota.",
         "objective": {"kind": "state", "metric": "vehicle_count", "target": 2, "label": "Ter 2 veículos"},
         "requires": ["c2_garage"], "rewards": {"dirty": 5000, "respect": 100},
     },
@@ -125,11 +125,11 @@ QUEST_DEFS = {
     },
     "c4_empire": {
         "name": "Império", "type": "principal", "category": "geral", "chapter": 4, "difficulty": "lendaria",
-        "desc": "Atinge o nível 5 de respeito. Lisboa vai conhecer o teu nome.",
+        "desc": "Atinge o nível 5 de respeito. Portugal vai conhecer o teu nome.",
         "objective": {"kind": "state", "metric": "level_at_least", "target": 5, "label": "Atingir nível 5"},
         "requires": ["c3_informant"],
         "rewards": {"employee": {"role": "espiao", "rarity": "lendario", "fallback_clean": 30000}, "respect": 500},
-        "unlocks_text": "Dominas Lisboa. Mas consolidar o império é outro trabalho — Capítulo 5 — Consolidação desbloqueado.",
+        "unlocks_text": "Dominas Portugal. Mas consolidar o império é outro trabalho — Capítulo 5 — Consolidação desbloqueado.",
     },
 
     # ---------- Capítulo 5 — Consolidação ----------
@@ -189,7 +189,7 @@ QUEST_DEFS = {
     },
     "c5_empire2": {
         "name": "Consolidação Total", "type": "principal", "category": "geral", "chapter": 5, "difficulty": "lendaria",
-        "desc": "Atinge o nível 8. Lisboa já não te escapa das mãos.",
+        "desc": "Atinge o nível 8. Portugal já não te escapa das mãos.",
         "objective": {"kind": "state", "metric": "level_at_least", "target": 8, "label": "Atingir nível 8"},
         "requires": ["c5_ops50"],
         "rewards": {"employee": {"role": "quimico", "rarity": "lendario", "fallback_clean": 40000}, "respect": 600},
@@ -247,17 +247,17 @@ QUEST_DEFS = {
     },
     "c6_properties10": {
         "name": "Impérios de Tijolo", "type": "principal", "category": "geral", "chapter": 6, "difficulty": "lendaria",
-        "desc": "Tem pelo menos 10 propriedades. O teu nome está em cada esquina de Lisboa.",
+        "desc": "Tem pelo menos 10 propriedades. O teu nome está em cada esquina de Portugal.",
         "objective": {"kind": "state", "metric": "property_count", "target": 10, "label": "Ter 10 propriedades"},
         "requires": ["c5_empire2"], "rewards": {"dirty": 36000, "respect": 480},
     },
     "c6_level10": {
-        "name": "Lenda de Lisboa", "type": "principal", "category": "geral", "chapter": 6, "difficulty": "lendaria",
-        "desc": "Atinge o nível máximo, 10. O teu nome fica escrito na história do crime organizado.",
+        "name": "Lenda de Portugal", "type": "principal", "category": "geral", "chapter": 6, "difficulty": "lendaria",
+        "desc": "Atinge o nível 10. É o fim do prólogo e o início da expansão nacional.",
         "objective": {"kind": "state", "metric": "level_at_least", "target": 10, "label": "Atingir nível 10"},
         "requires": ["c5_empire2"],
         "rewards": {"employee": {"role": "espiao", "rarity": "lendario", "fallback_clean": 60000}, "respect": 1000},
-        "unlocks_text": "És uma lenda de Lisboa. O teu legado está completo.",
+        "unlocks_text": "O prólogo terminou. A progressão nacional até ao nível 100 foi desbloqueada.",
     },
 
     # ---------- Diárias ----------
@@ -595,7 +595,7 @@ QUEST_DEFS = {
     },
     "ev_cidade_quente": {
         "name": "Cidade Quente", "type": "evento", "category": "operacao", "difficulty": "dificil", "duration_s": 2700,
-        "desc": "Rusgas por toda a Lisboa. Prova que operas mesmo debaixo de pressão: 2 operações concluídas.",
+        "desc": "Rusgas por toda a Portugal. Prova que operas mesmo debaixo de pressão: 2 operações concluídas.",
         "objective": {"kind": "counter", "metric": "missions_success", "target": 2, "label": "Concluir 2 operações"},
         "rewards": {"heat": -15, "dirty": 3000},
     },
@@ -606,7 +606,7 @@ QUEST_DEFS = {
         "rewards": {"dirty": 7000},
     },
     "ev_tempestade": {
-        "name": "Tempestade sobre Lisboa", "type": "evento", "category": "operacao", "difficulty": "dificil", "duration_s": 2700, "min_level": 2,
+        "name": "Tempestade sobre Portugal", "type": "evento", "category": "operacao", "difficulty": "dificil", "duration_s": 2700, "min_level": 2,
         "desc": "Chuva torrencial esvazia as ruas — perfeito para trabalho técnico. 2 operações técnicas.",
         "objective": {"kind": "counter", "metric": "success_by_category.tecnica", "target": 2, "label": "2 operações técnicas"},
         "rewards": {"clean": 5000},
@@ -710,6 +710,27 @@ QUEST_DEFS = {
         },
     },
 }
+
+# ---------- Progressão nacional 15-100 ----------
+_prev_level_quest = "c6_level10"
+for _level in range(15, 101, 5):
+    _key = f"national_level_{_level}"
+    _chapter = 7 + ((_level - 15) // 15)
+    _final = _level == 100
+    QUEST_DEFS[_key] = {
+        "name": "Império SUBMUNDO" if _final else f"Expansão Nacional · Nível {_level}",
+        "type": "principal",
+        "category": "geral",
+        "chapter": _chapter,
+        "difficulty": "lendaria" if _level >= 50 else "elite",
+        "min_level": max(1, _level - 5),
+        "desc": "Atinge o nível 100 e conclui a progressão máxima da organização." if _final else f"Consolida a organização e atinge o nível {_level}.",
+        "objective": {"kind": "state", "metric": "level_at_least", "target": _level, "label": f"Atingir nível {_level}"},
+        "requires": [_prev_level_quest],
+        "rewards": {"clean": 12000 + _level * 1800, "respect": 250 + _level * 15},
+        "unlocks_text": "Nível 100 alcançado. O endgame SUBMUNDO está totalmente desbloqueado." if _final else f"Marco {_level} concluído. Próximo objetivo: nível {_level + 5}.",
+    }
+    _prev_level_quest = _key
 
 QUEST_ORDER = {k: i for i, k in enumerate(QUEST_DEFS)}
 
