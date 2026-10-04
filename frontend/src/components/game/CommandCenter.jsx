@@ -9,7 +9,7 @@ import {
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, orgAlerts, teamsReadiness } from "../../lib/game";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
 
@@ -285,11 +285,8 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
       >
         <DialogHeader className="border-b border-white/10 px-4 pb-3 pt-4">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Search size={17} className="text-red-400" /> Centro de Comandos
+            <Search size={17} className="text-red-400" /> Pesquisa
           </DialogTitle>
-          <DialogDescription className="text-[11px] text-zinc-500">
-            Procura qualquer área, ativo ou operação e executa ações globais.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="relative border-b border-white/10">
@@ -299,13 +296,13 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
             data-testid="command-search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Escreve um comando, nome, veículo ou operação…"
+            placeholder="Pesquisar área, veículo ou operação…"
             className="h-12 rounded-none border-0 bg-transparent pl-11 pr-4 font-mono text-sm text-white shadow-none focus-visible:ring-0"
           />
         </div>
 
         <ScrollArea className="h-[min(55vh,430px)]">
-          <div className="p-2" role="listbox" aria-label="Resultados de comandos">
+          <div className="p-2" role="listbox" aria-label="Resultados de pesquisa">
             {!query && recentIds.length > 0 && (
               <p className="px-2 pb-1 pt-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">
                 Recentes e ações rápidas
