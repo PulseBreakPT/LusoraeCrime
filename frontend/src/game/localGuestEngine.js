@@ -1106,8 +1106,26 @@ const mutateGame=(save,path,payload)=>{
     const list=save.player.favorite_types||=[];const i=list.indexOf(p.type_key);if(i>=0)list.splice(i,1);else list.push(p.type_key);return {ok:true};
   }
   if(path==="teams/create"){
-    if(caps.teams.used>=caps.teams.max)fail(400,"Limite de equipas atingido");chargeClean(save,LOCAL_CATALOG.team_create_cost,"Formação de equipa");
-    const t=makeTeam();t.name=`Crew ${String.fromCharCode(65+save.teams.length)}`;t.spec=p.spec||"assalto";t.vehicle_id=null;save.teams.push(t);return {ok:true,team_id:t.id};
+    if(caps.teams.used>=caps.teams.max)fail(400,"Limite de equipas atingido");
+    const memberIds=[...new Set(p.employee_ids||[])];
+    if(memberIds.length>(LOCAL_CATALOG.team_max_members||4))fail(400,"Equipa demasiado grande");
+    const members=memberIds.map(id=>save.employees.find(e=>e.id===id));
+    if(members.some(e=>!e))fail(404,"Operacional não encontrado");
+    if(members.some(e=>e.status!=="idle"||e.team_id))fail(400,"Um ou mais operacionais estão indisponíveis");
+    const vehicle=p.vehicle_id?save.vehicles.find(v=>v.id===p.vehicle_id):null;
+    if(p.vehicle_id&&!vehicle)fail(404,"Veículo não encontrado");
+    if(vehicle?.team_id||vehicle?.transfer)fail(400,"Veículo indisponível");
+    const seats=vehicle?(LOCAL_CATALOG.vehicle_models?.[vehicle.model_key]?.seats||0):0;
+    if(vehicle&&memberIds.length&&seats&&memberIds.length>seats)fail(400,`O veículo só tem ${seats} lugares`);
+    chargeClean(save,LOCAL_CATALOG.team_create_cost,"Formação de equipa");
+    const t=makeTeam();
+    t.name=`Crew ${String.fromCharCode(65+save.teams.length)}`;
+    t.spec=p.spec||"assalto";
+    t.vehicle_id=vehicle?.id||null;
+    save.teams.push(t);
+    members.forEach(e=>{e.team_id=t.id;});
+    if(vehicle)vehicle.team_id=t.id;
+    return {ok:true,team_id:t.id,team_name:t.name,assigned_members:members.length,vehicle_id:vehicle?.id||null};
   }
   if(path==="teams/equip_emblem"){
     const team=save.teams.find((t)=>t.id===p.team_id);
