@@ -241,9 +241,9 @@ export function LiveOpsPanel({ state, serverNow }) {
             {segs.map((sg, i) => (
               <div key={i} className="flex-1">
                 <div className="sub-lo-seg">
-                  <div className="sub-lo-seg-fill" style={{ width: `${sg.f * 100}%`, background: sg.col }} />
+                  <div className="sub-lo-seg-fill" style={{ transform: `scaleX(${sg.f})`, background: sg.col }} />
                 </div>
-                <p className={`mt-0.5 text-center font-mono text-[8px] uppercase tracking-[0.2em] ${sg.f > 0 && sg.f < 1 ? "text-zinc-300" : "text-zinc-600"}`}>
+                <p className={`mt-0.5 text-center font-mono text-[9px] uppercase tracking-[0.2em] ${sg.f > 0 && sg.f < 1 ? "text-zinc-300" : "text-zinc-600"}`}>
                   {sg.label}
                 </p>
               </div>
@@ -251,7 +251,7 @@ export function LiveOpsPanel({ state, serverNow }) {
           </div>
         </div>
         <div className="w-16 shrink-0 text-right" title="Probabilidade atual de sucesso.">
-          <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-zinc-500">Chance</p>
+          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Chance</p>
           <p
             className={`font-mono text-lg font-bold leading-none tabular-nums ${recentComp ? "sub-lo-chance-pulse" : ""}`}
             style={{ color: chanceCol }}
@@ -303,7 +303,7 @@ export function LiveOpsPanel({ state, serverNow }) {
           const fresh = isLast && now - Date.parse(e.at) < 2600;
           return (
             <div key={`${e.at}-${i}`} className="sub-lo-line flex items-baseline gap-1.5 py-[3px]" data-testid="liveops-line">
-              <span className="shrink-0 font-mono text-[8.5px] tabular-nums text-zinc-600">{fmtHMS(e.at)}</span>
+              <span className="shrink-0 font-mono text-[9px] tabular-nums text-zinc-600">{fmtHMS(e.at)}</span>
               <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider" style={{ color: e.pct != null ? meta.color : catColor }}>
                 {e.speaker}
               </span>
