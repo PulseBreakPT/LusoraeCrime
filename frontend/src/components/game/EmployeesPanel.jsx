@@ -8,7 +8,7 @@ import {
 import { cn } from "../../lib/utils";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, EmptyState, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -580,7 +580,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="employees-panel">
         <SheetHeader>
           <PanelWatermark icon={IdCard} />
-          <PanelKicker>Recursos · Efetivo</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <IdCard size={18} className="text-primary" /> Operacionais
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="employee-caps">{caps.used}/{caps.max}</span>
