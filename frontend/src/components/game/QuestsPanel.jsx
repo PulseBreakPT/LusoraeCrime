@@ -7,7 +7,7 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
-import { MiniBar, PanelKicker, PanelWatermark, SectionHeader, SummaryStrip, Kpi, Tip } from "./hud";
+import { MiniBar, PanelWatermark, SectionHeader, SummaryStrip, Kpi, Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -277,7 +277,6 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
       <SheetContent side="right" className="overflow-y-auto sub-panel" data-testid="quests-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
-          <PanelKicker>Contratos · Objetivos</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-primary" /> Missões
             {claimable > 0 && (
