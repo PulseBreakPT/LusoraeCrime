@@ -124,7 +124,17 @@ async def _change_dirty(player, amount, note, kind):
 @router.get("/state")
 async def get_city_state(user: dict = Depends(get_current_user)):
     player = await get_player(user)
-    return await city_snapshot(db, player)
+    snapshot = await city_snapshot(db, player)
+    blocked = {str(value) for value in (player.get("city_blocked_player_ids") or [])}
+    social = snapshot.get("social") or {}
+    if blocked:
+        social["chat"] = [
+            row for row in (social.get("chat") or [])
+            if str(row.get("player_id") or "") not in blocked
+        ]
+    social["blocked_player_ids"] = sorted(blocked)
+    snapshot["social"] = social
+    return snapshot
 
 
 @router.post("/businesses/buy")
