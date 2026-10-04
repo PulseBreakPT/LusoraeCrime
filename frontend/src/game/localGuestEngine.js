@@ -394,6 +394,13 @@ const ensureOrganizationSave = (save) => {
   save.player.territories ||= {};
   save.player.prestige_items ||= [];
   save.player.governance ||= {};
+  save.player.organization_policy ||= {
+    reserve_cash:25000,
+    max_single_spend_pct:.35,
+    stock_targets:{},
+    automation:{enabled:false,auto_restock:false,renew_insurance:false,preventive_service:false},
+  };
+  save.organization_audit ||= [];
   (save.teams || []).forEach((team) => {
     team.doctrine ||= "balanced";
     team.policies ||= { abort_below_pct:0, protect_injured:true, auto_use_medical:true, auto_use_armor:true };
@@ -422,6 +429,8 @@ const ensureOrganizationSave = (save) => {
     property.storage_level = Number(property.storage_level || 0);
     property.operations_level = Number(property.operations_level || 0);
     property.staff_employee_ids ||= [];
+    property.staff_roles ||= {};
+    property.staff_effectiveness = Number(property.staff_effectiveness || 0);
   });
   (save.employees || []).forEach((employee) => {
     employee.stationed_property_id ||= null;
@@ -463,6 +472,105 @@ const orgTerritoryIncome = (save) => {
 
 const orgProtectionCost = (save) =>
   save.player.level < 5 ? 0 : 25000 + (save.employees?.length || 0) * 1000 + (save.properties?.length || 0) * 2000;
+
+const guestLogisticsMult=(save)=>Math.max(.70,1-Number(save.player.departments?.logistica||0)*.06);
+
+const guestOrgPolicy=(save)=>({
+  reserve_cash:Math.max(0,Number(save.player.organization_policy?.reserve_cash??25000)),
+  max_single_spend_pct:clamp(Number(save.player.organization_policy?.max_single_spend_pct??.35),.05,1),
+  stock_targets:{...(save.player.organization_policy?.stock_targets||{})},
+  automation:{
+    enabled:!!save.player.organization_policy?.automation?.enabled,
+    auto_restock:!!save.player.organization_policy?.automation?.auto_restock,
+    renew_insurance:!!save.player.organization_policy?.automation?.renew_insurance,
+    preventive_service:!!save.player.organization_policy?.automation?.preventive_service,
+  },
+});
+
+const guestOrgIntelligence=(save)=>{
+  ensureOrganizationSave(save);
+  const org=LOCAL_CATALOG.organization||{};
+  const policy=guestOrgPolicy(save);
+  const inventory=save.player.inventory||{};
+  const reserved={};
+  Object.keys(org.supplies||{}).forEach((key)=>reserved[key]=0);
+  (save.teams||[]).forEach((team)=>Object.entries(team.loadout||{}).forEach(([key,qty])=>{
+    if(key in reserved) reserved[key]+=Math.max(0,Number(qty||0));
+  }));
+  const stock=Object.entries(org.supplies||{}).map(([key,cfg])=>{
+    const qty=Number(inventory[key]||0), target=Math.max(Number(policy.stock_targets[key]||0),Number(reserved[key]||0)*3);
+    const ratio=target>0?qty/target:1;
+    return {
+      key,name:cfg.name,qty,target,reserved_per_dispatch:reserved[key]||0,
+      coverage_dispatches:reserved[key]?Math.round(qty/reserved[key]*10)/10:null,
+      status:ratio>=1?"ok":ratio>=.5?"low":"critical",
+      reorder_packs:Math.max(0,Math.ceil(Math.max(0,target-qty)/Math.max(1,Number(cfg.pack||1)))),
+      buy_price:Math.max(1,Math.trunc(Number(cfg.price||0)*guestLogisticsMult(save))),
+      sell_value:Math.trunc(Number(cfg.price||0)*.45),
+    };
+  });
+  const recent=(save.transactions||[]).filter((tx)=>Date.parse(tx.ts||0)>=Date.now()-28*86400000);
+  const income=recent.reduce((sum,tx)=>sum+Math.max(0,Number(tx.amount||0)),0);
+  const expenses=recent.reduce((sum,tx)=>sum+Math.abs(Math.min(0,Number(tx.amount||0))),0);
+  const gross=(save.employees||[]).reduce((sum,e)=>sum+Number(e.salary||0),0);
+  const weeklyBurn=Math.max(1,gross*1.2375,expenses/4);
+  const runway=Number(save.player.clean_money||0)/weeklyBurn;
+  const financeScore=clamp(runway/8*100);
+  const fleet=(save.vehicles||[]).map((v)=>{
+    const condition=Number(v.condition||0),missing=Math.max(0,100-condition);
+    const lc=org.vehicle_lifecycle||{};
+    const base=Math.max(120,Math.trunc(Number(v.price||LOCAL_CATALOG.vehicle_models?.[v.model_key]?.price||0)*Number(lc.service_base_pct||.018)+missing*8));
+    const material=(Number(inventory.service_fluids||0)>0?Number(org.supplies?.service_fluids?.price||0):0)+(missing>=20&&Number(inventory.vehicle_parts||0)>0?Number(org.supplies?.vehicle_parts?.price||0):0);
+    const service=Math.max(60,base-Math.trunc(material*.70));
+    const insurance=Math.max(80,Math.trunc(Number(v.price||0)*Number(lc.insurance_week_pct||.0012)*4));
+    let score=100;
+    if(condition<70)score-=(70-condition)*.8;
+    if(Number(v.tires_pct??100)<45)score-=(45-Number(v.tires_pct??100))*.7;
+    const reasons=[];
+    if(condition<60)reasons.push("condição baixa");
+    if(Number(v.tires_pct??100)<35)reasons.push("pneus gastos");
+    if(!v.insurance_until||Date.parse(v.insurance_until)<=Date.now()){score-=16;reasons.push("sem seguro");}
+    return {id:v.id,name:v.name,score:Math.round(clamp(score)),condition,tires_pct:Number(v.tires_pct??100),reasons,costs:{service,service_base:base,tires:Number(inventory.tire_set||0)>0?0:Number(org.supplies?.tire_set?.price||520),insurance,inspection:Number(lc.inspection_base||85)}};
+  });
+  const properties=(save.properties||[]).map((p)=>{
+    const module_costs={};
+    Object.entries(org.property_modules||{}).forEach(([key,cfg])=>{
+      const level=Number(p[`${key}_level`]||0);
+      module_costs[key]=level>=Number(cfg.max_level||0)?null:Math.trunc(Number(cfg.base_cost||0)*(1+level*.75)*Number(p.market_multiplier||1));
+    });
+    const staffScore=clamp(Number(p.staff_effectiveness||0)*100);
+    return {id:p.id,name:p.name,score:Math.round(clamp(Number(p.condition||100)*.6+staffScore*.4)),condition:Number(p.condition||100),staff_score:Math.round(staffScore),staff_count:(p.staff_employee_ids||[]).length,staff_roles:{...(p.staff_roles||{})},module_costs};
+  });
+  const territories=Object.entries(save.player.territories||{}).map(([district,info])=>{
+    const tier=Number(info.tier||1),cfg=org.territory_tiers?.[tier]||{},next=org.territory_tiers?.[tier+1];
+    return {district,tier,defense:Number(info.defense||0),pressure:Number(info.pressure||0),score:Math.round(clamp(Number(info.defense||0)*.65+(100-Number(info.pressure||0))*.35)),costs:{defend:Math.max(500,Math.trunc(Number(cfg.defense_weekly||0)*1.5)),consolidate:next?Number(next.cost||0):null}};
+  });
+  const fleetScore=fleet.length?fleet.reduce((a,v)=>a+v.score,0)/fleet.length:45;
+  const propertyScore=properties.length?properties.reduce((a,p)=>a+p.score,0)/properties.length:55;
+  const logisticsScore=clamp(100-stock.filter(x=>x.status==="critical").length*8-(orgInventoryUsed(save)/Math.max(1,orgInventoryCapacity(save))>.9?20:0));
+  const territoryScore=territories.length?territories.reduce((a,t)=>a+t.score,0)/territories.length:70;
+  const crewScore=save.teams.length?clamp(75+save.teams.filter(t=>t.status==="idle").length/save.teams.length*20):35;
+  const securityScore=clamp(100-Number(save.player.heat||0));
+  const overall=Math.round(financeScore*.24+crewScore*.18+fleetScore*.16+logisticsScore*.15+propertyScore*.12+territoryScore*.10+securityScore*.05);
+  const alerts=[];
+  if(runway<1.25)alerts.push({severity:"critical",code:"cash_runway",title:"Caixa em risco",detail:`Runway de ${runway.toFixed(1)} semanas.`,tab:"centro"});
+  stock.filter(x=>x.status==="critical").slice(0,5).forEach(x=>alerts.push({severity:"critical",code:`stock:${x.key}`,title:`${x.name} crítico`,detail:`Stock ${x.qty} / alvo ${x.target}.`,tab:"stock",entity_id:x.key}));
+  fleet.filter(x=>x.score<55).forEach(x=>alerts.push({severity:"critical",code:`vehicle:${x.id}`,title:`${x.name} exige atenção`,detail:x.reasons.join(", ")||"prontidão baixa",tab:"frota",entity_id:x.id}));
+  territories.filter(x=>x.defense<35||x.pressure>75).forEach(x=>alerts.push({severity:"critical",code:`territory:${x.district}`,title:`${x.district} instável`,detail:`Defesa ${x.defense}% · pressão ${x.pressure}%.`,tab:"territorios",entity_id:x.district}));
+  const deptQuotes={};
+  Object.entries(org.departments||{}).forEach(([key,cfg])=>{const level=Number(save.player.departments?.[key]||0);deptQuotes[key]={level,next_cost:level>=Number(cfg.max_level||0)?null:Math.trunc(Number(cfg.base_cost||0)*(1+level*.75))};});
+  return {
+    health:{score:overall,grade:overall>=92?"SSS":overall>=85?"SS":overall>=78?"S":overall>=68?"A":overall>=55?"B":"C",finance:Math.round(financeScore),crew:Math.round(crewScore),fleet:Math.round(fleetScore),logistics:Math.round(logisticsScore),properties:Math.round(propertyScore),territory:Math.round(territoryScore),security:Math.round(securityScore)},
+    finance:{cash:Number(save.player.clean_money||0),weekly_burn:Math.round(weeklyBurn),runway_weeks:Math.round(runway*10)/10,income_28d:Math.round(income),expenses_28d:Math.round(expenses),reserve_cash:policy.reserve_cash,available_above_reserve:Math.max(0,Number(save.player.clean_money||0)-policy.reserve_cash)},
+    organization:{score:(save.employees.length*8+save.teams.length*18+save.vehicles.length*6+save.properties.length*22),dimensions:{power:Math.min(100,save.employees.length*8),influence:Math.min(100,territories.length*14),logistics:Math.round(logisticsScore),security:Math.round(securityScore),management:Math.round((financeScore+crewScore+propertyScore)/3)}},
+    quotes:{departments:deptQuotes,protection:orgProtectionCost(save),territory_claim:Number(org.territory_tiers?.[1]?.cost||0)},
+    storage:{used:Number(orgInventoryUsed(save).toFixed(2)),capacity:orgInventoryCapacity(save),pct:Math.round(orgInventoryUsed(save)/Math.max(1,orgInventoryCapacity(save))*1000)/10},
+    stock,fleet,properties,territories,teams:(save.teams||[]).map(t=>({id:t.id,name:t.name,score:t.status==="idle"?90:82,status:t.status,doctrine:t.doctrine||"balanced",reasons:[]})),
+    alerts,alert_counts:{critical:alerts.filter(a=>a.severity==="critical").length,warning:0,info:0},
+    recommendations:alerts.slice(0,5).map(a=>({title:a.title,reason:a.detail,tab:a.tab,entity_id:a.entity_id,confidence:.9,action:"review"})),
+    policy,
+  };
+};
 
 const loadSave = () => {
   try {
