@@ -74,7 +74,9 @@
     "android:open": "cap open android",
     "android:prepare": "PUBLIC_URL=/ yarn build && cap sync android",
     "android:bundle": "cd android && ./gradlew bundleRelease",
-    "impeccable:detect": "npx -y impeccable detect --json src/"
+    "impeccable:detect": "npx -y impeccable detect --json src/",
+    "ui:audit": "node scripts/ui-quality-audit.mjs",
+    "quality:ui": "yarn impeccable:detect && yarn ui:audit"
   },
   "browserslist": {
     "production": [

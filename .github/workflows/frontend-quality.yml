@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "frontend/src/**"
+      - "frontend/scripts/**"
       - "frontend/public/**"
       - "frontend/package.json"
       - "frontend/yarn.lock"
