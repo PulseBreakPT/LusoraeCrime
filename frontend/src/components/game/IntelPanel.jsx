@@ -2,7 +2,6 @@ import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -142,18 +141,23 @@ const RecommendedActions = ({ onNavigate }) => {
       ) : (
         <div className="sub-action-list overflow-hidden rounded-xl border border-white/[0.065]">
           {recs.map((r) => (
-            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="sub-action-row flex items-center justify-between gap-2 rounded-none border-0 px-3 py-2.5 shadow-none">
-              <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
-              <Button
+            <button
+              key={r.id}
+              type="button"
+              data-testid={`intel-rec-${r.id}`}
+              onClick={r.run}
+              disabled={!r.can}
+              title={`${r.action}: ${r.text}`}
+              className="sub-action-row flex w-full items-center justify-between gap-2 rounded-none border-0 px-3 py-2.5 text-left shadow-none transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500/45 disabled:opacity-45"
+            >
+              <span className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</span>
+              <span
                 data-testid={`intel-rec-action-${r.id}`}
-                variant="outline" size="sm"
-                onClick={r.run}
-                disabled={!r.can}
-                className="h-auto shrink-0 gap-1 border-white/15 px-2 py-1 font-mono text-[10px] font-bold text-cyan-300 hover:bg-white/10"
+                className="flex shrink-0 items-center gap-1 font-mono text-[10px] font-bold text-cyan-300"
               >
                 {r.action} <ArrowRight size={10} />
-              </Button>
-            </Card>
+              </span>
+            </button>
           ))}
         </div>
       )}
