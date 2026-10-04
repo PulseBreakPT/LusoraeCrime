@@ -809,6 +809,8 @@ export function GameProvider({ children }) {
     action("org/territories/defend", { district }, "Defesa territorial reforçada");
   const buyPrestige = (itemKey) =>
     action("org/prestige/buy", { item_key: itemKey }, "Investimento adquirido");
+  const chooseOrganizationSpecialization = (specializationKey) =>
+    action("org/specialization/choose", { specialization_key: specializationKey }, "Especialização da organização definida");
   const buyProtection = () =>
     action("org/governance/protection", {}, "Rede de proteção renovada");
   const fetchFinanceSummary = useCallback(async () => {
@@ -1046,6 +1048,7 @@ export function GameProvider({ children }) {
         consolidateTerritory,
         defendTerritory,
         buyPrestige,
+        chooseOrganizationSpecialization,
         buyProtection,
         fetchFinanceSummary,
         fetchOrganizationIntelligence,
