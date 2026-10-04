@@ -1221,10 +1221,7 @@ export function resolveEventNavigation(state, event) {
   }
 
   if (base.panel === "fleet") {
-    item = longestNamedMatch(msg, state.vehicles, (v) => [
-      v.name,
-      state.catalog?.vehicle_models?.[v.model_key]?.name,
-    ]);
+    item = longestNamedMatch(msg, state.vehicles, (v) => [v.name]);
     if (item) return { ...base, focusTestId: `vehicle-card-${item.id}` };
   }
 
@@ -1234,7 +1231,7 @@ export function resolveEventNavigation(state, event) {
   }
 
   if (base.panel === "properties") {
-    item = longestNamedMatch(msg, state.properties, (p) => [p.name, p.district]);
+    item = longestNamedMatch(msg, state.properties, (p) => [p.name]);
     if (item) return { ...base, focusTestId: `property-card-${item.id}` };
   }
 
