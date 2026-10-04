@@ -99,7 +99,7 @@ describe("UI action ownership", () => {
   test("team builder creates the selected configuration in one action", () => {
     expect(teams).toContain('data-testid="team-builder"');
     expect(teams).toContain('data-testid="team-builder-vehicle"');
-    expect(teams).toContain('data-testid="team-builder-create"');
+    expect(teams).toContain('testId="team-builder-create"');
     expect(teams).toContain("createTeam(spec, memberIds, selectedVehicle?.id || null)");
     expect(teams).not.toContain("testId={`create-team-${key}`}");
     expect(gameContext).toContain("employee_ids: employeeIds");
