@@ -206,7 +206,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
       aria-selected={tab === "log"}
       data-testid={`${idPrefix}-tab-log`}
       onClick={() => onTab("log")}
-      className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] transition-colors ${
+      className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors ${
         tab === "log" ? "text-white" : "text-zinc-500 hover:text-zinc-300"
       }`}
     >
@@ -229,7 +229,7 @@ const FilterChips = ({ counts, filter, onFilter }) => (
         aria-selected={filter === c.key}
         data-testid={`feed-filter-${c.key}`}
         onClick={() => onFilter(c.key)}
-        className={`sub-feed-chip font-mono ${filter === c.key ? "is-active" : ""}`}
+        className={`sub-feed-chip ${filter === c.key ? "is-active" : ""}`}
       >
         {c.label}
         <span className="sub-feed-chip-n">{counts[c.key] || 0}</span>
@@ -350,7 +350,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
           type="button"
           data-testid="feed-collapse-toggle"
           onClick={toggleCollapsed}
-          title={collapsed ? "Abrir a atividade" : "Encolher a atividade"}
+          title={collapsed ? "Abrir notificações" : "Encolher notificações"}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.035] text-zinc-300">
