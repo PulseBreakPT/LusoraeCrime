@@ -6,7 +6,7 @@ import {
   weaponTier, WEAPON_STATS, weaponStatValue, weaponJamRisk, weaponConditionFactor, weaponSkillInfo,
   weaponWearPerMission, weaponAdequacy,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -174,7 +174,6 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Swords} />
-          <PanelKicker>Arsenal · Equipamento</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Swords size={18} className="text-primary" /> Armamento
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="weapons-count">{weapons.length}</span>
