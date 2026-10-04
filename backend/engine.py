@@ -2362,6 +2362,16 @@ async def _progress_mission(db, player, m, now):
             if heat_now - heat_then >= SMART_WARN_HEAT_DELTA:
                 await add_event(db, m["player_id"], "intel",
                                 f"Líder de {m['team_name']} reporta do alvo: o calor subiu de {round(heat_then)}% para {round(heat_now)}% desde a partida — condições piores do que o planeado. A equipa mantém a operação.")
+    if phase == "operating":
+        decision = m.get("decision") or {}
+        if (
+            decision.get("status") == "pending"
+            and decision.get("expires_at")
+            and now > parse_dt(decision["expires_at"])
+        ):
+            decision = {**decision, "status": "expired"}
+            updates["decision"] = decision
+            m["decision"] = decision
     if phase == "operating" and now >= parse_dt(m["finish_at"]):
         outcome = _roll_outcome(player, m)
         _apply_outcome(player, m, outcome)
