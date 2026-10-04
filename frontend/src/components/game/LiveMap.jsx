@@ -1359,7 +1359,7 @@ export const PlacementControls = () => {
 // o idioma de atribuição). Esbate (não esconde) propriedades e missões que
 // não pertencem à base selecionada. Vive no topo-esquerdo, sob a ResourceBar,
 // para não colidir com o dock (que no mobile está encostado à esquerda) nem
-// com a central da rede.
+// com o estado partilhado do jogo.
 export const MapBaseFilter = ({ value, onChange }) => {
   const { state } = useGame();
   if (!state?.properties?.length) return null;
