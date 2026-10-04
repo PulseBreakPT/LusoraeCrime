@@ -4853,3 +4853,119 @@ html.sub-focus-mode .sub-optional-hud {
         padding-inline: 0.3rem !important;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO CONTEXT MODALS — dock-connected floating panels
+   Os painéis deixam de funcionar como gavetas laterais e passam
+   a surgir como superfícies flutuantes ligadas ao grupo de origem.
+   ============================================================ */
+
+.sub-sheet-panel {
+    overflow: visible !important;
+    border-color: rgba(255, 255, 255, 0.09) !important;
+    background: #0a0a0d !important;
+    box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(255, 255, 255, 0.018) inset !important;
+}
+
+.sub-sheet-scroll {
+    width: 100%;
+    max-height: inherit;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    border-radius: inherit;
+    scrollbar-gutter: stable;
+}
+
+/* Pequena cauda física que aponta para o botão do dock de onde nasceu o modal. */
+.sub-sheet-panel::after {
+    content: "";
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    transform: translateX(-50%) rotate(45deg);
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    background: #0a0a0d;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Os cinco grupos do dock ocupam posições regulares em redor do centro. */
+html[data-sub-panel-origin="operations"] .sub-sheet-panel::after {
+    left: calc(50% - 88px);
+}
+
+html[data-sub-panel-origin="crew"] .sub-sheet-panel::after {
+    left: calc(50% - 44px);
+}
+
+html[data-sub-panel-origin="equipment"] .sub-sheet-panel::after {
+    left: 50%;
+}
+
+html[data-sub-panel-origin="empire"] .sub-sheet-panel::after {
+    left: calc(50% + 44px);
+}
+
+html[data-sub-panel-origin="menu"] .sub-sheet-panel::after {
+    left: calc(50% + 88px);
+}
+
+/* O topo continua preso ao modal, mas sem parecer uma barra de aplicação. */
+.sub-sheet-panel .sub-sheet-scroll > [class*="sticky"][class*="top-0"] {
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+/* O botão fechar vive no canto do modal, não no scroll. */
+.sub-sheet-panel > button[data-radix-collection-item],
+.sub-sheet-panel > button {
+    isolation: isolate;
+}
+
+/* Mobile: continua a ser modal e preserva o mapa visível em redor. */
+@media (max-width: 639px) {
+    .sub-sheet-panel {
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important;
+        max-height: calc(100dvh - 6rem) !important;
+        border-radius: 16px !important;
+    }
+
+    .sub-sheet-scroll {
+        max-height: calc(100dvh - 6rem);
+    }
+
+    html[data-sub-panel-origin="operations"] .sub-sheet-panel::after {
+        left: calc(50% - 82px);
+    }
+
+    html[data-sub-panel-origin="crew"] .sub-sheet-panel::after {
+        left: calc(50% - 41px);
+    }
+
+    html[data-sub-panel-origin="equipment"] .sub-sheet-panel::after {
+        left: 50%;
+    }
+
+    html[data-sub-panel-origin="empire"] .sub-sheet-panel::after {
+        left: calc(50% + 41px);
+    }
+
+    html[data-sub-panel-origin="menu"] .sub-sheet-panel::after {
+        left: calc(50% + 82px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sub-sheet-panel {
+        transition: none !important;
+    }
+}
