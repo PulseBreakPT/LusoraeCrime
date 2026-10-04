@@ -144,7 +144,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
           </Tip>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="properties-list">
+        <div className="mt-3 flex flex-col gap-2" data-testid="properties-list">
           {state.player.heat >= 70 && props.some((p) => p.type_key === "laboratorio") && (
             <Alert variant="destructive" data-testid="raid-warning" className="border-red-600/40 bg-red-600/10 py-2">
               <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
@@ -301,7 +301,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Landmark} title="Mercado imobiliário" meta={catalog ? `${Object.keys(catalog.property_types || {}).length} tipos` : undefined} />
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-2">
             {catalog &&
               Object.entries(catalog.property_types).map(([key, pt]) => {
                 const tier = propertyTier(pt);
