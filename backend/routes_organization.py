@@ -15,6 +15,7 @@ from organization_systems import (
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
+    PRESTIGE_CATALOG, protection_cost,
 )
 
 router = APIRouter(prefix="/api/game/org", tags=["organization"])
@@ -108,6 +109,7 @@ async def organization_catalog():
         "territory_tiers": TERRITORY_TIERS,
         "property_modules": PROPERTY_MODULES,
         "vehicle_lifecycle": VEHICLE_LIFECYCLE,
+        "prestige": PRESTIGE_CATALOG,
     }
 
 
@@ -459,3 +461,45 @@ async def vehicle_lifecycle(vehicle_id: str, user: dict = Depends(get_current_us
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     return vehicle_service_snapshot(vehicle)
+
+
+class PrestigeInput(BaseModel):
+    item_key: str
+
+
+@router.post("/prestige/buy")
+async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    cfg = PRESTIGE_CATALOG.get(body.item_key)
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Investimento de prestígio inválido")
+    if int(player.get("level", 1) or 1) < int(cfg.get("unlock_level", 1) or 1):
+        raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {cfg.get('unlock_level', 1)}")
+    if body.item_key in set(player.get("prestige_items") or []):
+        raise HTTPException(status_code=400, detail="Investimento já adquirido")
+    cost = int(cfg["cost"])
+    await _debit(player, cost, stat="prestige_purchases")
+    await db.players.update_one({"_id": player["_id"]}, {"$addToSet": {"prestige_items": body.item_key}})
+    await record_tx(db, str(player["_id"]), "prestige", -cost, "clean", player["clean_money"], cfg["name"])
+    return {"ok": True, "cost": cost}
+
+
+@router.post("/governance/protection")
+async def buy_protection(user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    employees, properties = await __import__("asyncio").gather(
+        db.employees.count_documents({"player_id": pid}),
+        db.properties.count_documents({"player_id": pid}),
+    )
+    cost = protection_cost(player, employees, properties)
+    if cost <= 0:
+        raise HTTPException(status_code=400, detail="Rede de proteção desbloqueia no nível 5")
+    await _debit(player, cost, stat="protection_payments")
+    until = (now_utc() + timedelta(days=30)).isoformat()
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+        "governance.protection_until": until,
+        "governance.last_cost": cost,
+    }})
+    await record_tx(db, pid, "protection", -cost, "clean", player["clean_money"], "Rede de proteção — 30 dias")
+    return {"ok": True, "cost": cost, "protection_until": until}
