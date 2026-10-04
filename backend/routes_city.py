@@ -16,7 +16,7 @@ from city_data import (
     BUSINESS_TYPES, RIVAL_ACTIONS, CASINO_MIN_BET, CASINO_MAX_BET,
 )
 from city_systems import (
-    city_snapshot, business_projection, season_info,
+    city_snapshot, business_projection, season_info, boss_status,
 )
 
 router = APIRouter(prefix="/api/game/city", tags=["city"])
@@ -507,10 +507,19 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
         upsert=True,
     )
     consequence = None
-    if rng.random() < 0.08:
-        until = (now_utc() + timedelta(minutes=rng.randint(10, 30))).isoformat()
-        await db.players.update_one({"_id": loser["_id"]}, {"$set": {"boss_hospital_until": until, "boss_health": rng.randint(55, 80)}})
+    loser_fields = {}
+    loser_inc = {"boss_stress": 8}
+    if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:
+        loser_fields["boss_sentence_until"] = (now_utc() + timedelta(minutes=rng.randint(15, 45))).isoformat()
+        consequence = "sentence"
+    elif rng.random() < 0.08:
+        loser_fields["boss_hospital_until"] = (now_utc() + timedelta(minutes=rng.randint(10, 30))).isoformat()
+        loser_fields["boss_health"] = rng.randint(55, 80)
         consequence = "hospital"
+    await db.players.update_one(
+        {"_id": loser["_id"]},
+        {"$set": loser_fields, "$inc": loser_inc} if loser_fields else {"$inc": loser_inc},
+    )
     await db.city_pvp_challenges.update_one(
         {"_id": challenge["_id"]},
         {"$set": {
@@ -548,10 +557,16 @@ async def decline_pvp(body: PvpDeclineInput, user: dict = Depends(get_current_us
 async def recover_boss(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     now = now_utc()
-    hospital = player.get("boss_hospital_until")
-    sentence = player.get("boss_sentence_until")
+    status = boss_status(player, now)
+    hospital = status.get("hospital_until")
+    sentence = status.get("sentence_until")
     cost = 0
-    fields = {"boss_health": 100, "boss_stress": max(0, int(player.get("boss_stress", 0)) - 30)}
+    fields = {
+        "boss_health": 100,
+        "boss_stress": max(0, int(player.get("boss_stress", 0)) - 30),
+        "boss_hospital_until": None,
+        "boss_sentence_until": None,
+    }
     if hospital:
         cost += 3500
         fields["boss_hospital_until"] = None
