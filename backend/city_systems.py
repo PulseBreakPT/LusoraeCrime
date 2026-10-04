@@ -1,0 +1,336 @@
+import hashlib
+import math
+import random
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+from bson import ObjectId
+
+from city_data import (
+    WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES,
+    SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO,
+)
+
+LISBON = ZoneInfo("Europe/Lisbon")
+
+
+def _utc_now():
+    return datetime.now(timezone.utc)
+
+
+def _parse(value):
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _seed_int(*parts):
+    payload = "|".join(str(p) for p in parts)
+    return int(hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16], 16)
+
+
+def _weighted_key(table, seed):
+    rows = list(table.items())
+    total = sum(max(0, int(cfg.get("weight", 1))) for _, cfg in rows) or 1
+    pick = seed % total
+    cursor = 0
+    for key, cfg in rows:
+        cursor += max(0, int(cfg.get("weight", 1)))
+        if pick < cursor:
+            return key
+    return rows[-1][0]
+
+
+def daypart_key(now=None):
+    local = (now or _utc_now()).astimezone(LISBON)
+    h = local.hour
+    if h < 6:
+        return "madrugada"
+    if h < 12:
+        return "manha"
+    if h < 19:
+        return "tarde"
+    return "noite"
+
+
+def season_info(now=None):
+    now = now or _utc_now()
+    anchor = datetime.fromisoformat(SEASON_ANCHOR_ISO)
+    span = timedelta(days=SEASON_LENGTH_DAYS)
+    elapsed = max(0, (now - anchor).total_seconds())
+    index = int(elapsed // span.total_seconds())
+    start = anchor + index * span
+    end = start + span
+    return {
+        "id": f"S{index + 1:03d}",
+        "number": index + 1,
+        "starts_at": start.isoformat(),
+        "ends_at": end.isoformat(),
+        "remaining_s": max(0, int((end - now).total_seconds())),
+    }
+
+
+def world_context(now=None, region="Portugal"):
+    now = now or _utc_now()
+    local = now.astimezone(LISBON)
+    weather_slot = int(now.timestamp() // (2 * 3600))
+    event_slot = int(now.timestamp() // (6 * 3600))
+    weather_key = _weighted_key(WEATHER_STATES, _seed_int(region, weather_slot, "weather"))
+    event_keys = list(CITY_EVENTS)
+    event_key = event_keys[_seed_int(region, event_slot, "event") % len(event_keys)]
+    period_key = daypart_key(now)
+    weather = WEATHER_STATES[weather_key]
+    event = CITY_EVENTS[event_key]
+    period = DAYPARTS[period_key]
+
+    chance = {}
+    for source in (weather.get("chance", {}), period.get("chance", {}), event.get("chance", {})):
+        for category, value in source.items():
+            chance[category] = round(chance.get(category, 0.0) + float(value), 4)
+
+    return {
+        "generated_at": now.isoformat(),
+        "local_time": local.isoformat(),
+        "weather": {"key": weather_key, **weather},
+        "daypart": {"key": period_key, **period},
+        "event": {"key": event_key, **event},
+        "modifiers": {
+            "chance": chance,
+            "travel_mult": round(float(weather.get("travel_mult", 1.0)) * float(period.get("traffic_mult", 1.0)), 4),
+            "heat_mult": round(float(weather.get("heat_mult", 1.0)) * float(event.get("heat_mult", 1.0)), 4),
+            "reward_mult": round(float(weather.get("reward_mult", 1.0)) * float(period.get("reward_mult", 1.0)) * float(event.get("reward_mult", 1.0)), 4),
+            "police_mult": round(float(period.get("police_mult", 1.0)), 4),
+        },
+        "next_weather_at": datetime.fromtimestamp((weather_slot + 1) * 2 * 3600, tz=timezone.utc).isoformat(),
+        "next_event_at": datetime.fromtimestamp((event_slot + 1) * 6 * 3600, tz=timezone.utc).isoformat(),
+    }
+
+
+def operation_world_modifier(category, now=None, region="Portugal"):
+    ctx = world_context(now, region)
+    return {
+        "chance_delta": float(ctx["modifiers"]["chance"].get(category, 0.0)),
+        "travel_mult": float(ctx["modifiers"]["travel_mult"]),
+        "heat_mult": float(ctx["modifiers"]["heat_mult"]),
+        "reward_mult": float(ctx["modifiers"]["reward_mult"]),
+        "label": f'{ctx["weather"]["name"]} · {ctx["event"]["name"]}',
+        "context": ctx,
+    }
+
+
+def _rival_doc(player_id, idx, archetype, level):
+    rng = random.Random(_seed_int(player_id, idx, "rival"))
+    power = max(18, min(95, 26 + level * 4 + rng.randint(-7, 15)))
+    return {
+        "player_id": player_id,
+        "key": f"rival_{idx + 1}",
+        "name": archetype["name"],
+        "style": archetype["style"],
+        "focus": archetype["focus"],
+        "power": power,
+        "hostility": rng.randint(18, 68),
+        "intel": 0,
+        "relation": "neutral",
+        "territory_pressure": rng.randint(8, 34),
+        "last_action_at": None,
+        "created_at": _utc_now().isoformat(),
+    }
+
+
+async def ensure_rivals(db, player):
+    pid = str(player["_id"])
+    existing = await db.city_rivals.find({"player_id": pid}).to_list(20)
+    if existing:
+        return existing
+    level = int(player.get("level", 1) or 1)
+    docs = [_rival_doc(pid, i, RIVAL_ARCHETYPES[i], level) for i in range(min(5, len(RIVAL_ARCHETYPES)))]
+    if docs:
+        await db.city_rivals.insert_many(docs)
+    return docs
+
+
+def business_projection(doc, now=None):
+    now = now or _utc_now()
+    cfg = BUSINESS_TYPES.get(doc.get("type_key"), {})
+    level = max(1, int(doc.get("level", 1) or 1))
+    last = _parse(doc.get("last_collect_at")) or _parse(doc.get("bought_at")) or now
+    hours = max(0.0, min(168.0, (now - last).total_seconds() / 3600))
+    efficiency = max(0.35, min(1.35, float(doc.get("condition", 100)) / 100))
+    clean = float(cfg.get("clean_h", 0)) * level * hours * efficiency
+    dirty = float(cfg.get("dirty_h", 0)) * level * hours * efficiency
+    return {
+        "hours": round(hours, 3),
+        "clean": int(clean),
+        "dirty": int(dirty),
+        "heat": round(float(cfg.get("heat_h", 0)) * level * hours, 2),
+    }
+
+
+def business_network_effect(businesses, category):
+    total = 0.0
+    for doc in businesses or []:
+        cfg = BUSINESS_TYPES.get(doc.get("type_key"), {})
+        base = float((cfg.get("effects") or {}).get(category, 0.0))
+        level = max(1, int(doc.get("level", 1) or 1))
+        condition = max(0.35, min(1.0, float(doc.get("condition", 100)) / 100))
+        total += base * (1 + 0.45 * (level - 1)) * condition
+    return min(0.06, round(total, 4))
+
+
+def _serialize(doc):
+    out = dict(doc)
+    if "_id" in out:
+        out["id"] = str(out.pop("_id"))
+    return out
+
+
+async def _season_checkpoint(db, player, season):
+    pid = str(player["_id"])
+    record = await db.city_season_scores.find_one({"player_id": pid})
+    respect = int(player.get("respect", 0) or 0)
+    successes = int((player.get("stats") or {}).get("missions_success", 0) or 0)
+    if not record or record.get("season_id") != season["id"]:
+        record = {
+            "player_id": pid,
+            "season_id": season["id"],
+            "points": 0,
+            "respect_checkpoint": respect,
+            "success_checkpoint": successes,
+            "updated_at": _utc_now().isoformat(),
+        }
+        await db.city_season_scores.update_one({"player_id": pid}, {"$set": record}, upsert=True)
+        return record
+
+    delta_respect = max(0, respect - int(record.get("respect_checkpoint", respect)))
+    delta_success = max(0, successes - int(record.get("success_checkpoint", successes)))
+    gained = delta_respect + delta_success * 12
+    if gained:
+        record["points"] = int(record.get("points", 0)) + gained
+        record["respect_checkpoint"] = respect
+        record["success_checkpoint"] = successes
+        record["updated_at"] = _utc_now().isoformat()
+        await db.city_season_scores.update_one(
+            {"player_id": pid},
+            {"$set": {
+                "points": record["points"],
+                "respect_checkpoint": respect,
+                "success_checkpoint": successes,
+                "updated_at": record["updated_at"],
+            }},
+        )
+    return record
+
+
+async def _leaderboard(db, season_id, player):
+    rows = await db.city_season_scores.find({"season_id": season_id}).sort("points", -1).to_list(20)
+    player_ids = [r["player_id"] for r in rows]
+    players = {}
+    if player_ids:
+        async for doc in db.players.find({"_id": {"$in": [ObjectId(x) for x in player_ids if ObjectId.is_valid(x)]}}):
+            players[str(doc["_id"])] = doc.get("org_name", "Organização")
+    board = [
+        {
+            "rank": idx + 1,
+            "player_id": row["player_id"],
+            "org_name": players.get(row["player_id"], "Organização"),
+            "points": int(row.get("points", 0)),
+            "is_you": row["player_id"] == str(player["_id"]),
+        }
+        for idx, row in enumerate(rows)
+    ]
+    return board
+
+
+def _news_from_world(ctx):
+    return [
+        {
+            "id": f'world:{ctx["event"]["key"]}:{ctx["next_event_at"]}',
+            "kind": "world",
+            "headline": ctx["event"]["name"],
+            "body": ctx["event"]["description"],
+            "severity": ctx["event"]["severity"],
+            "ts": ctx["generated_at"],
+        },
+        {
+            "id": f'weather:{ctx["weather"]["key"]}:{ctx["next_weather_at"]}',
+            "kind": "weather",
+            "headline": f'Condições: {ctx["weather"]["name"]}',
+            "body": ctx["weather"]["description"],
+            "severity": "low",
+            "ts": ctx["generated_at"],
+        },
+    ]
+
+
+async def city_snapshot(db, player):
+    now = _utc_now()
+    pid = str(player["_id"])
+    ctx = world_context(now, player.get("region") or "Portugal")
+    rivals = await ensure_rivals(db, player)
+    businesses = await db.city_businesses.find({"player_id": pid}).sort("bought_at", 1).to_list(50)
+    projections = [business_projection(b, now) for b in businesses]
+    season = season_info(now)
+    score = await _season_checkpoint(db, player, season)
+    board = await _leaderboard(db, season["id"], player)
+    chat = await db.city_chat.find({}).sort("ts", -1).to_list(20)
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    recent_events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(8)
+
+    news = _news_from_world(ctx)
+    for event in recent_events[:5]:
+        message = str(event.get("message") or "").strip()
+        if message:
+            news.append({
+                "id": f'event:{event.get("_id")}',
+                "kind": "organization",
+                "headline": "Movimento no submundo",
+                "body": message,
+                "severity": "medium" if event.get("kind") in {"warning", "police"} else "low",
+                "ts": event.get("ts") or now.isoformat(),
+            })
+    news.sort(key=lambda item: item.get("ts", ""), reverse=True)
+
+    rival_out = []
+    for row in rivals:
+        d = _serialize(row)
+        player_power = max(10, int(player.get("level", 1)) * 7 + int(player.get("respect", 0)) // 700)
+        d["threat"] = max(0, min(100, int(d.get("power", 0) + d.get("hostility", 0) * 0.35 - player_power * 0.35)))
+        rival_out.append(d)
+
+    business_out = []
+    for doc, projection in zip(businesses, projections):
+        d = _serialize(doc)
+        d["projection"] = projection
+        d["config"] = BUSINESS_TYPES.get(doc.get("type_key"), {})
+        business_out.append(d)
+
+    return {
+        "world": ctx,
+        "season": {**season, "your_points": int(score.get("points", 0)), "leaderboard": board},
+        "news": news[:12],
+        "rivals": rival_out,
+        "businesses": business_out,
+        "business_catalog": BUSINESS_TYPES,
+        "business_totals": {
+            "unclaimed_clean": sum(p["clean"] for p in projections),
+            "unclaimed_dirty": sum(p["dirty"] for p in projections),
+            "pending_heat": round(sum(p["heat"] for p in projections), 2),
+        },
+        "social": {
+            "alliance": _serialize(alliance) if alliance else None,
+            "chat": [_serialize(x) for x in chat],
+            "pvp_opt_in": bool(player.get("pvp_opt_in", False)),
+        },
+        "boss": {
+            "health": int(player.get("boss_health", 100) or 100),
+            "stress": int(player.get("boss_stress", 0) or 0),
+            "hospital_until": player.get("boss_hospital_until"),
+            "sentence_until": player.get("boss_sentence_until"),
+        },
+    }
