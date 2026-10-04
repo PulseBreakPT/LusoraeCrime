@@ -119,7 +119,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
           </Card>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
+            <div className="mt-4 grid grid-cols-1 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 min-[390px]:grid-cols-3">
               {TABS.map(([key, label, Icon]) => (
                 <button
                   key={key}
@@ -263,7 +263,7 @@ const RadarTab = ({ street, now }) => {
           <span className="font-mono text-[10px] text-zinc-500">{fmtDuration(eventRemaining)}</span>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{street.event.description}</p>
-        <div className="mt-3 grid grid-cols-3 gap-1 text-center font-mono text-[10px]">
+        <div className="mt-3 grid grid-cols-1 gap-1 text-center font-mono text-[10px] min-[390px]:grid-cols-3">
           <Modifier label="Sucesso" value={street.event.success} pct />
           <Modifier label="Pagamento" value={street.event.reward_mult - 1} pct />
           <Modifier label="Calor" value={street.event.heat_mult - 1} pct inverse />
@@ -420,7 +420,7 @@ const ActivitiesTab = ({
             </Badge>
           </div>
           <MiniBar value={activeJob.progress_pct} color={ready ? "#34D399" : "#22D3EE"} className="mt-4" height="h-2" />
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="mt-3 grid grid-cols-1 gap-2 text-center min-[390px]:grid-cols-3">
             <Info label="Chance" value={`${Math.round(activeJob.chance * 100)}%`} />
             <Info label="Recompensa" value={fmtMoney(activeJob.reward)} />
             <Info label="Plano" value={activeJob.approach_key} />
@@ -524,7 +524,7 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
               <Siren size={10} /> Apreendido durante {fmtDuration(meta.impound_remaining_s)}
             </p>
           )}
-          <div className="mt-3 grid grid-cols-3 gap-1">
+          <div className="mt-3 grid grid-cols-1 gap-1 min-[390px]:grid-cols-3">
             <Button size="sm" variant="outline" className="h-8 px-1 text-[10px]" disabled={!meta.notoriety} onClick={() => onAction(vehicle.id, "plates")}>
               Matrículas
             </Button>
