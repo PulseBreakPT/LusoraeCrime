@@ -439,7 +439,7 @@ const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick 
       onClick={onClick}
       aria-label={label}
       aria-expanded={active}
-      className={`sub-hud-btn relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl p-0 ${active ? "sub-hud-btn-active" : ""}`}
+      className={`sub-hud-btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl p-0 ${active ? "sub-hud-btn-active" : ""}`}
     >
       <Icon size={19} className={color} />
       {alert && (
@@ -457,7 +457,7 @@ const NavAction = ({ testId, icon: Icon, label, color, alert, active, onClick })
     type="button"
     data-testid={testId}
     onClick={onClick}
-    className={`sub-nav-action relative flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center ${active ? "is-active" : ""}`}
+    className={`sub-nav-action relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center ${active ? "is-active" : ""}`}
   >
     <Icon size={17} className={color} />
     <span className="max-w-full truncate text-[10px] font-semibold tracking-[0.015em] text-zinc-300">
