@@ -89,6 +89,9 @@ def maybe_spawn_organization_event(
     due = parse_dt(player.get("next_organization_event_at"))
     if due and due > now:
         return None
+    if due is None and not current:
+        player["next_organization_event_at"] = schedule_next_event(now)
+        return None
 
     candidates = ["information_leak"]
     if employee_count:
