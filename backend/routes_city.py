@@ -67,6 +67,10 @@ class AllianceJoinInput(MutationInput):
     code: str = Field(min_length=4, max_length=12)
 
 
+class AllianceMemberInput(MutationInput):
+    player_id: str
+
+
 class PvpChallengeInput(MutationInput):
     defender_player_id: str
 
@@ -521,6 +525,50 @@ async def leave_alliance(body: MutationInput, user: dict = Depends(get_current_u
     else:
         await db.city_alliances.update_one({"_id": alliance["_id"]}, {"$pull": {"member_ids": pid}})
     return {"ok": True}
+
+
+@router.post("/social/alliance/transfer")
+@idempotent("city_alliance_transfer")
+async def transfer_alliance_leadership(body: AllianceMemberInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    target_id = str(body.player_id or "").strip()
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    if not alliance:
+        raise HTTPException(status_code=404, detail="Não pertences a uma aliança")
+    if alliance.get("leader_id") != pid:
+        raise HTTPException(status_code=403, detail="Só o líder pode transferir a liderança")
+    if target_id == pid:
+        raise HTTPException(status_code=400, detail="Já és o líder da aliança")
+    if target_id not in (alliance.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Esse jogador não pertence à aliança")
+    await db.city_alliances.update_one(
+        {"_id": alliance["_id"], "leader_id": pid},
+        {"$set": {"leader_id": target_id, "leadership_changed_at": now_utc().isoformat()}},
+    )
+    return {"ok": True, "leader_id": target_id}
+
+
+@router.post("/social/alliance/kick")
+@idempotent("city_alliance_kick")
+async def kick_alliance_member(body: AllianceMemberInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    target_id = str(body.player_id or "").strip()
+    alliance = await db.city_alliances.find_one({"member_ids": pid})
+    if not alliance:
+        raise HTTPException(status_code=404, detail="Não pertences a uma aliança")
+    if alliance.get("leader_id") != pid:
+        raise HTTPException(status_code=403, detail="Só o líder pode expulsar membros")
+    if target_id == pid:
+        raise HTTPException(status_code=400, detail="O líder não se pode expulsar; transfere a liderança primeiro")
+    if target_id not in (alliance.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Esse jogador não pertence à aliança")
+    await db.city_alliances.update_one(
+        {"_id": alliance["_id"], "leader_id": pid},
+        {"$pull": {"member_ids": target_id}, "$set": {"updated_at": now_utc().isoformat()}},
+    )
+    return {"ok": True, "removed_player_id": target_id}
 
 
 @router.post("/social/pvp/challenge")
