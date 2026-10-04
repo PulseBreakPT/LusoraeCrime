@@ -49,27 +49,22 @@ const ToggleSwitch = ({ checked, onChange, testId, disabled }) => (
 const Section = ({ icon: Icon, title, children, testId, hidden = false }) => {
   if (hidden) return null;
   return (
-  <div className="mt-6 first:mt-0" data-testid={testId}>
-    <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
-      <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/[0.07] bg-white/[0.03]">
-        <Icon size={12} className="text-red-400/90" />
-      </span>
-      {title}
-    </h3>
-    <Card className="sub-settings-section sub-card overflow-hidden p-0 shadow-none">{children}</Card>
-  </div>
+    <div className="mt-6 first:mt-0" data-testid={testId}>
+      <SectionHeader icon={Icon} title={title} />
+      <Card className="sub-settings-section sub-card overflow-hidden p-0 shadow-none">{children}</Card>
+    </div>
   );
 };
 
 const Row = ({ label, hint, children, testId, hidden = false }) => {
   if (hidden) return null;
   return (
-  <div className="sub-settings-row flex min-h-12 items-center justify-between gap-4 px-3 py-2.5" data-testid={testId}>
+  <div className="sub-settings-row flex min-h-12 flex-col items-stretch justify-between gap-2 px-3 py-3 sm:flex-row sm:items-center sm:gap-4 sm:py-2.5" data-testid={testId}>
     <div className="min-w-0">
       <p className="text-[11px] font-semibold text-zinc-300">{label}</p>
       {hint && <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{hint}</p>}
     </div>
-    <div className="shrink-0">{children}</div>
+    <div className="w-full shrink-0 sm:w-auto">{children}</div>
   </div>
   );
 };
