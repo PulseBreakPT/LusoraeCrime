@@ -401,11 +401,13 @@ async def create_alliance(body: AllianceCreateInput, user: dict = Depends(get_cu
     code = _alliance_code()
     while await db.city_alliances.find_one({"code": code}):
         code = _alliance_code()
+    season = season_info()
     doc = {
         "name": body.name.strip(),
         "code": code,
         "leader_id": pid,
         "member_ids": [pid],
+        "season_id": season["id"],
         "season_points": 0,
         "created_at": now_utc().isoformat(),
     }
@@ -545,6 +547,26 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
         {"$inc": {"points": loser_points}, "$set": {"updated_at": now.isoformat()}},
         upsert=True,
     )
+
+    # As alianças têm a mesma época dos jogadores. Ao mudar de época, os
+    # pontos antigos são arquivados implicitamente pelo season_id e a tabela
+    # começa novamente em zero antes de aplicar o resultado atual.
+    for member_id, points in (
+        (str(winner["_id"]), winner_points),
+        (str(loser["_id"]), loser_points),
+    ):
+        alliance = await db.city_alliances.find_one({"member_ids": member_id})
+        if alliance:
+            if alliance.get("season_id") != season["id"]:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$set": {"season_id": season["id"], "season_points": points}},
+                )
+            else:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$inc": {"season_points": points}},
+                )
     consequence = None
     loser_fields = {"boss_stress": min(100, int(loser.get("boss_stress", 0) or 0) + 8)}
     if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:
