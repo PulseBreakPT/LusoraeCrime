@@ -114,6 +114,7 @@ from game_data import operation_profile_of
 from time_rules import portugal_hour_allowed
 
 from organization_automation import run_organization_automation
+from organization_events import maybe_spawn_organization_event
 from organization_systems import (
     apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
@@ -3302,6 +3303,16 @@ async def advance(db, player):
     await _refresh_recruitment_pool(db, player, now)
 
     props = await db.properties.find({"player_id": pid}).to_list(200)
+    previous_event_id = (player.get("organization_event") or {}).get("id")
+    event = maybe_spawn_organization_event(
+        player,
+        now=now,
+        employee_count=len(employees),
+        property_count=len(props),
+        territory_count=len(player.get("territories") or {}),
+    )
+    if event and event.get("id") != previous_event_id:
+        await add_event(db, pid, "system", f"Decisão da organização: {event['title']}.")
     await _apply_passive_income(db, player, props, minutes / 60, bonuses, now)
     await _complete_property_upgrades(db, player, props, now)
     await _complete_hq_upgrade(db, player, now)
@@ -3424,6 +3435,8 @@ async def advance(db, player):
         "phrase_memory": player.get("phrase_memory", []),
         "territories": player.get("territories", {}),
         "frac_territory": player.get("frac_territory", 0.0),
+        "organization_event": player.get("organization_event"),
+        "next_organization_event_at": player.get("next_organization_event_at"),
     }})
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player
