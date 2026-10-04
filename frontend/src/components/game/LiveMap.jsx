@@ -1204,7 +1204,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
             {Object.entries(SPEC_LABELS).map(([k, label]) => (
               <span key={k} className="flex items-center gap-1.5 font-mono text-[10px] text-zinc-300">
                 <span
-                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-extrabold text-black"
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-extrabold text-black"
                   style={{ background: CATEGORY_COLORS[k] }}
                 >
                   {label.charAt(0)}
@@ -1215,7 +1215,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
           </div>
           <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Marcadores</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
-            <span className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-white text-[8px] text-black">⌂</span> Quartel-general</span>
+            <span className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-white text-[9px] text-black">⌂</span> Quartel-general</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-white/40 bg-zinc-800" /> Propriedade tua</span>
             <span className="flex items-center gap-1.5">
               <span className="relative flex h-3 w-3 items-center justify-center">
@@ -1225,7 +1225,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
               Veículo a caminho / a regressar
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-extrabold text-cyan-200">
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-extrabold text-cyan-200">
                 <span className="h-3 w-1.5 rounded-sm bg-cyan-800" />
               </span>
               Veículo estacionado (orientado à via)
@@ -1242,13 +1242,13 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
             </span>
             <span className="flex items-start gap-1.5">
               <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-blue-500 text-[6px] font-black text-black">P</span>
+                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-blue-500 text-[9px] font-black text-black">P</span>
               </span>
               <span><b className="text-blue-300">PSP</b> — centros urbanos: muitas patrulhas, resposta imediata mas curto alcance; cerco compacto, perseguições curtas.</span>
             </span>
             <span className="flex items-start gap-1.5">
               <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-green-600 text-[6px] font-black text-black">G</span>
+                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-green-600 text-[9px] font-black text-black">G</span>
               </span>
               <span><b className="text-green-300">GNR</b> — periferia, estradas e campo: menos patrulhas mas alcance vasto, resposta mais lenta; reforços em maior número, perseguições longas e persistentes.</span>
             </span>
@@ -1268,7 +1268,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
           <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full bg-cyan-400" /> A caminho — falta percorrer</span>
-            <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-violet-400" /> Regresso — falta chegar</span>
+            <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t-2 border-dashed border-sky-400" /> Regresso — falta chegar</span>
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full border-t border-dotted border-zinc-300" /> Trilho a pé veículo ↔ alvo</span>
           </div>
         </Card>
@@ -1279,6 +1279,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
           variant="outline" size="icon"
           onClick={() => setOpen(!open)}
           title="Legenda do mapa"
+          aria-label={open ? "Fechar legenda do mapa" : "Abrir legenda do mapa"}
           className="rounded-full border-white/10 bg-[#0a0a0c]/95 text-zinc-400 shadow-2xl hover:bg-black hover:text-white"
         >
           {open ? <X size={15} /> : <MapIcon size={15} />}
