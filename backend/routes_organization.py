@@ -782,6 +782,8 @@ async def replace_tires(body: EntityIdInput, user: dict = Depends(get_current_us
         cost = SUPPLY_CATALOG["tire_set"]["price"]
         await _debit(player, cost, stat="vehicle_tires")
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"tires_pct": 100.0}})
+    if cost:
+        await record_tx(db, pid, "vehicle_tires", -cost, "clean", player["clean_money"], f"Pneus de {vehicle.get('name','veículo')}")
     return {"ok": True, "cost": cost}
 
 
@@ -797,6 +799,7 @@ async def insure_vehicle(body: EntityIdInput, user: dict = Depends(get_current_u
     await _debit(player, cost, stat="vehicle_insurance")
     until = (now_utc() + timedelta(days=VEHICLE_LIFECYCLE["insurance_days"])).isoformat()
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"insurance_until": until}})
+    await record_tx(db, pid, "vehicle_insurance", -cost, "clean", player["clean_money"], f"Seguro de {vehicle.get('name','veículo')}")
     return {"ok": True, "cost": cost, "insurance_until": until}
 
 
@@ -814,6 +817,7 @@ async def inspect_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
     await _debit(player, cost, stat="vehicle_inspections")
     until = (now_utc() + timedelta(days=VEHICLE_LIFECYCLE["inspection_days"])).isoformat()
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"inspection_due_at": until}})
+    await record_tx(db, pid, "vehicle_inspection", -cost, "clean", player["clean_money"], f"IPO de {vehicle.get('name','veículo')}")
     return {"ok": True, "cost": cost, "inspection_due_at": until}
 
 
@@ -953,6 +957,7 @@ async def consolidate_territory(body: TerritoryInput, user: dict = Depends(get_c
     await _debit(player, cost, stat="territories_consolidated")
     info.update({"tier": nxt, "pressure": min(100.0, float(info.get("pressure", 0)) + 12), "defense": 100.0})
     await db.players.update_one({"_id": player["_id"]}, {"$set": {f"territories.{body.district}": info}})
+    await record_tx(db, str(player["_id"]), "territory_consolidate", -cost, "clean", player["clean_money"], f"Consolidação de {body.district}")
     return {"ok": True, "territory": info, "cost": cost}
 
 
@@ -970,6 +975,7 @@ async def defend_territory(body: TerritoryInput, user: dict = Depends(get_curren
     info["pressure"] = max(0.0, float(info.get("pressure", 0)) - 22)
     info["last_defended_at"] = now_utc().isoformat()
     await db.players.update_one({"_id": player["_id"]}, {"$set": {f"territories.{body.district}": info}})
+    await record_tx(db, str(player["_id"]), "territory_defend", -cost, "clean", player["clean_money"], f"Defesa de {body.district}")
     return {"ok": True, "cost": cost, "territory": info}
 
 
