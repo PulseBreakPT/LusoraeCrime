@@ -7,6 +7,7 @@ import {
 } from "../../lib/game";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import { MiniBar, PanelWatermark, SectionHeader, SummaryStrip, Kpi, Tip } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
@@ -211,11 +212,12 @@ const TABS = [
   { key: "alertas", label: "Alertas" },
 ];
 
-export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusTabConsumed }) => {
+export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTarget, onFocusTabConsumed }) => {
   const { state, serverNow, claimAllQuests } = useGame();
   const { rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("questsTab", "historia", rememberSort);
   useTick(open);
+  usePanelFocus(open, focusTarget);
   // Ao chegar de um registo de atividade que aponta para uma aba específica
   // (ex.: uma decisão pendente), abre já nessa aba em vez da última usada.
   useEffect(() => {
