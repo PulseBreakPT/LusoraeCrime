@@ -246,7 +246,7 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
         respect_for_level = LEVEL_THRESHOLDS[min(level - 1, len(LEVEL_THRESHOLDS) - 1)]
 
     await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "clean_money": 75000,
+        "clean_money": 125000,
         "dirty_money": 5000,
         "respect": respect_for_level,
         "level": level,
@@ -320,12 +320,18 @@ async def ban_user(user_id: str, body: BanUserInput, admin: dict = Depends(requi
         raise HTTPException(status_code=400, detail="Não é possível banir um administrador — remove primeiro a função")
 
     # Marcar como banido
-    await db.users.update_one({"_id": user_oid}, {"$set": {
-        "banned": True,
-        "ban_reason": body.reason,
-        "banned_at": now_utc().isoformat(),
-        "banned_by": admin["email"],
-    }})
+    await db.users.update_one(
+        {"_id": user_oid},
+        {
+            "$set": {
+                "banned": True,
+                "ban_reason": body.reason,
+                "banned_at": now_utc().isoformat(),
+                "banned_by": admin["email"],
+            },
+            "$inc": {"token_version": 1},
+        },
+    )
 
     # Log da ação
     await db.admin_logs.insert_one({
@@ -398,7 +404,7 @@ async def set_user_role(user_id: str, body: SetRoleInput, admin: dict = Depends(
     if previous_role == body.role:
         raise HTTPException(status_code=400, detail=f"Utilizador já tem a função '{body.role}'")
 
-    await db.users.update_one({"_id": user_oid}, {"$set": {"role": body.role}})
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": body.role}, "$inc": {"token_version": 1}})
 
     await db.admin_logs.insert_one({
         "admin_id": admin["_id"],
@@ -428,7 +434,7 @@ async def grant_admin(user_id: str, admin: dict = Depends(require_admin)):
     if user.get("role") == "admin":
         raise HTTPException(status_code=400, detail="Utilizador já é administrador")
 
-    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "admin"}})
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "admin"}, "$inc": {"token_version": 1}})
 
     # Log da ação
     await db.admin_logs.insert_one({
@@ -463,7 +469,7 @@ async def revoke_admin(user_id: str, admin: dict = Depends(require_admin)):
     if user.get("role") != "admin":
         raise HTTPException(status_code=400, detail="Utilizador não é administrador")
 
-    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "player"}})
+    await db.users.update_one({"_id": user_oid}, {"$set": {"role": "player"}, "$inc": {"token_version": 1}})
 
     # Log da ação
     await db.admin_logs.insert_one({
