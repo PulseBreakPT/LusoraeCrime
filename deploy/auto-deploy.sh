@@ -30,6 +30,7 @@ fi
 
 cd "$APP_DIR"
 
+PREVIOUS_SHA="$(git rev-parse HEAD)"
 log "A puxar branch '$BRANCH'..."
 git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
@@ -47,7 +48,20 @@ for i in $(seq 1 24); do
         break
     fi
     if [[ "$i" -eq 24 ]]; then
-        err "Backend não ficou saudável. Logs:\n$(docker compose --env-file "$ENV_FILE" logs --tail=50 backend)"
+        echo "❌ Backend não ficou saudável. A iniciar rollback para $PREVIOUS_SHA..." >&2
+        docker compose --env-file "$ENV_FILE" logs --tail=50 backend || true
+        git reset --hard "$PREVIOUS_SHA"
+        docker compose --env-file "$ENV_FILE" up -d --build --remove-orphans
+        for j in $(seq 1 24); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' lusoraecrime-backend 2>/dev/null || echo "unknown")
+            [[ "$STATUS" == "healthy" ]] && break
+            sleep 5
+        done
+        STATUS=$(docker inspect --format='{{.State.Health.Status}}' lusoraecrime-backend 2>/dev/null || echo "unknown")
+        if [[ "$STATUS" == "healthy" ]]; then
+            err "Deploy revertido automaticamente para $PREVIOUS_SHA porque a nova versão falhou o healthcheck."
+        fi
+        err "Rollback também não recuperou o backend. Intervenção manual necessária."
     fi
     sleep 5
 done
