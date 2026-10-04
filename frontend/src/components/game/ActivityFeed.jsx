@@ -379,7 +379,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
               type="button"
               data-testid="feed-expand-toggle"
               onClick={() => setExpanded((x) => !x)}
-              title={expanded ? "Reduzir a altura da central" : "Aumentar a altura da central"}
+              title={expanded ? "Reduzir a altura do painel" : "Aumentar a altura do painel"}
               className="sub-feed-iconbtn"
             >
               {expanded ? <Minimize2 size={10} /> : <Maximize2 size={10} />}
