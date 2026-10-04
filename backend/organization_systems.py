@@ -182,6 +182,45 @@ TRAITS = [
 
 PRESTIGE_CATALOG = PRESTIGE_ITEMS
 
+ORGANIZATION_SPECIALIZATIONS = {
+    "shadow_network": {
+        "name": "Rede Sombra",
+        "cost": 280000,
+        "unlock_level": 9,
+        "desc": "Contrainteligência e discrição: menos rusgas, melhor dissipação de calor, menor foco em rendimento bruto.",
+        "effects": {"raid_mult": 0.84, "heat_decay_bonus": 0.12, "property_income_mult": 0.97},
+    },
+    "industrial_machine": {
+        "name": "Máquina Industrial",
+        "cost": 280000,
+        "unlock_level": 9,
+        "desc": "Escala logística: compras mais eficientes e imóveis mais produtivos, com maior pegada operacional.",
+        "effects": {"supply_mult": 0.92, "property_income_mult": 1.12, "raid_mult": 1.05},
+    },
+    "territorial_empire": {
+        "name": "Império Territorial",
+        "cost": 300000,
+        "unlock_level": 9,
+        "desc": "Domínio local: mais rendimento e prémio nos distritos controlados, pressão rival mais controlável.",
+        "effects": {"territory_income_mult": 1.18, "territory_reward_bonus": 0.03, "territory_pressure_mult": 0.88},
+    },
+}
+
+
+def organization_specialization_effects(player: dict) -> dict:
+    defaults = {
+        "raid_mult": 1.0,
+        "heat_decay_bonus": 0.0,
+        "property_income_mult": 1.0,
+        "supply_mult": 1.0,
+        "territory_income_mult": 1.0,
+        "territory_reward_bonus": 0.0,
+        "territory_pressure_mult": 1.0,
+    }
+    key = player.get("organization_specialization")
+    cfg = ORGANIZATION_SPECIALIZATIONS.get(key) or {}
+    return {**defaults, **(cfg.get("effects") or {})}
+
 INJURY_SEVERITIES = {
     "ligeiro": {"recovery_s": 180, "performance": 0.96},
     "moderado": {"recovery_s": 480, "performance": 0.90},
@@ -250,7 +289,8 @@ def territory_income_per_hour(player: dict) -> int:
         if tier:
             pressure = max(0.0, min(100.0, float((info or {}).get("pressure", 0) or 0)))
             total += int(TERRITORY_TIERS[tier]["income_h"] * (1 - pressure / 160.0))
-    return max(0, total)
+    spec = organization_specialization_effects(player)
+    return max(0, int(total * float(spec.get("territory_income_mult", 1.0) or 1.0)))
 
 
 def territory_reward_bonus(player: dict, district: str | None) -> float:
@@ -260,7 +300,8 @@ def territory_reward_bonus(player: dict, district: str | None) -> float:
     if not info:
         return 0.0
     tier = max(0, min(3, int(info.get("tier", 0) or 0)))
-    return TERRITORY_TIERS.get(tier, {}).get("reward_bonus", 0.0)
+    spec = organization_specialization_effects(player)
+    return TERRITORY_TIERS.get(tier, {}).get("reward_bonus", 0.0) + float(spec.get("territory_reward_bonus", 0.0) or 0.0)
 
 
 def vehicle_service_snapshot(vehicle: dict) -> dict:
@@ -327,13 +368,16 @@ def supply_cost_multiplier(player: dict, now: datetime | None = None) -> float:
                 mult *= 1.12
         except (TypeError, ValueError):
             pass
-    return max(0.70, mult)
+    spec = organization_specialization_effects(player)
+    mult *= float(spec.get("supply_mult", 1.0) or 1.0)
+    return max(0.62, mult)
 
 
 def raid_risk_multiplier(player: dict, properties: list[dict]) -> float:
     investigation = max(0.50, 1.0 - department_level(player, "investigacao") * 0.10)
     protection = protection_risk_multiplier(player)
-    return investigation * property_security_factor(properties) * protection
+    spec = organization_specialization_effects(player)
+    return investigation * property_security_factor(properties) * protection * float(spec.get("raid_mult", 1.0) or 1.0)
 
 
 def loadout_effect(loadout: dict, category: str, policies: dict | None = None) -> dict:
