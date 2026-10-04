@@ -23,7 +23,8 @@ from organization_systems import (
     inventory_capacity,
     inventory_used,
     normalize_inventory,
-    protection_cost, logistics_cost_multiplier, supply_cost_multiplier,
+    protection_cost, protection_active, protection_risk_multiplier,
+    logistics_cost_multiplier, supply_cost_multiplier,
 )
 
 DEFAULT_ORG_POLICY = {
@@ -382,7 +383,14 @@ def build_organization_intelligence(
     territory_score = round(sum(t["score"] for t in territory_rows) / len(territory_rows), 1) if territory_rows else 70.0
 
     heat = clamp(player.get("heat", 0))
+    governance = dict(player.get("governance") or {})
+    governance_trust = clamp(governance.get("trust", 0))
+    governance_exposure = clamp(governance.get("exposure", 0))
+    governance_active = protection_active(player, now)
+    governance_risk_mult = protection_risk_multiplier(player, now)
     security_score = clamp(100 - heat)
+    if governance_active:
+        security_score = clamp(security_score + (1.0 - governance_risk_mult) * 30)
     overall = round(
         finance_score * 0.24
         + crew_score * 0.18
@@ -412,6 +420,14 @@ def build_organization_intelligence(
         add_alert("critical", "cash_runway", "Caixa em risco", f"Runway de apenas {runway:.1f} semanas ao ritmo atual.", "centro")
     elif runway < 3:
         add_alert("warning", "cash_runway", "Runway curto", f"A caixa cobre aproximadamente {runway:.1f} semanas.", "centro")
+    if governance_exposure >= 80:
+        add_alert("critical", "governance_exposure", "Rede de proteção demasiado exposta", f"Exposição institucional em {round(governance_exposure)}%. Deixa a rede arrefecer.", "centro")
+    elif governance_exposure >= 60:
+        add_alert("warning", "governance_exposure", "Rede de proteção exposta", f"Exposição institucional em {round(governance_exposure)}%.", "centro")
+    protection_until = parse_dt(governance.get("protection_until"))
+    if governance_active and protection_until and (protection_until - now).total_seconds() <= 3 * 86400:
+        add_alert("warning", "governance_expiry", "Proteção perto do fim", "A rede de proteção termina em menos de 3 dias.", "centro")
+
     if heat >= 85:
         add_alert("critical", "heat", "Exposição extrema", f"Calor em {round(heat)}%. Evita expansão até reduzir exposição.", "centro")
     elif heat >= 70:
@@ -510,6 +526,14 @@ def build_organization_intelligence(
             "departments": department_quotes,
             "protection": protection_cost(player, len(employees), len(properties)),
             "territory_claim": int(TERRITORY_TIERS[1]["cost"]),
+        },
+        "governance": {
+            "active": governance_active,
+            "trust": round(governance_trust, 1),
+            "exposure": round(governance_exposure, 1),
+            "renewals": int(governance.get("renewals", 0) or 0),
+            "risk_multiplier": round(governance_risk_mult, 3),
+            "protection_until": governance.get("protection_until"),
         },
         "storage": {"used": used, "capacity": cap, "pct": round(storage_ratio * 100, 1), "stock_value": round(stock_value)},
         "stock": stock_rows,
