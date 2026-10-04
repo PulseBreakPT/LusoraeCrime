@@ -2690,12 +2690,16 @@ async def _process_payroll(db, player, employees, now):
         ) * fixed_mult))
 
         props = await db.properties.find({"player_id": pid}).to_list(200)
+        inventory = normalize_inventory(player)
+        safehouse_available = int(inventory.get("safehouse_supplies", 0) or 0)
+        safehouse_covered = min(len(props), safehouse_available)
+        supply_coverage = safehouse_covered / max(1, len(props))
         property_weekly = int(round(sum(
             (p.get("purchase_price") or PROPERTY_TYPES[p["type_key"]]["price"])
             * max(1, int(p.get("level", 1)))
             * PROPERTY_MAINTENANCE_PCT_PER_WEEK
             for p in props
-        ) * fixed_mult))
+        ) * fixed_mult * (1.0 - 0.10 * supply_coverage)))
         territory_weekly = int(round(territory_weekly_cost(player) * fixed_mult))
 
         total = gross_payroll + employer_ss + fleet_weekly + property_weekly + territory_weekly
@@ -2729,11 +2733,21 @@ async def _process_payroll(db, player, employees, now):
                     {"_id": {"$in": idle_ids}, "loyalty": {"$gt": 100.0}},
                     {"$set": {"loyalty": 100.0}},
                 )
+            if safehouse_covered:
+                await db.players.update_one(
+                    {"_id": player["_id"], "inventory.safehouse_supplies": {"$gte": safehouse_covered}},
+                    {"$inc": {"inventory.safehouse_supplies": -safehouse_covered}},
+                )
+                player.setdefault("inventory", {})["safehouse_supplies"] = max(
+                    0, int(player.get("inventory", {}).get("safehouse_supplies", 0) or 0) - safehouse_covered
+                )
             if props:
+                covered_ids = {p["_id"] for p in props[:safehouse_covered]}
                 for p in props:
+                    recovery = PROPERTY_CONDITION_RECOVERY_PER_WEEK + (2.0 if p["_id"] in covered_ids else 0.0)
                     condition = min(
                         100.0,
-                        float(p.get("condition", 100.0)) + PROPERTY_CONDITION_RECOVERY_PER_WEEK,
+                        float(p.get("condition", 100.0)) + recovery,
                     )
                     await db.properties.update_one(
                         {"_id": p["_id"]}, {"$set": {"condition": condition}}
