@@ -132,6 +132,47 @@ def city_calendar(now=None, region="Portugal", count=4):
     return rows
 
 
+def boss_status(player, now=None):
+    now = now or _utc_now()
+    hospital_raw = player.get("boss_hospital_until")
+    sentence_raw = player.get("boss_sentence_until")
+    hospital_dt = _parse(hospital_raw)
+    sentence_dt = _parse(sentence_raw)
+    return {
+        "health": max(0, min(100, int(player.get("boss_health", 100) or 100))),
+        "stress": max(0, min(100, int(player.get("boss_stress", 0) or 0))),
+        "hospital_until": hospital_raw if hospital_dt and hospital_dt > now else None,
+        "sentence_until": sentence_raw if sentence_dt and sentence_dt > now else None,
+    }
+
+
+def boss_leadership_modifier(player, now=None):
+    status = boss_status(player, now)
+    delta = 0.0
+    reasons = []
+    if status["sentence_until"]:
+        delta -= 0.05
+        reasons.append("chefia detida")
+    elif status["hospital_until"]:
+        delta -= 0.03
+        reasons.append("chefia hospitalizada")
+
+    if status["stress"] > 35:
+        stress_penalty = min(0.025, (status["stress"] - 35) / 65 * 0.025)
+        delta -= stress_penalty
+        reasons.append(f"stress {status['stress']}%")
+    if status["health"] < 70:
+        health_penalty = min(0.015, (70 - status["health"]) / 70 * 0.015)
+        delta -= health_penalty
+        reasons.append(f"saúde {status['health']}%")
+
+    return {
+        "chance_delta": round(max(-0.075, delta), 4),
+        "label": " · ".join(reasons) if reasons else "chefia operacional",
+        **status,
+    }
+
+
 def operation_world_modifier(category, now=None, region="Portugal"):
     ctx = world_context(now, region)
     return {
@@ -581,10 +622,5 @@ async def city_snapshot(db, player):
                 for x in pvp_challenges
             ],
         },
-        "boss": {
-            "health": int(player.get("boss_health", 100) or 100),
-            "stress": int(player.get("boss_stress", 0) or 0),
-            "hospital_until": player.get("boss_hospital_until"),
-            "sentence_until": player.get("boss_sentence_until"),
-        },
+        "boss": boss_status(player, now),
     }
