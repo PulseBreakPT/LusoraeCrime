@@ -198,10 +198,6 @@ export default function GamePage() {
         baseFilter={baseFilter}
       />
       <div className="sub-vignette" aria-hidden="true" />
-      <div className="sub-grid" aria-hidden="true" />
-      <div className="sub-hud-frame" aria-hidden="true">
-        <span className="c-tl" /><span className="c-tr" /><span className="c-bl" /><span className="c-br" />
-      </div>
       {stamp && (
         <div key={stamp.key} className="sub-stamp" aria-hidden="true" data-testid="dispatch-stamp">
           <div className="sub-stamp-box">
@@ -318,7 +314,7 @@ export default function GamePage() {
 
                   {(state.properties || []).length > 0 && (
                     <label className="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
-                      <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">Base no mapa</span>
+                      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Base no mapa</span>
                       <select
                         data-testid="map-base-filter"
                         value={baseFilter}

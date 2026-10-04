@@ -64,7 +64,7 @@ const policeOfficerIcon = (force) => {
 
 const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   <div className="flex items-baseline justify-between gap-3">
-    <span className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</span>
+    <span className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</span>
     <span className="font-mono text-[10px] font-bold" style={{ color }}>{value}</span>
   </div>
 );
@@ -249,7 +249,7 @@ export default function PoliceLayer({ state, serverNow }) {
               <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
                 <div className="min-w-[150px]">
                   <p className="text-[11px] font-bold" style={{ color: forceTint }}>Patrulha {p.id}</p>
-                  <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color }}>{label}</p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color }}>{label}</p>
                   <div className="mt-1 space-y-0.5">
                     <TipRow label="força" value={`${p.force} · ${F.terrainLabel}`} color={F.color} />
                     <TipRow label="viatura" value={vtypeLabel} color={forceTint} />
@@ -263,10 +263,10 @@ export default function PoliceLayer({ state, serverNow }) {
                     )}
                   </div>
                   {p.state === "pursuit" && (
-                    <p className="mt-1 text-[9px] text-red-400/80">Se apanhar a equipa antes do QG, a carga perde-se.</p>
+                    <p className="mt-1 text-[10px] text-red-400/80">Se apanhar a equipa antes do QG, a carga perde-se.</p>
                   )}
                   {p.state === "patrol" && (
-                    <p className="mt-1 text-[9px] text-zinc-500">{F.label}.</p>
+                    <p className="mt-1 text-[10px] text-zinc-500">{F.label}.</p>
                   )}
                 </div>
               </LTooltip>

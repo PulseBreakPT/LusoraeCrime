@@ -67,7 +67,7 @@ export function BootScreen() {
 
             <details className="text-[10px] text-zinc-500">
               <summary className="cursor-pointer font-mono uppercase tracking-widest hover:text-zinc-400">Detalhes Técnicos</summary>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/50 p-2 font-mono text-[9px]">
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/50 p-2 font-mono text-[10px]">
                 {JSON.stringify(error, null, 2)}
               </pre>
             </details>

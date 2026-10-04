@@ -37,7 +37,7 @@ const useTick = (active) => {
 const TierChip = ({ tier, missions }) => (
   <Tip tip={`Unidade ${tier.label}: ${missions} operações concluídas. A experiência melhora o entrosamento e a mestria da equipa.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[10px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -51,7 +51,7 @@ const RoleChip = ({ icon: Icon, label, on, detail, tip, tone = "#34D399" }) => (
   <Tip tip={tip}>
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide",
+        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide",
         !on && "border-white/5 bg-black/30 text-zinc-600"
       )}
       style={on ? { borderColor: `${tone}44`, color: tone, backgroundColor: `${tone}12` } : undefined}
@@ -69,7 +69,7 @@ const MomentumChip = ({ team, meta, testId }) => {
   if (mo.state === "hot") {
     return (
       <Tip tip={`Momentum: ${mo.streak} vitórias seguidas → +${(mo.pct * 100).toFixed(1)}% de chance (máx. +${Math.round((meta.momentum_bonus_max ?? 0.06) * 100)}%). Também foge melhor da polícia (+1%/vitória, até +${Math.round((meta.momentum_escape_bonus_max ?? 0.05) * 100)}%). Uma falha apaga a série.`}>
-        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-emerald-400">
+        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[10px] font-bold text-emerald-400">
           <Flame size={9} /> {mo.streak} vitórias · +{(mo.pct * 100).toFixed(1)}%
         </span>
       </Tip>
@@ -78,7 +78,7 @@ const MomentumChip = ({ team, meta, testId }) => {
   if (mo.state === "cold") {
     return (
       <Tip tip={`Confiança abalada: ${-mo.streak} falhas consecutivas → ${(mo.pct * 100).toFixed(1)}% de chance (máx. −${Math.round((meta.momentum_penalty_max ?? 0.06) * 100)}%). Uma vitória limpa restaura tudo — escolhe uma operação segura.`}>
-        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-red-400">
+        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[10px] font-bold text-red-400">
           <TrendingDown size={9} /> {-mo.streak} falhas · {(mo.pct * 100).toFixed(1)}%
         </span>
       </Tip>
@@ -86,7 +86,7 @@ const MomentumChip = ({ team, meta, testId }) => {
   }
   return (
     <Tip tip={`Sem série ativa. Séries de 2+ vitórias dão +${((meta.momentum_bonus_per_win ?? 0.012) * 100).toFixed(1)}%/vitória (máx. +${Math.round((meta.momentum_bonus_max ?? 0.06) * 100)}%); 2+ falhas penalizam até −${Math.round((meta.momentum_penalty_max ?? 0.06) * 100)}%.`}>
-      <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-600">
+      <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-600">
         <Flame size={9} /> sem série
       </span>
     </Tip>
@@ -104,7 +104,7 @@ const CohesionBar = ({ team, meta, nowMs, testId }) => {
       block
     >
       <div data-testid={testId}>
-        <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+        <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
           <span className="inline-flex items-center gap-1"><Link2 size={9} /> Entrosamento</span>
           <span className={frac >= 0.999 ? "text-emerald-400" : "text-cyan-400"}>+{(co.pct * 100).toFixed(1)}%</span>
         </div>
@@ -129,7 +129,7 @@ const FamiliarityRow = ({ team, meta, testId }) => (
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", isSpec ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-            <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", fam.mastery ? "text-amber-400" : isSpec ? "text-emerald-400" : "text-zinc-600")}>
+            <p className={cn("truncate text-center font-mono text-[10px] uppercase tracking-wide", fam.mastery ? "text-amber-400" : isSpec ? "text-emerald-400" : "text-zinc-600")}>
               {(SPEC_LABELS[cat] || cat).slice(0, 3)}{fam.mastery ? " ★" : ""}
             </p>
             <MiniBar value={fam.frac * 100} color={color} className="mt-0.5" />
@@ -151,7 +151,7 @@ const VitalsRow = ({ members, meta, testId }) => {
     <div data-testid={testId} className="grid grid-cols-3 gap-x-3">
       <Tip tip={`Moral média ${morale}%. Moral baixa reduz o desempenho; bónus e vitórias ajudam a recuperar.`} block>
         <div>
-          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+          <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <span>Moral</span><span style={{ color: goodBarColor(morale) }}>{morale}%</span>
           </div>
           <MiniBar value={morale} color={goodBarColor(morale)} className="mt-0.5" />
@@ -159,7 +159,7 @@ const VitalsRow = ({ members, meta, testId }) => {
       </Tip>
       <Tip tip={`Lealdade média ${loyalty}% — acima de 70 dá até +${Math.round((meta.loyalty_bonus_max ?? 0.04) * 100)}% de chance; abaixo penaliza até −${Math.round((meta.loyalty_penalty_max ?? 0.06) * 100)}% e aumenta o risco de traições. Promoções e bónus sobem a lealdade.`} block>
         <div>
-          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+          <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <span>Lealdade</span><span style={{ color: goodBarColor(loyalty) }}>{loyalty}%</span>
           </div>
           <MiniBar value={loyalty} color={goodBarColor(loyalty)} className="mt-0.5" />
@@ -167,7 +167,7 @@ const VitalsRow = ({ members, meta, testId }) => {
       </Tip>
       <Tip tip={`Fadiga média ${fatigue}% — acima de 30% penaliza em curva convexa (exp. ${meta.fatigue_curve_exp ?? 1.35}): moderada custa pouco, extrema é um perigo real. A 90%+ o membro fica indisponível.`} block>
         <div>
-          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+          <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <span>Fadiga</span><span style={{ color: fatigueColor(fatigue) }}>{fatigue}%</span>
           </div>
           <MiniBar value={fatigue} color={fatigueColor(fatigue)} className="mt-0.5" />
@@ -417,7 +417,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                         <p className="truncate text-sm font-bold text-white">{t.name}</p>
                         {justReturned && (
                           <Tip tip="Esta equipa acabou de regressar ao QG e já está pronta a operar.">
-                            <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-emerald-400">
+                            <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-emerald-400">
                               <PartyPopper size={9} /> regressou
                             </span>
                           </Tip>
@@ -436,7 +436,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       <Tip tip={t.status === "idle" ? "Na base — pronta a receber ordens." : "Em operação — volta a estar disponível quando regressar ao QG."} align="end">
                         <Badge
                           variant="outline"
-                          className="ml-1.5 rounded-full border-transparent px-1.5 py-0 font-mono text-[9px] font-bold uppercase"
+                          className="ml-1.5 rounded-full border-transparent px-1.5 py-0 font-mono text-[10px] font-bold uppercase"
                           style={{ color: STATUS_COLORS[t.status], background: `${STATUS_COLORS[t.status]}1a` }}
                         >
                           {STATUS_LABELS[t.status]}
@@ -447,7 +447,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       <MomentumChip team={t} meta={teamMeta} testId={`team-momentum-${t.id}`} />
                       {synergy && (
                         <Tip tip={`Química da equipa: ${synergy.pct >= 0 ? "+" : ""}${(synergy.pct * 100).toFixed(1)}% de chance. Equipas com atributos e papéis complementares têm melhor desempenho.`}>
-                          <span className={cn("inline-flex items-center gap-0.5 font-mono text-[9px]", synergy.pct >= 0.0005 ? "text-emerald-400" : synergy.pct <= -0.0005 ? "text-amber-400" : "text-zinc-600")}>
+                          <span className={cn("inline-flex items-center gap-0.5 font-mono text-[10px]", synergy.pct >= 0.0005 ? "text-emerald-400" : synergy.pct <= -0.0005 ? "text-amber-400" : "text-zinc-600")}>
                             <FlaskConical size={9} /> química {synergy.pct >= 0 ? "+" : ""}{(synergy.pct * 100).toFixed(1)}%
                           </span>
                         </Tip>
@@ -531,7 +531,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                   <UserRound size={12} className="mt-1 shrink-0 text-zinc-500" />
                   <div className="min-w-0 flex-1">
                     <Tip tip={`Membros atuais na equipa vs. capacidade máxima (${teamMaxMembers}).`}>
-                      <span data-testid={`team-members-cap-${t.id}`} className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                      <span data-testid={`team-members-cap-${t.id}`} className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                         Membros: <span className={members.length >= teamMaxMembers ? "text-amber-400" : "text-zinc-300"}>{members.length}/{teamMaxMembers}</span>
                       </span>
                     </Tip>
@@ -578,7 +578,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                           </Select>
                         )}
                         {freeEmployees.length > 0 && members.length >= teamMaxMembers && (
-                          <span className="font-mono text-[9px] text-zinc-600">equipa cheia</span>
+                          <span className="font-mono text-[10px] text-zinc-600">equipa cheia</span>
                         )}
                       </div>
                     )}
@@ -618,7 +618,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <Tip tip={`Lugares ocupados pela equipa vs. capacidade do veículo (${vehicleSeats}). Se a equipa tiver mais membros disponíveis do que lugares, o despacho fica bloqueado.`}>
                       <span
                         data-testid={`team-vehicle-seats-${t.id}`}
-                        className={`shrink-0 font-mono text-[9px] ${members.length > vehicleSeats ? "text-red-400" : "text-zinc-500"}`}
+                        className={`shrink-0 font-mono text-[10px] ${members.length > vehicleSeats ? "text-red-400" : "text-zinc-500"}`}
                       >
                         {members.length}/{vehicleSeats} lugares
                       </span>
@@ -647,19 +647,19 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                         <div className="flex items-center gap-1.5">
                           <Fuel size={9} className="shrink-0" style={{ color: fuelPct < 25 ? "#EF4444" : "#F59E0B" }} />
                           <MiniBar value={fuelPct} color={fuelPct < 25 ? "#EF4444" : "#F59E0B"} height="h-1" />
-                          <span className="shrink-0 font-mono text-[9px]" style={{ color: fuelPct < 25 ? "#EF4444" : "#F59E0B" }}>{Math.round(fuelPct)}%</span>
+                          <span className="shrink-0 font-mono text-[10px]" style={{ color: fuelPct < 25 ? "#EF4444" : "#F59E0B" }}>{Math.round(fuelPct)}%</span>
                         </div>
                       </Tip>
                       <Tip tip={`Condição: ${Math.round(vehicle.condition)}% — abaixo de 30% o veículo não opera; abaixo de 50% perde velocidade.`} block className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <Wrench size={9} className="shrink-0" style={{ color: vehicle.condition < 30 ? "#EF4444" : "#34D399" }} />
                           <MiniBar value={vehicle.condition} color={vehicle.condition < 30 ? "#EF4444" : "#34D399"} height="h-1" />
-                          <span className="shrink-0 font-mono text-[9px]" style={{ color: vehicle.condition < 30 ? "#EF4444" : "#34D399" }}>{Math.round(vehicle.condition)}%</span>
+                          <span className="shrink-0 font-mono text-[10px]" style={{ color: vehicle.condition < 30 ? "#EF4444" : "#34D399" }}>{Math.round(vehicle.condition)}%</span>
                         </div>
                       </Tip>
                     </div>
                     {(fuelPct < 60 || vehicle.condition < 60) && (
-                      <p className="font-mono text-[9px] text-amber-400">
+                      <p className="font-mono text-[10px] text-amber-400">
                         Manutenção necessária — gere combustível e reparações na Frota.
                       </p>
                     )}
@@ -683,7 +683,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     variant="outline"
                     onClick={() => best && rec && dispatchTeam(best.id, t.id)}
                     disabled={!best || !rec}
-                    className={`relative z-[1] mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
+                    className={`relative z-[1] mt-2 h-auto w-full flex-col items-start gap-1 px-2 py-1.5 font-mono text-[10px] font-bold uppercase md:flex-row md:items-center md:text-[10px] ${
                       best && rec
                         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
                         : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
@@ -716,7 +716,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       data-testid={`team-repeat-last-${t.id}`}
                       variant="outline"
                       onClick={() => dispatchTeam(repeatOpp.id, t.id)}
-                      className="relative z-[1] mt-1.5 h-auto w-full flex-col items-start gap-1 border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-cyan-400 hover:bg-cyan-500/20 md:flex-row md:items-center md:text-[10px]"
+                      className="relative z-[1] mt-1.5 h-auto w-full flex-col items-start gap-1 border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 font-mono text-[10px] font-bold uppercase text-cyan-400 hover:bg-cyan-500/20 md:flex-row md:items-center md:text-[10px]"
                     >
                       <div className="flex items-center gap-1 truncate">
                         <Undo2 size={11} className="shrink-0 rotate-180" /> Repetir última → {repeatOpp.name}

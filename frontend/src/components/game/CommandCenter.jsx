@@ -305,7 +305,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
         <ScrollArea className="min-h-0 flex-1">
           <div className="p-2" role="listbox" aria-label="Resultados de pesquisa">
             {!query && recentIds.length > 0 && (
-              <p className="px-2 pb-1 pt-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">
+              <p className="px-2 pb-1 pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">
                 Recentes e ações rápidas
               </p>
             )}
@@ -329,10 +329,10 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-semibold">{command.label}</span>
-                    <span className="block truncate font-mono text-[9px] text-zinc-500">{command.hint}</span>
+                    <span className="block truncate font-mono text-[10px] text-zinc-500">{command.hint}</span>
                   </span>
                   {command.shortcut && (
-                    <kbd className="rounded border border-white/10 bg-black/50 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500">
+                    <kbd className="rounded border border-white/10 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
                       {command.shortcut}
                     </kbd>
                   )}
@@ -348,7 +348,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
           </div>
         </ScrollArea>
 
-        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2 font-mono text-[9px] text-zinc-600">
+        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2 font-mono text-[10px] text-zinc-600">
           <span className="flex items-center gap-1"><Clock3 size={10} /> ↑↓ navegar</span>
           <span className="flex items-center gap-1"><CornerDownLeft size={10} /> executar</span>
           <span className="ml-auto">Ctrl K · /</span>

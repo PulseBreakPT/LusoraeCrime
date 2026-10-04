@@ -383,7 +383,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                   </Button>
                 ))}
               </div>
-              <p className="mt-1.5 font-mono text-[9px] text-zinc-600">
+              <p className="mt-1.5 font-mono text-[10px] text-zinc-600">
                 Influencia as recomendações do consultor e o desempate das sugestões automáticas de equipa/oportunidade.
               </p>
             </div>
@@ -403,7 +403,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                         <p className={`text-[12px] font-semibold ${unlocked ? "text-white" : "text-zinc-500"}`}>{dept.name}</p>
                         <p className="text-[10px] text-zinc-600">{dept.desc}</p>
                       </div>
-                      <span className={`shrink-0 font-mono text-[9px] uppercase ${unlocked ? "text-emerald-400" : "text-zinc-600"}`}>
+                      <span className={`shrink-0 font-mono text-[10px] uppercase ${unlocked ? "text-emerald-400" : "text-zinc-600"}`}>
                         {unlocked ? "Em breve" : `Nível ${unlockLevel}`}
                       </span>
                     </Card>

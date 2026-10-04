@@ -373,12 +373,12 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   ? "Em operação no alvo"
                   : "A regressar à base"}
               </p>
-              <p className="mt-0.5 font-mono text-[9px] text-zinc-500">
+              <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
                 Partida: {baseNameOf(activeMission.origin_property_id)} · Regresso: {baseNameOf(activeMission.origin_property_id)}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[9px] uppercase tracking-wider text-zinc-500">
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
                 {activeMission.chase_active && activeMission.phase === "returning" ? "Escape" : "Sucesso previsto"}
               </p>
               <p className="font-mono text-sm font-bold" style={{
@@ -439,22 +439,22 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <p className="flex items-center gap-1.5 truncate text-xs font-semibold text-white">
                     {selectedTeam.name}
                     {selectedTeam.id === recommendedTeamId && (
-                      <Badge variant="outline" className="gap-0.5 border-emerald-500/20 bg-emerald-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-emerald-300">
+                      <Badge variant="outline" className="gap-0.5 border-emerald-500/20 bg-emerald-500/10 px-1 py-0 font-mono text-[10px] font-normal uppercase text-emerald-300">
                         <Sparkles size={8} /> automático
                       </Badge>
                     )}
                   </p>
-                  <p className="mt-0.5 truncate font-mono text-[9px] text-zinc-500">
+                  <p className="mt-0.5 truncate font-mono text-[10px] text-zinc-500">
                     {selectedTeamReadiness.members} membros · {selectedTeamReadiness.vehicle?.name || "sem veículo"}
                     {chances[selectedTeam.id] != null ? ` · ${Math.round(chances[selectedTeam.id] * 100)}% sucesso` : ""}
                   </p>
                 </div>
-                <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-400">Pronta</span>
+                <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-400">Pronta</span>
               </div>
             ) : (
               <div>
                 <p className="text-xs font-semibold text-white">{anyReady ? "Escolhe uma equipa" : "Nenhuma equipa pronta"}</p>
-                <p className="mt-0.5 font-mono text-[9px] text-zinc-500">
+                <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
                   {anyReady ? "A recomendação automática está disponível na configuração avançada." : "Corrige membros, veículo, combustível ou condição para poder despachar."}
                 </p>
               </div>
@@ -464,7 +464,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               type="button"
               variant="ghost"
               onClick={() => setShowAdvancedSetup((value) => !value)}
-              className="mt-2 h-7 w-full justify-center gap-1 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
+              className="mt-2 h-7 w-full justify-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
             >
               {showAdvancedSetup ? "Ocultar configuração" : "Configuração avançada"}
               <ChevronDown size={11} className={`transition-transform ${showAdvancedSetup ? "rotate-180" : ""}`} />
@@ -511,13 +511,13 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                           {t.name}
                           {t.id === recommendedTeamId && (
                             <Tip tip="Sugestão automática: a equipa com maior probabilidade de sucesso para esta operação. Podes escolher outra clicando nela.">
-                              <Badge variant="outline" className="ml-1.5 gap-0.5 border-amber-500/30 bg-amber-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-amber-400">
+                              <Badge variant="outline" className="ml-1.5 gap-0.5 border-amber-500/30 bg-amber-500/10 px-1 py-0 font-mono text-[10px] font-normal uppercase text-amber-400">
                                 <Sparkles size={9} /> recomendada
                               </Badge>
                             </Tip>
                           )}
                           {match && (
-                            <Badge variant="outline" className="ml-1.5 border-emerald-500/30 bg-emerald-500/10 px-1 py-0 font-mono text-[9px] font-normal uppercase text-emerald-400">match</Badge>
+                            <Badge variant="outline" className="ml-1.5 border-emerald-500/30 bg-emerald-500/10 px-1 py-0 font-mono text-[10px] font-normal uppercase text-emerald-400">match</Badge>
                           )}
                         </p>
                         <p className="font-mono text-[10px] text-zinc-500">
@@ -547,7 +547,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                               onClick={(ev) => { ev.stopPropagation(); fix.run(); }}
                               disabled={!fix.can}
                               title={r.reason}
-                              className={`h-auto gap-1 border-white/15 px-1.5 py-1 font-mono text-[9px] font-bold ${fix.color} hover:bg-white/10`}
+                              className={`h-auto gap-1 border-white/15 px-1.5 py-1 font-mono text-[10px] font-bold ${fix.color} hover:bg-white/10`}
                             >
                               <fix.icon size={10} /> {fix.label}
                             </Button>
@@ -598,11 +598,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             return (
               <Card ref={previewRef} data-testid="dispatch-preview" className="mt-2 animate-slide-up sub-card p-2.5 shadow-none">
                 <div className="flex items-baseline justify-between">
-                  <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
                   <div className="flex items-center gap-1.5">
                     <Badge
                       variant="outline"
-                      className="rounded border-transparent px-1.5 py-0 font-mono text-[9px] font-bold uppercase tracking-wider"
+                      className="rounded border-transparent px-1.5 py-0 font-mono text-[10px] font-bold uppercase tracking-wider"
                       style={{ color: quality.color, background: `${quality.color}1a` }}
                     >
                       {quality.label}
@@ -654,7 +654,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   <button type="button"
                     data-testid="dispatch-preview-toggle-details"
                     onClick={() => setShowDetails((v) => !v)}
-                    className="mt-1.5 flex w-full items-center justify-center gap-1 border-t border-white/5 pt-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500 transition-colors hover:text-white"
+                    className="mt-1.5 flex w-full items-center justify-center gap-1 border-t border-white/5 pt-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500 transition-colors hover:text-white"
                   >
                     {showDetails ? "Ocultar detalhes" : "Ver detalhes"}
                     <ChevronDown size={11} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
@@ -670,7 +670,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                     <Accordion type="multiple" className="mt-1">
                       {categoryOrder.map((cat) => (
                         <AccordionItem key={cat} value={cat} className="border-white/5">
-                          <AccordionTrigger className="py-1.5 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-400 hover:no-underline">
+                          <AccordionTrigger className="py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:no-underline">
                             {MODIFIER_CATEGORY_LABELS[cat]}
                             <span className="ml-auto mr-1.5 font-normal normal-case text-zinc-600">{byCategory[cat].length}</span>
                           </AccordionTrigger>
@@ -734,7 +734,7 @@ const Metric = ({ icon: Icon, label, value, color, tip }) => (
     <Card className="h-full sub-card p-2 shadow-none">
       <div className="flex items-center gap-1">
         <Icon size={10} style={{ color }} />
-        <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
+        <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
       </div>
       <p className="mt-0.5 font-mono text-xs font-bold text-white">{value}</p>
     </Card>

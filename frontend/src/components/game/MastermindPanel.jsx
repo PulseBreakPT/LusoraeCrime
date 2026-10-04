@@ -103,7 +103,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
                   type="button"
                   onClick={() => setTab(key)}
                   data-testid={`mastermind-tab-${key}`}
-                  className={`flex items-center justify-center gap-1 rounded-lg px-1 py-2 font-mono text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                  className={`flex items-center justify-center gap-1 rounded-lg px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
                     tab === key ? "bg-sky-500/20 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
                   }`}
                 >
@@ -174,16 +174,16 @@ const RankCard = ({ rank }) => (
   <Card className="sub-card p-4" data-testid="mastermind-rank">
     <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Estatuto Mastermind</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">Estatuto Mastermind</p>
         <p className="mt-1 text-sm font-bold text-white">{rank.name}</p>
-        <p className="font-mono text-[9px] text-zinc-600">Nível {rank.level} · {rank.xp} XP</p>
+        <p className="font-mono text-[10px] text-zinc-600">Nível {rank.level} · {rank.xp} XP</p>
       </div>
       <Badge className="border-sky-500/25 bg-sky-500/10 font-mono text-sky-300">
         {rank.next_name || "Lenda máxima"}
       </Badge>
     </div>
     <MiniBar value={rank.progress_pct} color="#A78BFA" className="mt-3" height="h-1.5" />
-    <p className="mt-1 text-right font-mono text-[9px] text-zinc-600">
+    <p className="mt-1 text-right font-mono text-[10px] text-zinc-600">
       {rank.next_xp ? `${rank.next_xp - rank.xp} XP até ao próximo estatuto` : "Progressão completa"}
     </p>
   </Card>
@@ -257,7 +257,7 @@ const BoardTab = ({
                 </select>
               </Field>
             </div>
-            <label className="mt-3 block font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <label className="mt-3 block font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               Parte da equipa · <span className="text-sky-300">{draft.crew_cut_pct}%</span>
               <input
                 type="range"
@@ -307,7 +307,7 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
         <p className="font-display text-sm font-bold uppercase tracking-wide text-white">{target.name}</p>
         <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{target.description}</p>
       </div>
-      <Badge variant="outline" className="shrink-0 border-white/10 font-mono text-[9px] text-zinc-400">
+      <Badge variant="outline" className="shrink-0 border-white/10 font-mono text-[10px] text-zinc-400">
         {fmtMoney(target.base_reward)}
       </Badge>
     </div>
@@ -318,7 +318,7 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
     </div>
     {target.intel ? (
       <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-2">
-        <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-sky-300">
+        <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-sky-300">
           <ScanLine size={11} /> Dossiê ativo · {target.intel.recommended_name}
         </p>
         <p className="mt-1 text-[10px] text-zinc-500">
@@ -330,7 +330,7 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
       <Button
         size="sm"
         variant="outline"
-        className="h-8 flex-1 text-[9px]"
+        className="h-8 flex-1 text-[10px]"
         disabled={!target.unlocked || target.intel_active}
         onClick={onScout}
       >
@@ -338,7 +338,7 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
       </Button>
       <Button
         size="sm"
-        className="h-8 flex-1 text-[9px]"
+        className="h-8 flex-1 text-[10px]"
         disabled={!target.unlocked || !canCreate || target.cooldown_remaining_s > 0}
         onClick={onCreate}
       >
@@ -364,7 +364,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-white">{active.target_name}</p>
-              <p className="font-mono text-[9px] uppercase text-zinc-500">
+              <p className="font-mono text-[10px] uppercase text-zinc-500">
                 {active.team_name} · {active.vehicle_name}
               </p>
             </div>
@@ -374,7 +374,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
           </div>
           <MiniBar value={finale.progress_pct} color={ready ? "#34D399" : "#A78BFA"} className="mt-4" height="h-2" />
           <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-            <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-amber-300">
+            <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-amber-300">
               <Sparkles size={11} /> {finale.complication_name}
             </p>
             <p className="mt-1 text-[10px] text-zinc-500">{finale.complication_description}</p>
@@ -407,8 +407,8 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
           <Info label="Recetor" value={active.fence_name} />
         </div>
         <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-2">
-          <p className="font-mono text-[9px] uppercase text-zinc-500">Lista de prontidão</p>
-          <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-[9px]">
+          <p className="font-mono text-[10px] uppercase text-zinc-500">Lista de prontidão</p>
+          <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-[10px]">
             <ReadyLine ready={active.readiness.team} label="Equipa escolhida" />
             <ReadyLine ready={active.readiness.vehicle} label="Veículo escolhido" />
             <ReadyLine ready={active.readiness.approach} label="Abordagem definida" />
@@ -427,7 +427,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-bold text-white">{prep.name}</p>
-                <p className="font-mono text-[9px] text-zinc-500">
+                <p className="font-mono text-[10px] text-zinc-500">
                   {prep.required ? "Obrigatória" : "Opcional"} · {fmtMoney(prep.cost)} · {prep.attempts} tentativa(s)
                 </p>
               </div>
@@ -438,7 +438,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
             {isCurrent && (
               <div className="mt-3">
                 <MiniBar value={active.current_prep.progress_pct} color={canClaim ? "#34D399" : "#A78BFA"} height="h-1.5" />
-                <p className="mt-1 text-right font-mono text-[9px] text-zinc-600">
+                <p className="mt-1 text-right font-mono text-[10px] text-zinc-600">
                   {canClaim ? "Relatório disponível" : fmtDuration(active.current_prep.remaining_s)}
                 </p>
               </div>
@@ -446,7 +446,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
             <Button
               size="sm"
               variant={canClaim ? "default" : "outline"}
-              className="mt-3 h-8 w-full text-[9px]"
+              className="mt-3 h-8 w-full text-[10px]"
               disabled={prep.status === "complete" || Boolean(active.current_prep && !canClaim)}
               onClick={() => canClaim ? onClaimPrep(prep.key) : onStartPrep(prep.key)}
             >
@@ -479,7 +479,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
     <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-mono text-[9px] uppercase text-zinc-500">Armazenamento clandestino</p>
+          <p className="font-mono text-[10px] uppercase text-zinc-500">Armazenamento clandestino</p>
           <p className="mt-1 text-xs font-bold text-white">{market.used} de {market.capacity} unidades</p>
         </div>
         <Badge className={market.raid_risk_pct >= 25 ? "bg-red-500/15 text-red-300" : "bg-amber-500/15 text-amber-300"}>
@@ -487,7 +487,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
         </Badge>
       </div>
       <MiniBar value={(market.used / Math.max(1, market.capacity)) * 100} color="#F59E0B" className="mt-3" height="h-1.5" />
-      <label className="mt-3 block font-mono text-[9px] uppercase text-zinc-500">
+      <label className="mt-3 block font-mono text-[10px] uppercase text-zinc-500">
         Quantidade por ordem
         <input
           type="number"
@@ -502,7 +502,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
 
     {market.raid_log?.[0] && (
       <Card className="border-red-500/20 bg-red-500/5 p-3">
-        <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-red-300">
+        <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-red-300">
           <AlertTriangle size={11} /> Última rusga ao armazém
         </p>
         <p className="mt-1 text-[10px] text-zinc-500">
@@ -526,7 +526,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
                 <span className="font-mono text-[10px] font-bold text-amber-300">{fmtMoney(good.price)}</span>
               </div>
               <p className="mt-1 text-[10px] text-zinc-500">{good.description}</p>
-              <div className="mt-2 flex items-center justify-between font-mono text-[9px]">
+              <div className="mt-2 flex items-center justify-between font-mono text-[10px]">
                 <span className="text-zinc-500">Carteira: {good.owned} · espaço {good.space}/un.</span>
                 <span className={good.trend === "up" ? "text-emerald-300" : good.trend === "down" ? "text-red-300" : "text-zinc-400"}>
                   <TrendIcon size={10} className="mr-1 inline" /> {good.change_pct > 0 ? "+" : ""}{good.change_pct}%
@@ -538,7 +538,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-[9px]"
+              className="h-8 text-[10px]"
               disabled={!good.unlocked || market.used + totalSpace > market.capacity}
               onClick={() => onTrade(good.key, "buy")}
             >
@@ -546,7 +546,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
             </Button>
             <Button
               size="sm"
-              className="h-8 text-[9px]"
+              className="h-8 text-[10px]"
               disabled={!good.unlocked || good.owned < quantity}
               onClick={() => onTrade(good.key, "sell")}
             >
@@ -566,7 +566,7 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
     <Card className="sub-card overflow-hidden p-4" data-testid="mastermind-bounty">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Recompensa rival</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">Recompensa rival</p>
           <p className="mt-1 text-lg font-bold text-white">{bounty.name}</p>
         </div>
         <span className="font-mono text-2xl font-black text-red-400">{bounty.value}</span>
@@ -579,7 +579,7 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
     </Card>
 
     <Card className="sub-card p-3">
-      <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-zinc-400">
+      <p className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-zinc-400">
         <Users size={11} /> Contraemboscada
       </p>
       <p className="mt-1 text-[10px] text-zinc-500">
@@ -591,12 +591,12 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
         ))}
       </select>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button size="sm" variant="outline" className="h-9 text-[9px]" disabled={!bounty.value} onClick={onPay}>
+        <Button size="sm" variant="outline" className="h-9 text-[10px]" disabled={!bounty.value} onClick={onPay}>
           <Coins size={11} /> Pagar silêncio
         </Button>
         <Button
           size="sm"
-          className="h-9 text-[9px]"
+          className="h-9 text-[10px]"
           disabled={!bounty.value || !teamId || bounty.hunter_remaining_s > 0}
           onClick={onAmbush}
         >
@@ -614,7 +614,7 @@ const CachesTab = ({ caches, onScan }) => (
     <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="font-mono text-[9px] uppercase text-zinc-500">Cifragem territorial</p>
+          <p className="font-mono text-[10px] uppercase text-zinc-500">Cifragem territorial</p>
           <p className="mt-1 text-xs font-bold text-white">
             {caches.completion_claimed ? "Todos os sinais encontrados" : "Localiza as caches de cada zona"}
           </p>
@@ -637,7 +637,7 @@ const CachesTab = ({ caches, onScan }) => (
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-white">{district.name}</p>
-            <p className="font-mono text-[9px] uppercase text-zinc-600">Assinatura {district.signature}</p>
+            <p className="font-mono text-[10px] uppercase text-zinc-600">Assinatura {district.signature}</p>
           </div>
           <Badge variant="outline" className={district.collected ? "border-emerald-500/30 text-emerald-300" : "border-white/10 text-zinc-500"}>
             {district.collected ? "Recuperada" : "Por localizar"}
@@ -646,7 +646,7 @@ const CachesTab = ({ caches, onScan }) => (
         <Button
           size="sm"
           variant="outline"
-          className="mt-3 h-8 w-full text-[9px]"
+          className="mt-3 h-8 w-full text-[10px]"
           disabled={district.collected || district.remaining_s > 0}
           onClick={() => onScan(district.key)}
         >
@@ -663,7 +663,7 @@ const CachesTab = ({ caches, onScan }) => (
 
 
 const Field = ({ label, children }) => (
-  <label className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+  <label className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
     {label}
     {children}
   </label>
@@ -671,7 +671,7 @@ const Field = ({ label, children }) => (
 
 const Info = ({ label, value }) => (
   <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
-    <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className="mt-0.5 truncate font-mono text-[10px] font-bold text-zinc-300">{value}</p>
   </div>
 );

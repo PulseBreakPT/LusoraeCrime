@@ -74,7 +74,7 @@ export default function ChangelogPage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <span className="font-display text-2xl font-bold tracking-tight text-white">v{v.version}</span>
                     {v.tag === "atual" && (
-                      <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
+                      <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
                         Atual
                       </span>
                     )}

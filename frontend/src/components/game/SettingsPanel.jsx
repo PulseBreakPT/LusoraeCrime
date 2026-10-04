@@ -299,7 +299,7 @@ const DeleteAccountForm = () => {
         href={`${(process.env.PUBLIC_URL || "").replace(/\/$/, "")}/delete-account.html`}
         target="_blank"
         rel="noreferrer"
-        className="mt-2 block text-center font-mono text-[9px] uppercase tracking-wider text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
+        className="mt-2 block text-center font-mono text-[10px] uppercase tracking-wider text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
       >
         Ajuda e pedido de eliminação fora da app
       </a>
@@ -542,7 +542,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
               onChange={(v) => patchAutomation({ auto_claim_quests: v })}
             />
           </Row>
-          <p className="flex items-center gap-1.5 pt-1 text-[9px] text-zinc-600">
+          <p className="flex items-center gap-1.5 pt-1 text-[10px] text-zinc-600">
             <Wrench size={9} /> <Fuel size={9} /> <BedDouble size={9} /> <Gift size={9} />
             Corre mesmo com a app fechada — os custos são os mesmos das ações manuais.
           </p>

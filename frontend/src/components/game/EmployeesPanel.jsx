@@ -45,7 +45,7 @@ const useTick = (active) => {
 
 const StatBar = ({ label, value, color }) => (
   <div>
-    <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+    <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
       <span>{label}</span>
       <span>{Math.round(value)}%</span>
     </div>
@@ -57,7 +57,7 @@ const RarityBadge = ({ rarity, rar }) => (
   <Tip tip={rar ? `Raridade ${RARITY_LABELS[rarity]}: atributos ×${rar.mult}, nível máx. ${rar.max_level}, ${rar.talent_slots} slot(s) de talento.` : null} align="end">
     <Badge
       variant="outline"
-      className="rounded border-transparent px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+      className="rounded border-transparent px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider"
       style={{ color: RARITY_COLORS[rarity], background: `${RARITY_COLORS[rarity]}1a` }}
     >
       {RARITY_LABELS[rarity]}
@@ -149,21 +149,21 @@ const EmployeeCard = ({ e, onNavigate }) => {
             <span className="shrink-0 font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
             {isNewbie && (
               <Tip tip="Recém-recrutado — ainda se está a adaptar, com um pequeno desempenho reduzido que desaparece na primeira hora ao serviço.">
-                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-lime-400">
+                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-lime-400">
                   <Leaf size={9} /> novato
                 </span>
               </Tip>
             )}
             {isHeavyUse && (
               <Tip tip={`Muito solicitado (${e.missions_done} operações) — cansa-se mais depressa e precisa de descansar com mais frequência.`}>
-                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-orange-400">
+                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-orange-400">
                   <BatteryMedium size={9} /> veterano
                 </span>
               </Tip>
             )}
             {isNearExhausted && (
               <Tip tip="Fadiga a aproximar-se do limiar de exaustão (70%) — manda descansar antes que fique indisponível.">
-                <span data-testid={`emp-near-exhausted-${e.id}`} className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] uppercase text-amber-400">
+                <span data-testid={`emp-near-exhausted-${e.id}`} className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-amber-400">
                   <BatteryMedium size={9} /> cansado
                 </span>
               </Tip>
@@ -182,7 +182,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
             <Badge
               data-testid={`employee-status-${e.id}`}
               variant="outline"
-              className="rounded-full border-transparent px-2 py-0.5 text-right font-mono text-[9px] font-bold uppercase"
+              className="rounded-full border-transparent px-2 py-0.5 text-right font-mono text-[10px] font-bold uppercase"
               style={{ color: EMP_STATUS_COLORS[e.status], background: `${EMP_STATUS_COLORS[e.status]}1a` }}
             >
               {mission ? mission.opportunity?.name || EMP_STATUS_LABELS[e.status] : EMP_STATUS_LABELS[e.status] || e.status}
@@ -193,7 +193,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
       </div>
 
       <div className="mt-2">
-        <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+        <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
           <span>XP</span>
           <span>{nextXp ? `${e.xp}/${nextXp}` : "MAX"}</span>
         </div>
@@ -218,7 +218,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
           return (
             <Tip key={k} tip={`${ATTR_FULL[k] || k}: ${v}${key ? " — atributo-chave desta especialização, pesa mais nas operações." : ""}`} block>
               <div
-                className={`rounded px-1 py-0.5 text-center font-mono text-[9px] ${
+                className={`rounded px-1 py-0.5 text-center font-mono text-[10px] ${
                   key ? "bg-red-500/15 text-red-300" : "bg-black/40 text-zinc-500"
                 }`}
               >
@@ -239,7 +239,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
             block
           >
             <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-              <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+              <p className={cn("truncate text-center font-mono text-[10px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
                 {c.label.slice(0, 3)}
               </p>
               <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
@@ -252,7 +252,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
         <div className="relative z-[1] mt-1.5 flex flex-wrap gap-1">
           {e.talents.map((t) => (
             <Tip key={t} tip={catalog.talents[t]?.desc}>
-              <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300">
+              <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
                 <Sparkles size={9} /> {catalog.talents[t]?.name || t}
               </span>
             </Tip>
@@ -304,16 +304,16 @@ const EmployeeCard = ({ e, onNavigate }) => {
               data-testid={`emp-unassign-weapon-${e.id}`}
               onClick={() => unassignWeapon(e.id)}
               disabled={!idle}
-              className="shrink-0 font-mono text-[9px] text-red-400 underline-offset-2 hover:underline disabled:opacity-40 disabled:no-underline"
+              className="shrink-0 font-mono text-[10px] text-red-400 underline-offset-2 hover:underline disabled:opacity-40 disabled:no-underline"
             >
               desatribuir
             </button>
           </div>
           {weaponProficiency > 0 && (
-            <p className="mt-0.5 font-mono text-[9px] text-zinc-500">Proficiência: {Math.round(weaponProficiency)}%</p>
+            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">Proficiência: {Math.round(weaponProficiency)}%</p>
           )}
           {weaponCompat && !weaponCompat.compatible && (
-            <p className="mt-0.5 flex items-center gap-1 font-mono text-[9px] text-amber-400">
+            <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-amber-400">
               <ShieldAlert size={9} /> pouco compatível ({weaponCompat.missing.join(", ")})
             </p>
           )}
@@ -483,14 +483,14 @@ const CandidateCard = ({ c }) => {
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
         {topAttrs.map(([k, v]) => (
           <Tip key={k} tip={`${ATTR_FULL[k] || k}: ${v} — um dos melhores atributos deste candidato.`}>
-            <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
+            <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
               {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
             </span>
           </Tip>
         ))}
         {(c.talents || []).map((t) => (
           <Tip key={t} tip={catalog.talents[t]?.desc}>
-            <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300">
+            <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
               <Sparkles size={9} /> {catalog.talents[t]?.name || t}
             </span>
           </Tip>
@@ -600,13 +600,13 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <Card className="mt-3 flex items-center justify-between sub-card px-3 py-2 shadow-none">
           <div>
-            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Fecho semanal</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Fecho semanal</p>
             <Tip tip={`Salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)} + TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)} + frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} + imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}.`}>
               <p className="font-mono text-xs font-bold text-white" data-testid="salary-total">{fmtMoney(weeklyFixed)}</p>
             </Tip>
           </div>
           <div className="text-right">
-            <p className="text-[9px] uppercase tracking-wider text-zinc-500">Segunda · 20:00</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Segunda · 20:00</p>
             <p className="font-mono text-xs font-bold text-amber-400" data-testid="payroll-countdown">
               {payrollMs !== null ? fmtDuration(payrollMs / 1000) : "—"}
             </p>
@@ -639,7 +639,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                   {Object.entries(statusCounts).map(([s, n]) => (
                     <Tip key={s} tip={EMP_STATUS_TIPS[s]}>
                       <span
-                        className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase"
+                        className="rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase"
                         style={{ color: EMP_STATUS_COLORS[s], background: `${EMP_STATUS_COLORS[s]}14` }}
                       >
                         {n} {EMP_STATUS_LABELS[s]}
@@ -782,7 +782,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                   <h3 className="mb-1.5 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
                     {src.name}
                     {locked && (
-                      <span className="flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                      <span className="flex items-center gap-0.5 font-mono text-[10px] text-amber-400">
                         <Lock size={9} /> Nível {src.min_level}
                       </span>
                     )}

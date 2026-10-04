@@ -90,7 +90,7 @@ const Stat = ({ icon: Icon, color, label, value, tip, testId, className = "" }) 
         <Icon size={14} style={{ color }} />
       </span>
       <span className="min-w-0">
-        <span className="sub-resource-label block truncate text-[9px] font-semibold uppercase leading-none tracking-[0.11em] text-zinc-600">
+        <span className="sub-resource-label block truncate text-[10px] font-semibold uppercase leading-none tracking-[0.11em] text-zinc-600">
           {label}
         </span>
         <span className="mt-1 block whitespace-nowrap font-mono text-[11px] font-bold leading-none tabular-nums text-zinc-100 sm:text-[13px]">

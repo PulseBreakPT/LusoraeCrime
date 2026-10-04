@@ -126,7 +126,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
                   type="button"
                   onClick={() => setTab(key)}
                   data-testid={`street-tab-${key}`}
-                  className={`flex items-center justify-center gap-1 rounded-lg px-2 py-2 font-mono text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                  className={`flex items-center justify-center gap-1 rounded-lg px-2 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
                     tab === key ? "bg-red-600/20 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
                   }`}
                 >
@@ -196,7 +196,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
               />
             )}
 
-            <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+            <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3 font-mono text-[10px] uppercase tracking-wider text-zinc-600">
               <span>{selectedDistrict?.name || "Sem zona"}</span>
               <span>{selectedVehicle?.name || "Sem veículo"}</span>
             </div>
@@ -215,7 +215,7 @@ const RadarTab = ({ street, now }) => {
       <Card className="sub-card overflow-hidden p-4" data-testid="wanted-level-card">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Nível de procurado</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">Nível de procurado</p>
             <div className="mt-2 flex gap-1" aria-label={`${wanted.stars} de 5 estrelas`}>
               {[0, 1, 2, 3, 4].map((index) => (
                 <Star
@@ -245,13 +245,13 @@ const RadarTab = ({ street, now }) => {
       <Card className="sub-card p-4" data-testid="street-rank-card">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Reputação de rua</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">Reputação de rua</p>
             <p className="mt-1 text-sm font-bold text-white">{street.rank.name}</p>
           </div>
           <span className="font-mono text-lg font-bold text-cyan-300">{street.rank.rep}</span>
         </div>
         <MiniBar value={street.rank.progress_pct} color="#22D3EE" className="mt-3" height="h-1.5" />
-        <p className="mt-1 text-right font-mono text-[9px] text-zinc-600">
+        <p className="mt-1 text-right font-mono text-[10px] text-zinc-600">
           {street.rank.next_rep ? `Próximo nível em ${street.rank.next_rep}` : "Nível máximo"}
         </p>
       </Card>
@@ -260,10 +260,10 @@ const RadarTab = ({ street, now }) => {
       <Card className="sub-card p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="font-bold text-white">{street.event.name}</p>
-          <span className="font-mono text-[9px] text-zinc-500">{fmtDuration(eventRemaining)}</span>
+          <span className="font-mono text-[10px] text-zinc-500">{fmtDuration(eventRemaining)}</span>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{street.event.description}</p>
-        <div className="mt-3 grid grid-cols-3 gap-1 text-center font-mono text-[9px]">
+        <div className="mt-3 grid grid-cols-3 gap-1 text-center font-mono text-[10px]">
           <Modifier label="Sucesso" value={street.event.success} pct />
           <Modifier label="Pagamento" value={street.event.reward_mult - 1} pct />
           <Modifier label="Calor" value={street.event.heat_mult - 1} pct inverse />
@@ -302,7 +302,7 @@ const TerritoriesTab = ({ districts, onAction }) => (
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-bold text-white">{district.name}</p>
-              <p className="mt-0.5 font-mono text-[9px] uppercase text-zinc-500">
+              <p className="mt-0.5 font-mono text-[10px] uppercase text-zinc-500">
                 {district.controlled ? `Controlo nível ${district.tier}` : "Zona aberta"} · {fmtMoney(district.income_per_h)}/h
               </p>
             </div>
@@ -311,25 +311,25 @@ const TerritoriesTab = ({ districts, onAction }) => (
             </Badge>
           </div>
           <div className="mt-3">
-            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase text-zinc-600">
+            <div className="mb-1 flex justify-between font-mono text-[10px] uppercase text-zinc-600">
               <span>Influência</span><span>{Math.round(district.influence)}/150</span>
             </div>
             <MiniBar value={(district.influence / 150) * 100} color="#22D3EE" height="h-1" />
           </div>
           <div className="mt-2">
-            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase text-zinc-600">
+            <div className="mb-1 flex justify-between font-mono text-[10px] uppercase text-zinc-600">
               <span>Pressão rival</span><span>{Math.round(district.rival_pressure)}%</span>
             </div>
             <MiniBar value={district.rival_pressure} color={district.rival_pressure >= 70 ? "#EF4444" : "#F59E0B"} height="h-1" />
           </div>
           <div className="mt-3 flex gap-2">
             {!district.controlled && (
-              <Button size="sm" className="h-8 flex-1 text-[9px]" disabled={!canClaim} onClick={() => onAction(district.key, "claim")}>
+              <Button size="sm" className="h-8 flex-1 text-[10px]" disabled={!canClaim} onClick={() => onAction(district.key, "claim")}>
                 <Target size={11} /> Assumir · {fmtMoney(5000)}
               </Button>
             )}
             {district.controlled && district.tier < 3 && (
-              <Button size="sm" variant="outline" className="h-8 flex-1 text-[9px]" disabled={!canReinforce} onClick={() => onAction(district.key, "reinforce")}>
+              <Button size="sm" variant="outline" className="h-8 flex-1 text-[10px]" disabled={!canReinforce} onClick={() => onAction(district.key, "reinforce")}>
                 <ShieldCheck size={11} /> Consolidar
               </Button>
             )}
@@ -337,7 +337,7 @@ const TerritoriesTab = ({ districts, onAction }) => (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 flex-1 text-[9px]"
+                className="h-8 flex-1 text-[10px]"
                 disabled={district.rival_pressure < 5 || district.defend_remaining_s > 0}
                 onClick={() => onAction(district.key, "defend")}
               >
@@ -368,9 +368,9 @@ const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-xs font-bold text-white">{contact.name}</p>
-                <span className="font-mono text-[9px] text-zinc-500">Favor {contact.favor}</span>
+                <span className="font-mono text-[10px] text-zinc-500">Favor {contact.favor}</span>
               </div>
-              <p className="font-mono text-[9px] uppercase text-red-300/70">{contact.role}</p>
+              <p className="font-mono text-[10px] uppercase text-red-300/70">{contact.role}</p>
               <p className="mt-1 text-[10px] text-zinc-500">{contact.description}</p>
             </div>
           </div>
@@ -382,7 +382,7 @@ const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
           <Button
             size="sm"
             variant="outline"
-            className="mt-3 h-8 w-full text-[9px]"
+            className="mt-3 h-8 w-full text-[10px]"
             disabled={!contact.unlocked || contact.remaining_s > 0 || (contact.key === "mechanic" && !vehicleId)}
             onClick={() => onCall(contact.key)}
           >
@@ -411,7 +411,7 @@ const ActivitiesTab = ({
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-white">{activeJob.name}</p>
-              <p className="font-mono text-[9px] uppercase text-zinc-500">
+              <p className="font-mono text-[10px] uppercase text-zinc-500">
                 {activeJob.district_name} · {activeJob.vehicle_name}
               </p>
             </div>
@@ -437,13 +437,13 @@ const ActivitiesTab = ({
     <div className="mt-4 space-y-3">
       <SectionHeader icon={Gauge} label="Preparar atividade" />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="font-mono text-[9px] uppercase text-zinc-500">
+        <label className="font-mono text-[10px] uppercase text-zinc-500">
           Zona
           <select className={`${selectClass} mt-1`} value={districtKey} onChange={(event) => setDistrictKey(event.target.value)}>
             {districts.map((district) => <option key={district.key} value={district.key}>{district.name}</option>)}
           </select>
         </label>
-        <label className="font-mono text-[9px] uppercase text-zinc-500">
+        <label className="font-mono text-[10px] uppercase text-zinc-500">
           Veículo
           <select className={`${selectClass} mt-1`} value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
             {vehicles.map((vehicle) => {
@@ -453,7 +453,7 @@ const ActivitiesTab = ({
           </select>
         </label>
       </div>
-      <label className="block font-mono text-[9px] uppercase text-zinc-500">
+      <label className="block font-mono text-[10px] uppercase text-zinc-500">
         Aposta para corridas
         <select className={`${selectClass} mt-1`} value={wagerKey} onChange={(event) => setWagerKey(event.target.value)}>
           {street.wagers.map((wager) => (
@@ -476,15 +476,15 @@ const ActivitiesTab = ({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-bold text-white">{job.name}</p>
-                  <span className="font-mono text-[9px] text-zinc-500">{fmtDuration(job.duration_s)}</span>
+                  <span className="font-mono text-[10px] text-zinc-500">{fmtDuration(job.duration_s)}</span>
                 </div>
                 <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{job.description}</p>
-                <p className="mt-2 font-mono text-[9px] text-zinc-400">
+                <p className="mt-2 font-mono text-[10px] text-zinc-400">
                   Base {Math.round(job.base_success * 100)}% · {fmtMoney(job.reward_min)}–{fmtMoney(job.reward_max)}
                 </p>
               </div>
             </div>
-            <Button size="sm" className="mt-3 h-8 w-full text-[9px]" disabled={blocked} onClick={() => onStart(job.key)}>
+            <Button size="sm" className="mt-3 h-8 w-full text-[10px]" disabled={blocked} onClick={() => onStart(job.key)}>
               {!job.unlocked ? `Desbloqueia no nível ${job.unlock_rank}` : <><ChevronRight size={12} /> Iniciar em {districts.find((item) => item.key === districtKey)?.name}</>}
             </Button>
           </Card>
@@ -507,31 +507,31 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-bold text-white">{vehicle.name}</p>
-              <p className="font-mono text-[9px] uppercase text-zinc-500">
+              <p className="font-mono text-[10px] uppercase text-zinc-500">
                 Condição {Math.round(vehicle.condition)}% · Combustível {Math.round(vehicle.fuel_l)}/{Math.round(vehicle.tank_l)} L
               </p>
             </div>
             {meta.insured && <Badge className="bg-emerald-500/10 text-emerald-300"><ShieldCheck size={10} /> Seguro</Badge>}
           </div>
           <div className="mt-3">
-            <div className="mb-1 flex justify-between font-mono text-[9px] uppercase text-zinc-600">
+            <div className="mb-1 flex justify-between font-mono text-[10px] uppercase text-zinc-600">
               <span>Notoriedade</span><span>{Math.round(meta.notoriety || 0)}%</span>
             </div>
             <MiniBar value={meta.notoriety || 0} color={(meta.notoriety || 0) >= 60 ? "#EF4444" : "#F59E0B"} height="h-1" />
           </div>
           {meta.impounded && (
-            <p className="mt-2 flex items-center gap-1 font-mono text-[9px] text-red-300">
+            <p className="mt-2 flex items-center gap-1 font-mono text-[10px] text-red-300">
               <Siren size={10} /> Apreendido durante {fmtDuration(meta.impound_remaining_s)}
             </p>
           )}
           <div className="mt-3 grid grid-cols-3 gap-1">
-            <Button size="sm" variant="outline" className="h-8 px-1 text-[9px]" disabled={!meta.notoriety} onClick={() => onAction(vehicle.id, "plates")}>
+            <Button size="sm" variant="outline" className="h-8 px-1 text-[10px]" disabled={!meta.notoriety} onClick={() => onAction(vehicle.id, "plates")}>
               Matrículas
             </Button>
-            <Button size="sm" variant="outline" className="h-8 px-1 text-[9px]" disabled={meta.insured} onClick={() => onAction(vehicle.id, "insure")}>
+            <Button size="sm" variant="outline" className="h-8 px-1 text-[10px]" disabled={meta.insured} onClick={() => onAction(vehicle.id, "insure")}>
               Segurar
             </Button>
-            <Button size="sm" variant="outline" className="h-8 px-1 text-[9px]" disabled={!meta.impounded} onClick={() => onAction(vehicle.id, "recover")}>
+            <Button size="sm" variant="outline" className="h-8 px-1 text-[10px]" disabled={!meta.impounded} onClick={() => onAction(vehicle.id, "recover")}>
               Recuperar
             </Button>
           </div>
@@ -583,18 +583,18 @@ const PlanningTab = ({ street, draft, setDraft, toggleGear, onBuy, onSave }) => 
                 <div>
                   <p className="text-xs font-bold text-white">{item.name}</p>
                   <p className="mt-1 text-[10px] text-zinc-500">{item.description}</p>
-                  <p className="mt-1 font-mono text-[9px] text-zinc-400">Em armazém: {item.owned}</p>
+                  <p className="mt-1 font-mono text-[10px] text-zinc-400">Em armazém: {item.owned}</p>
                 </div>
                 <Badge variant="outline" className="shrink-0 border-white/10 text-zinc-300">{fmtMoney(item.current_price)}</Badge>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <Button size="sm" variant="outline" className="h-8 text-[9px]" disabled={!item.unlocked} onClick={() => onBuy(item.key)}>
+                <Button size="sm" variant="outline" className="h-8 text-[10px]" disabled={!item.unlocked} onClick={() => onBuy(item.key)}>
                   Comprar
                 </Button>
                 <Button
                   size="sm"
                   variant={selected ? "default" : "outline"}
-                  className="h-8 text-[9px]"
+                  className="h-8 text-[10px]"
                   disabled={!item.unlocked || (!selected && item.owned < 1) || (!selected && draft.gear_keys.length >= 2)}
                   onClick={() => toggleGear(item.key)}
                 >
@@ -627,7 +627,7 @@ const ChoiceCard = ({ item, selected, onClick }) => (
       {selected && <Check size={13} className="text-red-300" />}
     </div>
     <p className="mt-1 text-[10px] text-zinc-500">{item.description}</p>
-    <div className="mt-2 flex gap-3 font-mono text-[9px] uppercase text-zinc-600">
+    <div className="mt-2 flex gap-3 font-mono text-[10px] uppercase text-zinc-600">
       <span>Sucesso {signedPct(item.success)}</span>
       {item.reward_mult != null && <span>Pagamento {signedPct(item.reward_mult - 1)}</span>}
       {item.cost > 0 && <span>Custo {fmtMoney(item.cost)}</span>}
@@ -647,7 +647,7 @@ const Modifier = ({ label, value, pct, inverse }) => {
 
 const Info = ({ label, value, accent }) => (
   <div className="rounded-lg border border-white/10 bg-black/25 p-2">
-    <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className={`mt-1 truncate font-mono text-[10px] font-bold ${accent ? "text-cyan-300" : "text-zinc-300"}`}>{value}</p>
   </div>
 );

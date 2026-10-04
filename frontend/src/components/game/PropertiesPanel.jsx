@@ -31,7 +31,7 @@ const useTick = (active) => {
 const TierChip = ({ tier }) => (
   <Tip tip={`Tier ${tier.label} — classe do imóvel pelo nível de desbloqueio no mercado.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[10px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -209,20 +209,20 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <LevelDots level={p.level} max={maxLevel} color={tier.color} />
                       <Tip tip={`Manutenção fixa semanal deste imóvel: ${fmtMoney(maintWeek)}. É cobrada no fecho de segunda-feira às 20:00; falhar o fecho reduz a condição e os benefícios do imóvel.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-500">
                           <Wrench size={9} /> {fmtMoney(maintWeek)}/semana
                         </span>
                       </Tip>
                       {stacks && (
                         <Tip tip={`${stackRank + 1}.ª unidade deste tipo (por ordem de compra) — rendimentos decrescentes do motor: esta unidade rende ${Math.round(stackMult * 100)}% do benefício.`}>
-                          <span data-testid={`property-stack-${p.id}`} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                          <span data-testid={`property-stack-${p.id}`} className="inline-flex items-center gap-0.5 font-mono text-[10px] text-amber-400">
                             <Layers size={9} /> {stackRank + 1}.ª · {Math.round(stackMult * 100)}%
                           </span>
                         </Tip>
                       )}
                       {paybackH != null && !upgrading && (
                         <Tip tip={`Payback da melhoria para N${p.level + 1}: ~${paybackH >= 48 ? `${Math.round(paybackH / 24)} dias` : `${Math.round(paybackH)}h`} de produção à condição atual — a mesma régua que o botão Otimizar usa para ordenar melhorias.`}>
-                          <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-cyan-400">
+                          <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-cyan-400">
                             <Timer size={9} /> payback {paybackH >= 48 ? `${Math.round(paybackH / 24)}d` : `${Math.round(paybackH)}h`}
                           </span>
                         </Tip>
@@ -233,7 +233,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
                 {/* Condição — alimenta diretamente o rendimento passivo */}
                 <div className="relative z-[1] mt-2">
-                  <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+                  <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
                     <span>Condição</span>
                     <Tip tip={`Condição ${Math.round(condition)}% — os benefícios passivos rendem proporcionalmente. Degrada-se ${meta.condition_decay_per_hour ?? 2}%/h sem manutenção paga e recupera ${meta.condition_recovery_per_hour ?? 4}%/h com ela em dia.`}>
                       <span style={{ color: condition < 50 ? "#EF4444" : condition < 90 ? "#F59E0B" : "#34D399" }}>
@@ -356,20 +356,20 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
                     <div className="relative z-[1] mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                       <Tip tip={`Manutenção semanal base ao nível 1: ${fmtMoney(maintWeek)}. O preço final e a manutenção variam com a localização escolhida no mapa.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400">
                           <Wrench size={9} /> {fmtMoney(maintWeek)}/semana
                         </span>
                       </Tip>
                       {roiDays != null && (
                         <Tip tip={`Retorno do investimento em ~${roiDays} dias de produção contínua a 100% de condição.`}>
-                          <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-cyan-400">
+                          <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-cyan-400">
                             <Timer size={9} /> ROI ~{roiDays}d
                           </span>
                         </Tip>
                       )}
                       {diminished && (
                         <Tip tip={`Rendimentos decrescentes: já tens ${ownedOfType} unidade(s) deste tipo — a próxima rende ${nextStackPct}% do benefício.`}>
-                          <span data-testid={`market-stack-${key}`} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                          <span data-testid={`market-stack-${key}`} className="inline-flex items-center gap-0.5 font-mono text-[10px] text-amber-400">
                             <Layers size={9} /> próxima {nextStackPct}%
                           </span>
                         </Tip>
@@ -378,7 +378,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
                     <div className="relative z-[1] mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       {ownedOfType > 0 ? (
-                        <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">no património: <span className="text-zinc-300">{ownedOfType}</span></span>
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">no património: <span className="text-zinc-300">{ownedOfType}</span></span>
                       ) : <span />}
                       <PurchaseButton
                         testId={`buy-property-${key}`}

@@ -75,7 +75,7 @@ export default function LegalPage() {
                     href={`#${t.id}`}
                     className="flex items-baseline gap-2 truncate rounded-r py-1.5 pl-3 text-xs text-zinc-500 hover:text-zinc-100"
                   >
-                    <span className="shrink-0 font-mono text-[9px] font-bold text-zinc-700">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="shrink-0 font-mono text-[10px] font-bold text-zinc-700">{String(i + 1).padStart(2, "0")}</span>
                     <span className="truncate">{t.label}</span>
                   </a>
                 ))}
@@ -145,7 +145,7 @@ export default function LegalPage() {
                     <li key={v.version} className="flex items-center gap-2.5 text-xs text-zinc-500">
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${v.version === doc.version ? "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" : "bg-zinc-700"}`} aria-hidden="true" />
                       Versão {v.version} — em vigor desde {formatDate(v.effective_date)}
-                      {v.version === doc.version && <span className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-red-400">Atual</span>}
+                      {v.version === doc.version && <span className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-400">Atual</span>}
                     </li>
                   ))}
                 </ul>

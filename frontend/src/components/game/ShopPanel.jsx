@@ -177,7 +177,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                           <span className="h-6 w-6 shrink-0 rounded-full border border-white/20" style={{ background: item.color }} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-semibold text-white">{item.label}</p>
-                            {owns && <p className="flex items-center gap-1 font-mono text-[9px] text-emerald-400"><CheckCircle2 size={9} /> possuído</p>}
+                            {owns && <p className="flex items-center gap-1 font-mono text-[10px] text-emerald-400"><CheckCircle2 size={9} /> possuído</p>}
                           </div>
                           {owns ? (
                             cat === "hq_skin" ? (
