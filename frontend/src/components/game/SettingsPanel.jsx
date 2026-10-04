@@ -23,11 +23,11 @@ const GAME_VERSION = "1.4.0";
 
 const CHANGELOG = [
   { v: "1.4.0", text: "Mastermind: grandes golpes por fases, dossiês e preparações, abordagens e recetores, mercado negro dinâmico, caçadores rivais, recompensas e caches de sinal." },
-  { v: "1.3.0", text: "Cidade Viva: procurado por estrelas, scanner policial, eventos urbanos, territórios, contactos, atividades de rua, planeamento tático e garagem clandestina." },
+  { v: "1.3.0", text: "Procurado por estrelas, scanner policial, eventos urbanos, territórios, contactos, atividades de rua e garagem clandestina." },
   { v: "1.2.0", text: "Pesquisa global, atalhos, ações em lote e melhorias de acessibilidade." },
   { v: "1.1.0", text: "Banda sonora original e efeitos sonoros temáticos — sirenes de perseguição, dinheiro, subida de nível e mais." },
-  { v: "1.0.0", text: "Módulo de Definições: conta, interface, jogabilidade, automatizações e notificações." },
-  { v: "0.9.0", text: "Interligação total do jogo: novos veículos exigidos por operações, novas especialidades com talentos e bónus próprios." },
+  { v: "1.0.0", text: "Definições de conta, interface, jogabilidade, automatizações e notificações." },
+  { v: "0.9.0", text: "Novos veículos exigidos por operações e novas especialidades com talentos e bónus próprios." },
   { v: "0.8.0", text: "50 novas operações, novos operacionais, veículos, imóveis e capítulos de história." },
   { v: "0.7.0", text: "Extrato financeiro, autonomia de tesouraria, limite de armazenamento de dinheiro sujo, abastecimento com tempo de espera." },
   { v: "0.6.0", text: "Favoritos, ordenação, ações em lote e confirmações de segurança em toda a interface." },
