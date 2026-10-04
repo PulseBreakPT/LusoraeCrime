@@ -205,7 +205,7 @@ export default function HQOnboarding() {
               </>
             )}
           </Button>
-          <p className="mt-2 text-center font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+          <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-wider text-zinc-600">
             Decisão permanente — o QG não pode ser mudado depois
           </p>
         </div>

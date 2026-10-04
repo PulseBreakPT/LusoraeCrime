@@ -46,7 +46,7 @@ const ProgressBar = ({ q }) => {
     : `${Math.min(Math.round(q.progress), q.target)}/${q.target}`;
   return (
     <div className="mt-2" data-testid={`quest-progress-${q.id || q.quest_key}`}>
-      <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+      <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
         <span>{q.objective_label}</span>
         <span>{label}</span>
       </div>
@@ -79,7 +79,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
       style={{ "--mk": q.status === "completed" ? "#10B981" : DIFFICULTY_COLORS[q.difficulty] || "#71717a" }}
     >
       {featured && (
-        <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-red-400">
+        <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-red-400">
           <Star size={9} fill="currentColor" /> Contrato em destaque
         </p>
       )}
@@ -96,7 +96,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
         </div>
         <Badge
           variant="outline"
-          className="shrink-0 rounded-full border-transparent px-2 py-0.5 font-mono text-[9px] font-bold uppercase"
+          className="shrink-0 rounded-full border-transparent px-2 py-0.5 font-mono text-[10px] font-bold uppercase"
           style={{ color: QUEST_STATUS_COLORS[q.status], background: `${QUEST_STATUS_COLORS[q.status]}1a` }}
         >
           {QUEST_STATUS_LABELS[q.status]}
@@ -128,7 +128,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
                 <Badge
                   variant="outline"
                   data-testid={`quest-mult-${q.id || q.quest_key}`}
-                  className="gap-0.5 border-transparent bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300"
+                  className="gap-0.5 border-transparent bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300"
                 >
                   <Zap size={9} /> ×{q.reward_mult.toFixed(2)}
                 </Badge>
@@ -136,7 +136,7 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
             );
           })()}
           {chips.map((c, i) => (
-            <Badge key={i} variant="outline" className="gap-0.5 border-transparent bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-normal text-emerald-300">
+            <Badge key={i} variant="outline" className="gap-0.5 border-transparent bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-normal text-emerald-300">
               <Gift size={9} /> {c}
             </Badge>
           ))}
@@ -347,7 +347,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
               >
                 {t.label}
                 {tabCounts[t.key] > 0 && (
-                  <Badge variant="outline" className="ml-1 border-transparent bg-white/10 px-1 py-0 font-mono text-[9px] font-bold text-zinc-300">
+                  <Badge variant="outline" className="ml-1 border-transparent bg-white/10 px-1 py-0 font-mono text-[10px] font-bold text-zinc-300">
                     {tabCounts[t.key]}
                   </Badge>
                 )}

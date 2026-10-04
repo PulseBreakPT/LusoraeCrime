@@ -17,7 +17,7 @@ import {
 
 const VStat = ({ label, value }) => (
   <Card className="rounded bg-black/40 px-1.5 py-1 text-center shadow-none">
-    <p className="text-[9px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="text-[10px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className="font-mono text-[10px] font-bold text-white">{value}</p>
   </Card>
 );
@@ -36,7 +36,7 @@ const useTick = (active) => {
 const TierChip = ({ tier }) => (
   <Tip tip={`Tier ${tier.label} — classe do veículo pelo nível de desbloqueio no stand.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[10px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -57,7 +57,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-            <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+            <p className={cn("truncate text-center font-mono text-[10px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
               {c.label.slice(0, 3)}
             </p>
             <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
@@ -257,7 +257,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       </div>
                       <TierChip tier={tier} />
                     </div>
-                    <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       {renamed && (
                         <Tip tip="Modelo original deste veículo, antes de o renomeares.">
                           <span data-testid={`vehicle-model-tag-${v.id}`} className="mr-1.5 rounded bg-black/40 px-1 py-px text-zinc-400">{modelName}</span>
@@ -273,24 +273,24 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <Tip tip={`Velocidade efetiva ${effSpeed.toFixed(1)} m/s de ${v.speed} m/s nominais — a condição (${Math.round(v.condition)}%) rende ${Math.round(speedFactor * 100)}% em curva contínua do motor (nunca abaixo de ${Math.round((fleetMeta.speed_floor ?? 0.6) * 100)}%).`}>
-                        <span className={cn("inline-flex items-center gap-0.5 font-mono text-[9px]", speedReduced ? "text-amber-400" : "text-zinc-500")}>
+                        <span className={cn("inline-flex items-center gap-0.5 font-mono text-[10px]", speedReduced ? "text-amber-400" : "text-zinc-500")}>
                           <Gauge size={9} /> {effSpeed.toFixed(1)} m/s
                         </span>
                       </Tip>
                       <Tip tip={`Autonomia com o combustível atual (${v.fuel_l.toFixed(0)}L, consumo ${v.cons}L/100km). As viagens são ida e volta a partir do QG.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-cyan-400">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-cyan-400">
                           <Route size={9} /> ~{Math.round(vehicleRangeKm(v))} km
                         </span>
                       </Tip>
                       {seats != null && (
                         <Tip tip={`Lugares ocupados pela equipa atribuída vs. capacidade do veículo (${seats}). Acima da capacidade, o despacho fica bloqueado.`}>
-                          <span className={cn("inline-flex items-center gap-0.5 font-mono text-[9px]", members.length > seats ? "text-red-400" : "text-zinc-500")}>
+                          <span className={cn("inline-flex items-center gap-0.5 font-mono text-[10px]", members.length > seats ? "text-red-400" : "text-zinc-500")}>
                             <Users size={9} /> {members.length}/{seats}
                           </span>
                         </Tip>
                       )}
                       <Tip tip={`${Math.round(Number(v.km_total) || 0)} km percorridos ao serviço da organização.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-500">
                           <BarChart3 size={9} /> {Math.round(Number(v.km_total) || 0)} km
                         </span>
                       </Tip>
@@ -322,7 +322,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                     {teamFit != null && (
                       <Tip tip={`Adequação à especialização ${SPEC_LABELS[team.spec] || team.spec}: ${Math.round(teamFit * 100)}%${teamBest ? " — modelo ideal para esta equipa." : "."}`} block>
                         <div className="mt-1">
-                          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                          <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                             <span>Match · {SPEC_LABELS[team.spec] || team.spec}</span>
                             <span className={teamBest ? "text-emerald-400" : teamFit >= 0.5 ? "text-zinc-300" : "text-amber-400"}>{Math.round(teamFit * 100)}%{teamBest ? " ★" : ""}</span>
                           </div>
@@ -345,14 +345,14 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
                 <div className="relative z-[1] mt-2 grid grid-cols-2 gap-2">
                   <div>
-                    <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+                    <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
                       <span>Combustível</span>
                       <span>{v.fuel_l.toFixed(0)}/{v.tank_l.toFixed(0)}L</span>
                     </div>
                     <MiniBar value={fuelPct} color="#FBBF24" className="mt-0.5" />
                   </div>
                   <div>
-                    <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+                    <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
                       <span>Condição</span>
                       <Tip tip={`${Math.round(v.condition)}% de condição — velocidade real ${Math.round(speedFactor * 100)}% do nominal (curva contínua do motor) e penalização de chance abaixo de ${fleetMeta.condition_penalty_threshold ?? 70}%.`}>
                         <span>
@@ -507,7 +507,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           <p className="truncate text-sm font-semibold text-white">{m.name}</p>
                           <TierChip tier={tier} />
                         </div>
-                        <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                        <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                           {locked && (
                             <span className="mr-1.5 inline-flex items-center gap-0.5 text-amber-400">
                               <Lock size={9} /> nível {m.min_level}
@@ -523,19 +523,19 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                         </p>
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                           <Tip tip={`Velocidade nominal ${m.speed} m/s (referência máxima do catálogo: 26).`}>
-                            <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400"><Gauge size={9} /> {m.speed} m/s</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400"><Gauge size={9} /> {m.speed} m/s</span>
                           </Tip>
                           <Tip tip={`Discrição ${m.discretion}/100 — veículos discretos escondem-se melhor em operações furtivas.`}>
-                            <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400"><Search size={9} /> discr. {m.discretion}</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400"><Search size={9} /> discr. {m.discretion}</span>
                           </Tip>
                           <Tip tip="Lugares disponíveis para membros da equipa.">
-                            <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400"><Users size={9} /> {m.seats}</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400"><Users size={9} /> {m.seats}</span>
                           </Tip>
                           <Tip tip={`Autonomia máxima com o depósito cheio (${m.tank_l}L, ${m.cons}L/100km).`}>
-                            <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-cyan-400"><Route size={9} /> ~{Math.round((m.tank_l / m.cons) * 100)} km</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-cyan-400"><Route size={9} /> ~{Math.round((m.tank_l / m.cons) * 100)} km</span>
                           </Tip>
                           <Tip tip={`Depósito ${m.tank_l}L de ${m.fuel_type === "gasoleo" ? "gasóleo" : "gasolina"} — consumo ${m.cons}L/100km.`}>
-                            <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400"><Fuel size={9} /> {m.cons}L/100</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400"><Fuel size={9} /> {m.cons}L/100</span>
                           </Tip>
                         </div>
                       </div>
@@ -546,7 +546,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
                     <div className="relative z-[1] mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       {owned > 0 ? (
-                        <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">na frota: <span className="text-zinc-300">{owned}</span></span>
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">na frota: <span className="text-zinc-300">{owned}</span></span>
                       ) : <span />}
                       <PurchaseButton
                         testId={`buy-vehicle-${key}`}

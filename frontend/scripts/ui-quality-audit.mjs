@@ -34,7 +34,7 @@ function walk(dir) {
 
 function scanJsx(file, source) {
   for (const match of source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) {
-    if (Number(match[1]) < 9) add("microtext-under-9px", file, source, match.index, match[0]);
+    if (Number(match[1]) < 10) add("microtext-under-10px", file, source, match.index, match[0]);
   }
 
   for (const match of source.matchAll(/transition-all/g)) {
@@ -88,11 +88,12 @@ function scanJsx(file, source) {
 function scanCss(file, source) {
   metrics.importantDeclarations += (source.match(/!important/g) || []).length;
   metrics.hardcodedHexColors += (source.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
-  metrics.backdropEffects += (source.match(/(?:^|\s)(?:-webkit-)?backdrop-filter\s*:\s*(?!none)[^;]+;/gm) || []).length;
+  metrics.backdropEffects += [...source.matchAll(/(?:^|\s)(?:-webkit-)?backdrop-filter\s*:\s*([^;]+);/gm)]
+    .filter((match) => match[1].trim() !== "none").length;
   metrics.infiniteAnimations += (source.match(/animation\s*:[^;\n]*\binfinite\b/g) || []).length;
 
   for (const match of source.matchAll(/font-size\s*:\s*(\d+(?:\.\d+)?)px/g)) {
-    if (Number(match[1]) < 9) add("microtext-under-9px", file, source, match.index, match[0]);
+    if (Number(match[1]) < 10) add("microtext-under-10px", file, source, match.index, match[0]);
   }
   for (const match of source.matchAll(/transition\s*:[^;]*(?:width|height|padding|margin|top|left|right|bottom)[^;]*;/g)) {
     add("layout-transition", file, source, match.index, match[0]);

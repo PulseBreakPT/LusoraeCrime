@@ -213,7 +213,7 @@ export function LiveOpsPanel({ state, serverNow }) {
                 type="button"
                 data-testid={`liveops-tab-${i}`}
                 onClick={() => setSelectedId(m.id)}
-                className={`relative shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                className={`relative shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
                   isSel ? "border-red-500/50 bg-red-500/10 text-white" : "border-white/10 text-zinc-500 hover:text-zinc-300"
                 }`}
               >
@@ -243,7 +243,7 @@ export function LiveOpsPanel({ state, serverNow }) {
                 <div className="sub-lo-seg">
                   <div className="sub-lo-seg-fill" style={{ transform: `scaleX(${sg.f})`, background: sg.col }} />
                 </div>
-                <p className={`mt-0.5 text-center font-mono text-[9px] uppercase tracking-[0.2em] ${sg.f > 0 && sg.f < 1 ? "text-zinc-300" : "text-zinc-600"}`}>
+                <p className={`mt-0.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] ${sg.f > 0 && sg.f < 1 ? "text-zinc-300" : "text-zinc-600"}`}>
                   {sg.label}
                 </p>
               </div>
@@ -251,7 +251,7 @@ export function LiveOpsPanel({ state, serverNow }) {
           </div>
         </div>
         <div className="w-16 shrink-0 text-right" title="Probabilidade atual de sucesso.">
-          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Chance</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">Chance</p>
           <p
             className={`font-mono text-lg font-bold leading-none tabular-nums ${recentComp ? "sub-lo-chance-pulse" : ""}`}
             style={{ color: chanceCol }}
@@ -260,7 +260,7 @@ export function LiveOpsPanel({ state, serverNow }) {
             {Math.round(liveChance * 100)}%
           </p>
           {compDelta !== 0 && (
-            <p className="font-mono text-[9px] font-bold tabular-nums" style={{ color: compDelta > 0 ? "#34D399" : "#F43F5E" }} data-testid="liveops-chance-delta">
+            <p className="font-mono text-[10px] font-bold tabular-nums" style={{ color: compDelta > 0 ? "#34D399" : "#F43F5E" }} data-testid="liveops-chance-delta">
               {compDelta > 0 ? "+" : ""}
               {Math.round(compDelta * 100)}% campo
             </p>
@@ -303,8 +303,8 @@ export function LiveOpsPanel({ state, serverNow }) {
           const fresh = isLast && now - Date.parse(e.at) < 2600;
           return (
             <div key={`${e.at}-${i}`} className="sub-lo-line flex items-baseline gap-1.5 py-[3px]" data-testid="liveops-line">
-              <span className="shrink-0 font-mono text-[9px] tabular-nums text-zinc-600">{fmtHMS(e.at)}</span>
-              <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider" style={{ color: e.pct != null ? meta.color : catColor }}>
+              <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-600">{fmtHMS(e.at)}</span>
+              <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider" style={{ color: e.pct != null ? meta.color : catColor }}>
                 {e.speaker}
               </span>
               <span className="min-w-0 font-mono text-[10.5px] leading-snug" style={{ color: meta.color }}>

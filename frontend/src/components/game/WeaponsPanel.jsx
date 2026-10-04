@@ -30,7 +30,7 @@ const useTick = (active) => {
 const TierChip = ({ tier }) => (
   <Tip tip={`Tier ${tier.label} — classe de equipamento pelo nível de desbloqueio no mercado.`}>
     <span
-      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] font-bold uppercase tracking-widest"
+      className="shrink-0 rounded-sm border px-1 py-px font-mono text-[10px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
     >
       {tier.label}
@@ -48,7 +48,7 @@ const StatGrid = ({ model }) => (
       return (
         <Tip key={s.key} tip={s.tip} block>
           <div>
-            <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <span>{s.label}</span>
               <span className="text-zinc-300">{display}</span>
             </div>
@@ -73,7 +73,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-            <p className={cn("truncate text-center font-mono text-[9px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
+            <p className={cn("truncate text-center font-mono text-[10px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
               {c.label.slice(0, 3)}
             </p>
             <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
@@ -91,7 +91,7 @@ const JamChip = ({ model, condition, meta, testId }) => {
   if ((model.magazine_capacity || 0) < 2 && !model.loud) {
     return (
       <Tip tip="Arma sem mecanismo de fogo — nunca encrava, independentemente da condição.">
-        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[9px] text-emerald-400">
+        <span data-testid={testId} className="inline-flex items-center gap-0.5 font-mono text-[10px] text-emerald-400">
           <ShieldCheck size={9} /> nunca encrava
         </span>
       </Tip>
@@ -105,7 +105,7 @@ const JamChip = ({ model, condition, meta, testId }) => {
     <span
       data-testid={testId}
       className={cn(
-        "inline-flex items-center gap-0.5 font-mono text-[9px]",
+        "inline-flex items-center gap-0.5 font-mono text-[10px]",
         critical ? "text-red-400" : warned ? "text-amber-400" : "text-zinc-500"
       )}
     >
@@ -278,7 +278,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <p className="min-w-0 truncate text-sm font-bold text-white">{w.name}</p>
                     <TierChip tier={tier} />
                   </div>
-                  <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                     {catalog?.weapon_categories?.[model.category]?.name || model.category}
                     {model.loud && (
                       <Tip tip={`Arma ruidosa — multiplica o calor da operação por ×${meta.loud_heat_mult ?? 1.3} e denuncia abordagens discretas.`}>
@@ -291,12 +291,12 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <JamChip model={model} condition={w.condition} meta={meta} testId={`weapon-jam-${w.id}`} />
                     <Tip tip={`Desgaste base de condição por missão deste modelo (durabilidade ${model.durability}): missões arriscadas desgastam ainda mais (+${Math.round((meta.wear_risk_mult ?? 1.5) * 100) / 100} por ponto de risco).`}>
-                      <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-500">
                         <Wrench size={9} /> −{wear.toFixed(1)}/missão
                       </span>
                     </Tip>
                     <Tip tip={`${w.missions_done ?? 0} missões no total, ${w.missions_since_repair ?? 0} desde a última reparação.`}>
-                      <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-500">
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-500">
                         <Crosshair size={9} /> {w.missions_done ?? 0} op.
                       </span>
                     </Tip>
@@ -305,7 +305,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
                 {/* Condição com curva não-linear do motor */}
                 <div className="relative z-[1] mt-2">
-                  <div className="flex justify-between font-mono text-[9px] uppercase text-zinc-500">
+                  <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
                     <span>Condição</span>
                     <Tip tip={`${Math.round(w.condition)}% de condição — eficácia real ${effCond}% (abaixo de ${meta.condition_soft_knee ?? 40}% a curva é quadrática: uma arma a 20% é quase sucata).`}>
                       <span>
@@ -330,7 +330,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                       </p>
                       {compat && !compat.compatible && (
                         <Tip tip={`${emp.name} não cumpre os requisitos mínimos (${compat.missing.map((k) => ATTR_FULL[k] || k).join(", ")}) — usa a arma com eficácia reduzida (nunca bloqueia).`}>
-                          <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[9px] text-amber-400">
+                          <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-amber-400">
                             <ShieldAlert size={10} /> requisitos
                           </span>
                         </Tip>
@@ -339,7 +339,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <div className="mt-1 grid grid-cols-2 gap-x-3">
                       <Tip tip={`A arma certa na mão errada rende pouco: a eficácia escala com ${ATTR_FULL[skill.attr] || skill.attr} (${skill.value}/${meta.skill_attr_cap ?? 8}) — este portador extrai ${Math.round(skill.factor * 100)}% do potencial.`} block>
                         <div>
-                          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                          <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                             <span>Mão · {ATTR_FULL[skill.attr] || skill.attr}</span>
                             <span className={skill.factor >= 0.9 ? "text-emerald-400" : skill.factor >= 0.75 ? "text-zinc-300" : "text-amber-400"}>{Math.round(skill.factor * 100)}%</span>
                           </div>
@@ -348,7 +348,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                       </Tip>
                       <Tip tip={`Proficiência com armas ${catalog?.weapon_categories?.[model.category]?.name || model.category}: ${Math.round(prof)}/${profMax} (+${(meta.proficiency_gain_per_mission ?? 4)} por missão). Bónus de chance atual: +${(profBonus * 100).toFixed(1)}% (máx. +${Math.round((meta.proficiency_bonus_max_pct ?? 0.08) * 100)}%).`} block>
                         <div>
-                          <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                          <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                             <span>Proficiência</span>
                             <span className="text-cyan-400">+{(profBonus * 100).toFixed(1)}%</span>
                           </div>
@@ -440,7 +440,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                         <p className="min-w-0 truncate text-sm font-semibold text-white">{m.name}</p>
                         <TierChip tier={tier} />
                       </div>
-                      <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                         {catalog?.weapon_categories?.[m.category]?.name || m.category}
                         {locked && (
                           <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">
@@ -468,22 +468,22 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
                     <div className="relative z-[1] mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                       <Tip tip={`Fiabilidade ${m.reliability}% — risco base de encravar ${Math.round(weaponJamRisk(m, 100, meta) * 100)}% mesmo em perfeitas condições.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400">
                           <ShieldCheck size={9} className={m.reliability >= 85 ? "text-emerald-400" : m.reliability >= 70 ? "text-amber-400" : "text-red-400"} /> fiab. {m.reliability}%
                         </span>
                       </Tip>
                       <Tip tip={`Durabilidade ${m.durability} — perde ~${wear.toFixed(1)} de condição por missão (mais em operações arriscadas).`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400">
                           <Wrench size={9} /> −{wear.toFixed(1)}/missão
                         </span>
                       </Tip>
                       <Tip tip={`Discrição ${m.discretion}/100 — armas discretas escondem-se melhor em operações furtivas.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400">
                           <Search size={9} /> discr. {m.discretion}
                         </span>
                       </Tip>
                       <Tip tip={`Custo de manutenção de referência: reparação total custa até ${fmtMoney(Math.round(m.maintenance_cost * (meta.repair_cost_multiplier ?? 0.5)))}.`}>
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-zinc-400">
+                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-zinc-400">
                           <Banknote size={9} /> manut. {fmtMoney(m.maintenance_cost)}
                         </span>
                       </Tip>
@@ -491,7 +491,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
                     {reqAttrs.length > 0 && (
                       <Tip tip="Atributos mínimos recomendados — abaixo destes valores o portador continua a poder equipar, mas extrai menos eficácia (nunca bloqueia)." block>
-                        <p className="relative z-[1] mt-1.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
+                        <p className="relative z-[1] mt-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
                           requer: <span className="text-zinc-300">{reqAttrs.map(([a, v]) => `${ATTR_FULL[a] || a} ${v}+`).join(" · ")}</span>
                         </p>
                       </Tip>
@@ -499,7 +499,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
                     <div className="relative z-[1] mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       {owned > 0 ? (
-                        <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">no arsenal: <span className="text-zinc-300">{owned}</span></span>
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">no arsenal: <span className="text-zinc-300">{owned}</span></span>
                       ) : <span />}
                       <PurchaseButton
                         testId={`buy-weapon-${key}`}

@@ -208,7 +208,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                     {isFav && <Star size={10} className="shrink-0 text-amber-400" fill="currentColor" />}
                     {opp.name}
                   </p>
-                  <p className="flex items-center gap-1 truncate font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                  <p className="flex items-center gap-1 truncate font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                     <MapPin size={8} /> {opp.district} · {SPEC_LABELS[opp.category]}
                     <span className="font-bold" style={{ color: force.color }}>· {force.label}</span>
                   </p>
@@ -217,7 +217,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                   <span className="font-mono text-[11px] font-bold" style={{ color: opp.pays === "clean" ? "#10B981" : "#F59E0B" }}>
                     {fmtMoney(opp.reward)}
                   </span>
-                  <span className="flex items-center gap-1.5 font-mono text-[9px]">
+                  <span className="flex items-center gap-1.5 font-mono text-[10px]">
                     <span className="text-red-400">{"●".repeat(opp.risk)}{"○".repeat(5 - opp.risk)}</span>
                     <Tip tip={reachable ? "Tempo estimado da melhor equipa pronta." : "Nenhuma equipa pronta para esta operação agora."}>
                       <span className={reachable ? "text-cyan-400" : "text-zinc-600"}>
@@ -225,7 +225,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                       </span>
                     </Tip>
                   </span>
-                  <span className={`flex items-center gap-0.5 font-mono text-[9px] ${urgent ? "text-amber-400" : "text-zinc-500"}`}>
+                  <span className={`flex items-center gap-0.5 font-mono text-[10px] ${urgent ? "text-amber-400" : "text-zinc-500"}`}>
                     <Clock size={8} /> {fmtDuration(expiresS)}
                   </span>
                 </div>

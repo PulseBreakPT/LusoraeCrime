@@ -318,7 +318,7 @@ const ZoomObserver = ({ onZoom }) => {
 
 const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   <div className="flex items-baseline justify-between gap-3">
-    <span className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</span>
+    <span className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</span>
     <span className="font-mono text-[10px] font-bold" style={{ color }}>{value}</span>
   </div>
 );
@@ -717,7 +717,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         <LTooltip direction="top" offset={[0, -12]} opacity={1} className="sub-map-tip">
           <div className="min-w-[150px]">
             <p className="text-[11px] font-bold text-red-400">{mission.opportunity?.name}</p>
-            <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               Alvo da operação · {mission.opportunity?.district}
             </p>
             <div className="mt-1 space-y-0.5">
@@ -729,10 +729,10 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               )}
             </div>
             {phase === "operating" && choreo?.driverInside && (
-              <p className="mt-0.5 text-[9px] text-cyan-500/80">{choreo.driverMember?.name ? `${choreo.driverMember.name} · motorista ao volante` : "Motorista ao volante"} — pronto para a fuga</p>
+              <p className="mt-0.5 text-[10px] text-cyan-500/80">{choreo.driverMember?.name ? `${choreo.driverMember.name} · motorista ao volante` : "Motorista ao volante"} — pronto para a fuga</p>
             )}
-            {choreo && <p className="mt-1 text-[9px] text-zinc-500">{CHOREO_LABELS[choreo.kind]}</p>}
-            <p className="mt-1 text-[9px] text-cyan-400/90">
+            {choreo && <p className="mt-1 text-[10px] text-zinc-500">{CHOREO_LABELS[choreo.kind]}</p>}
+            <p className="mt-1 text-[10px] text-cyan-400/90">
               Acompanha no mapa os membros, deslocações e ações da equipa.
             </p>
           </div>
@@ -810,7 +810,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
           <div className="min-w-[150px]">
             <p className="text-[11px] font-bold text-white">{mission.team_name}</p>
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE" }}>
+            <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE" }}>
               {chased ? "PERSEGUIÇÃO POLICIAL" : STATUS_LABELS[pos.phase] || pos.phase} · {mission.opportunity?.name}
             </p>
             <TipRow label="fase" value={mstate.label} color={chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE"} />
@@ -819,7 +819,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
               <TipRow label="no terreno" value={`${groundCount} operacionais`} color="#FAFAFA" />
             )}
             {phase === "operating" && choreo && (
-              <p className="mt-0.5 text-[9px] text-zinc-400">
+              <p className="mt-0.5 text-[10px] text-zinc-400">
                 {choreo.driverInside ? `${choreo.driverMember?.name || "Motorista"} · ao volante` : "Veículo estacionado"} · {CHOREO_LABELS[choreo.kind]}
               </p>
             )}
@@ -839,7 +839,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             {route?.outward && !route.outward.unavailable && (
               <TipRow label="rota" value={(route.outward.distance / 1000).toFixed(1) + " km"} color="#22D3EE" />
             )}
-            <p className="mt-1 text-[9px] text-cyan-500/80">
+            <p className="mt-1 text-[10px] text-cyan-500/80">
               {followed ? "O mapa está a seguir esta unidade — clica para largar" : "Clica para seguir esta unidade no mapa"}
             </p>
           </div>
@@ -948,7 +948,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
         <LTooltip direction="top" offset={[0, -12]} opacity={1} className="sub-map-tip">
           <div className="min-w-[140px]">
             <p className="text-[11px] font-bold text-white">{vehicle.name}</p>
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: TRANSFER_COLOR }}>
+            <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: TRANSFER_COLOR }}>
               {route?.unavailable ? "Percurso indisponível" : route ? "Em transferência" : "A calcular percurso"}
             </p>
             <TipRow label="chega em" value={fmtDuration(remaining)} color={TRANSFER_COLOR} />
@@ -1029,8 +1029,8 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
         <LTooltip direction="top" offset={[0, -18]} opacity={1} className="sub-map-tip">
           <div className="min-w-[130px]">
             <p className="text-[11px] font-bold text-white">{hq.name}</p>
-            <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">Quartel-general · {state.player.org_name}</p>
-            <p className="mt-0.5 text-[9px] text-cyan-400">Nível {hq.level} · clica para gerir</p>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Quartel-general · {state.player.org_name}</p>
+            <p className="mt-0.5 text-[10px] text-cyan-400">Nível {hq.level} · clica para gerir</p>
           </div>
         </LTooltip>
       </Marker>
@@ -1048,10 +1048,10 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
               <div className="min-w-[140px]">
                 <p className="text-[11px] font-bold text-white">{p.name}</p>
-                <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                   {p.district} · nível {p.level}/{catalog?.property_max_level || 3}
                 </p>
-                {pt && <p className="mt-0.5 font-mono text-[9px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>}
+                {pt && <p className="mt-0.5 font-mono text-[10px] text-emerald-400">{propertyBenefit(pt, p.level)}</p>}
               </div>
             </LTooltip>
           </Marker>
@@ -1096,7 +1096,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             <LTooltip direction="top" offset={[0, -18]} opacity={1} className="sub-map-tip">
               <div className="min-w-[150px]">
                 <p className="text-[11px] font-bold text-white">{opp.name}</p>
-                <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: CATEGORY_COLORS[opp.category] }}>
+                <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: CATEGORY_COLORS[opp.category] }}>
                   {opp.district} · {SPEC_LABELS[opp.category]}
                 </p>
                 <div className="mt-1 space-y-0.5">
@@ -1112,7 +1112,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
                     <TipRow label="expira" value={fmtDuration(expiresS)} color="#F59E0B" />
                   )}
                 </div>
-                <p className="mt-1 text-[9px] text-zinc-500">
+                <p className="mt-1 text-[10px] text-zinc-500">
                   {taken
                     ? "Operação em curso — clica para ver detalhes"
                     : locked
@@ -1199,12 +1199,12 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
           style={{ maxHeight: "min(calc(100dvh - 9rem), 34rem)" }}
         >
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Legenda do mapa</p>
-          <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Oportunidades (cor + inicial = categoria)</p>
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-zinc-600">Oportunidades (cor + inicial = categoria)</p>
           <div className="mb-2 grid grid-cols-2 gap-x-2 gap-y-1">
             {Object.entries(SPEC_LABELS).map(([k, label]) => (
               <span key={k} className="flex items-center gap-1.5 font-mono text-[10px] text-zinc-300">
                 <span
-                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-extrabold text-black"
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[10px] font-extrabold text-black"
                   style={{ background: CATEGORY_COLORS[k] }}
                 >
                   {label.charAt(0)}
@@ -1213,9 +1213,9 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
               </span>
             ))}
           </div>
-          <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">Marcadores</p>
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-zinc-600">Marcadores</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
-            <span className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-white text-[9px] text-black">⌂</span> Quartel-general</span>
+            <span className="flex items-center gap-1.5"><span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-white text-[10px] text-black">⌂</span> Quartel-general</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-white/40 bg-zinc-800" /> Propriedade tua</span>
             <span className="flex items-center gap-1.5">
               <span className="relative flex h-3 w-3 items-center justify-center">
@@ -1225,7 +1225,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
               Veículo a caminho / a regressar
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-extrabold text-cyan-200">
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[10px] font-extrabold text-cyan-200">
                 <span className="h-3 w-1.5 rounded-sm bg-cyan-800" />
               </span>
               Veículo estacionado (orientado à via)
@@ -1242,13 +1242,13 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
             </span>
             <span className="flex items-start gap-1.5">
               <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-blue-500 text-[9px] font-black text-black">P</span>
+                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-blue-500 text-[10px] font-black text-black">P</span>
               </span>
               <span><b className="text-blue-300">PSP</b> — centros urbanos: muitas patrulhas, resposta imediata mas curto alcance; cerco compacto, perseguições curtas.</span>
             </span>
             <span className="flex items-start gap-1.5">
               <span className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-green-600 text-[9px] font-black text-black">G</span>
+                <span className="flex h-3 w-2.5 items-center justify-center rounded-sm bg-green-600 text-[10px] font-black text-black">G</span>
               </span>
               <span><b className="text-green-300">GNR</b> — periferia, estradas e campo: menos patrulhas mas alcance vasto, resposta mais lenta; reforços em maior número, perseguições longas e persistentes.</span>
             </span>
@@ -1265,7 +1265,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-blue-900 bg-blue-200" /> Agentes no terreno (perímetro)</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 animate-pulse rounded-full border-2 border-amber-400" /> Oportunidade a expirar (&lt;{Math.round(OPP_URGENT_SECONDS / 60)} min)</span>
           </div>
-          <p className="mb-1 mt-2 text-[9px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
+          <p className="mb-1 mt-2 text-[10px] uppercase tracking-wider text-zinc-600">Trajetos (restante)</p>
           <div className="space-y-1 font-mono text-[10px] text-zinc-300">
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-6 rounded-full bg-cyan-400" /> A caminho — falta percorrer</span>
             <span className="flex items-center gap-1.5"><span className="h-px w-6 rounded-full bg-amber-400" /> Regresso — falta chegar</span>
@@ -1311,7 +1311,7 @@ export const PlacementControls = () => {
       <div className="sub-panel animate-slide-up rounded-xl border p-3 shadow-2xl">
         <div className="flex items-center gap-1.5">
           <span className={`inline-block h-1.5 w-1.5 animate-pulse rounded-full ${placement.checking ? "bg-amber-400" : invalid ? "bg-red-500" : "bg-emerald-400"}`} />
-          <p className={`font-mono text-[9px] font-bold uppercase tracking-[0.24em] ${placement.checking ? "text-amber-300" : invalid ? "text-red-400" : "text-emerald-300"}`}>
+          <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.24em] ${placement.checking ? "text-amber-300" : invalid ? "text-red-400" : "text-emerald-300"}`}>
             Modo de colocação
           </p>
         </div>
@@ -1327,7 +1327,7 @@ export const PlacementControls = () => {
             : `localização válida · ${placement.district || market?.zone || "Portugal"} · ${market?.price?.toLocaleString("pt-PT") || "—"} €.`}
         </p>
         {market && (
-          <p className="mt-1 font-mono text-[9px] text-zinc-500">
+          <p className="mt-1 font-mono text-[10px] text-zinc-500">
             Base {propertyType.price.toLocaleString("pt-PT")} € × índice regional {market.multiplier.toFixed(2)}
           </p>
         )}

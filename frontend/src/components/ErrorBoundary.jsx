@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component {
           {this.state.info?.componentStack && (
             <details className="text-[10px] text-zinc-500" open>
               <summary className="cursor-pointer hover:text-zinc-400">Onde aconteceu</summary>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/50 p-2 font-mono text-[9px]">
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/50 p-2 font-mono text-[10px]">
                 {this.state.info.componentStack.split("\n").slice(0, 12).join("\n")}
               </pre>
             </details>

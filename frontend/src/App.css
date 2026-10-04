@@ -3,9 +3,9 @@
 }
 
 /* ============================================================
-   SUBMUNDO — Design System "Noir Tático" (SSS tier)
-   Obsidiana + vermelho sangue + ouro velho, vidro profundo,
-   linhas laser, grain cinematográfico e HUD tático.
+   SUBMUNDO — Noir operacional
+   Mapa primeiro, superfícies sólidas, hierarquia compacta,
+   cor semântica e movimento apenas quando comunica estado.
    ============================================================ */
 
 /* ---------- Animations ---------- */
@@ -187,7 +187,7 @@
     box-shadow: 0 5px 14px rgba(0, 0, 0, 0.35);
     color: #81838a !important;
     font-family: "IBM Plex Sans", sans-serif;
-    font-size: 9px !important;
+    font-size: 10px !important;
 }
 
 .leaflet-control-attribution a {
@@ -271,7 +271,7 @@
     width: 14px;
     height: 14px;
     border-radius: 9999px;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 800;
     line-height: 1;
     color: #050505;
@@ -586,7 +586,7 @@
 
 /* ---------- Título cinematográfico (Auth) ---------- */
 .sub-title {
-    color: #f4f4f5;
+    color: var(--sub-text);
     filter: drop-shadow(0 4px 18px rgba(220, 38, 38, 0.22));
 }
 
@@ -708,7 +708,7 @@
     padding: 14px 18px;
     pointer-events: none;
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.28em;
     text-transform: uppercase;
     color: rgba(161, 161, 170, 0.6);
@@ -1015,10 +1015,10 @@
     padding-bottom: 10px;
     border-bottom: 1px dashed rgba(255, 255, 255, 0.09);
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.3em;
     text-transform: uppercase;
-    color: #71717a;
+    color: var(--sub-text-muted);
 }
 
 .sub-frame-status {
@@ -1064,7 +1064,7 @@
 .sub-radar-cardinal {
     position: absolute;
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0;
     color: rgba(212, 168, 83, 0.65);
     line-height: 1;
@@ -1187,7 +1187,7 @@
 
 /* Wordmark de arranque: sólido, rápido e legível. */
 .sub-boot-logo {
-    color: #f4f4f5;
+    color: var(--sub-text);
     animation: sub-logo-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1277,10 +1277,10 @@
     background: rgba(255, 255, 255, 0.04);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.3em;
     text-transform: uppercase;
-    color: #71717a;
+    color: var(--sub-text-muted);
 }
 
 .sub-term-dots {
@@ -1322,7 +1322,7 @@
 .sub-term-idx {
     width: 18px;
     flex-shrink: 0;
-    font-size: 9px;
+    font-size: 10px;
     color: #3f3f46;
 }
 
@@ -1363,25 +1363,25 @@
 }
 
 .sub-term-ok {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.22em;
     color: #34d399;
 }
 
 .sub-term-err {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.22em;
     color: #f87171;
 }
 
 .sub-term-run {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.22em;
     color: #ef4444;
 }
 
 .sub-term-wait {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.22em;
     color: #3f3f46;
 }
@@ -1623,43 +1623,6 @@ kbd {
    carimbo de despacho, flashes de valor e empty states táticos.
    ============================================================ */
 
-/* ---------- Moldura HUD do viewport (4 cantos táticos) ---------- */
-.sub-hud-frame {
-    position: absolute;
-    inset: 0;
-    z-index: 10;
-    pointer-events: none;
-}
-
-.sub-hud-frame span {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    border: 1.5px solid rgba(220, 38, 38, 0.5);
-    opacity: 0.75;
-    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.35));
-}
-
-.sub-hud-frame .c-tl { top: 8px; left: 8px; border-right: none; border-bottom: none; border-top-left-radius: 4px; }
-.sub-hud-frame .c-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; border-top-right-radius: 4px; }
-.sub-hud-frame .c-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; border-bottom-left-radius: 4px; }
-.sub-hud-frame .c-br { bottom: 8px; right: 8px; border-left: none; border-top: none; border-bottom-right-radius: 4px; }
-
-/* ---------- Grelha tática — visível só perto das bordas ---------- */
-.sub-grid {
-    position: absolute;
-    inset: 0;
-    z-index: 10;
-    pointer-events: none;
-    opacity: 0.55;
-    background-image:
-        linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
-    background-size: 96px 96px;
-    -webkit-mask-image: radial-gradient(115% 85% at 50% 50%, transparent 42%, #000 95%);
-    mask-image: radial-gradient(115% 85% at 50% 50%, transparent 42%, #000 95%);
-}
-
 /* ---------- Flash do registo mais recente do feed ---------- */
 @keyframes sub-feed-flash {
     0% {
@@ -1739,7 +1702,7 @@ kbd {
 
 /* ---------- Título dos painéis ---------- */
 .sub-sheet-title {
-    color: #f4f4f5;
+    color: var(--sub-text);
 }
 
 /* ============================================================
@@ -1754,7 +1717,7 @@ kbd {
     padding: 8px 34px 8px 10px !important;
     border: 1px solid rgba(255, 255, 255, 0.09) !important;
     border-radius: 9px !important;
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
     background: rgba(7, 7, 9, 0.88) !important;
     box-shadow:
         0 5px 16px rgba(0, 0, 0, 0.34),
@@ -1785,7 +1748,7 @@ kbd {
 .sub-toast[data-type="loading"] { --lt-rgb: 161 161 170; }
 
 .sub-toast [data-title] {
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
     font-size: 11px;
     font-weight: 700;
     line-height: 1.3;
@@ -1793,7 +1756,7 @@ kbd {
 }
 
 .sub-toast [data-description] {
-    color: #a1a1aa !important;
+    color: var(--sub-text-secondary) !important;
     font-size: 10px;
     line-height: 1.35;
 }
@@ -1909,8 +1872,8 @@ kbd {
 }
 
 /* ============================================================
-   SSS — Páginas de documento (Termos/Privacidade/RGPD/Changelog)
-   Mesma identidade Noir Tático do jogo, adaptada a leitura longa.
+   Páginas de documento (Termos/Privacidade/RGPD/Changelog)
+   Leitura longa com a mesma linguagem Noir operacional.
    ============================================================ */
 
 /* Scroll suave nas âncoras do índice */
@@ -1920,19 +1883,6 @@ html:has(.sub-page-bg) {
 
 .sub-page-bg {
     background-color: #060607;
-}
-
-/* Grelha tática desvanecida a partir do topo */
-.sub-page-grid {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-        linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-    background-size: 44px 44px;
-    -webkit-mask-image: radial-gradient(75% 60% at 50% 0%, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
-    mask-image: radial-gradient(75% 60% at 50% 0%, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
 }
 
 /* Glows ambiente vermelho/ouro + vinheta inferior */
@@ -2236,11 +2186,11 @@ html:has(.sub-page-bg) {
 }
 
 .sub-fps-label {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: #71717a;
+    color: var(--sub-text-muted);
 }
 
 /* ============================================================
@@ -2256,7 +2206,7 @@ html:has(.sub-page-bg) {
     bottom: 12%;
     width: 3px;
     border-radius: 2px;
-    background: linear-gradient(180deg, transparent, var(--mk, #71717a) 30%, var(--mk, #71717a) 70%, transparent);
+    background: linear-gradient(180deg, transparent, var(--mk, var(--sub-text-muted)) 30%, var(--mk, var(--sub-text-muted)) 70%, transparent);
     box-shadow: 0 0 10px var(--mk, transparent);
     opacity: 0.85;
     pointer-events: none;
@@ -2323,7 +2273,7 @@ html:has(.sub-page-bg) {
 
 /* Wordmark sólido: identidade pelo tipo, não por efeito decorativo. */
 .sub-auth-logo {
-    color: #f4f4f5;
+    color: var(--sub-text);
     filter: drop-shadow(0 6px 22px rgba(220, 38, 38, 0.24));
 }
 
@@ -2505,7 +2455,7 @@ html:has(.sub-page-bg) {
 
 .sub-auth-alert-kicker {
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.3em;
     text-transform: uppercase;
@@ -2559,8 +2509,8 @@ html:has(.sub-page-bg) {
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.04);
-    color: #a1a1aa;
-    font-size: 9px;
+    color: var(--sub-text-secondary);
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -2579,7 +2529,7 @@ html:has(.sub-page-bg) {
 }
 
 .sub-feed-chip-n {
-    color: #71717a;
+    color: var(--sub-text-muted);
     font-weight: 700;
 }
 
@@ -2639,7 +2589,7 @@ html:has(.sub-page-bg) {
     align-items: center;
     gap: 6px;
     margin: 4px 2px 2px;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: #52525b;
@@ -2662,7 +2612,7 @@ html:has(.sub-page-bg) {
     border: 1px solid rgba(239, 68, 68, 0.5);
     background: linear-gradient(180deg, rgba(220, 38, 38, 0.85), rgba(153, 27, 27, 0.85));
     color: #fff;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -2693,7 +2643,7 @@ html:has(.sub-page-bg) {
     border-radius: 5px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.04);
-    color: #a1a1aa;
+    color: var(--sub-text-secondary);
     transition: color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -2721,7 +2671,7 @@ html:has(.sub-page-bg) {
 .sub-weapon-card {
     position: relative;
     overflow: hidden;
-    border-left: 2px solid color-mix(in srgb, var(--wtier, #a1a1aa) 55%, transparent);
+    border-left: 2px solid color-mix(in srgb, var(--wtier, var(--sub-text-secondary)) 55%, transparent);
 }
 
 .sub-weapon-card::before {
@@ -2729,19 +2679,19 @@ html:has(.sub-page-bg) {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--wtier, #a1a1aa) 9%, transparent), transparent 72%),
-        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--wtier, #a1a1aa) 4%, transparent), transparent 70%);
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--wtier, var(--sub-text-secondary)) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--wtier, var(--sub-text-secondary)) 4%, transparent), transparent 70%);
     pointer-events: none;
 }
 
 .sub-weapon-card:hover {
-    border-left-color: color-mix(in srgb, var(--wtier, #a1a1aa) 85%, transparent);
+    border-left-color: color-mix(in srgb, var(--wtier, var(--sub-text-secondary)) 85%, transparent);
 }
 
 /* Placa da silhueta: fundo blindado com grelha diagonal + halo do tier. */
 .sub-weapon-plate {
     background:
-        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--wtier, #a1a1aa) 15%, transparent), transparent 76%),
+        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--wtier, var(--sub-text-secondary)) 15%, transparent), transparent 76%),
         repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
         linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
@@ -2775,7 +2725,7 @@ html:has(.sub-page-bg) {
 .sub-team-card {
     position: relative;
     overflow: hidden;
-    border-left: 2px solid color-mix(in srgb, var(--ttier, #a1a1aa) 55%, transparent);
+    border-left: 2px solid color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 55%, transparent);
 }
 
 .sub-team-card::before {
@@ -2783,19 +2733,19 @@ html:has(.sub-page-bg) {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--ttier, #a1a1aa) 9%, transparent), transparent 72%),
-        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--ttier, #a1a1aa) 4%, transparent), transparent 70%);
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 4%, transparent), transparent 70%);
     pointer-events: none;
 }
 
 .sub-team-card:hover {
-    border-left-color: color-mix(in srgb, var(--ttier, #a1a1aa) 85%, transparent);
+    border-left-color: color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 85%, transparent);
 }
 
 /* Placa do emblema: fundo blindado com grelha diagonal + halo do tier. */
 .sub-team-plate {
     background:
-        radial-gradient(58px 30px at 50% 52%, color-mix(in srgb, var(--ttier, #a1a1aa) 16%, transparent), transparent 78%),
+        radial-gradient(58px 30px at 50% 52%, color-mix(in srgb, var(--ttier, var(--sub-text-secondary)) 16%, transparent), transparent 78%),
         repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
         linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
@@ -3273,7 +3223,7 @@ html:has(.sub-page-bg) {
     align-items: center;
     justify-content: center;
     font-family: ui-monospace, monospace;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 800;
     line-height: 1;
     color: #05070a;
@@ -3541,7 +3491,7 @@ html:has(.sub-page-bg) {
 .sub-doss-card {
     position: relative;
     overflow: hidden;
-    border-left: 2px solid color-mix(in srgb, var(--dtier, #a1a1aa) 55%, transparent);
+    border-left: 2px solid color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 55%, transparent);
 }
 
 .sub-doss-card::before {
@@ -3549,18 +3499,18 @@ html:has(.sub-page-bg) {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--dtier, #a1a1aa) 9%, transparent), transparent 72%),
-        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--dtier, #a1a1aa) 4%, transparent), transparent 70%);
+        radial-gradient(150px 70px at 8% 0%, color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 9%, transparent), transparent 72%),
+        radial-gradient(120px 50px at 100% 100%, color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 4%, transparent), transparent 70%);
     pointer-events: none;
 }
 
 .sub-doss-card:hover {
-    border-left-color: color-mix(in srgb, var(--dtier, #a1a1aa) 85%, transparent);
+    border-left-color: color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 85%, transparent);
 }
 
 .sub-doss-plate {
     background:
-        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--dtier, #a1a1aa) 15%, transparent), transparent 76%),
+        radial-gradient(70px 34px at 50% 58%, color-mix(in srgb, var(--dtier, var(--sub-text-secondary)) 15%, transparent), transparent 76%),
         repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 7px),
         linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.74));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 12px rgba(0, 0, 0, 0.45);
@@ -3620,7 +3570,7 @@ html.sub-high-contrast .sub-hud-btn {
 
 html.sub-high-contrast .text-zinc-500,
 html.sub-high-contrast .text-zinc-600 {
-    color: #a1a1aa !important;
+    color: var(--sub-text-secondary) !important;
 }
 
 html.sub-high-contrast button:focus-visible,
@@ -3787,15 +3737,6 @@ html.sub-focus-mode .sub-optional-hud {
     box-shadow: 0 0 7px rgba(248, 113, 113, 0.75) !important;
 }
 
-/* Moldura e grelha deixam de competir com a cartografia. */
-.sub-hud-frame {
-    opacity: 0.18;
-}
-
-.sub-grid {
-    opacity: 0.10;
-}
-
 /* UI contextual: após alguns segundos sem input, a instrumentação recua.
    Alertas críticos e conteúdos abertos continuam visíveis. */
 .sub-hud-awake [data-testid="resource-bar"],
@@ -3869,11 +3810,6 @@ html.sub-focus-mode .sub-optional-hud {
     .sub-dock .sub-hud-btn svg {
         width: 19px !important;
         height: 19px !important;
-    }
-
-    .sub-hud-frame,
-    .sub-grid {
-        display: none;
     }
 }
 
@@ -4099,7 +4035,7 @@ html.sub-focus-mode .sub-optional-hud {
 .hq-pin {
     border-color: transparent !important;
     background: transparent !important;
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
     box-shadow: none !important;
     filter:
         drop-shadow(0 1px 1px rgba(0, 0, 0, 0.68))
@@ -4137,13 +4073,6 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 /* SUBMUNDO NAV V5 — FOUR-GROUP GAMEPLAY NAVIGATION */
-
-/* O mapa é o palco principal. Moldura e grelha deixam de ser elementos
-   permanentes: a informação útil vem dos próprios marcadores. */
-.sub-hud-frame,
-.sub-grid {
-    display: none !important;
-}
 
 /* Quatro destinos de primeiro nível, sem barra ou caixa permanente. */
 .sub-dock {
@@ -4302,7 +4231,7 @@ html.sub-focus-mode .sub-optional-hud {
     user-select: none;
     color: rgba(250, 250, 250, 0.96);
     font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 800;
     line-height: 1.05;
     letter-spacing: 0.01em;
@@ -4322,7 +4251,7 @@ html.sub-focus-mode .sub-optional-hud {
     .op-name {
         max-width: 92px;
         bottom: calc(100% + 3px);
-        font-size: 9px;
+        font-size: 10px;
     }
 }
 
@@ -4334,7 +4263,7 @@ html.sub-focus-mode .sub-optional-hud {
    ============================================================ */
 
 .sub-panel {
-    background: #0a0a0d !important;
+    background: var(--sub-surface) !important;
     background-image: none !important;
     border-color: rgba(255, 255, 255, 0.085) !important;
     backdrop-filter: none;
@@ -4349,7 +4278,7 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 .sub-panel .sub-card {
-    background: #101014 !important;
+    background: var(--sub-raised) !important;
     background-image: none !important;
     border-color: rgba(255, 255, 255, 0.07) !important;
     box-shadow: none !important;
@@ -4366,7 +4295,7 @@ html.sub-focus-mode .sub-optional-hud {
     background: none !important;
     -webkit-background-clip: border-box !important;
     background-clip: border-box !important;
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
     text-shadow: none !important;
 }
 
@@ -4540,7 +4469,7 @@ html.sub-focus-mode .sub-optional-hud {
     border-radius: 7px !important;
     background: transparent !important;
     border-color: rgba(255, 255, 255, 0.075) !important;
-    color: #71717a !important;
+    color: var(--sub-text-muted) !important;
     letter-spacing: 0.04em !important;
     text-transform: none !important;
 }
@@ -4613,7 +4542,7 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 .sub-notification-trigger {
-    background: #101014 !important;
+    background: var(--sub-raised) !important;
     border-color: rgba(255, 255, 255, 0.09) !important;
 }
 
@@ -4730,7 +4659,7 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 .sub-minimal-stat:hover .sub-resource-label {
-    color: #a1a1aa;
+    color: var(--sub-text-secondary);
 }
 
 /* Flashes passam a ser discretos: mudança de superfície, sem glow. */
@@ -4790,7 +4719,7 @@ html.sub-focus-mode .sub-optional-hud {
     }
 
     .sub-resource-label {
-        font-size: 9px !important;
+        font-size: 10px !important;
         letter-spacing: 0.06em !important;
     }
 }
@@ -4823,7 +4752,7 @@ html.sub-focus-mode .sub-optional-hud {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
-    color: #71717a !important;
+    color: var(--sub-text-muted) !important;
 }
 
 .sub-sheet-panel .sub-sheet-close:hover,
@@ -4831,7 +4760,7 @@ html.sub-focus-mode .sub-optional-hud {
     border: 0 !important;
     background: rgba(255, 255, 255, 0.055) !important;
     box-shadow: none !important;
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
 }
 
 .sub-sheet-panel .sub-sheet-close svg {
@@ -4933,7 +4862,7 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 .sub-resource-label {
-    font-size: 9px !important;
+    font-size: 10px !important;
     letter-spacing: 0.07em !important;
 }
 
@@ -4974,8 +4903,8 @@ html.sub-focus-mode .sub-optional-hud {
 :root {
     --sub-modal-width: 46rem;
     --sub-modal-height: min(82dvh, 48rem);
-    --sub-modal-bg: #0a0a0d;
-    --sub-modal-raised: #101014;
+    --sub-modal-bg: var(--sub-surface);
+    --sub-modal-raised: var(--sub-raised);
     --sub-modal-border: rgba(255, 255, 255, 0.085);
     --sub-modal-radius: 18px;
     --sub-modal-shadow: 0 24px 64px rgba(0, 0, 0, 0.58);
@@ -5077,7 +5006,7 @@ html.sub-focus-mode .sub-optional-hud {
     background: none !important;
     -webkit-background-clip: border-box !important;
     background-clip: border-box !important;
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
     font-size: 17px !important;
     line-height: 1.25 !important;
     letter-spacing: 0.035em !important;
@@ -5086,7 +5015,7 @@ html.sub-focus-mode .sub-optional-hud {
 
 .sub-sheet-panel .sub-sheet-description {
     max-width: 36rem !important;
-    color: #a1a1aa !important;
+    color: var(--sub-text-secondary) !important;
     font-size: 11px !important;
 }
 
@@ -5106,7 +5035,7 @@ html.sub-focus-mode .sub-optional-hud {
     border-radius: 12px !important;
     background: transparent !important;
     opacity: 1 !important;
-    color: #71717a !important;
+    color: var(--sub-text-muted) !important;
     box-shadow: none !important;
 }
 
@@ -5116,7 +5045,7 @@ html.sub-focus-mode .sub-optional-hud {
 .sub-menu-modal > button:focus-visible {
     border-color: rgba(255, 255, 255, 0.08) !important;
     background: rgba(255, 255, 255, 0.045) !important;
-    color: #f4f4f5 !important;
+    color: var(--sub-text) !important;
     box-shadow: none !important;
 }
 
@@ -5127,9 +5056,9 @@ html.sub-focus-mode .sub-optional-hud {
 }
 
 .sub-resource-label {
-    font-size: 9px !important;
+    font-size: 10px !important;
     letter-spacing: 0.06em !important;
-    color: #71717a !important;
+    color: var(--sub-text-muted) !important;
 }
 
 /* Mobile preserva a mesma linguagem modal central. */

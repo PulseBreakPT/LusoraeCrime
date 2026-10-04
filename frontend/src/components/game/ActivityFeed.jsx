@@ -194,7 +194,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
       <span className="sub-lo-rec" style={liveCount === 0 ? { animation: "none", opacity: 0.25, boxShadow: "none" } : undefined} />
       Operações
       {liveCount > 0 && (
-        <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold text-red-300">
+        <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[10px] font-bold text-red-300">
           {liveCount}
         </span>
       )}
@@ -258,7 +258,7 @@ const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-mono text-[11px] leading-snug text-zinc-300">{parseActivityMessage(e.message)}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] text-zinc-600">
+        <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] text-zinc-600">
           <span className="uppercase tracking-wider" style={{ color: `${e.dest.color}B3` }}>
             {KIND_LABELS[e.kind] || e.kind}
           </span>
@@ -267,7 +267,7 @@ const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
           {e.count > 1 && <span className="sub-feed-xn">×{e.count}</span>}
         </p>
       </div>
-      <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, nowMs)}</span>
+      <span className="shrink-0 pt-0.5 font-mono text-[10px] text-zinc-600">{relTime(e.ts, nowMs)}</span>
     </button>
   );
 };
@@ -360,10 +360,10 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
             <span className="block truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-200">
               Notificações
             </span>
-            <span className="block text-[9px] text-zinc-600">{events.length} recentes</span>
+            <span className="block text-[10px] text-zinc-600">{events.length} recentes</span>
           </span>
           {collapsed && liveCount > 0 && (
-            <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold uppercase text-red-300">
+            <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[10px] font-bold uppercase text-red-300">
               Operações · {liveCount}
             </span>
           )}
@@ -378,7 +378,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
           />
         </button>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="text-[9px] tabular-nums text-zinc-600">{events.length}</span>
+          <span className="text-[10px] tabular-nums text-zinc-600">{events.length}</span>
           {!collapsed && (
             <button
               type="button"
@@ -491,7 +491,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
               </span>
               Notificações
             </p>
-            <span className="text-[9px] tabular-nums text-zinc-600">{events.length}</span>
+            <span className="text-[10px] tabular-nums text-zinc-600">{events.length}</span>
           </div>
           <ConsoleTabs tab={tab} onTab={setTab} liveCount={liveCount} unread={unread} idPrefix="console-m" />
           {tab === "live" ? (
@@ -539,7 +539,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
             <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-300">
               {parseActivityMessage(latest.message)}
             </span>
-            <span className="shrink-0 font-mono text-[9px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>
+            <span className="shrink-0 font-mono text-[10px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>
           </button>
         )}
 
@@ -554,7 +554,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           <Bell size={17} />
           {(unread > 0 || liveCount > 0) && !open && (
             <span
-              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[9px] font-bold text-white"
+              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[10px] font-bold text-white"
               style={{ background: liveCount > 0 ? "#EF4444" : "#F59E0B" }}
             >
               {liveCount > 0 ? liveCount : unread > 9 ? "9+" : unread}

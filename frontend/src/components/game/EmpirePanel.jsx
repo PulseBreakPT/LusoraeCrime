@@ -94,7 +94,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 
         {dirtyCap && (
           <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de operações são desperdiçadas — lava regularmente para abrir espaço.`} block>
-            <div className="mt-2 flex w-full items-center justify-between font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <div className="mt-2 flex w-full items-center justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <span>Armazenamento sujo</span>
               <span className={dirtyCap.used >= dirtyCap.max * 0.9 ? "text-red-400" : "text-zinc-400"}>
                 {fmtMoney(dirtyCap.used)} / {fmtMoney(dirtyCap.max)}
@@ -130,19 +130,19 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
           <div className="mt-2.5 grid grid-cols-3 gap-2">
             <Tip tip="Dinheiro sujo gerado por hora pelos laboratórios." block>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Produção</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-zinc-600">Produção</p>
                 <p className="mt-0.5 font-mono text-xs font-bold text-amber-400">+{fmtMoney(dirtyPerH)}/h</p>
               </div>
             </Tip>
             <Tip tip="Lavagem passiva por hora das empresas de fachada (sem taxa)." block>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Lavagem</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-zinc-600">Lavagem</p>
                 <p className="mt-0.5 font-mono text-xs font-bold text-emerald-400">+{fmtMoney(launderPerH)}/h</p>
               </div>
             </Tip>
             <Tip tip={`Fecho semanal ${fmtMoney(weeklyFixed)}: salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)}, TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)}, frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} e imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}. O valor /h abaixo é apenas equivalente analítico.`} block>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Fixos</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-zinc-600">Fixos</p>
                 <p className="mt-0.5 font-mono text-xs font-bold text-red-400">-{fmtMoney(fixedPerH)}/h</p>
               </div>
             </Tip>
@@ -156,7 +156,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
               </span>
             </p>
           </Tip>
-          <div className="mt-1.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+          <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-zinc-500">
             <Tip tip="Tempo até ao próximo fecho fixo semanal, sempre à segunda-feira às 20:00 (hora de Portugal).">
               <span className="flex items-center gap-1">
                 <Clock size={9} /> Próx. fecho: <span className="text-zinc-300">{payrollS != null ? fmtDuration(payrollS) : "—"}</span>
@@ -260,7 +260,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
               <span>{Math.round(p.heat)}%</span>
             </div>
             <MiniBar value={p.heat} color={hs.color} className="mt-1.5" height="h-1.5" />
-            <div className="mt-1.5 flex justify-between font-mono text-[9px] text-zinc-600">
+            <div className="mt-1.5 flex justify-between font-mono text-[10px] text-zinc-600">
               <Tip tip="Aos 70% há risco de rusgas aos laboratórios."><span className={p.heat >= 70 ? "text-orange-400" : ""}>70% rusgas</span></Tip>
               <Tip tip="Aos 90% todas as operações ficam bloqueadas até o calor baixar."><span className={p.heat >= 90 ? "text-red-500" : ""}>90% bloqueio</span></Tip>
             </div>
@@ -307,7 +307,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
                       <TableRow key={t.id} className="border-white/10 hover:bg-white/[0.03]">
                         <TableCell className="min-w-0 p-1.5">
                           <p className="truncate font-mono text-[10px] text-zinc-300">{t.note || TX_LABELS[t.kind] || t.kind}</p>
-                          <p className="font-mono text-[9px] text-zinc-600">{new Date(t.ts).toLocaleString("pt-PT")}</p>
+                          <p className="font-mono text-[10px] text-zinc-600">{new Date(t.ts).toLocaleString("pt-PT")}</p>
                         </TableCell>
                         <TableCell className="p-1.5 text-right">
                           <span
@@ -333,7 +333,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 const StatBox = ({ label, value, accent = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
     <Card className="h-full sub-card p-3 shadow-none">
-      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">{label}</p>
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">{label}</p>
       <p className="mt-1 truncate font-mono text-lg font-bold leading-tight" style={{ color: accent }}>{value}</p>
     </Card>
   </Tip>

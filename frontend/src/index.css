@@ -9,7 +9,7 @@ body {
     font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #050505;
+    background: var(--sub-canvas);
     overscroll-behavior: none;
 }
 
@@ -47,24 +47,33 @@ body::after {
 
 @layer base {
     :root {
-        --background: 0 0% 2%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 7%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 7%;
-        --popover-foreground: 0 0% 98%;
+        --sub-canvas: #050506;
+        --sub-surface: #0a0a0d;
+        --sub-raised: #101014;
+        --sub-raised-hover: #141419;
+        --sub-text: #f4f4f5;
+        --sub-text-secondary: #a1a1aa;
+        --sub-text-muted: #71717a;
+        --sub-border: rgba(255, 255, 255, 0.08);
+
+        --background: 240 9% 2%;
+        --foreground: 240 6% 96%;
+        --card: 240 11% 7%;
+        --card-foreground: 240 6% 96%;
+        --popover: 240 11% 7%;
+        --popover-foreground: 240 6% 96%;
         --primary: 0 72% 51%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 16%;
-        --accent-foreground: 0 0% 98%;
+        --secondary: 240 11% 9%;
+        --secondary-foreground: 240 6% 96%;
+        --muted: 240 10% 10%;
+        --muted-foreground: 240 5% 65%;
+        --accent: 240 10% 11%;
+        --accent-foreground: 240 6% 96%;
         --destructive: 0 72% 45%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14%;
-        --input: 0 0% 16%;
+        --destructive-foreground: 240 6% 96%;
+        --border: 240 6% 16%;
+        --input: 240 8% 14%;
         --ring: 0 72% 51%;
         --chart-1: 220 70% 50%;
         --chart-2: 160 60% 45%;

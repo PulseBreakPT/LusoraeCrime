@@ -95,7 +95,7 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
     <Card data-testid={testId} className="sub-kpi h-full rounded-lg sub-card p-2.5 shadow-none">
-      <p className="flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
+      <p className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-zinc-500">
         {Icon && <Icon size={10} style={{ color }} />} <span className="truncate">{label}</span>
       </p>
       <p className="mt-1 truncate font-mono text-sm font-bold leading-tight" style={{ color }}>{value}</p>
@@ -145,7 +145,7 @@ export const SectionHeader = ({ icon: Icon, title, meta, action, tip, className 
 // Micro-etiqueta acima do título dos painéis — dá contexto de secção com um
 // traço laser vermelho, no estilo dos kickers de HUD militar.
 export const PanelKicker = ({ children, className = "" }) => (
-  <p className={`flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-red-500/90 ${className}`}>
+  <p className={`flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-red-500/90 ${className}`}>
     <span className="inline-block h-px w-4 bg-red-500 shadow-[0_0_6px_rgba(220,38,38,0.8)]" aria-hidden="true" />
     {children}
   </p>
@@ -344,7 +344,7 @@ export const PurchaseButton = ({
         aria-busy={pending}
         className={cn(
           layout === "card"
-            ? "flex h-full w-full flex-col items-start gap-1 rounded-md border px-3 py-2 text-left font-mono text-[9px] font-bold uppercase md:flex-row md:items-center md:text-[10px]"
+            ? "flex h-full w-full flex-col items-start gap-1 rounded-md border px-3 py-2 text-left font-mono text-[10px] font-bold uppercase md:flex-row md:items-center md:text-[10px]"
             : "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase",
           "transition-colors disabled:cursor-not-allowed",
           pending
