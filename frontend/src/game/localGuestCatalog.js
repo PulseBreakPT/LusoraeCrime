@@ -1,4 +1,12 @@
-export const LOCAL_GUEST_SAVE_VERSION = 8;
+export const LOCAL_GUEST_SAVE_VERSION = 9;
+
+export const LOCAL_LEVEL_THRESHOLDS = [
+  0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000,
+  ...Array.from({ length: 90 }, (_, index) => {
+    const step = index + 1;
+    return 42000 + 9000 * step + 35 * (step ** 2);
+  }),
+];
 
 export const LOCAL_CATALOG = {
   team_create_cost: 5000,
@@ -319,3 +327,100 @@ export const LOCAL_CATALOG = {
     },
   },
 };
+
+
+/* --------------------------------------------------------------------------
+ * Progressão local 1-100
+ * Mantém o modo convidado alinhado com o backend persistente.
+ * -------------------------------------------------------------------------- */
+LOCAL_CATALOG.max_org_level = 100;
+LOCAL_CATALOG.level_thresholds = LOCAL_LEVEL_THRESHOLDS;
+LOCAL_CATALOG.rarity_min_respect = {
+  comum: 0,
+  raro: LOCAL_LEVEL_THRESHOLDS[9],
+  elite: LOCAL_LEVEL_THRESHOLDS[34],
+  lendario: LOCAL_LEVEL_THRESHOLDS[69],
+};
+Object.assign(LOCAL_CATALOG.recruit_sources, {
+  rua: { ...LOCAL_CATALOG.recruit_sources.rua, min_level: 1 },
+  bares: { ...LOCAL_CATALOG.recruit_sources.bares, min_level: 1 },
+  empresas: { ...LOCAL_CATALOG.recruit_sources.empresas, min_level: 10 },
+  prisoes: { ...LOCAL_CATALOG.recruit_sources.prisoes, min_level: 25 },
+  mercado_negro: { ...LOCAL_CATALOG.recruit_sources.mercado_negro, min_level: 50 },
+  contactos: { ...LOCAL_CATALOG.recruit_sources.contactos, min_level: 75 },
+});
+
+const spreadLocalUnlocks = (table, valueKey, fixed = {}, curve = 1.35) => {
+  const entries = Object.entries(table).sort((a, b) =>
+    Number(a[1]?.[valueKey] || 0) - Number(b[1]?.[valueKey] || 0)
+  );
+  entries.forEach(([key, cfg], index) => {
+    const ratio = entries.length <= 1 ? 0 : index / (entries.length - 1);
+    cfg.min_level = fixed[key] ?? Math.max(1, Math.min(100, 1 + Math.round(99 * (ratio ** curve))));
+  });
+};
+
+spreadLocalUnlocks(LOCAL_CATALOG.vehicle_models, "price", { usado:1, moto:1, van:5 });
+spreadLocalUnlocks(LOCAL_CATALOG.weapon_models, "price", { faca_taser:1, pistola:1 });
+spreadLocalUnlocks(LOCAL_CATALOG.property_types, "price", { esconderijo:1, garagem:1, empresa_legal:5 });
+
+const localOpportunityLevels = [1, 1, 15, 25, 35, 50, 70, 85];
+Object.entries(LOCAL_CATALOG.opportunity_types).forEach(([key, cfg], index) => {
+  cfg.min_level = localOpportunityLevels[index] ?? Math.min(100, 10 + index * 10);
+});
+
+LOCAL_CATALOG.hq_max_level = 10;
+LOCAL_CATALOG.hq_level_benefits = [
+  {level:1,min_org_level:1,upgrade_cost:0,upgrade_duration_s:0,unlocks:[]},
+  {level:2,min_org_level:3,upgrade_cost:12000,upgrade_duration_s:480,unlocks:[]},
+  {level:3,min_org_level:8,upgrade_cost:28000,upgrade_duration_s:1200,unlocks:["financeiro"]},
+  {level:4,min_org_level:15,upgrade_cost:60000,upgrade_duration_s:2400,unlocks:["rh"]},
+  {level:5,min_org_level:25,upgrade_cost:125000,upgrade_duration_s:4200,unlocks:["logistica"]},
+  {level:6,min_org_level:40,upgrade_cost:250000,upgrade_duration_s:6600,unlocks:[]},
+  {level:7,min_org_level:55,upgrade_cost:475000,upgrade_duration_s:9600,unlocks:["investigacao"]},
+  {level:8,min_org_level:70,upgrade_cost:800000,upgrade_duration_s:14400,unlocks:["comunicacoes"]},
+  {level:9,min_org_level:85,upgrade_cost:1250000,upgrade_duration_s:21600,unlocks:[]},
+  {level:10,min_org_level:100,upgrade_cost:2000000,upgrade_duration_s:28800,unlocks:[]},
+];
+
+Object.assign(LOCAL_CATALOG.organization.territory_tiers, {
+  1:{...LOCAL_CATALOG.organization.territory_tiers[1],unlock_level:20},
+  2:{...LOCAL_CATALOG.organization.territory_tiers[2],unlock_level:45},
+  3:{...LOCAL_CATALOG.organization.territory_tiers[3],unlock_level:75},
+});
+Object.assign(LOCAL_CATALOG.organization.prestige, {
+  warehouse_expansion:{...LOCAL_CATALOG.organization.prestige.warehouse_expansion,unlock_level:20},
+  vehicle_customization:{...LOCAL_CATALOG.organization.prestige.vehicle_customization,unlock_level:35},
+  advanced_warehouse:{...LOCAL_CATALOG.organization.prestige.advanced_warehouse,unlock_level:40},
+  crew_specialization:{...LOCAL_CATALOG.organization.prestige.crew_specialization,unlock_level:45},
+  research_formula:{...LOCAL_CATALOG.organization.prestige.research_formula,unlock_level:55},
+  research_laundry:{...LOCAL_CATALOG.organization.prestige.research_laundry,unlock_level:65},
+  research_evasion:{...LOCAL_CATALOG.organization.prestige.research_evasion,unlock_level:75},
+  ultimate_vault:{...LOCAL_CATALOG.organization.prestige.ultimate_vault,unlock_level:80},
+});
+
+LOCAL_CATALOG.economy_meta.mission_rewards.org_level_late = 0.018;
+
+LOCAL_CATALOG.org_level_unlocks = Object.fromEntries(
+  Array.from({ length: 100 }, (_, index) => [index + 1, []])
+);
+for (const [kind, table] of [
+  ["operação", LOCAL_CATALOG.opportunity_types],
+  ["veículo", LOCAL_CATALOG.vehicle_models],
+  ["arma", LOCAL_CATALOG.weapon_models],
+  ["imóvel", LOCAL_CATALOG.property_types],
+  ["recrutamento", LOCAL_CATALOG.recruit_sources],
+]) {
+  for (const [key, cfg] of Object.entries(table)) {
+    const level = Math.max(1, Math.min(100, Number(cfg.min_level || 1)));
+    LOCAL_CATALOG.org_level_unlocks[level].push({ kind, key, name:cfg.name || key });
+  }
+}
+for (const [level, name] of Object.entries({
+  10:"Rede profissional",20:"Controlo territorial",25:"Estrutura regional",
+  35:"Mercado de elite",50:"Operação nacional",60:"Especialização estratégica",
+  70:"Talento lendário",75:"Rede de contactos",85:"Infraestrutura soberana",
+  100:"Império SUBMUNDO",
+})) {
+  LOCAL_CATALOG.org_level_unlocks[Number(level)].push({kind:"marco",key:`milestone_${level}`,name});
+}
