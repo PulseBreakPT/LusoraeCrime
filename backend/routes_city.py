@@ -124,6 +124,9 @@ async def buy_business(body: BusinessBuyInput, user: dict = Depends(get_current_
     cfg = BUSINESS_TYPES.get(body.type_key)
     if not cfg:
         raise HTTPException(status_code=404, detail="Tipo de negócio inexistente")
+    required_level = int(cfg.get("min_level", 1))
+    if int(player.get("level", 1)) < required_level:
+        raise HTTPException(status_code=400, detail=f"Este negócio desbloqueia no nível {required_level}")
     pid = str(player["_id"])
     owned = await db.city_businesses.count_documents({"player_id": pid})
     same = await db.city_businesses.count_documents({"player_id": pid, "type_key": body.type_key})
@@ -356,6 +359,8 @@ async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_us
 @idempotent("city_pvp_toggle")
 async def toggle_pvp(body: TogglePvpInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
+    if body.enabled and int(player.get("level", 1)) < 15:
+        raise HTTPException(status_code=400, detail="PvP desbloqueia no nível 15")
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"pvp_opt_in": bool(body.enabled)}})
     return {"ok": True, "enabled": bool(body.enabled)}
 
@@ -448,22 +453,44 @@ async def challenge_pvp(body: PvpChallengeInput, user: dict = Depends(get_curren
     attacker = await get_player(user)
     if not attacker.get("pvp_opt_in"):
         raise HTTPException(status_code=400, detail="Ativa primeiro o PvP")
+    if int(attacker.get("level", 1)) < 15:
+        raise HTTPException(status_code=400, detail="PvP desbloqueia no nível 15")
     defender = await db.players.find_one({"_id": _oid(body.defender_player_id, "Jogador"), "pvp_opt_in": True})
-    if not defender or defender["_id"] == attacker["_id"]:
+    if not defender or defender["_id"] == attacker["_id"] or int(defender.get("level", 1)) < 15:
         raise HTTPException(status_code=404, detail="Rival PvP indisponível")
-    pending = await db.city_pvp_challenges.find_one({
-        "attacker_id": str(attacker["_id"]), "defender_id": str(defender["_id"]), "status": "pending"
-    })
+    now = now_utc()
+    attacker_id, defender_id = str(attacker["_id"]), str(defender["_id"])
+    pair_query = {"$or": [
+        {"attacker_id": attacker_id, "defender_id": defender_id},
+        {"attacker_id": defender_id, "defender_id": attacker_id},
+    ]}
+    await db.city_pvp_challenges.update_many(
+        {**pair_query, "status": "pending", "expires_at": {"$lte": now.isoformat()}},
+        {"$set": {"status": "expired", "resolved_at": now.isoformat()}},
+    )
+    pending = await db.city_pvp_challenges.find_one({**pair_query, "status": "pending", "expires_at": {"$gt": now.isoformat()}})
     if pending:
-        raise HTTPException(status_code=409, detail="Já existe um desafio pendente")
+        raise HTTPException(status_code=409, detail="Já existe um desafio pendente entre estas organizações")
+    recent = await db.city_pvp_challenges.count_documents({
+        **pair_query, "status": "resolved",
+        "resolved_at": {"$gte": (now - timedelta(hours=24)).isoformat()},
+    })
+    if recent >= 3:
+        raise HTTPException(status_code=429, detail="Limite diário atingido contra este rival")
+    last = await db.city_pvp_challenges.find_one({
+        **pair_query, "status": "resolved",
+        "resolved_at": {"$gte": (now - timedelta(hours=6)).isoformat()},
+    })
+    if last:
+        raise HTTPException(status_code=429, detail="Este confronto está em cooldown durante 6 horas")
     doc = {
         "attacker_id": str(attacker["_id"]),
         "attacker_name": attacker.get("org_name", "Organização"),
         "defender_id": str(defender["_id"]),
         "defender_name": defender.get("org_name", "Organização"),
         "status": "pending",
-        "created_at": now_utc().isoformat(),
-        "expires_at": (now_utc() + timedelta(hours=12)).isoformat(),
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=12)).isoformat(),
     }
     result = await db.city_pvp_challenges.insert_one(doc)
     return {"ok": True, "challenge_id": str(result.inserted_id)}
@@ -496,14 +523,26 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
     winner = attacker if a_score >= d_score else defender
     loser = defender if winner["_id"] == attacker["_id"] else attacker
     season = season_info()
+    now = now_utc()
+    pair_query = {"$or": [
+        {"attacker_id": str(attacker["_id"]), "defender_id": str(defender["_id"])},
+        {"attacker_id": str(defender["_id"]), "defender_id": str(attacker["_id"])},
+    ]}
+    recent_count = await db.city_pvp_challenges.count_documents({
+        **pair_query, "status": "resolved",
+        "resolved_at": {"$gte": (now - timedelta(days=7)).isoformat()},
+    })
+    farm_mult = [1.0, 0.5, 0.25][recent_count] if recent_count < 3 else 0.10
+    winner_points = max(8, int(round(80 * farm_mult)))
+    loser_points = max(2, int(round(20 * farm_mult)))
     await db.city_season_scores.update_one(
         {"player_id": str(winner["_id"]), "season_id": season["id"]},
-        {"$inc": {"points": 80}, "$set": {"updated_at": now_utc().isoformat()}},
+        {"$inc": {"points": winner_points}, "$set": {"updated_at": now.isoformat()}},
         upsert=True,
     )
     await db.city_season_scores.update_one(
         {"player_id": str(loser["_id"]), "season_id": season["id"]},
-        {"$inc": {"points": 20}, "$set": {"updated_at": now_utc().isoformat()}},
+        {"$inc": {"points": loser_points}, "$set": {"updated_at": now.isoformat()}},
         upsert=True,
     )
     consequence = None
