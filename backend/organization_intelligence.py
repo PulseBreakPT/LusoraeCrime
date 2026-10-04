@@ -310,6 +310,7 @@ def build_organization_intelligence(
         territory_rows.append({
             "district": district, "tier": tier,
             "defense": round(defense), "pressure": round(pressure), "score": round(score),
+            "rival": (info or {}).get("rival") or {},
             "costs": {
                 "defend": max(500, int(TERRITORY_TIERS[tier]["defense_weekly"] * 1.5)) if tier in TERRITORY_TIERS else None,
                 "consolidate": int(TERRITORY_TIERS[tier + 1]["cost"]) if tier + 1 in TERRITORY_TIERS else None,
@@ -398,6 +399,14 @@ def build_organization_intelligence(
         + sum(int((x or {}).get("tier", 0) or 0) for x in territories.values()) * 30
         + sum(int(v or 0) for v in (player.get("departments") or {}).values()) * 12
     )
+    org_level = max(1, min(10, 1 + org_power // 110))
+    next_level_power = None if org_level >= 10 else org_level * 110
+    progression = {
+        "level": org_level,
+        "power": org_power,
+        "next_level_power": next_level_power,
+        "progress_pct": 100 if org_level >= 10 else round(max(0, min(100, (org_power - (org_level - 1) * 110) / 110 * 100))),
+    }
     dimensions = {
         "power": min(100, round(org_power / 4)),
         "influence": min(100, round(len(territories) * 14 + department_level(player, "comunicacoes") * 12)),
@@ -426,7 +435,7 @@ def build_organization_intelligence(
             "income_28d": round(income_28), "expenses_28d": round(expenses_28),
             "reserve_cash": policy["reserve_cash"], "available_above_reserve": max(0, cash - policy["reserve_cash"]),
         },
-        "organization": {"score": org_power, "dimensions": dimensions},
+        "organization": {"score": org_power, "level": org_level, "progression": progression, "dimensions": dimensions},
         "quotes": {
             "departments": department_quotes,
             "protection": protection_cost(player, len(employees), len(properties)),
