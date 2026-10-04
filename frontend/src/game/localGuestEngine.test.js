@@ -55,10 +55,6 @@ describe("offline guest engine", () => {
     expect(state.opportunities.every((opp) => opp.min_level <= state.player.level)).toBe(true);
     expect(state.caps.employees.max).toBeGreaterThanOrEqual(4);
 
-    const street = (await localGuestRequest("get", "/game/street/state")).data;
-    expect(street.districts.length).toBeGreaterThan(0);
-    expect(street.wanted.stars).toBe(0);
-
     const mastermind = (await localGuestRequest("get", "/game/mastermind/state")).data;
     expect(mastermind.targets.length).toBe(3);
     expect(mastermind.rank.level).toBe(1);
@@ -183,14 +179,6 @@ describe("offline guest engine", () => {
       lng: -9.141,
     });
     expect(property.data.property_id).toBeTruthy();
-
-    await localGuestRequest("post", "/game/street/plan", {
-      approach_key: "ghost",
-      escape_key: "speed",
-      gear_keys: [],
-    });
-    const street = (await localGuestRequest("get", "/game/street/state")).data;
-    expect(street.plan.approach_key).toBe("ghost");
 
     await localGuestRequest("post", "/game/mastermind/heists/intel", {
       target_key: "auction",

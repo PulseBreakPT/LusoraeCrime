@@ -125,8 +125,8 @@ const makeVehicle = (modelKey, teamId = null) => {
     id: uid("veh"), name: model.name, model_key: modelKey, team_id: teamId, property_id: null,
     price: model.price, speed: model.speed, condition: 100, fuel_type: model.fuel_type,
     tank_l: model.tank_l, fuel_l: model.tank_l, cons: model.cons, km: 0,
-    status: "idle", transfer: null, refueling_until: null, impounded_until: null,
-    paint_key: null, insured: false, cold_plates: false, notoriety: 0,
+    status: "idle", transfer: null, refueling_until: null,
+    paint_key: null,
   };
 };
 
@@ -285,12 +285,6 @@ const makeOpportunities = (save, count = 5) => {
   return generated;
 };
 
-const initialStreet = () => ({
-  rep: 0, gear: {}, plan: { approach_key:"balanced", escape_key:"speed", gear_keys:[] },
-  districts: [], contacts: { fixer:0, mechanic:0, lawyer:0, informant:0 },
-  contact_cooldowns: {}, active_job: null, last_event_bucket: 0, intel_until: null,
-});
-
 const initialMastermind = () => ({
   xp:0, bounty:0, intel:{}, active_heist:null, target_cooldowns:{},
   market:{holdings:{chips:0,art:0,medical:0,cipher:0},raid_log:[]},
@@ -335,7 +329,7 @@ const createInitialSave = () => {
       {id:uid("evt"),kind:"system",message:"Modo convidado local iniciado. O jogo funciona sem servidor.",ts:nowIso()},
       {id:uid("evt"),kind:"team",message:"Crew Alfa está pronta com dois operacionais e um Sedan Usado.",ts:nowIso()},
     ],
-    transactions:[], quests:[], street:initialStreet(), mastermind:initialMastermind(),
+    transactions:[], quests:[], mastermind:initialMastermind(),
   };
 };
 
@@ -346,7 +340,6 @@ const loadSave = () => {
     const save = JSON.parse(raw);
     if (!save || typeof save !== "object") return createInitialSave();
     if (!save.version) save.version = 1;
-    save.street ||= initialStreet();
     save.mastermind ||= initialMastermind();
     save.transactions ||= [];
     save.events ||= [];
@@ -658,7 +651,6 @@ const finalizeMission = (save, mission) => {
     vehicle.condition=clamp(vehicle.condition-(success?2.5:6),0,100);
     vehicle.fuel_l=clamp(vehicle.fuel_l-mission.fuel_needed,0,vehicle.tank_l);
     vehicle.km=(vehicle.km||0)+mission.distance_km*2;
-    vehicle.notoriety=clamp((vehicle.notoriety||0)+(success?2:6),0,100);
   }
   mission.phase="done"; mission.outcome=success?"success":"failure"; mission.return_at=nowIso();
   save.opportunities = save.opportunities.filter((o) => o.id !== mission.opportunity_id);
@@ -737,9 +729,6 @@ const tick = (save) => {
     }
   }
 
-  const job=save.street?.active_job;
-  if(job && job.status==="running" && Date.parse(job.finish_at)<=now) job.status="ready";
-
   const heist=save.mastermind?.active_heist;
   if(heist?.current_prep?.status==="running" && Date.parse(heist.current_prep.finish_at)<=now){
     heist.current_prep.status="ready";
@@ -813,87 +802,6 @@ const tick = (save) => {
   }
   save.last_tick=now;
   return save;
-};
-
-const streetRank = (rep) => {
-  const levels=[
-    [0,"Desconhecido"],[100,"Operador"],[300,"Nome na Rua"],[650,"Influente"],[1100,"Predador"],[1800,"Lenda Urbana"]
-  ];
-  let idx=0; levels.forEach((v,i)=>{if(rep>=v[0])idx=i;});
-  const current=levels[idx], next=levels[idx+1];
-  return {level:idx+1,name:current[1],rep:Math.round(rep),next_rep:next?.[0]||null,
-    progress_pct:next?clamp((rep-current[0])/(next[0]-current[0])*100,0,100):100};
-};
-
-const streetSnapshot = (save) => {
-  const s=save.street;
-  if(!save.player.hq) return {hq_pending:true,server_time:nowIso()};
-  if(!s.districts.length){
-    s.districts=(save.player.districts||[]).slice(0,8).map((d,i)=>({
-      ...d,influence:25+i*4,controlled:false,tier:0,rival_pressure:18+i*6,
-      income_per_h:0,defend_remaining_s:0,
-    }));
-  }
-  const stars=clamp(Math.floor(save.player.heat/20),0,5);
-  const rank=streetRank(s.rep||0);
-  const contacts=[
-    ["fixer","A Ponte","Fixer","Reduz calor e abre caminhos.",1],
-    ["mechanic","Oficina 24","Mecânico","Recupera veículos e reduz notoriedade.",1],
-    ["lawyer","Linha Cinzenta","Advogado","Reduz pressão legal.",2],
-    ["informant","Olho Norte","Informador","Ativa inteligência policial.",2],
-  ].map(([key,name,role,description,unlock])=>({
-    key,name,role,description,unlock_rank:unlock,unlocked:rank.level>=unlock,
-    favor:s.contacts[key]||0,remaining_s:Math.max(0,Math.ceil((Date.parse(s.contact_cooldowns[key]||0)-Date.now())/1000)),
-  }));
-  const gearCatalog=[
-    {key:"vest",name:"Colete Modular",cost:2200,description:"Aumenta resistência em atividades de risco."},
-    {key:"jammer",name:"Bloqueador de Sinal",cost:3200,description:"Reduz deteção técnica."},
-    {key:"papers",name:"Documentos Frios",cost:2800,description:"Reduz atenção policial."},
-    {key:"tires",name:"Pneus Reforçados",cost:2600,description:"Melhora fugas e corridas."},
-  ].map(x=>({...x,owned:s.gear[x.key]||0,unlocked:true}));
-  return {
-    server_time:nowIso(),
-    wanted:{stars,heat:save.player.heat,search_active:stars>=3,remaining_s:stars>=3?Math.round(stars*120):0},
-    rank,
-    event:{name:"Janela de Oportunidade",description:"Movimento urbano elevado cria mais alvos, mas chama atenção.",
-      success:0.04,reward_mult:1.08,heat_mult:1.05,ends_at:new Date(Date.now()+25*60000).toISOString()},
-    scanner:{force:save.player.region==="Lisboa"?"PSP":"PSP/GNR",alert:stars>=3?"Elevado":stars?"Vigilância":"Normal",
-      hot_district:s.districts.slice().sort((a,b)=>b.rival_pressure-a.rival_pressure)[0]?.name||null,
-      intel_active:!!s.intel_until&&Date.parse(s.intel_until)>Date.now(),
-      intel_remaining_s:Math.max(0,Math.ceil((Date.parse(s.intel_until||0)-Date.now())/1000))},
-    districts:s.districts, contacts,
-    wagers:[
-      {key:"cautious",name:"Cautelosa",cost:500,reward_mult:0.9,unlocked:true},
-      {key:"standard",name:"Normal",cost:1500,reward_mult:1.2,unlocked:true},
-      {key:"high",name:"Alta",cost:3500,reward_mult:1.7,unlocked:rank.level>=2},
-    ],
-    activities:[
-      {key:"race",name:"Corrida Clandestina",description:"Velocidade e controlo sob pressão.",duration_s:20,base_success:.68,reward_min:4000,reward_max:7500,unlock_rank:1,unlocked:true},
-      {key:"chop_shop",name:"Entrega à Desmontagem",description:"Entrega um veículo sem levantar suspeitas.",duration_s:22,base_success:.72,reward_min:7500,reward_max:13500,unlock_rank:2,unlocked:rank.level>=2},
-      {key:"smuggling",name:"Rota Clandestina",description:"Move carga entre zonas controladas.",duration_s:26,base_success:.64,reward_min:12000,reward_max:22000,unlock_rank:3,unlocked:rank.level>=3},
-    ],
-    approaches:[
-      {key:"ghost",name:"Fantasma",description:"Discrição máxima."},
-      {key:"balanced",name:"Calculado",description:"Equilíbrio entre risco e retorno."},
-      {key:"impact",name:"Impacto",description:"Mais recompensa e mais calor."},
-    ],
-    escape_plans:[
-      {key:"low",name:"Baixo Perfil",description:"Menos notoriedade."},
-      {key:"speed",name:"Velocidade",description:"Fuga rápida."},
-      {key:"decoy",name:"Isca",description:"Desvia a resposta policial."},
-    ],
-    gear_catalog:gearCatalog,plan:s.plan,active_job:s.active_job ? {
-      ...clone(s.active_job),
-      remaining_s:Math.max(0,(Date.parse(s.active_job.finish_at)-Date.now())/1000),
-      progress_pct:clamp(
-        ((Date.now()-Date.parse(s.active_job.started_at)) /
-          Math.max(1,Date.parse(s.active_job.finish_at)-Date.parse(s.active_job.started_at))) * 100,
-        0,100
-      ),
-    } : null,
-    vehicle_meta:save.vehicles.map(v=>({vehicle_id:v.id,notoriety:v.notoriety||0,cold_plates:!!v.cold_plates,insured:!!v.insured,impounded:false})),
-    balances:{clean_money:save.player.clean_money,dirty_money:save.player.dirty_money,heat:save.player.heat},
-  };
 };
 
 const MM_TARGETS=[
@@ -1133,7 +1041,6 @@ const addStarterWorld=(save,lat,lng)=>{
   save.player.hq={lat,lng,name:"Quartel-General",level:1,upgrading_until:null,upgrade_history:[]};
   save.player.region=lat<34?"Madeira":lng<-20?"Açores":lat>40.7?"Norte":lat<38.0?"Algarve":"Centro";
   save.player.districts=makeDistricts(lat,lng);
-  save.street.districts=[];
   save.opportunities=makeOpportunities(save,5);
   addEvent(save,"system","Quartel-General estabelecido. Já há oportunidades disponíveis na zona.");
 };
@@ -1433,77 +1340,6 @@ const mutateGame=(save,path,payload)=>{
     return {ok:true,cost:0};
   }
 
-  if(path==="street/plan"){save.street.plan={...save.street.plan,...p};return {ok:true};}
-  if(path==="street/gear/buy"){const prices={vest:2200,jammer:3200,papers:2800,tires:2600};const cost=(prices[p.gear_key]||2500)*(p.quantity||1);chargeClean(save,cost,"Equipamento de rua");save.street.gear[p.gear_key]=(save.street.gear[p.gear_key]||0)+(p.quantity||1);return {ok:true};}
-  if(path==="street/territory"){const d=save.street.districts.find(x=>x.key===p.district_key);if(!d)fail(404,"Zona não encontrada");if(p.action==="claim"){if(d.influence<100)fail(400,"Influência insuficiente");chargeClean(save,5000,"Tomada territorial");d.controlled=true;d.tier=1;d.income_per_h=450;}else if(p.action==="reinforce"){d.tier=Math.min(3,d.tier+1);d.income_per_h=450*d.tier;}else if(p.action==="defend"){d.rival_pressure=Math.max(0,d.rival_pressure-35);}return {ok:true};}
-  if(path==="street/contacts/call"){const key=p.contact_key;save.street.contacts[key]=(save.street.contacts[key]||0)+1;save.street.contact_cooldowns[key]=new Date(Date.now()+5*60000).toISOString();if(key==="fixer"||key==="lawyer")save.player.heat=Math.max(0,save.player.heat-(key==="lawyer"?14:9));if(key==="mechanic"){const v=save.vehicles.find(x=>x.id===p.vehicle_id);if(v){v.condition=Math.min(100,v.condition+25);v.notoriety=Math.max(0,(v.notoriety||0)-20);}}if(key==="informant")save.street.intel_until=new Date(Date.now()+15*60000).toISOString();return {ok:true};}
-  if(path==="street/activities/start"){
-    if(save.street.active_job)fail(409,"Já existe uma atividade em curso");
-    const defs={
-      race:{name:"Corrida Clandestina",rewardMin:4000,rewardMax:7500,duration:20,chance:.68,pays:"clean",baseCost:0,fuel:7,wear:5,heat:5,rep:20},
-      chop_shop:{name:"Entrega à Desmontagem",rewardMin:7500,rewardMax:13500,duration:22,chance:.72,pays:"dirty",baseCost:1200,fuel:9,wear:8,heat:9,rep:32},
-      smuggling:{name:"Rota Clandestina",rewardMin:12000,rewardMax:22000,duration:26,chance:.64,pays:"dirty",baseCost:2500,fuel:13,wear:10,heat:12,rep:46},
-    };
-    const d=defs[p.job_key];if(!d)fail(400,"Atividade inválida");
-    const rank=streetRank(save.street.rep||0);
-    if(p.job_key==="chop_shop"&&rank.level<2)fail(400,"Esta atividade requer nível de rua 2");
-    if(p.job_key==="smuggling"&&rank.level<3)fail(400,"Esta atividade requer nível de rua 3");
-    const vehicle=save.vehicles.find(v=>v.id===p.vehicle_id);if(!vehicle)fail(400,"Seleciona um veículo");
-    const district=save.street.districts.find(x=>x.key===p.district_key);if(!district)fail(400,"Seleciona uma zona");
-    if((vehicle.fuel_l||0)<d.fuel)fail(400,"Combustível insuficiente");
-    const wagerCfg={
-      cautious:{cost:500,rewardMult:.9,success:.05},
-      standard:{cost:1500,rewardMult:1.2,success:0},
-      high:{cost:3500,rewardMult:1.7,success:-.08},
-    };
-    const wager=p.job_key==="race"?(wagerCfg[p.wager_key]||wagerCfg.standard):null;
-    const totalCost=d.baseCost+(wager?.cost||0);
-    if(totalCost)chargeClean(save,totalCost,p.job_key==="race"?"Aposta virtual":"Preparação de atividade");
-    const approach=save.street.plan?.approach_key||"balanced";
-    const approachReward=approach==="ghost"?.88:approach==="impact"?1.18:1;
-    const approachChance=approach==="ghost"?.06:approach==="impact"?-.06:0;
-    const chance=clamp(d.chance+approachChance+(wager?.success||0)-save.player.heat*.001,0.2,.95);
-    const jobId=uid("street");
-    const roll=rollFrom(jobId+":reward");
-    const baseReward=Math.round(d.rewardMin+(d.rewardMax-d.rewardMin)*roll);
-    const reward=Math.round(baseReward*approachReward*(wager?.rewardMult||1));
-    vehicle.fuel_l=clamp((vehicle.fuel_l||0)-d.fuel,0,vehicle.tank_l||100);
-    vehicle.condition=clamp((vehicle.condition??100)-d.wear,0,100);
-    save.street.active_job={
-      id:jobId,job_key:p.job_key,name:d.name,district_key:p.district_key,district_name:district.name,
-      vehicle_id:p.vehicle_id,vehicle_name:vehicle.name,status:"running",started_at:nowIso(),
-      finish_at:new Date(Date.now()+d.duration*1000).toISOString(),
-      reward,chance,approach_key:approach,wager_key:p.wager_key||null,pays:d.pays,heat_gain:d.heat,rep_reward:d.rep,
-    };
-    return {ok:true};
-  }
-  if(path==="street/activities/claim"){
-    const job=save.street.active_job;if(!job||job.id!==p.job_id)fail(404,"Atividade não encontrada");
-    if(job.status!=="ready")fail(400,"Atividade ainda em curso");
-    const success=rollFrom(job.id)<=job.chance;
-    const d=save.street.districts.find(x=>x.key===job.district_key);
-    const heat=success?(job.heat_gain||6):Math.max(2,Math.round((job.heat_gain||6)*1.35));
-    const rep=success?(job.rep_reward||20):Math.max(2,Math.round((job.rep_reward||20)*.15));
-    if(success){
-      if(job.pays==="clean"){
-        save.player.clean_money+=job.reward;
-        tx(save,"street_activity_reward",job.reward,"clean",job.name);
-      }else{
-        save.player.dirty_money+=job.reward;
-        tx(save,"street_activity_reward",job.reward,"dirty",job.name);
-      }
-      save.street.rep+=rep;
-      if(d)d.influence=Math.min(150,d.influence+18+Math.round(rep/4));
-      save.player.heat=clamp(save.player.heat+heat,0,100);
-    }else{
-      save.street.rep+=rep;save.player.heat=clamp(save.player.heat+heat,0,100);
-      if(d)d.rival_pressure=clamp((d.rival_pressure||0)+12,0,100);
-    }
-    save.street.active_job=null;
-    return {ok:true,success,reward:success?job.reward:0};
-  }
-  if(path==="street/garage"){const v=save.vehicles.find(x=>x.id===p.vehicle_id);if(!v)fail(404,"Veículo não encontrado");if(p.action==="plates"){chargeClean(save,1800,"Matrículas frias");v.cold_plates=true;v.notoriety=Math.max(0,(v.notoriety||0)-30);}else if(p.action==="insure"){chargeClean(save,2200,"Seguro clandestino");v.insured=true;}else if(p.action==="recover"){chargeClean(save,3200,"Recuperação do veículo");v.impounded_until=null;}return {ok:true};}
-
   if(path==="mastermind/heists/intel"){const target=MM_TARGETS.find(x=>x.key===p.target_key);if(!target)fail(404,"Alvo não encontrado");const cost=1500*target.unlock_rank;chargeClean(save,cost,"Dossiê Mastermind");save.mastermind.intel[target.key]={scouted_at:nowIso(),expires_at:new Date(Date.now()+30*60000).toISOString(),recommended_approach:"silent",recommended_name:"Silencioso",reward_min:Math.round(target.base_reward*.72),reward_max:Math.round(target.base_reward*1.34),risk_note:"Rotas sob vigilância"};return {ok:true};}
   if(path==="mastermind/heists/create"){if(save.mastermind.active_heist)fail(409,"Já existe um grande golpe em preparação");const target=MM_TARGETS.find(x=>x.key===p.target_key);const team=save.teams.find(x=>x.id===p.team_id),vehicle=save.vehicles.find(x=>x.id===p.vehicle_id);if(!target||!team||!vehicle)fail(400,"Configuração incompleta");const approach=MM_APPROACHES.find(x=>x.key===p.approach_key)||MM_APPROACHES[0],fence=MM_FENCES.find(x=>x.key===p.fence_key)||MM_FENCES[0];save.mastermind.active_heist={id:uid("heist"),target_key:target.key,target_name:target.name,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,vehicle_name:vehicle.name,approach_key:approach.key,approach_name:approach.name,fence_key:fence.key,fence_name:fence.name,crew_cut_pct:Number(p.crew_cut_pct||20),phase:"planning",preps:target.preps.map(x=>({...x,status:"available",attempts:0})),current_prep:null,finale:null};return {ok:true};}
   if(path==="mastermind/heists/prep/start"){const h=save.mastermind.active_heist;if(!h||h.id!==p.heist_id)fail(404,"Plano não encontrado");if(h.current_prep)fail(409,"Já existe preparação em curso");const prep=h.preps.find(x=>x.key===p.prep_key);if(!prep)fail(404,"Preparação não encontrada");chargeClean(save,prep.cost,"Preparação Mastermind");prep.status="running";prep.attempts=(prep.attempts||0)+1;h.current_prep={...prep,prep_key:prep.key,status:"running",started_at:nowIso(),finish_at:new Date(Date.now()+prep.duration_s*1000).toISOString()};return {ok:true};}
@@ -1553,7 +1389,6 @@ export async function localGuestRequest(method,url,payload){
   if(verb==="post"&&path==="/legal/disclaimer-ack"){save.user.disclaimer_accepted=true;persist(save);return {data:{ok:true},status:200};}
   if(verb==="get"&&path==="/game/catalog") return {data:clone(LOCAL_CATALOG),status:200};
   if(verb==="get"&&path==="/game/state"){persist(save);return {data:publicState(save),status:200};}
-  if(verb==="get"&&path==="/game/street/state"){const data=streetSnapshot(save);persist(save);return {data,status:200};}
   if(verb==="get"&&path==="/game/mastermind/state"){const data=mastermindSnapshot(save);persist(save);return {data,status:200};}
   if(verb==="get"&&path==="/game/transactions") return {data:{transactions:clone(save.transactions)},status:200};
 

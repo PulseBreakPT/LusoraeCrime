@@ -33,12 +33,6 @@ const ACTION_SOUNDS = [
   ["employees/release", "notify"],
   ["quests/claim", "cash"],
   ["quests/choose", "notify"],
-  ["street/activities/start", "dispatch"],
-  ["street/activities/claim", "cash"],
-  ["street/contacts/call", "notify"],
-  ["street/garage", "repair"],
-  ["street/gear/buy", "cash"],
-  ["street/territory", "success"],
   ["mastermind/heists/launch", "dispatch"],
   ["mastermind/heists/claim", "cash"],
   ["mastermind/heists/prep", "notify"],
@@ -130,22 +124,7 @@ export function GameProvider({ children }) {
       const { data } = await api.get("/game/state", { timeout: 8000 });
       hasLoadedRef.current = true;
 
-      // Cidade Viva é um módulo separado para manter o tick principal pequeno.
-      // A leitura é sequencial: evita que o avanço urbano e o avanço normal
-      // concorram pela mesma carteira no servidor.
       if (!data.hq_pending) {
-        try {
-          const { data: street } = await api.get("/game/street/state", { timeout: 8000 });
-          data.street = street;
-          if (street?.balances && data.player) {
-            data.player.clean_money = street.balances.clean_money;
-            data.player.dirty_money = street.balances.dirty_money;
-            data.player.heat = street.balances.heat;
-          }
-        } catch (streetError) {
-          // Uma falha no módulo urbano nunca deve esconder o resto do jogo.
-          console.error("Falha ao carregar /game/street/state:", streetError);
-        }
         try {
           const { data: mastermind } = await api.get("/game/mastermind/state", { timeout: 8000 });
           data.mastermind = mastermind;
@@ -155,8 +134,6 @@ export function GameProvider({ children }) {
             data.player.heat = mastermind.balances.heat;
           }
         } catch (mastermindError) {
-          // O quadro de grandes golpes é independente: o jogo base e a cidade
-          // continuam utilizáveis mesmo que esta leitura falhe.
           console.error("Falha ao carregar /game/mastermind/state:", mastermindError);
         }
       }
@@ -750,16 +727,6 @@ export function GameProvider({ children }) {
     "Não existem recursos para otimizar."
   );
 
-  // Cidade Viva — todas as ações reutilizam o mesmo canal seguro, feedback e
-  // refresh do resto do jogo.
-  const saveStreetPlan = (payload) => action("street/plan", payload, "Plano de rua atualizado");
-  const buyStreetGear = (payload) => action("street/gear/buy", payload, "Equipamento adquirido");
-  const streetTerritoryAction = (payload) => action("street/territory", payload, "Situação territorial atualizada");
-  const callStreetContact = (payload) => action("street/contacts/call", payload, "Favor confirmado");
-  const startStreetActivity = (payload) => action("street/activities/start", payload, "Atividade iniciada");
-  const claimStreetActivity = (payload) => action("street/activities/claim", payload, "Resultado recolhido");
-  const streetGarageAction = (payload) => action("street/garage", payload, "Garagem atualizada");
-
   // Mastermind — grandes golpes, mercado negro, caçadores rivais e caches.
   const scoutMastermindTarget = (payload) => action("mastermind/heists/intel", payload, "Dossiê atualizado");
   const createMastermindHeist = (payload) => action("mastermind/heists/create", payload, "Plano criado");
@@ -935,13 +902,6 @@ export function GameProvider({ children }) {
         repairFleetAll,
         repairWeaponsAll,
         optimizeOrganization,
-        saveStreetPlan,
-        buyStreetGear,
-        streetTerritoryAction,
-        callStreetContact,
-        startStreetActivity,
-        claimStreetActivity,
-        streetGarageAction,
         scoutMastermindTarget,
         createMastermindHeist,
         startHeistPrep,

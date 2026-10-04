@@ -16,7 +16,6 @@ import { QuestsPanel } from "../components/game/QuestsPanel";
 import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
 import { ShopPanel } from "../components/game/ShopPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
-import { StreetPanel } from "../components/game/StreetPanel";
 import { MastermindPanel } from "../components/game/MastermindPanel";
 import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeedMobile } from "../components/game/ActivityFeed";
@@ -27,7 +26,7 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { orgAlerts, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Radar, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -160,7 +159,7 @@ export default function GamePage() {
 
   const alerts = shellAlerts;
   const p = state.player;
-  const wantedStars = state.street?.wanted?.stars || 0;
+  const wantedStars = Math.max(0, Math.min(5, Math.floor(Number(p.heat || 0) / 20)));
   const empireAlert = p.heat >= 70 || p.dirty_money >= 15000;
 
   const weaponsDamaged = (state.weapons || []).filter((w) => w.condition < 30).length;
@@ -235,7 +234,7 @@ export default function GamePage() {
           data-testid="wanted-stars-hud"
           className="sub-optional-hud pointer-events-none absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
           aria-label={`Nível de procurado: ${wantedStars} de 5 estrelas`}
-          title="Indicador de procurado — gere a Cidade através do dock."
+          title="Indicador de procurado."
         >
           <span className="flex gap-0.5">
             {[0, 1, 2, 3, 4].map((index) => (
@@ -312,7 +311,6 @@ export default function GamePage() {
               {navGroup === "menu" && (
                 <>
                   <div className="grid grid-cols-3 gap-1">
-                    <NavAction testId="open-street-button" icon={Radar} label="Cidade" color="text-cyan-300" alert={wantedStars >= 3 || (state.street?.districts || []).some((district) => district.rival_pressure >= 70)} onClick={() => openFromNav("street")} />
                     <NavAction testId="open-intel-button" icon={BrainCircuit} label="Relatórios" color="text-red-400" alert={alerts.total > 0} onClick={() => openFromNav("intel")} />
                     <NavAction testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300" onClick={() => openFromNav("shop")} />
                     <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
@@ -388,14 +386,13 @@ export default function GamePage() {
               label="Menu"
               color="text-zinc-200"
               alert={alerts.total > 0 || wantedStars >= 3}
-              active={navGroup === "menu" || ["street", "intel", "shop", "settings"].includes(openPanel) || commandOpen || mapLegendOpen}
+              active={navGroup === "menu" || ["intel", "shop", "settings"].includes(openPanel) || commandOpen || mapLegendOpen}
               onClick={() => toggleNavGroup("menu")}
             />
           </div>
         </div>
       )}
 
-      <StreetPanel open={openPanel === "street"} onOpenChange={(o) => setOpenPanel(o ? "street" : null)} />
       <MastermindPanel open={openPanel === "mastermind"} onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />
       <CommandCenter
         open={commandOpen}
