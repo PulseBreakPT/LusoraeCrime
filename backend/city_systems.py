@@ -112,6 +112,28 @@ def world_context(now=None, region="Portugal"):
     }
 
 
+def city_calendar(now=None, region="Portugal", count=4):
+    now = now or _utc_now()
+    current_slot = int(now.timestamp() // (6 * 3600))
+    event_keys = list(CITY_EVENTS)
+    rows = []
+    for offset in range(max(1, min(8, int(count)))):
+        slot = current_slot + offset
+        key = event_keys[_seed_int(region, slot, "event") % len(event_keys)]
+        cfg = CITY_EVENTS[key]
+        start = datetime.fromtimestamp(slot * 6 * 3600, tz=timezone.utc)
+        rows.append({
+            "key": key,
+            "name": cfg["name"],
+            "severity": cfg["severity"],
+            "description": cfg["description"],
+            "starts_at": start.isoformat(),
+            "ends_at": (start + timedelta(hours=6)).isoformat(),
+            "active": offset == 0,
+        })
+    return rows
+
+
 def operation_world_modifier(category, now=None, region="Portugal"):
     ctx = world_context(now, region)
     return {
@@ -281,6 +303,16 @@ async def city_snapshot(db, player):
     chat = await db.city_chat.find({}).sort("ts", -1).to_list(20)
     alliance = await db.city_alliances.find_one({"member_ids": pid})
     recent_events = await db.events.find({"player_id": pid}).sort("ts", -1).to_list(8)
+    pvp_players = await db.players.find({
+        "pvp_opt_in": True,
+        "_id": {"$ne": player["_id"]},
+        "hq": {"$type": "object"},
+    }).sort("respect", -1).to_list(20)
+    pvp_challenges = await db.city_pvp_challenges.find({
+        "$or": [{"attacker_id": pid}, {"defender_id": pid}],
+        "status": "pending",
+        "expires_at": {"$gt": now.isoformat()},
+    }).sort("created_at", -1).to_list(20)
 
     news = _news_from_world(ctx)
     for event in recent_events[:5]:
@@ -312,6 +344,7 @@ async def city_snapshot(db, player):
 
     return {
         "world": ctx,
+        "calendar": city_calendar(now, player.get("region") or "Portugal", 5),
         "season": {**season, "your_points": int(score.get("points", 0)), "leaderboard": board},
         "news": news[:12],
         "rivals": rival_out,
@@ -326,6 +359,17 @@ async def city_snapshot(db, player):
             "alliance": _serialize(alliance) if alliance else None,
             "chat": [_serialize(x) for x in chat],
             "pvp_opt_in": bool(player.get("pvp_opt_in", False)),
+            "pvp_players": [
+                {
+                    "player_id": str(row["_id"]),
+                    "org_name": row.get("org_name", "Organização"),
+                    "level": int(row.get("level", 1) or 1),
+                    "respect": int(row.get("respect", 0) or 0),
+                    "heat": round(float(row.get("heat", 0) or 0), 1),
+                }
+                for row in pvp_players
+            ],
+            "pvp_challenges": [_serialize(x) for x in pvp_challenges],
         },
         "boss": {
             "health": int(player.get("boss_health", 100) or 100),
