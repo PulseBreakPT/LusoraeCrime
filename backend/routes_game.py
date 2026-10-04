@@ -1598,6 +1598,7 @@ async def toggle_favorite_type(body: TypeKeyInput, user: dict = Depends(get_curr
 
 
 @router.post("/missions/recall")
+@idempotent("missions.recall")
 async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -1621,11 +1622,16 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
     kept_log = [e for e in (m.get("live_log") or []) if e.get("at", "") <= now_iso]
     recall_entries, recall_used = build_recall_script(m, now, ret, memory=player.get("phrase_memory"))
     kept_log += recall_entries
-    await db.missions.update_one({"_id": m["_id"]}, {"$set": {
-        "phase": "returning", "outcome": "recalled",
-        "target": turn_point, "arrive_at": now.isoformat(), "finish_at": now.isoformat(),
-        "return_at": ret.isoformat(), "live_log": kept_log,
-    }})
+    changed = await db.missions.update_one(
+        {"_id": m["_id"], "player_id": pid, "phase": "en_route"},
+        {"$set": {
+            "phase": "returning", "outcome": "recalled",
+            "target": turn_point, "arrive_at": now.isoformat(), "finish_at": now.isoformat(),
+            "return_at": ret.isoformat(), "live_log": kept_log,
+        }},
+    )
+    if changed.modified_count != 1:
+        raise HTTPException(status_code=409, detail="A operação mudou de fase antes da chamada de volta")
     await db.players.update_one(
         {"_id": player["_id"]},
         {"$set": {"phrase_memory": update_memory(player.get("phrase_memory"), recall_used)}},
@@ -1653,6 +1659,7 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/missions/decision")
+@idempotent("missions.decision")
 async def resolve_mission_decision(body: MissionDecisionInput, user: dict = Depends(get_current_user)):
     """Resolve one optional live tactical choice.
 
@@ -1727,7 +1734,12 @@ async def resolve_mission_decision(body: MissionDecisionInput, user: dict = Depe
     }
     if chance_delta:
         update["$inc"] = {"live_chance_delta": chance_delta}
-    await db.missions.update_one({"_id": mission["_id"]}, update)
+    changed = await db.missions.update_one(
+        {"_id": mission["_id"], "player_id": pid, "phase": "operating", "decision.status": "pending"},
+        update,
+    )
+    if changed.modified_count != 1:
+        raise HTTPException(status_code=409, detail="Esta decisão acabou de ser resolvida noutra sessão")
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"heat": new_heat}})
 
     if fatigue_delta and mission.get("member_ids"):
@@ -3051,7 +3063,8 @@ async def rename_property(body: PropertyRenameInput, user: dict = Depends(get_cu
 
 
 @router.post("/properties/optimize")
-async def optimize_properties(user: dict = Depends(get_current_user)):
+@idempotent("properties.optimize")
+async def optimize_properties(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """QI do património (SSS v6): lança as melhorias com melhor retorno real,
     respeitando uma reserva de caixa para o próximo ciclo salarial. Imóveis
     produtivos (laboratórios/lavagem) ordenados por payback (custo ÷ ganho/h
@@ -3112,11 +3125,29 @@ async def optimize_properties(user: dict = Depends(get_current_user)):
         target_level = p["level"] + 1
         duration_s = PROPERTY_UPGRADE_BASE_S + PROPERTY_UPGRADE_PER_LEVEL_S * target_level
         until = (now + timedelta(seconds=duration_s)).isoformat()
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -x["cost"], "stats.properties_upgraded": 1}})
-        await db.properties.update_one({"_id": p["_id"]}, {"$set": {"upgrading_until": until}})
-        player["clean_money"] -= x["cost"]
-        await record_tx(db, pid, "property_upgrade", -x["cost"], "clean", player["clean_money"], f"Melhoria de {p['name']} (otimização)")
-        budget -= x["cost"]
+        fresh_player = await db.players.find_one_and_update(
+            {"_id": player["_id"], "clean_money": {"$gte": x["cost"] + reserve}},
+            {"$inc": {"clean_money": -x["cost"], "stats.properties_upgraded": 1}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not fresh_player:
+            continue
+        changed = await db.properties.update_one(
+            {
+                "_id": p["_id"], "player_id": pid, "level": p["level"],
+                "$or": [{"upgrading_until": None}, {"upgrading_until": {"$exists": False}}, {"upgrading_until": {"$lte": now.isoformat()}}],
+            },
+            {"$set": {"upgrading_until": until}},
+        )
+        if changed.modified_count != 1:
+            await db.players.update_one(
+                {"_id": player["_id"]},
+                {"$inc": {"clean_money": x["cost"], "stats.properties_upgraded": -1}},
+            )
+            continue
+        player["clean_money"] = fresh_player["clean_money"]
+        await record_tx(db, pid, "property_upgrade", -x["cost"], "clean", fresh_player["clean_money"], f"Melhoria de {p['name']} (otimização)")
+        budget = max(0, fresh_player["clean_money"] - reserve)
         actions.append({
             "property": p.get("name", pt["name"]), "to_level": target_level, "cost": x["cost"],
             "payback_h": round(x["payback_h"], 1) if x["payback_h"] else None,
@@ -3223,7 +3254,8 @@ async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
 
 
 @router.post("/hq/upgrade")
-async def upgrade_hq(user: dict = Depends(get_current_user)):
+@idempotent("hq.upgrade")
+async def upgrade_hq(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
     hq = player["hq"]
@@ -3242,12 +3274,18 @@ async def upgrade_hq(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     duration_s = tier["upgrade_duration_s"]
     until = (now + timedelta(seconds=duration_s)).isoformat()
-    await db.players.update_one({"_id": player["_id"]}, {
-        "$inc": {"clean_money": -cost},
-        "$set": {"hq.upgrading_until": until},
-    })
+    fresh_player = await db.players.find_one_and_update(
+        {
+            "_id": player["_id"], "clean_money": {"$gte": cost}, "hq.level": level,
+            "$or": [{"hq.upgrading_until": None}, {"hq.upgrading_until": {"$exists": False}}, {"hq.upgrading_until": {"$lte": now.isoformat()}}],
+        },
+        {"$inc": {"clean_money": -cost}, "$set": {"hq.upgrading_until": until}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh_player:
+        raise HTTPException(status_code=409, detail="O saldo ou o estado do Quartel-General mudou antes da melhoria")
     await add_event(db, pid, "property", f"Quartel-General começou a ser melhorado para nível {target_level} por {cost:,} € — pronto em {round(duration_s / 60, 1)} min.")
-    await record_tx(db, pid, "hq_upgrade", -cost, "clean", player["clean_money"] - cost, f"Melhoria do Quartel-General para nível {target_level}")
+    await record_tx(db, pid, "hq_upgrade", -cost, "clean", fresh_player["clean_money"], f"Melhoria do Quartel-General para nível {target_level}")
     return {"ok": True, "upgrading_until": until}
 
 
@@ -3263,7 +3301,8 @@ async def set_hq_priority(body: PriorityInput, user: dict = Depends(get_current_
 # ---------------- Polícia / economia ----------------
 
 @router.post("/police/bribe")
-async def bribe_police(user: dict = Depends(get_current_user)):
+@idempotent("police.bribe")
+async def bribe_police(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
     if player["heat"] < 10:
@@ -3273,9 +3312,15 @@ async def bribe_police(user: dict = Depends(get_current_user)):
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
     new_heat = max(0.0, player["heat"] - 40)
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.bribes_paid": 1}, "$set": {"heat": new_heat}})
+    fresh_player = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": cost}, "heat": player["heat"]},
+        {"$inc": {"clean_money": -cost, "stats.bribes_paid": 1}, "$set": {"heat": new_heat}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh_player:
+        raise HTTPException(status_code=409, detail="O saldo ou o nível de calor mudou antes do suborno")
     await add_event(db, pid, "police", f"Suborno de {cost:,} € pago. O calor baixou para {round(new_heat)}%.")
-    await record_tx(db, pid, "bribe", -cost, "clean", player["clean_money"] - cost, "Suborno à polícia")
+    await record_tx(db, pid, "bribe", -cost, "clean", fresh_player["clean_money"], "Suborno à polícia")
     return {"cost": cost}
 
 
@@ -3351,6 +3396,7 @@ async def update_settings(body: SettingsUpdateInput, user: dict = Depends(get_cu
 
 
 @router.post("/quests/claim")
+@idempotent("quests.claim")
 async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3362,18 +3408,31 @@ async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_us
     d = QUEST_DEFS.get(q["quest_key"])
     if not d:
         raise HTTPException(status_code=400, detail="Missão desconhecida")
-    # Recompensas dinâmicas SSS v3 — nível × dificuldade × tier adaptativo ×
-    # série diária × execução rápida (mesma fórmula do auto-reclamar).
-    rewards, mult_note = effective_quest_rewards(player, q, d, now_utc())
-    parts = await grant_quest_rewards(db, player, rewards)
-    if mult_note:
-        parts.append(mult_note)
-    # effective_quest_rewards mutou série/desempenho — persistir já.
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "quest_streak": player.get("quest_streak", {}),
-        "quest_perf": player.get("quest_perf", {}),
-    }})
-    await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}})
+    # Reserva por compare-and-set antes de creditar qualquer recompensa.
+    reserved = await db.quests.find_one_and_update(
+        {"_id": q["_id"], "player_id": pid, "status": "completed"},
+        {"$set": {"status": "claiming"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not reserved:
+        raise HTTPException(status_code=409, detail="A recompensa acabou de ser reclamada noutra sessão")
+    try:
+        rewards, mult_note = effective_quest_rewards(player, q, d, now_utc())
+        parts = await grant_quest_rewards(db, player, rewards)
+        if mult_note:
+            parts.append(mult_note)
+        # effective_quest_rewards mutou série/desempenho — persistir já.
+        await db.players.update_one({"_id": player["_id"]}, {"$set": {
+            "quest_streak": player.get("quest_streak", {}),
+            "quest_perf": player.get("quest_perf", {}),
+        }})
+        await db.quests.update_one(
+            {"_id": q["_id"], "status": "claiming"},
+            {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}},
+        )
+    except Exception:
+        await db.quests.update_one({"_id": q["_id"], "status": "claiming"}, {"$set": {"status": "completed"}})
+        raise
     if q["quest_key"] == "c2_front":
         await db.quests.insert_one(make_instance(pid, "dec_informador", now_utc(), player.get("stats", {}), expires_s=3600))
         await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
@@ -3383,7 +3442,8 @@ async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_us
 
 
 @router.post("/quests/claim_all")
-async def claim_all_quests(user: dict = Depends(get_current_user)):
+@idempotent("quests.claim_all")
+async def claim_all_quests(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
     """Reclama TODAS as missões concluídas de uma vez — a mesma fórmula
     dinâmica do claim individual (nível × dificuldade × tier × série ×
     execução rápida), com a série/momentum persistidos uma única vez no fim."""
@@ -3395,13 +3455,29 @@ async def claim_all_quests(user: dict = Depends(get_current_user)):
     if not claimable:
         raise HTTPException(status_code=400, detail="Nenhuma missão concluída por reclamar")
     all_parts = []
+    claimed_count = 0
     for q in claimable:
+        reserved = await db.quests.find_one_and_update(
+            {"_id": q["_id"], "player_id": pid, "status": "completed"},
+            {"$set": {"status": "claiming"}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not reserved:
+            continue
         d = QUEST_DEFS[q["quest_key"]]
-        rewards, mult_note = effective_quest_rewards(player, q, d, now)
-        parts = await grant_quest_rewards(db, player, rewards)
-        if mult_note:
-            parts.append(mult_note)
-        await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
+        try:
+            rewards, mult_note = effective_quest_rewards(player, q, d, now)
+            parts = await grant_quest_rewards(db, player, rewards)
+            if mult_note:
+                parts.append(mult_note)
+            await db.quests.update_one(
+                {"_id": q["_id"], "status": "claiming"},
+                {"$set": {"status": "claimed", "claimed_at": now.isoformat()}},
+            )
+        except Exception:
+            await db.quests.update_one({"_id": q["_id"], "status": "claiming"}, {"$set": {"status": "completed"}})
+            raise
+        claimed_count += 1
         if q["quest_key"] == "c2_front":
             await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
             await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
@@ -3411,12 +3487,15 @@ async def claim_all_quests(user: dict = Depends(get_current_user)):
         "quest_streak": player.get("quest_streak", {}),
         "quest_perf": player.get("quest_perf", {}),
     }})
+    if claimed_count == 0:
+        raise HTTPException(status_code=409, detail="As recompensas foram reclamadas noutra sessão")
     await add_event(db, pid, "success",
-                    f"Recompensas reclamadas — {len(claimable)} contrato(s) fechado(s) de uma vez.")
-    return {"ok": True, "claimed": len(claimable), "rewards": all_parts}
+                    f"Recompensas reclamadas — {claimed_count} contrato(s) fechado(s) de uma vez.")
+    return {"ok": True, "claimed": claimed_count, "rewards": all_parts}
 
 
 @router.post("/quests/choose")
+@idempotent("quests.choose")
 async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3461,17 +3540,38 @@ async def choose_quest(body: QuestChooseInput, user: dict = Depends(get_current_
         chains = list(player.get("pending_chains") or [])
         chains.append({"key": chain["key"], "at": due})
         sets["pending_chains"] = chains
+    reserved = await db.quests.find_one_and_update(
+        {"_id": q["_id"], "player_id": pid, "status": "active"},
+        {"$set": {"status": "resolving"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not reserved:
+        raise HTTPException(status_code=409, detail="Esta decisão acabou de ser tomada noutra sessão")
+
     update = {}
     if inc:
         update["$inc"] = inc
     if sets:
         update["$set"] = sets
+    query = {"_id": player["_id"]}
+    if opt.get("cost_clean"):
+        query["clean_money"] = {"$gte": opt["cost_clean"]}
     if update:
-        await db.players.update_one({"_id": player["_id"]}, update)
-    await db.quests.update_one({"_id": q["_id"]}, {"$set": {
-        "status": "claimed", "choice": body.option, "outcome": res["outcome"],
-        "claimed_at": now_utc().isoformat(),
-    }})
+        fresh_player = await db.players.find_one_and_update(
+            query, update, return_document=ReturnDocument.AFTER
+        )
+        if not fresh_player:
+            await db.quests.update_one({"_id": q["_id"], "status": "resolving"}, {"$set": {"status": "active"}})
+            raise HTTPException(status_code=409, detail="O saldo mudou antes da decisão")
+    finalized = await db.quests.update_one(
+        {"_id": q["_id"], "player_id": pid, "status": "resolving"},
+        {"$set": {
+            "status": "claimed", "choice": body.option, "outcome": res["outcome"],
+            "claimed_at": now_utc().isoformat(),
+        }},
+    )
+    if finalized.modified_count != 1:
+        raise HTTPException(status_code=409, detail="Não foi possível finalizar a decisão")
     await add_event(db, pid, "intel", f"{d['name']}: {res['outcome']}")
     return {"ok": True, "outcome": res["outcome"]}
 
