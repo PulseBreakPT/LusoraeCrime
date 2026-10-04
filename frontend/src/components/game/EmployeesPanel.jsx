@@ -754,12 +754,12 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
           return (
             <>
               <SummaryStrip cols={3} className="mt-2" testId="hr-summary">
+                <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
+                  tip="Fadiga média. Aos 90% um operacional fica indisponível — manda-o descansar (recupera 50)." />
                 <Kpi icon={HeartPulse} label="Moral" value={`${avgMorale}%`} color={goodBarColor(avgMorale)} bar={avgMorale}
                   tip="Moral média do efetivo. Moral baixa aumenta falhas e abandonos — sobe com bónus, promoções e descanso." />
                 <Kpi icon={ShieldCheck} label="Lealdade" value={`${avgLoyalty}%`} color={goodBarColor(avgLoyalty)} bar={avgLoyalty}
                   tip="Lealdade média. Valores baixos aumentam o risco de traições: roubos, fugas de informação e sabotagem." />
-                <Kpi icon={BatteryMedium} label="Fadiga" value={`${avgFatigue}%`} color={fatigueColor(avgFatigue)} bar={avgFatigue}
-                  tip="Fadiga média. Aos 90% um operacional fica indisponível — manda-o descansar (recupera 50)." />
               </SummaryStrip>
               {Object.keys(statusCounts).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1" data-testid="hr-status-chips">
