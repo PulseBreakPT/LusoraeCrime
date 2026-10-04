@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
-import { fmtMoney, fmtDuration } from "../../lib/game";
+import { fmtMoney } from "../../lib/game";
 import {
   Kpi, SummaryStrip, MiniBar, PanelWatermark, SectionHeader,
   InlineRename, PurchaseButton, ConfirmButton, EmptyState,
@@ -13,8 +13,8 @@ import { Input } from "../ui/input";
 import {
   Network, Wallet, PackageOpen, Users, Car, Swords, Warehouse, MapPinned,
   TrendingUp, ShieldCheck, Gauge, Wrench, Fuel, Shield, ClipboardCheck,
-  Crosshair, Plus, Minus, Crown, Building2, Activity, AlertTriangle,
-  Boxes, UserRoundCog, Landmark, Banknote, HeartPulse, RadioTower,
+  Crosshair, Plus, Minus, Crown, Building2,
+  Boxes, UserRoundCog, Landmark, Banknote,
 } from "lucide-react";
 
 const TABS = [
