@@ -99,7 +99,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel sm:max-w-xl" data-testid="street-panel">
+      <SheetContent side="right" className="sub-panel" data-testid="street-panel">
         <SheetHeader>
           <PanelWatermark icon={Radar} />
           <SheetTitle className="flex items-center gap-2 text-white">
