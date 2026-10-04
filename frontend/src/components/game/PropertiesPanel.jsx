@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import {
   fmtMoney, fmtDuration, propertyBenefit, passiveRates, LARGE_PURCHASE_THRESHOLD, matchesSearch,
   propertyTier, propertyStackRank, propertyStackMult, propertyUpgradeCost, propertyMaintPerWeek,
@@ -48,10 +49,14 @@ const LevelDots = ({ level, max, color }) => (
   </Tip>
 );
 
-export const PropertiesPanel = ({ open, onOpenChange }) => {
+export const PropertiesPanel = ({ open, onOpenChange, focusTarget }) => {
   const { state, catalog, serverNow, sellProperty, upgradeProperty, renameProperty, startPlacement, optimizeProperties } = useGame();
   const [query, setQuery] = useState("");
   useTick(open);
+  usePanelFocus(open, focusTarget);
+  useEffect(() => {
+    if (open && focusTarget?.testId?.startsWith("property-card-")) setQuery("");
+  }, [open, focusTarget?.token, focusTarget?.testId]);
   if (!state) return null;
 
   const meta = catalog?.property_meta || {};
