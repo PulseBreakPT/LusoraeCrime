@@ -528,6 +528,9 @@ async def delete_account(body: DeleteAccountInput, response: Response, user: dic
         await db.city_pvp_challenges.delete_many({
             "$or": [{"attacker_id": pid}, {"defender_id": pid}],
         })
+        await db.city_chat_reports.delete_many({
+            "$or": [{"reporter_id": pid}, {"target_player_id": pid}],
+        })
         await db.city_alliances.update_many({"member_ids": pid}, {"$pull": {"member_ids": pid}})
         await db.city_alliances.delete_many({"member_ids": {"$size": 0}})
         await db.players.delete_one({"_id": player["_id"]})
