@@ -577,7 +577,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="employees-panel">
+      <SheetContent side="right" className="sub-panel" data-testid="employees-panel">
         <SheetHeader>
           <PanelWatermark icon={IdCard} />
           <SheetTitle className="flex items-center gap-2 text-white">
