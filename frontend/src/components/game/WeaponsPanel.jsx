@@ -117,7 +117,8 @@ const JamChip = ({ model, condition, meta, testId }) => {
 
 export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
   const {
-    state, catalog, buyWeapon, sellWeapon, repairWeapon, assignWeapon, unassignWeapon, autoAssignWeapon, optimizeWeapons,
+    state, catalog, buyWeapon, sellWeapon, repairWeapon, assignWeapon, unassignWeapon, autoAssignWeapon,
+    optimizeWeapons, repairWeaponsAll,
   } = useGame();
   const [query, setQuery] = useState("");
   useTick(open);
