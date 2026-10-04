@@ -552,6 +552,18 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       ? `ativa por ${daysLeft(org.governance.protection_until, now)} dias`
                       : "inativa · reduz risco de rusga durante 30 dias"}
                   </p>
+                  {intelligence?.governance && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="mb-1 flex justify-between font-mono text-[10px] text-zinc-600"><span>Confiança</span><span>{Math.round(intelligence.governance.trust)}%</span></div>
+                        <MiniBar value={intelligence.governance.trust} color="#34D399" />
+                      </div>
+                      <div>
+                        <div className="mb-1 flex justify-between font-mono text-[10px] text-zinc-600"><span>Exposição</span><span>{Math.round(intelligence.governance.exposure)}%</span></div>
+                        <MiniBar value={intelligence.governance.exposure} color="#F59E0B" />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <PurchaseButton
                   label={`${org.governance?.protection_until && Date.parse(org.governance.protection_until) > now ? "Renovar" : "Ativar"} · ${fmtMoney(protectionCost)}`}
