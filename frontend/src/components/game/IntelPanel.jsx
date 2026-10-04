@@ -1,6 +1,6 @@
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
-import { Tip, PanelKicker, PanelWatermark, EmptyState, SectionHeader } from "./hud";
+import { Tip, PanelWatermark, EmptyState, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -166,7 +166,6 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={BrainCircuit} />
-          <PanelKicker>Rede · Relatórios</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <BrainCircuit size={18} className="text-primary" /> Relatórios
           </SheetTitle>
