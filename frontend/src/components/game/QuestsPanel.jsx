@@ -274,7 +274,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel" data-testid="quests-panel">
+      <SheetContent side="right" className="sub-panel" data-testid="quests-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
           <SheetTitle className="flex items-center gap-2 text-white">
