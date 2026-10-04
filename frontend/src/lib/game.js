@@ -224,8 +224,11 @@ export const CHAPTER_LABELS = {
 export const OPP_URGENT_SECONDS = 120;
 
 export function effectiveSpeed(v) {
-  if (v.condition >= 50) return v.speed;
-  return v.speed * (0.6 + (0.4 * v.condition) / 50);
+  const condition = Math.max(0, Math.min(100, Number(v?.condition ?? 100))) / 100;
+  const conditionFactor = 0.6 + 0.4 * Math.pow(condition, 0.9);
+  const tires = Math.max(0, Math.min(100, Number(v?.tires_pct ?? 100))) / 100;
+  const tireFactor = 0.82 + 0.18 * tires;
+  return Number(v?.speed || 0) * conditionFactor * tireFactor;
 }
 
 export function chanceColor(c) {
@@ -835,7 +838,9 @@ export function passiveRates(state, catalog, now = Date.now()) {
     const t = pt[p.type_key];
     if (!t) return;
     if (p.upgrading_until && Date.parse(p.upgrading_until) > now) return;
-    const factor = (p.condition ?? 100) / 100;
+    const condition = (p.condition ?? 100) / 100;
+    const operations = 1 + Number(p.operations_level || 0) * 0.05 + Math.min(4, (p.staff_employee_ids || []).length) * 0.02;
+    const factor = condition * operations;
     dirtyPerH += (t.dirty_per_h || 0) * p.level * factor;
     launderPerH += (t.launder_per_h || 0) * p.level * factor;
     heatPerH += (t.heat_per_h || 0) * p.level * factor;
@@ -885,6 +890,9 @@ export function teamReadiness(state, catalog, team, { opp = null, now = Date.now
   if (!vehicle) return { ok: false, reason: "Sem veículo" };
   if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > now) {
     return { ok: false, reason: "Veículo indisponível" };
+  }
+  if (vehicle.seized_until && Date.parse(vehicle.seized_until) > now) {
+    return { ok: false, reason: "Veículo apreendido" };
   }
   if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
   if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > now) {
@@ -1340,11 +1348,13 @@ export function vehicleAdequacy(vm, catalog) {
 
 // Espelho de engine.effective_speed: curva contínua da condição
 // (floor + span × (condição/100)^exp) — um veículo a 65% já se ressente.
-export function vehicleSpeedFactor(condition, meta) {
+export function vehicleSpeedFactor(condition, meta, tiresPct = 100) {
   const floor = meta?.speed_floor ?? 0.6;
   const exp = meta?.speed_curve_exp ?? 0.9;
   const c = Math.max(0, Math.min(100, condition ?? 100)) / 100;
-  return floor + (1 - floor) * Math.pow(c, exp);
+  const conditionFactor = floor + (1 - floor) * Math.pow(c, exp);
+  const tires = Math.max(0, Math.min(100, tiresPct ?? 100)) / 100;
+  return conditionFactor * (0.82 + 0.18 * tires);
 }
 
 // ============ QI do Património (SSS v6) — espelhos do motor passivo ============
