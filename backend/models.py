@@ -41,6 +41,7 @@ class Player(BaseDocument):
     quest_perf: dict = {}
     temp_bonus: Optional[dict] = None
     stats: dict = {}
+    records: dict = {}
     hq: Optional[dict] = None
     region: str = ""
     districts: List[dict] = []
