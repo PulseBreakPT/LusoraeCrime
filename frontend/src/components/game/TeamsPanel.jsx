@@ -35,7 +35,7 @@ const useTick = (active) => {
 // Chip do tier da unidade (Recruta/Operacional/Veterana/Lendária) — derivado
 // das operações concluídas; a cor alimenta toda a moldura do cartão.
 const TierChip = ({ tier, missions }) => (
-  <Tip tip={`Unidade ${tier.label} — classificação pela experiência real (${missions} operações concluídas). Os degraus alinham com as rampas do motor: 8 ops = entrosamento em prática, 25 = mestria de categoria, 60 = lenda das ruas.`}>
+  <Tip tip={`Unidade ${tier.label}: ${missions} operações concluídas. A experiência melhora o entrosamento e a mestria da equipa.`}>
     <span
       className="shrink-0 rounded-sm border px-1 py-px font-mono text-[8px] font-bold uppercase tracking-widest"
       style={{ borderColor: `${tier.color}55`, color: tier.color, backgroundColor: `${tier.color}14` }}
@@ -100,7 +100,7 @@ const CohesionBar = ({ team, meta, nowMs, testId }) => {
   const frac = co.max > 0 ? co.pct / co.max : 0;
   return (
     <Tip
-      tip={`Entrosamento do plantel: +${(co.pct * 100).toFixed(1)}% de chance (máx. +${Math.round(co.max * 100)}%). Fórmula do motor: 50% tempo com o plantel estável (${Math.round(co.timeFrac * 100)}%) + 50% operações feitas juntos (${co.missions}/${co.rampMissions}). Mudar membros reinicia ambos os contadores.`}
+      tip={`Entrosamento: +${(co.pct * 100).toFixed(1)}% de chance. Aumenta com tempo de plantel estável e operações feitas em conjunto. Mudar membros reinicia o progresso.`}
       block
     >
       <div data-testid={testId}>
@@ -125,7 +125,7 @@ const FamiliarityRow = ({ team, meta, testId }) => (
       return (
         <Tip
           key={cat}
-          tip={`${SPEC_LABELS[cat] || cat}: ${fam.count} operações concluídas — ${fam.active ? `bónus +${(fam.pct * 100).toFixed(1)}%` : `sem bónus (conta a partir da ${fam.min}.ª)`}${fam.mastery ? " · MESTRIA (máximo atingido)" : ` · mestria às ${fam.ramp}`}. ${isSpec ? "Especialidade desta equipa — bónus adicional de match no motor." : "A equipa enquanto unidade aprende cada tipo de trabalho."}`}
+          tip={`${SPEC_LABELS[cat] || cat}: ${fam.count} operações concluídas — ${fam.active ? `bónus +${(fam.pct * 100).toFixed(1)}%` : `sem bónus (conta a partir da ${fam.min}.ª)`}${fam.mastery ? " · MESTRIA (máximo atingido)" : ` · mestria às ${fam.ramp}`}. ${isSpec ? "Especialidade desta equipa — recebe um bónus adicional." : "A equipa melhora à medida que repete este tipo de trabalho."}`}
           block
         >
           <div className={cn("rounded-sm border px-1 py-0.5", isSpec ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
@@ -149,7 +149,7 @@ const VitalsRow = ({ members, meta, testId }) => {
   const fatigue = Math.round(avg((e) => e.fatigue ?? 0));
   return (
     <div data-testid={testId} className="grid grid-cols-3 gap-x-3">
-      <Tip tip={`Moral média ${morale}% — no motor, moral baixa pesa ×${meta.morale_penalty_asymmetry ?? 1.25} mais do que moral alta ajuda. Bónus pagos e vitórias sobem a moral.`} block>
+      <Tip tip={`Moral média ${morale}%. Moral baixa reduz o desempenho; bónus e vitórias ajudam a recuperar.`} block>
         <div>
           <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
             <span>Moral</span><span style={{ color: goodBarColor(morale) }}>{morale}%</span>
@@ -446,7 +446,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <MomentumChip team={t} meta={teamMeta} testId={`team-momentum-${t.id}`} />
                       {synergy && (
-                        <Tip tip={`Química da equipa: ${synergy.pct >= 0 ? "+" : ""}${(synergy.pct * 100).toFixed(1)}% de chance. Fórmula do motor: 60% cobertura dos atributos-chave da especialidade pelos melhores membros (${Math.round(synergy.coverage * 100)}%) + 40% diversidade de papéis (${Math.round(synergy.diversity * 100)}%). Composições complementares ganham; monoculturas fracas perdem.`}>
+                        <Tip tip={`Química da equipa: ${synergy.pct >= 0 ? "+" : ""}${(synergy.pct * 100).toFixed(1)}% de chance. Equipas com atributos e papéis complementares têm melhor desempenho.`}>
                           <span className={cn("inline-flex items-center gap-0.5 font-mono text-[9px]", synergy.pct >= 0.0005 ? "text-emerald-400" : synergy.pct <= -0.0005 ? "text-amber-400" : "text-zinc-600")}>
                             <FlaskConical size={9} /> química {synergy.pct >= 0 ? "+" : ""}{(synergy.pct * 100).toFixed(1)}%
                           </span>
