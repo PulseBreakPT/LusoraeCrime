@@ -398,6 +398,7 @@ const ensureOrganizationSave = (save) => {
     reserve_cash:25000,
     max_single_spend_pct:.35,
     stock_targets:{},
+    weekly_budgets:{supplies:0,fleet:0,infrastructure:0,territory:0,people:0},
     automation:{enabled:false,auto_restock:false,renew_insurance:false,preventive_service:false},
   };
   save.organization_audit ||= [];
@@ -492,6 +493,13 @@ const guestOrgPolicy=(save)=>({
   reserve_cash:Math.max(0,Number(save.player.organization_policy?.reserve_cash??25000)),
   max_single_spend_pct:clamp(Number(save.player.organization_policy?.max_single_spend_pct??.35),.05,1),
   stock_targets:{...(save.player.organization_policy?.stock_targets||{})},
+  weekly_budgets:{
+    supplies:Math.max(0,Number(save.player.organization_policy?.weekly_budgets?.supplies||0)),
+    fleet:Math.max(0,Number(save.player.organization_policy?.weekly_budgets?.fleet||0)),
+    infrastructure:Math.max(0,Number(save.player.organization_policy?.weekly_budgets?.infrastructure||0)),
+    territory:Math.max(0,Number(save.player.organization_policy?.weekly_budgets?.territory||0)),
+    people:Math.max(0,Number(save.player.organization_policy?.weekly_budgets?.people||0)),
+  },
   automation:{
     enabled:!!save.player.organization_policy?.automation?.enabled,
     auto_restock:!!save.player.organization_policy?.automation?.auto_restock,
@@ -525,6 +533,11 @@ const guestOrgIntelligence=(save)=>{
   const recent=(save.transactions||[]).filter((tx)=>Date.parse(tx.ts||0)>=Date.now()-28*86400000);
   const income=recent.reduce((sum,tx)=>sum+Math.max(0,Number(tx.amount||0)),0);
   const expenses=recent.reduce((sum,tx)=>sum+Math.abs(Math.min(0,Number(tx.amount||0))),0);
+  const budgetKind={supply_buy:"supplies",automation_restock:"supplies",vehicle_service:"fleet",vehicle_tires:"fleet",vehicle_insurance:"fleet",vehicle_inspection:"fleet",automation_insurance:"fleet",automation_service:"fleet",property_module:"infrastructure",department_upgrade:"infrastructure",prestige:"infrastructure",territory_claim:"territory",territory_consolidate:"territory",territory_defend:"territory",protection:"people",organization_event:"people",training:"people",bonus:"people"};
+  const weeklyTx=(save.transactions||[]).filter((tx)=>Date.parse(tx.ts||0)>=Date.now()-7*86400000);
+  const weeklySpend={supplies:0,fleet:0,infrastructure:0,territory:0,people:0};
+  weeklyTx.forEach((entry)=>{const category=budgetKind[entry.kind];if(category&&Number(entry.amount||0)<0)weeklySpend[category]+=Math.abs(Number(entry.amount||0));});
+  const budgets=Object.entries(policy.weekly_budgets||{}).map(([key,limit])=>{const spent=Math.round(weeklySpend[key]||0);return {key,limit:Number(limit||0),spent,remaining:Number(limit||0)>0?Math.max(0,Number(limit)-spent):null,pct:Number(limit||0)>0?Math.round(spent/Number(limit)*1000)/10:null,status:Number(limit||0)<=0?"unlimited":spent>Number(limit)?"over":spent>=Number(limit)*.8?"warning":"ok"};});
   const gross=(save.employees||[]).reduce((sum,e)=>sum+Number(e.salary||0),0);
   const weeklyBurn=Math.max(1,gross*1.2375,expenses/4);
   const runway=Number(save.player.clean_money||0)/weeklyBurn;
@@ -574,7 +587,7 @@ const guestOrgIntelligence=(save)=>{
   Object.entries(org.departments||{}).forEach(([key,cfg])=>{const level=Number(save.player.departments?.[key]||0);deptQuotes[key]={level,next_cost:level>=Number(cfg.max_level||0)?null:Math.trunc(Number(cfg.base_cost||0)*(1+level*.75))};});
   return {
     health:{score:overall,grade:overall>=92?"SSS":overall>=85?"SS":overall>=78?"S":overall>=68?"A":overall>=55?"B":"C",finance:Math.round(financeScore),crew:Math.round(crewScore),fleet:Math.round(fleetScore),logistics:Math.round(logisticsScore),properties:Math.round(propertyScore),territory:Math.round(territoryScore),security:Math.round(securityScore)},
-    finance:{cash:Number(save.player.clean_money||0),weekly_burn:Math.round(weeklyBurn),runway_weeks:Math.round(runway*10)/10,income_28d:Math.round(income),expenses_28d:Math.round(expenses),reserve_cash:policy.reserve_cash,available_above_reserve:Math.max(0,Number(save.player.clean_money||0)-policy.reserve_cash)},
+    finance:{cash:Number(save.player.clean_money||0),weekly_burn:Math.round(weeklyBurn),runway_weeks:Math.round(runway*10)/10,income_28d:Math.round(income),expenses_28d:Math.round(expenses),reserve_cash:policy.reserve_cash,available_above_reserve:Math.max(0,Number(save.player.clean_money||0)-policy.reserve_cash),budgets},
     organization:{score:(save.employees.length*8+save.teams.length*18+save.vehicles.length*6+save.properties.length*22),dimensions:{power:Math.min(100,save.employees.length*8),influence:Math.min(100,territories.length*14),logistics:Math.round(logisticsScore),security:Math.round(securityScore),management:Math.round((financeScore+crewScore+propertyScore)/3)}},
     quotes:{departments:deptQuotes,protection:orgProtectionCost(save),territory_claim:Number(org.territory_tiers?.[1]?.cost||0)},
     storage:{used:Number(orgInventoryUsed(save).toFixed(2)),capacity:orgInventoryCapacity(save),pct:Math.round(orgInventoryUsed(save)/Math.max(1,orgInventoryCapacity(save))*1000)/10},
@@ -1588,6 +1601,7 @@ const mutateGame=(save,path,payload)=>{
         reserve_cash:Math.max(0,Math.min(100000000,Number(p.reserve_cash??25000))),
         max_single_spend_pct:clamp(Number(p.max_single_spend_pct??.35),.05,1),
         stock_targets:Object.fromEntries(Object.entries(p.stock_targets||{}).filter(([key])=>org.supplies?.[key]).map(([key,value])=>[key,Math.max(0,Math.min(10000,Number(value||0)))])),
+        weekly_budgets:Object.fromEntries(["supplies","fleet","infrastructure","territory","people"].map((key)=>[key,Math.max(0,Math.min(100000000,Number(p.weekly_budgets?.[key]||0)))])),
         automation:Object.fromEntries(allowedAuto.map((key)=>[key,!!p.automation?.[key]])),
       };
       return {ok:true,policy:guestOrgPolicy(save)};
