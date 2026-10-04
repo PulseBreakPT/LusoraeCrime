@@ -170,7 +170,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto sub-panel" data-testid="hq-panel">
+      <SheetContent side="right" className="sub-panel" data-testid="hq-panel">
         <SheetHeader>
           <PanelWatermark icon={Landmark} />
           <SheetTitle className="flex items-center gap-2 text-white">
