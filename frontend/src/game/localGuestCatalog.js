@@ -1,4 +1,4 @@
-export const LOCAL_GUEST_SAVE_VERSION = 6;
+export const LOCAL_GUEST_SAVE_VERSION = 7;
 
 export const LOCAL_CATALOG = {
   team_create_cost: 5000,
@@ -257,11 +257,11 @@ export const LOCAL_CATALOG = {
       auto_use_armor:{name:"Usar proteção",default:true},
     },
     departments:{
-      financeiro:{name:"Gabinete Financeiro",unlock_hq:3,base_cost:18000,max_level:3,desc:"Reduz custos fixos não salariais."},
-      rh:{name:"Recursos Humanos",unlock_hq:4,base_cost:22000,max_level:3,desc:"Melhora recrutamento, treino e estabilidade."},
-      logistica:{name:"Logística",unlock_hq:5,base_cost:28000,max_level:3,desc:"Reduz custos logísticos e aumenta armazenamento."},
-      investigacao:{name:"Investigação",unlock_hq:7,base_cost:38000,max_level:3,desc:"Reduz exposição e melhora inteligência territorial."},
-      comunicacoes:{name:"Comunicações",unlock_hq:8,base_cost:45000,max_level:3,desc:"Melhora reorganização e coordenação."},
+      financeiro:{name:"Gabinete Financeiro",unlock_hq:3,base_cost:18000,max_level:5,desc:"Reduz custos fixos não salariais."},
+      rh:{name:"Recursos Humanos",unlock_hq:4,base_cost:22000,max_level:5,desc:"Melhora recrutamento, treino e estabilidade."},
+      logistica:{name:"Logística",unlock_hq:5,base_cost:28000,max_level:5,desc:"Reduz custos logísticos e aumenta armazenamento."},
+      investigacao:{name:"Investigação",unlock_hq:7,base_cost:38000,max_level:5,desc:"Reduz exposição e melhora inteligência territorial."},
+      comunicacoes:{name:"Comunicações",unlock_hq:8,base_cost:45000,max_level:5,desc:"Melhora reorganização e coordenação."},
     },
     territory_tiers:{
       1:{name:"Presença",cost:55000,income_h:180,reward_bonus:.01,defense_weekly:900},
