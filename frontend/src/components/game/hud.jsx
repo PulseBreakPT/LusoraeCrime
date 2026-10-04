@@ -94,13 +94,13 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <Card data-testid={testId} className="sub-kpi h-full rounded-lg sub-card p-2.5 shadow-none">
-      <p className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-        {Icon && <Icon size={10} style={{ color }} />} <span className="truncate">{label}</span>
+    <Card data-testid={testId} className="sub-kpi sub-card flex h-full flex-col items-center rounded-lg p-2.5 text-center shadow-none">
+      <p className="flex w-full items-center justify-center gap-1 text-center text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+        {Icon && <Icon size={10} className="shrink-0" style={{ color }} />} <span className="truncate">{label}</span>
       </p>
-      <p className="mt-1 truncate font-mono text-sm font-bold leading-tight" style={{ color }}>{value}</p>
-      {sub != null && <p className="mt-0.5 truncate font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
-      {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1.5" height="h-0.5" />}
+      <p className="mt-1 w-full truncate text-center font-mono text-sm font-bold leading-tight" style={{ color }}>{value}</p>
+      {sub != null && <p className="mt-0.5 w-full truncate text-center font-mono text-[10px] leading-tight" style={{ color: subColor }}>{sub}</p>}
+      {bar != null && <MiniBar value={bar} color={barColor || color} className="mt-1.5 w-full" height="h-0.5" />}
     </Card>
   </Tip>
 );
