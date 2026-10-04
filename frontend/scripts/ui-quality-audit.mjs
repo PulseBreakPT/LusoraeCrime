@@ -49,7 +49,7 @@ function scanJsx(file, source) {
     add("unfinished-marker", file, source, match.index, match[0], "advisory");
   }
 
-  for (const match of source.matchAll(/<(input|textarea)\b([\s\S]*?)>/gi)) {
+  for (const match of source.matchAll(/<(input|textarea)\b([\s\S]*?)>/g)) {
     const attrs = match[2] || "";
     const cls = attrs.match(/className\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*["'`]([^"'`]*)["'`]\s*\})/);
     const classes = cls?.[1] || cls?.[2] || cls?.[3] || "";
@@ -59,11 +59,11 @@ function scanJsx(file, source) {
     }
   }
 
-  for (const match of source.matchAll(/<img\b([\s\S]*?)>/gi)) {
+  for (const match of source.matchAll(/<img\b([\s\S]*?)>/g)) {
     if (!/\balt\s*=/.test(match[1] || "")) add("image-missing-alt", file, source, match.index, match[0]);
   }
 
-  for (const match of source.matchAll(/<button\b([\s\S]*?)>([\s\S]*?)<\/button>/gi)) {
+  for (const match of source.matchAll(/<button\b([\s\S]*?)>([\s\S]*?)<\/button>/g)) {
     const attrs = match[1] || "";
     const body = match[2] || "";
     if (!/\btype\s*=/.test(attrs)) add("button-missing-type", file, source, match.index, match[0].slice(0, 260));
@@ -88,7 +88,7 @@ function scanJsx(file, source) {
 function scanCss(file, source) {
   metrics.importantDeclarations += (source.match(/!important/g) || []).length;
   metrics.hardcodedHexColors += (source.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
-  metrics.backdropEffects += (source.match(/backdrop-filter|-webkit-backdrop-filter/g) || []).length;
+  metrics.backdropEffects += (source.match(/(?:^|\s)(?:-webkit-)?backdrop-filter\s*:\s*(?!none)[^;]+;/gm) || []).length;
   metrics.infiniteAnimations += (source.match(/animation\s*:[^;\n]*\binfinite\b/g) || []).length;
 
   for (const match of source.matchAll(/font-size\s*:\s*(\d+(?:\.\d+)?)px/g)) {
@@ -144,3 +144,4 @@ const report = {
 };
 
 process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+process.exitCode = findings.some((finding) => finding.severity === "warning") ? 2 : 0;
