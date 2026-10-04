@@ -590,6 +590,8 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
+  const [rosterSort, setRosterSort] = usePreferenceState("empRosterSort", "priority", rememberSort);
+  const [recruitSort, setRecruitSort] = usePreferenceState("empRecruitSort", "recommended", rememberSort);
   const [restAllBusy, setRestAllBusy] = useState(false);
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
   useTick(open);
@@ -610,11 +612,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
   const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
   const weeklyBreakdown = state.weekly_cost_breakdown || {};
   const poolMs = state.player.pool_refresh_at ? Date.parse(state.player.pool_refresh_at) - serverNow() : null;
-
-  const grouped = {};
-  (state.candidates || []).forEach((c) => {
-    (grouped[c.source] = grouped[c.source] || []).push(c);
-  });
 
   const restAllIds = state.employees.filter((e) => e.status === "idle" && e.fatigue >= 15).map((e) => e.id);
   const restAll = async () => {
@@ -642,16 +639,37 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
   const unavailableHidden = hideUnavailable
     ? searched.filter((e) => e.status === "idle" || favoriteEmployeeIds.includes(e.id))
     : searched;
-  // Favoritos sempre no topo; depois disponíveis primeiro (o jogador quer ver
-  // quem pode operar já), indisponíveis por último.
   const sortedEmployees = [...unavailableHidden].sort((a, b) => {
     const favA = favoriteEmployeeIds.includes(a.id) ? 0 : 1;
     const favB = favoriteEmployeeIds.includes(b.id) ? 0 : 1;
     if (favA !== favB) return favA - favB;
-    const rank = (e) => (e.status === "idle" ? 0 : 1);
-    return rank(a) - rank(b);
+
+    if (rosterSort === "name") return a.name.localeCompare(b.name, "pt-PT");
+    if (rosterSort === "fatigue") return b.fatigue - a.fatigue;
+    if (rosterSort === "loyalty") return a.loyalty - b.loyalty;
+    if (rosterSort === "salary") return b.salary - a.salary;
+
+    const statusA = a.status === "idle" ? 0 : 1;
+    const statusB = b.status === "idle" ? 0 : 1;
+    if (statusA !== statusB) return statusA - statusB;
+    if ((a.betrayal_risk || 0) !== (b.betrayal_risk || 0)) return (b.betrayal_risk || 0) - (a.betrayal_risk || 0);
+    return b.fatigue - a.fatigue;
   });
   const hiddenCount = searched.length - unavailableHidden.length;
+
+  const rarityOrder = { comum: 0, raro: 1, elite: 2, lendario: 3 };
+  const candidateRows = (state.candidates || []).map((candidate) => ({
+    c: candidate,
+    assessment: candidateAssessment(candidate, state, catalog),
+    sourceName: catalog.recruit_sources?.[candidate.source]?.name || candidate.source,
+  })).sort((a, b) => {
+    if (recruitSort === "aptitude") return b.assessment.skillScore - a.assessment.skillScore;
+    if (recruitSort === "cost") return a.c.cost - b.c.cost;
+    if (recruitSort === "salary") return a.c.salary - b.c.salary;
+    if (recruitSort === "rarity") return (rarityOrder[b.c.rarity] || 0) - (rarityOrder[a.c.rarity] || 0);
+    return b.assessment.priority - a.assessment.priority || b.assessment.skillScore - a.assessment.skillScore;
+  });
+  const lockedRecruitSources = Object.entries(catalog.recruit_sources || {}).filter(([, source]) => state.player.level < source.min_level);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -760,73 +778,102 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
               <EmptyState
                 icon={IdCard}
                 title="Plantel vazio"
-                sub="As ruas de Lisboa estão cheias de talento à espera de patrão — abre a aba Recrutar."
+                sub="Ainda não tens operacionais. Abre Recrutar para montar o primeiro núcleo da organização."
                 testId="employees-empty"
               />
             ) : (
               <>
-                <div className="flex items-center gap-1.5">
-                  <div className="relative flex-1">
-                    <Search size={11} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600" />
-                    <Input
-                      data-testid="employees-search"
-                      value={query}
-                      onChange={(ev) => setQuery(ev.target.value)}
-                      aria-label="Pesquisar operacionais"
-                      placeholder="Pesquisar operacional..."
-                      className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
-                    />
-                  </div>
+                <div className="relative">
+                  <Search size={12} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                  <Input
+                    data-testid="employees-search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    aria-label="Pesquisar operacionais"
+                    placeholder="Pesquisar por nome ou função..."
+                    className="min-h-11 w-full border-white/10 bg-black/60 pl-8 pr-3 font-mono text-[11px] text-white placeholder:text-zinc-600"
+                  />
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                  <Select value={rosterSort} onValueChange={setRosterSort}>
+                    <SelectTrigger data-testid="employees-sort" className="min-h-10 w-full border-white/10 bg-black/50 font-mono text-[10px] text-zinc-300">
+                      <ArrowUpDown size={11} className="mr-1 shrink-0 text-zinc-500" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="priority">Prioridade</SelectItem>
+                      <SelectItem value="name">Nome</SelectItem>
+                      <SelectItem value="fatigue">Mais cansados</SelectItem>
+                      <SelectItem value="loyalty">Menor lealdade</SelectItem>
+                      <SelectItem value="salary">Maior custo</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Tip tip={canOptimize
-                    ? `Distribui os ${freeIdleCount} operacionais sem equipa pelas ${openTeamsCount} equipas com vagas, procurando a melhor especialização. Não move membros que já estejam numa equipa.`
-                    : freeIdleCount === 0 ? "Nenhum operacional disponível sem equipa para colocar." : "Nenhuma equipa disponível com vagas."}>
-                    <button type="button"
+                    ? `Distribui ${freeIdleCount} operacional(is) sem equipa pelas equipas livres com vagas, respeitando especializações.`
+                    : freeIdleCount === 0 ? "Não tens operacionais livres sem equipa." : "Não existem equipas livres com vagas."}>
+                    <button
+                      type="button"
                       data-testid="employees-optimize"
                       onClick={() => canOptimize && optimizeEmployees()}
                       disabled={!canOptimize}
                       className={cn(
-                        "flex shrink-0 items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                        "flex min-h-10 w-full items-center justify-center gap-1 rounded-md border px-2 font-mono text-[10px] font-bold uppercase transition-colors",
                         canOptimize
-                          ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
-                          : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+                          ? "border-cyan-500/30 bg-cyan-500/[0.08] text-cyan-300 hover:bg-cyan-500/[0.14]"
+                          : "cursor-not-allowed border-white/[0.06] bg-white/[0.02] text-zinc-600"
                       )}
                     >
                       <Sparkles size={11} /> Otimizar
                     </button>
                   </Tip>
-                  <Tip tip={hideUnavailable ? "A mostrar só disponíveis (e favoritos) — clica para ver todos." : "A mostrar todos — clica para esconder indisponíveis."}>
-                    <Button
-                      data-testid="employees-toggle-unavailable"
-                      variant="outline"
-                      onClick={() => setHideUnavailable(!hideUnavailable)}
-                      className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
-                    >
-                      {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
-                      {hideUnavailable && hiddenCount > 0 ? ` +${hiddenCount}` : ""}
-                    </Button>
-                  </Tip>
-                  {restAllIds.length > 0 && (
-                    <Tip tip={`Manda descansar todos os operacionais disponíveis com fadiga (${restAllIds.length}) — cada um recupera 50 de fadiga e +5 de moral.`}>
-                      <Button
-                        data-testid="employees-rest-all"
-                        variant="outline"
-                        onClick={restAll}
-                        disabled={restAllBusy}
-                        aria-busy={restAllBusy}
-                        aria-label={`Descansar ${restAllIds.length} operacionais`}
-                        className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-300 hover:bg-white/5"
-                      >
-                        {restAllBusy ? <Loader2 size={11} className="animate-spin" /> : <BedDouble size={11} />} {restAllIds.length}
-                      </Button>
-                    </Tip>
-                  )}
+
+                  <Button
+                    data-testid="employees-toggle-unavailable"
+                    variant="outline"
+                    onClick={() => setHideUnavailable(!hideUnavailable)}
+                    className="min-h-10 w-full gap-1 border-white/10 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
+                  >
+                    {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
+                    {hideUnavailable ? `Disponíveis${hiddenCount > 0 ? ` +${hiddenCount}` : ""}` : "Todos"}
+                  </Button>
+
+                  <Button
+                    data-testid="employees-rest-all"
+                    variant="outline"
+                    onClick={restAll}
+                    disabled={restAllBusy || restAllIds.length === 0}
+                    aria-busy={restAllBusy}
+                    className="min-h-10 w-full gap-1 border-white/10 font-mono text-[10px] text-amber-300 hover:bg-white/5 disabled:text-zinc-600"
+                  >
+                    {restAllBusy ? <Loader2 size={11} className="animate-spin" /> : <BedDouble size={11} />}
+                    Descansar {restAllIds.length}
+                  </Button>
                 </div>
-                <div className="mt-2 flex flex-col gap-2" data-testid="employees-list">
+
+                <SectionHeader
+                  icon={IdCard}
+                  title="Plantel"
+                  meta={`${sortedEmployees.length}/${state.employees.length}`}
+                  className="mt-4"
+                />
+
+                <div className="flex flex-col gap-2" data-testid="employees-list">
                   {sortedEmployees.length === 0 && (
-                    <p className="col-span-full font-mono text-[11px] text-zinc-600">Ninguém no plantel bate certo com esses filtros — limpa-os e tenta de novo.</p>
+                    <Card className="border-white/[0.06] bg-white/[0.02] p-3 shadow-none">
+                      <p className="font-mono text-[11px] text-zinc-500">Nenhum operacional corresponde à pesquisa e aos filtros atuais.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setQuery(""); setHideUnavailable(false); }}
+                        className="mt-2 font-mono text-[10px] text-cyan-300"
+                      >
+                        Limpar filtros
+                      </button>
+                    </Card>
                   )}
-                  {sortedEmployees.map((e) => (
-                    <EmployeeCard key={e.id} e={e} onNavigate={onNavigate} />
+                  {sortedEmployees.map((employee) => (
+                    <EmployeeCard key={employee.id} e={employee} onNavigate={onNavigate} />
                   ))}
                 </div>
               </>
@@ -836,50 +883,106 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
 
         {tab === "recruit" && (
           <div className="mt-3" data-testid="recruitment-list">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="font-mono text-[10px] text-zinc-500">
-                Novos contactos em <span className="text-white">{poolMs !== null ? fmtDuration(Math.max(0, poolMs / 1000)) : "—"}</span>
-              </p>
+            <SummaryStrip cols={3} testId="recruitment-summary">
+              <Kpi
+                icon={UserPlus}
+                label="Contactos"
+                value={candidateRows.length}
+                color={candidateRows.length > 0 ? "#38BDF8" : "#71717A"}
+                tip="Candidatos atualmente disponíveis para contratação."
+              />
+              <Kpi
+                icon={UserCheck}
+                label="Capacidade"
+                value={`${caps.used}/${caps.max}`}
+                color={capFull ? "#EF4444" : "#34D399"}
+                tip="Operacionais contratados face à capacidade total dos teus esconderijos."
+              />
+              <Kpi
+                icon={RefreshCw}
+                label="Renovação"
+                value={poolMs !== null ? fmtDuration(Math.max(0, poolMs / 1000)) : "—"}
+                color="#F59E0B"
+                tip="Tempo até a rede de contactos poder ser renovada naturalmente."
+              />
+            </SummaryStrip>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Select value={recruitSort} onValueChange={setRecruitSort}>
+                <SelectTrigger data-testid="recruit-sort" className="min-h-11 w-full border-white/10 bg-black/50 font-mono text-[10px] text-zinc-300">
+                  <ArrowUpDown size={11} className="mr-1 shrink-0 text-zinc-500" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recommended">Recomendados para a organização</SelectItem>
+                  <SelectItem value="aptitude">Maior aptidão</SelectItem>
+                  <SelectItem value="cost">Menor custo de entrada</SelectItem>
+                  <SelectItem value="salary">Menor custo semanal</SelectItem>
+                  <SelectItem value="rarity">Maior raridade</SelectItem>
+                </SelectContent>
+              </Select>
+
               <PurchaseButton
                 testId="refresh-pool-btn"
                 icon={RefreshCw}
-                label={`Novos contactos ${fmtMoney(catalog.hr_costs.pool_refresh)}`}
+                label={`Renovar · ${fmtMoney(catalog.hr_costs.pool_refresh)}`}
                 can={state.player.clean_money >= catalog.hr_costs.pool_refresh}
-                blockedReasons={["Dinheiro insuficiente."]}
-                availableTip="Gera uma nova lista de candidatos a recrutar."
+                blockedReasons={state.player.clean_money < catalog.hr_costs.pool_refresh ? ["Dinheiro insuficiente."] : []}
+                availableTip="Substitui a lista atual por novos contactos. Os candidatos atuais desaparecem."
+                requireConfirm
                 onConfirm={() => refreshPool()}
-                className="w-auto shrink-0"
+                className="w-full sm:w-auto"
               />
             </div>
 
-            {Object.entries(catalog.recruit_sources).map(([key, src]) => {
-              const locked = state.player.level < src.min_level;
-              const cands = grouped[key] || [];
-              // Secções desbloqueadas e sem candidatos colapsam-se sozinhas — só as
-              // bloqueadas ficam sempre visíveis (mostram o que falta desbloquear).
-              if (!locked && cands.length === 0) return null;
-              return (
-                <div key={key} className="mb-4">
-                  <h3 className="mb-1.5 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    {src.name}
-                    {locked && (
-                      <span className="flex items-center gap-0.5 font-mono text-[10px] text-amber-400">
-                        <Lock size={9} /> Nível {src.min_level}
+            <Card className="mt-2 border-cyan-500/10 bg-cyan-500/[0.025] px-3 py-2 shadow-none">
+              <p className="font-mono text-[10px] leading-relaxed text-zinc-500">
+                <span className="font-bold text-cyan-300">Recomendados</span> considera aptidão nos atributos da função, talentos e vagas compatíveis nas tuas equipas. O custo semanal apresentado já inclui TSU patronal.
+              </p>
+            </Card>
+
+            <SectionHeader
+              icon={UserPlus}
+              title="Candidatos disponíveis"
+              meta={candidateRows.length}
+              className="mt-4"
+            />
+
+            {candidateRows.length === 0 ? (
+              <EmptyState
+                icon={UserPlus}
+                title="Sem candidatos"
+                sub="Renova a rede de contactos para gerar uma nova lista."
+                testId="recruitment-empty"
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {candidateRows.map((row) => (
+                  <CandidateCard
+                    key={row.c.id}
+                    c={row.c}
+                    assessment={row.assessment}
+                    sourceName={row.sourceName}
+                  />
+                ))}
+              </div>
+            )}
+
+            {lockedRecruitSources.length > 0 && (
+              <div className="mt-5">
+                <SectionHeader icon={Lock} title="Próximas fontes" />
+                <div className="space-y-1.5">
+                  {lockedRecruitSources.map(([key, source]) => (
+                    <div key={key} className="flex items-center justify-between rounded-md border border-white/[0.06] bg-black/20 px-3 py-2">
+                      <span className="font-mono text-[10px] text-zinc-500">{source.name}</span>
+                      <span className="flex items-center gap-1 font-mono text-[10px] text-amber-400">
+                        <Lock size={9} /> Nível {source.min_level}
                       </span>
-                    )}
-                  </h3>
-                  {locked ? (
-                    <p className="font-mono text-[10px] text-zinc-600">Sobe de nível para desbloquear esta fonte de recrutamento.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-                      {cands.map((c) => (
-                        <CandidateCard key={c.id} c={c} />
-                      ))}
                     </div>
-                  )}
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
       </SheetContent>
