@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus } from "../../lib/game";
-import { Tip, MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, MiniBar, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -66,7 +66,6 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Building2} />
-          <PanelKicker>Rede · Visão Geral</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Building2 size={18} className="text-primary" /> {p.org_name}
           </SheetTitle>
