@@ -51,7 +51,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const {
     state, catalog, serverNow,
     buySupply, sellSupply,
-    renameTeam, setTeamDoctrine, setTeamPolicies, setTeamLoadout, dissolveTeam,
+    renameTeam, setTeamDoctrine, setTeamPolicies, setTeamLoadout, applyTeamPreset, dissolveTeam,
     reloadWeapon, upgradeWeaponMod,
     serviceVehicle, replaceVehicleTires, insureVehicle, inspectVehicle,
     upgradePropertyModule, assignPropertyStaff, upgradeDepartment,
@@ -131,6 +131,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const ammoMap = orgCatalog.weapon_ammo || {};
   const upgradeCatalog = orgCatalog.weapon_upgrades || {};
   const doctrines = orgCatalog.team_doctrines || {};
+  const teamPresets = orgCatalog.team_presets || {};
   const departmentCatalog = orgCatalog.departments || {};
   const territoryTiers = orgCatalog.territory_tiers || {};
   const propertyModules = orgCatalog.property_modules || {};
@@ -166,6 +167,17 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   );
 
   if (!state || !catalog) return null;
+
+  const handleTeamPreset = async (teamId, presetKey) => {
+    const result = await applyTeamPreset(teamId, presetKey);
+    if (result?.ok && result.data) {
+      setLoadouts((prev) => ({ ...prev, [teamId]: { ...(result.data.loadout || {}) } }));
+      setAbortThreshold((prev) => ({
+        ...prev,
+        [teamId]: Number(result.data.policies?.abort_below_pct || 0),
+      }));
+    }
+  };
 
   const setLoadoutQty = (teamId, key, checked) => {
     setLoadouts((prev) => {
@@ -663,6 +675,24 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       disabled={team.status !== "idle"}
                       onConfirm={() => dissolveTeam(team.id)}
                     />
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 font-mono text-[10px] uppercase text-zinc-500">Preset operacional</p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {Object.entries(teamPresets).map(([presetKey, preset]) => (
+                        <button
+                          type="button"
+                          key={presetKey}
+                          disabled={team.status !== "idle"}
+                          title={preset.desc}
+                          onClick={() => handleTeamPreset(team.id, presetKey)}
+                          className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 font-mono text-[10px] text-zinc-400 transition hover:border-sky-400/30 hover:text-sky-200 disabled:opacity-40"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
