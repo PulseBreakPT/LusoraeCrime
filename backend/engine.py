@@ -1889,10 +1889,14 @@ def _apply_outcome(player, m, outcome):
         heat_mult *= LUXURY_HEAT_MULT
     if m.get("weapon_loud") and t["category"] in DISCREET_CATEGORIES:
         heat_mult *= WEAPON_LOUD_HEAT_MULT
+    # Rotating world pulse is persisted with the mission at dispatch so a
+    # four-hour window cannot change underneath an operation already running.
+    heat_mult *= float((m.get("world_pulse") or {}).get("applied_heat_mult", 1.0) or 1.0)
+    decision_reward_mult = float(m.get("decision_reward_mult", 1.0) or 1.0)
     if outcome == "success":
         # Money is *not* credited here anymore. Store as pending reward — paid on arrival at HQ
         # if the police chase (if any) is escaped.
-        reward = t["reward"]
+        reward = int(t["reward"] * decision_reward_mult)
         # Pequeno imprevisto: saque adicional aleatório.
         if random.random() < BONUS_LOOT_CHANCE:
             bonus_pct = random.uniform(0.02, BONUS_LOOT_MAX_PCT)
@@ -1913,7 +1917,7 @@ def _apply_outcome(player, m, outcome):
         # Sucesso parcial (SSS v3): a equipa abortou a meio mas salvou parte do
         # saque — paga menos, faz mais barulho e a polícia fica mais desconfiada.
         frac = random.uniform(PARTIAL_REWARD_MIN, PARTIAL_REWARD_MAX)
-        m["pending_reward"] = int(t["reward"] * frac)
+        m["pending_reward"] = int(t["reward"] * decision_reward_mult * frac)
         m["pending_pays"] = t["pays"]
         m["partial_fraction"] = round(frac, 2)
         base_rep = m.get("reward_reputation", t["respect"])
