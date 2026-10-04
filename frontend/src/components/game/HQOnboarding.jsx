@@ -86,7 +86,7 @@ export default function HQOnboarding() {
     try {
       const { data } = await api.post("/game/hq/place", { lat: point.lat, lng: point.lng }, { timeout: 20000 });
       const where = data?.hq?.name || "novo território";
-      toast.success(`${where} estabelecido — a rede está a mapear as zonas de operação.`);
+      toast.success(`${where} estabelecido.`);
       await refresh();
     } catch (e) {
       const status = e.response?.status;
