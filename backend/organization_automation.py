@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from math import ceil
 
-from organization_intelligence import organization_policy
+from organization_intelligence import organization_policy, weekly_budget_spend
 from organization_systems import (
     SUPPLY_CATALOG, VEHICLE_LIFECYCLE,
     inventory_capacity, inventory_used, normalize_inventory,
@@ -45,7 +45,19 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
     inventory = normalize_inventory(player)
     cash = int(player.get("clean_money", 0) or 0)
     reserve = int(policy["reserve_cash"])
+    recent_transactions = await db.transactions.find({"player_id": pid}).sort("ts", -1).to_list(1000)
+    budget_spend = weekly_budget_spend(recent_transactions, now)
+    budget_limits = policy.get("weekly_budgets") or {}
     actions = []
+
+    def budget_allows(category, cost):
+        limit = int(budget_limits.get(category, 0) or 0)
+        if limit <= 0:
+            return True
+        return int(budget_spend.get(category, 0) or 0) + int(cost) <= limit
+
+    def consume_budget(category, cost):
+        budget_spend[category] = int(budget_spend.get(category, 0) or 0) + int(cost)
 
     async def spend(amount, inc=None):
         nonlocal cash
@@ -92,8 +104,11 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
                 continue
             cost = max(1, int(cfg["price"] * packs * supply_cost_multiplier(player, now)))
             units = packs * pack
+            if not budget_allows("supplies", cost):
+                continue
             if not await spend(cost, {f"inventory.{key}": units}):
                 continue
+            consume_budget("supplies", cost)
             inventory[key] = current + units
             player.setdefault("inventory", {})[key] = inventory[key]
             actions.append({"type": "restock", "item_key": key, "units": units, "cost": cost})
@@ -108,8 +123,11 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
             if until and until - now > timedelta(days=3):
                 continue
             cost = max(80, int(float(vehicle.get("price", 0) or 0) * VEHICLE_LIFECYCLE["insurance_week_pct"] * 4))
+            if not budget_allows("fleet", cost):
+                continue
             if not await spend(cost):
                 continue
+            consume_budget("fleet", cost)
             new_until = now + timedelta(days=VEHICLE_LIFECYCLE["insurance_days"])
             await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"insurance_until": new_until.isoformat()}})
             actions.append({"type": "insurance", "vehicle_id": str(vehicle["_id"]), "name": vehicle.get("name"), "cost": cost})
@@ -139,8 +157,11 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
                 inc["inventory.service_fluids"] = -1
             if use_parts:
                 inc["inventory.vehicle_parts"] = -1
+            if not budget_allows("fleet", cost):
+                continue
             if not await spend(cost, inc):
                 continue
+            consume_budget("fleet", cost)
             if use_fluids:
                 inventory["service_fluids"] -= 1
                 player.setdefault("inventory", {})["service_fluids"] = inventory["service_fluids"]
@@ -179,4 +200,7 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
             "result": {"actions": actions, "cash_after": cash},
             "ts": now.isoformat(),
         })
-    return {"ok": True, "actions": actions, "cash_after": cash, "reserve_cash": reserve}
+    return {
+        "ok": True, "actions": actions, "cash_after": cash, "reserve_cash": reserve,
+        "weekly_budget_spend": budget_spend,
+    }
