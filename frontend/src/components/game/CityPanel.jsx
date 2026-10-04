@@ -142,7 +142,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
           <TabsList className="grid h-auto w-full grid-cols-5 gap-1 bg-black/40 p-1">
             {TABS.map(([key, label, Icon]) => (
-              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[9px] uppercase data-[state=active]:bg-red-600 data-[state=active]:text-white">
+              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] uppercase data-[state=active]:bg-red-600 data-[state=active]:text-white">
                 <Icon size={11} /><span className="hidden min-[430px]:inline">{label}</span>
               </TabsTrigger>
             ))}
@@ -180,12 +180,12 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{world?.event?.description}</p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {Object.entries(world?.modifiers?.chance || {}).map(([key, value]) => (
-                          <Badge key={key} variant="outline" className="border-white/10 font-mono text-[9px] text-zinc-400">
+                          <Badge key={key} variant="outline" className="border-white/10 font-mono text-[10px] text-zinc-400">
                             {key} {pct(value)}
                           </Badge>
                         ))}
-                        <Badge variant="outline" className="border-white/10 font-mono text-[9px] text-zinc-400">recompensa {pct((world?.modifiers?.reward_mult || 1) - 1)}</Badge>
-                        <Badge variant="outline" className="border-white/10 font-mono text-[9px] text-zinc-400">calor {pct((world?.modifiers?.heat_mult || 1) - 1)}</Badge>
+                        <Badge variant="outline" className="border-white/10 font-mono text-[10px] text-zinc-400">recompensa {pct((world?.modifiers?.reward_mult || 1) - 1)}</Badge>
+                        <Badge variant="outline" className="border-white/10 font-mono text-[10px] text-zinc-400">calor {pct((world?.modifiers?.heat_mult || 1) - 1)}</Badge>
                       </div>
                     </div>
                   </div>
@@ -195,7 +195,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-white"><Clock3 size={13} className="text-sky-400" /> Calendário da cidade</p>
                   <div className="space-y-1">
                     {(city.calendar || []).slice(0, 5).map((slot) => (
-                      <div key={`${slot.key}-${slot.starts_at}`} className={`flex items-center gap-2 rounded-md px-2 py-1.5 font-mono text-[9px] ${slot.active ? "bg-sky-500/10 text-sky-200" : "bg-white/[0.025] text-zinc-500"}`}>
+                      <div key={`${slot.key}-${slot.starts_at}`} className={`flex items-center gap-2 rounded-md px-2 py-1.5 font-mono text-[10px] ${slot.active ? "bg-sky-500/10 text-sky-200" : "bg-white/[0.025] text-zinc-500"}`}>
                         <span className="w-14 shrink-0">{slot.active ? "AGORA" : new Date(slot.starts_at).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" })}</span>
                         <span className="min-w-0 flex-1 truncate">{slot.name}</span>
                         <span className="uppercase text-zinc-600">{slot.severity}</span>
@@ -249,7 +249,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-white">{item.headline}</p>
                         <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{item.body}</p>
-                        <p className="mt-1 font-mono text-[9px] uppercase text-zinc-600">{item.kind} · {new Date(item.ts).toLocaleString("pt-PT")}</p>
+                        <p className="mt-1 font-mono text-[10px] uppercase text-zinc-600">{item.kind} · {new Date(item.ts).toLocaleString("pt-PT")}</p>
                       </div>
                     </div>
                   </Card>
@@ -266,11 +266,11 @@ export const CityPanel = ({ open, onOpenChange }) => {
                         <p className="truncate text-sm font-bold text-white">{rival.name}</p>
                         <p className="font-mono text-[10px] text-zinc-500">{rival.style} · foco {rival.focus} · relação {rival.relation}</p>
                       </div>
-                      <Badge variant="outline" className={`shrink-0 font-mono text-[9px] ${rival.threat >= 65 ? "border-red-500/30 text-red-300" : rival.threat >= 35 ? "border-amber-500/30 text-amber-300" : "border-emerald-500/30 text-emerald-300"}`}>
+                      <Badge variant="outline" className={`shrink-0 font-mono text-[10px] ${rival.threat >= 65 ? "border-red-500/30 text-red-300" : rival.threat >= 35 ? "border-amber-500/30 text-amber-300" : "border-emerald-500/30 text-emerald-300"}`}>
                         ameaça {rival.threat}
                       </Badge>
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-[9px] text-zinc-500">
+                    <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-[10px] text-zinc-500">
                       <span>Poder <b className="text-zinc-300">{rival.power}</b></span>
                       <span>Hostilidade <b className="text-zinc-300">{rival.hostility}</b></span>
                       <span>Intel <b className="text-zinc-300">{rival.intel}</b></span>
@@ -309,7 +309,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       <Card key={b.id} className="sub-card p-3 shadow-none">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="text-xs font-bold text-white">{b.name} <span className="font-mono text-[9px] text-zinc-500">LV {b.level}</span></p>
+                            <p className="text-xs font-bold text-white">{b.name} <span className="font-mono text-[10px] text-zinc-500">LV {b.level}</span></p>
                             <p className="mt-1 font-mono text-[10px] text-zinc-500">{fmtMoney(b.projection?.clean)} + {fmtMoney(b.projection?.dirty)} por recolher · segurança {b.security}</p>
                           </div>
                           <ActionButton disabled={!!busy || b.level >= Number(b.config?.max_level || 5)} onClick={() => act(`upgrade-${b.id}`, "businesses/upgrade", { business_id:b.id }, `${b.name} melhorado`)}>
@@ -356,7 +356,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
 
                   {(city.social?.pvp_challenges || []).filter((c) => c.defender_id && c.status === "pending").length > 0 && (
                     <div className="mt-3 space-y-1 border-t border-white/[0.06] pt-2">
-                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">Desafios pendentes</p>
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Desafios pendentes</p>
                       {(city.social?.pvp_challenges || []).filter((c) => c.status === "pending").map((challenge) => (
                         <div key={challenge.id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-2">
                           <span className="min-w-0 flex-1 truncate text-[10px] text-zinc-300">
@@ -386,12 +386,12 @@ export const CityPanel = ({ open, onOpenChange }) => {
 
                   {!!city.social?.pvp_opt_in && (city.social?.pvp_players || []).length > 0 && (
                     <div className="mt-3 space-y-1 border-t border-white/[0.06] pt-2">
-                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">Organizações disponíveis</p>
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Organizações disponíveis</p>
                       {(city.social?.pvp_players || []).slice(0, 8).map((player) => (
                         <div key={player.player_id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-2">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[10px] font-bold text-zinc-200">{player.org_name}</p>
-                            <p className="font-mono text-[9px] text-zinc-600">LV {player.level} · {nfmt(player.respect)} respeito</p>
+                            <p className="font-mono text-[10px] text-zinc-600">LV {player.level} · {nfmt(player.respect)} respeito</p>
                           </div>
                           <ActionButton
                             tone="danger"
