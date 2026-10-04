@@ -16,7 +16,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/35 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
+      "fixed inset-0 z-50 bg-black/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
       className
     )}
     {...props}
@@ -51,7 +51,7 @@ const SheetContent = React.forwardRef(({ side = "right", className, children, ..
     <SheetOverlay />
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), side === "right" && "sub-sheet-panel", className)} {...props}>
       <SheetPrimitive.Close
-        className="absolute right-3.5 top-3.5 z-30 flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-[#151519] p-0 text-zinc-500 transition-colors hover:border-white/15 hover:bg-[#1b1b20] hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/40 disabled:pointer-events-none sm:right-4">
+        className="sub-sheet-close absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-transparent p-0 text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white focus:outline-none focus:ring-1 focus:ring-white/20 disabled:pointer-events-none sm:right-4">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
@@ -69,7 +69,7 @@ const SheetHeader = ({
 }) => (
   <div
     className={cn(
-      "sticky top-0 z-20 -mx-4 mb-4 flex flex-col space-y-1 border-b border-white/[0.075] bg-[#0c0c0f] px-4 pb-4 pr-14 pt-5 text-left shadow-[0_10px_24px_rgba(0,0,0,0.18)] sm:-mx-6 sm:px-6 sm:pr-16",
+      "sticky top-0 z-20 -mx-4 mb-3 flex flex-col space-y-1 border-b border-white/[0.065] bg-[#0b0b0e] px-4 pb-3.5 pr-12 pt-4 text-left sm:-mx-6 sm:px-6 sm:pr-14",
       className
     )}
     {...props} />
@@ -89,7 +89,7 @@ SheetFooter.displayName = "SheetFooter"
 const SheetTitle = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Title
     ref={ref}
-    className={cn("sub-sheet-title font-display text-xl font-bold uppercase tracking-[0.055em] text-foreground", className)}
+    className={cn("sub-sheet-title font-display text-[17px] font-bold uppercase tracking-[0.04em] text-foreground sm:text-lg", className)}
     {...props} />
 ))
 SheetTitle.displayName = SheetPrimitive.Title.displayName
@@ -97,7 +97,7 @@ SheetTitle.displayName = SheetPrimitive.Title.displayName
 const SheetDescription = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Description
     ref={ref}
-    className={cn("max-w-[34rem] text-[11px] leading-relaxed text-muted-foreground", className)}
+    className={cn("sub-sheet-description max-w-[34rem] text-[10.5px] leading-relaxed text-muted-foreground", className)}
     {...props} />
 ))
 SheetDescription.displayName = SheetPrimitive.Description.displayName
