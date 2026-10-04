@@ -88,7 +88,8 @@ function scanJsx(file, source) {
 function scanCss(file, source) {
   metrics.importantDeclarations += (source.match(/!important/g) || []).length;
   metrics.hardcodedHexColors += (source.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
-  metrics.backdropEffects += [...source.matchAll(/(?:^|\s)(?:-webkit-)?backdrop-filter\s*:\s*([^;]+);/gm)]\n    .filter((match) => match[1].trim() !== "none").length;
+  metrics.backdropEffects += [...source.matchAll(/(?:^|\s)(?:-webkit-)?backdrop-filter\s*:\s*([^;]+);/gm)]
+    .filter((match) => match[1].trim() !== "none").length;
   metrics.infiniteAnimations += (source.match(/animation\s*:[^;\n]*\binfinite\b/g) || []).length;
 
   for (const match of source.matchAll(/font-size\s*:\s*(\d+(?:\.\d+)?)px/g)) {
