@@ -221,3 +221,65 @@ def ensure_employee_profile(emp: dict) -> dict:
     emp.setdefault("sentence", None)
     emp.setdefault("relations", {})
     return emp
+
+
+def fixed_cost_multiplier(player: dict) -> float:
+    """Gabinete Financeiro: reduz apenas custos fixos operacionais, nunca salários/TSU."""
+    return max(0.88, 1.0 - department_level(player, "financeiro") * 0.04)
+
+
+def logistics_cost_multiplier(player: dict) -> float:
+    return max(0.82, 1.0 - department_level(player, "logistica") * 0.06)
+
+
+def raid_risk_multiplier(player: dict, properties: list[dict]) -> float:
+    investigation = max(0.70, 1.0 - department_level(player, "investigacao") * 0.10)
+    return investigation * property_security_factor(properties)
+
+
+def loadout_effect(loadout: dict, category: str) -> dict:
+    loadout = loadout or {}
+    chance = 0.0
+    heat = 1.0
+    injury = 1.0
+    if loadout.get("surveillance_kit"):
+        chance += 0.012
+    if loadout.get("electronics_kit") and category == "tecnica":
+        chance += 0.025
+    if loadout.get("disguise_kit") and category in {"tecnica", "influencia"}:
+        chance += 0.02
+        heat *= 0.92
+    if loadout.get("entry_tools") and category in {"assalto", "especial"}:
+        chance += 0.018
+    if loadout.get("burner_phones"):
+        heat *= 0.95
+    if loadout.get("evidence_cleanup"):
+        heat *= 0.86
+    if loadout.get("medical_kit"):
+        injury *= 0.72
+    if loadout.get("body_armor"):
+        injury *= 0.78
+        heat *= 1.02
+    return {"chance": min(0.08, chance), "heat": max(0.65, heat), "injury": max(0.45, injury)}
+
+
+def apply_weapon_upgrades(model: dict, weapon: dict | None) -> dict:
+    result = dict(model or {})
+    for installed in (weapon or {}).get("upgrades") or []:
+        cfg = WEAPON_UPGRADES.get(installed.get("key"))
+        if not cfg:
+            continue
+        for stat in ("reliability", "use_speed", "accuracy", "range", "discretion", "power", "durability", "weight"):
+            if stat in cfg:
+                result[stat] = max(0, float(result.get(stat, 0) or 0) + float(cfg[stat]))
+    return result
+
+
+def weapon_ammo_status(model_key: str, model: dict, weapon: dict) -> dict:
+    ammo_key = WEAPON_AMMO.get(model_key)
+    capacity = max(0, int((model or {}).get("magazine_capacity", 0) or 0))
+    if ammo_key is None:
+        return {"ammo_key": None, "capacity": capacity, "loaded": capacity, "fraction": 1.0}
+    loaded = max(0, min(capacity, int((weapon or {}).get("ammo_loaded", 0) or 0)))
+    fraction = loaded / max(1, capacity)
+    return {"ammo_key": ammo_key, "capacity": capacity, "loaded": loaded, "fraction": fraction}
