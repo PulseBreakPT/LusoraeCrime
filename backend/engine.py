@@ -120,6 +120,7 @@ from organization_systems import (
     territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
     VEHICLE_LIFECYCLE, INJURY_SEVERITIES, ensure_employee_profile,
     prestige_effects, department_level, property_operations_factor, rival_profile, property_staff_profile,
+    organization_specialization_effects,
 )
 
 logger = logging.getLogger(__name__)
@@ -3109,6 +3110,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
     launder_rate = 0
     # Químicos na equipa tornam os laboratórios mais produtivos.
     prestige = prestige_effects(player)
+    specialization = organization_specialization_effects(player)
     lab_mult = 1 + bonuses.get("lab_boost", 0) + float(prestige.get("lab_bonus", 0.0))
     # O Quartel-General melhora a eficiência de todas as propriedades: mais
     # produção/lavagem passiva e menos calor gerado pelas ilegais.
@@ -3124,14 +3126,14 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
         pt = PROPERTY_TYPES[p["type_key"]]
         factor = property_condition_factor(p) * property_operations_factor(p)
         if pt.get("dirty_per_h"):
-            rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult * hq_income_mult
+            rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult * hq_income_mult * float(specialization.get("property_income_mult", 1.0) or 1.0)
             share = rate * hours
             dirty_rate += rate
             await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_dirty_generated": share}})
         if pt.get("heat_per_h"):
             heat_rate += pt["heat_per_h"] * p["level"] * factor * hq_heat_mult
         if pt.get("launder_per_h"):
-            launder_rate += pt["launder_per_h"] * p["level"] * factor
+            launder_rate += pt["launder_per_h"] * p["level"] * factor * float(specialization.get("property_income_mult", 1.0) or 1.0)
     launder_rate *= (1 + bonuses.get("empresa_boost", 0) + float(prestige.get("laundry_bonus", 0.0))) * hq_income_mult
 
     if dirty_rate > 0:
@@ -3379,6 +3381,7 @@ async def advance(db, player):
             rival_defense_mult = float(rival.get("defense_mult", 1.0) or 1.0)
             pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
             pressure_gain *= (0.72 + rival_strength / 180.0) * rival_pressure_mult
+            pressure_gain *= float(organization_specialization_effects(player).get("territory_pressure_mult", 1.0) or 1.0)
             pressure_gain *= 1.0 + max(0.0, 55.0 - defense) / 140.0
             defense_loss = minutes * 0.018 * (1.0 + pressure / 140.0) * rival_defense_mult
             pressure = min(100.0, pressure + pressure_gain)
@@ -3415,7 +3418,7 @@ async def advance(db, player):
     # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
     # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
     decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
-    decay_rate *= 1.0 + float(prestige_effects(player).get("heat_decay_bonus", 0.0))
+    decay_rate *= 1.0 + float(prestige_effects(player).get("heat_decay_bonus", 0.0)) + float(organization_specialization_effects(player).get("heat_decay_bonus", 0.0))
     player["heat"] = round(max(0.0, player["heat"] - minutes * decay_rate), 3)
     # A atenção policial por distrito arrefece com o tempo — zonas quentes
     # voltam gradualmente a ser operáveis.
