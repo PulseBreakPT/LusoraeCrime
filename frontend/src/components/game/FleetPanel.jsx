@@ -319,7 +319,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       </p>
                     </div>
                     {teamFit != null && (
-                      <Tip tip={`Adequação à especialização ${SPEC_LABELS[team.spec] || team.spec}: ${Math.round(teamFit * 100)}%${teamBest ? " — categoria ideal deste modelo (bónus extra do motor)" : ""}. Velocidade e discrição ponderadas pela mesma régua da chance de missão.`} block>
+                      <Tip tip={`Adequação à especialização ${SPEC_LABELS[team.spec] || team.spec}: ${Math.round(teamFit * 100)}%${teamBest ? " — modelo ideal para esta equipa." : "."}`} block>
                         <div className="mt-1">
                           <div className="flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
                             <span>Match · {SPEC_LABELS[team.spec] || team.spec}</span>
