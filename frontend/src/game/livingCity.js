@@ -296,7 +296,25 @@ export const localCitySnapshot = (save) => {
     businesses,business_catalog:clone(LOCAL_BUSINESS_TYPES),business_totals:totals,
     rival_actions:clone(ACTIONS),
     social:{
-      alliance:clone(save.city.social.alliance),
+      alliance:save.city.social.alliance ? {
+        ...clone(save.city.social.alliance),
+        is_leader:true,
+        members:[{
+          player_id:String(save.player.id||"guest"),
+          org_name:save.player.org_name||"Organização",
+          level:Number(save.player.level||1),
+          respect:Number(save.player.respect||0),
+          is_leader:true,
+          is_you:true,
+        }],
+      } : null,
+      alliance_leaderboard:save.city.social.alliance ? [{
+        id:save.city.social.alliance.id,
+        name:save.city.social.alliance.name,
+        members:1,
+        points:Number(save.city.social.alliance.season_points||0),
+        is_yours:true,
+      }] : [],
       chat:clone(save.city.social.chat||[])
         .filter((row)=>!save.city.social.blocked_player_ids.includes(String(row.player_id||"")))
         .slice(0,20),
@@ -418,6 +436,8 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
   if(verb==="post"&&path==="/game/city/social/alliance/create"){if(save.city.social.alliance)fail(409,"Já pertences a uma aliança");const name=String(payload.name||"").trim();if(name.length<3)fail(400,"Nome demasiado curto");save.city.social.alliance={id:uid("alliance"),name,code:"LOCAL"+String(Math.floor(Math.random()*900)+100),leader_id:save.player.id,member_ids:[save.player.id],season_points:0,created_at:nowIso()};return {handled:true,data:{ok:true,code:save.city.social.alliance.code}};}
   if(verb==="post"&&path==="/game/city/social/alliance/join")fail(409,"Entrar numa aliança de outros jogadores requer uma conta online");
   if(verb==="post"&&path==="/game/city/social/alliance/leave"){save.city.social.alliance=null;return {handled:true,data:{ok:true}};}
+  if(verb==="post"&&path==="/game/city/social/alliance/transfer")fail(400,"Não existem outros membros reais no modo convidado");
+  if(verb==="post"&&path==="/game/city/social/alliance/kick")fail(400,"Não existem outros membros reais no modo convidado");
   if(verb==="post"&&path==="/game/city/boss/recover"){const b=save.city.boss;const stress=Number(b.stress||0),health=Number(b.health??100);if(!b.hospital_until&&!b.sentence_until&&health>=100&&stress<35)fail(400,"Não há nenhuma consequência ativa para tratar");const cost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0)+(!b.hospital_until&&!b.sentence_until&&stress>=35?1000:0);if(cost)spend(save,cost,"Recuperação do chefe","city_boss_recovery");Object.assign(b,{health:100,stress:Math.max(0,stress-30),hospital_until:null,sentence_until:null});pushEvent(save,"system","O chefe regressou à atividade.");return {handled:true,data:{ok:true,cost}};}
   return {handled:false};
 };
