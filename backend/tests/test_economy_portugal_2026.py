@@ -26,6 +26,7 @@ from economy_constants import (
 from reward_config import (
     MONEY_REWARD_MIN,
     MONEY_REWARD_MAX,
+    MONEY_REWARD_MAX_LATE_PER_LEVEL,
     BASE_REWARD_PER_RISK,
     ORG_LEVEL_MULTIPLIER_PER_LEVEL,
 )
@@ -67,6 +68,20 @@ def run():
 
     assert rewards == sorted(rewards)
     assert len(set(rewards)) == 5
+
+    late = calculate_money_reward(
+        difficulty_score=5.0,
+        risk=5,
+        org_level=100,
+        category="especial",
+        is_rare_mission=True,
+        multiplier_stack=2.0,
+        repeat_count=0,
+    )
+    expected_late_cap = MONEY_REWARD_MAX + 90 * MONEY_REWARD_MAX_LATE_PER_LEVEL
+    assert MONEY_REWARD_MAX < late <= expected_late_cap
+    assert expected_late_cap == 315000
+
     assert BASE_REWARD_PER_RISK[1] < BASE_REWARD_PER_RISK[5]
     assert ORG_LEVEL_MULTIPLIER_PER_LEVEL <= 0.12
 
