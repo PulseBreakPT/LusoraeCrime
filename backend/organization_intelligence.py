@@ -23,7 +23,7 @@ from organization_systems import (
     inventory_capacity,
     inventory_used,
     normalize_inventory,
-    protection_cost, logistics_cost_multiplier,
+    protection_cost, logistics_cost_multiplier, supply_cost_multiplier,
 )
 
 DEFAULT_ORG_POLICY = {
@@ -211,7 +211,7 @@ def build_organization_intelligence(
         stock_value += (qty / pack) * unit_pack_price
         ratio = 1.0 if target <= 0 else qty / max(1, target)
         status = "ok" if target <= 0 or ratio >= 1 else ("low" if ratio >= 0.5 else "critical")
-        buy_price = max(1, int(unit_pack_price * logistics_cost_multiplier(player)))
+        buy_price = max(1, int(unit_pack_price * supply_cost_multiplier(player)))
         row = {
             "key": key, "name": cfg["name"], "qty": qty, "target": target,
             "reserved_per_dispatch": reserved.get(key, 0), "coverage_dispatches": None if reserved.get(key, 0) <= 0 else round(qty / max(1, reserved[key]), 1),
@@ -485,7 +485,7 @@ def quote_action(
         if not cfg:
             reasons.append("Consumível inválido.")
         else:
-            cost = max(1, int(int(cfg["price"]) * packs * logistics_cost_multiplier(player)))
+            cost = max(1, int(int(cfg["price"]) * packs * supply_cost_multiplier(player)))
             effect = f"+{int(cfg['pack']) * packs} {cfg['name']}"
             if int(player.get("level", 1) or 1) < int(cfg.get("min_level", 1) or 1):
                 reasons.append(f"Requer nível {cfg['min_level']}.")
