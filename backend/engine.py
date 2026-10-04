@@ -213,6 +213,7 @@ async def reconcile_mission_stats(db, player):
     )
 
     total = success = partial = failure = police = high_value = 0
+    mission_earned_clean = mission_earned_dirty = 0
     by_category = {}
     success_by_category = {}
     target_fines = 0
@@ -232,6 +233,14 @@ async def reconcile_mission_stats(db, player):
             by_category[category] = by_category.get(category, 0) + 1
 
         outcome = "police" if mission.get("chase_outcome") == "caught" else raw_outcome
+        if outcome in ("success", "partial"):
+            reward = max(0, int(mission.get("pending_reward", 0) or 0))
+            pays = mission.get("pending_pays") or (mission.get("opportunity") or {}).get("pays")
+            if pays == "clean":
+                mission_earned_clean += reward
+            elif pays == "dirty":
+                mission_earned_dirty += reward
+
         if outcome == "success":
             success += 1
             if category:
@@ -278,8 +287,8 @@ async def reconcile_mission_stats(db, player):
 
     # O histórico financeiro é independente do saldo atual: gastar dinheiro
     # depois de o ganhar nunca deve fazer o relatório voltar a zero.
-    _max_stat(stats, "earned_clean", round(earned_clean))
-    _max_stat(stats, "earned_dirty", round(earned_dirty))
+    _max_stat(stats, "earned_clean", round(max(earned_clean, mission_earned_clean)))
+    _max_stat(stats, "earned_dirty", round(max(earned_dirty, mission_earned_dirty)))
     passive_laundered = sum(max(0, float(prop.get("total_laundered", 0) or 0)) for prop in properties)
     _max_stat(stats, "laundered_total", round(manual_laundered + passive_laundered))
     _max_stat(stats, "fines_paid", target_fines)
