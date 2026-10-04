@@ -3048,6 +3048,14 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {pt['min_level']}")
     market = property_market_price(pt["price"], body.lat, body.lng)
     price = market["price"]
+    # Onboarding protegido: o primeiro Esconderijo nunca custa mais do que o
+    # preço-base, mesmo em Lisboa/Porto/Algarve. Isto evita que a localização
+    # escolhida no início bloqueie o primeiro objetivo, sem inflacionar o
+    # capital inicial nem alterar o mercado das compras seguintes.
+    first_property = int((player.get("stats") or {}).get("properties_bought", 0) or 0) == 0
+    starter_discount = body.type_key == "esconderijo" and first_property
+    if starter_discount:
+        price = min(price, int(pt["price"]))
     if player["clean_money"] < price:
         raise HTTPException(
             status_code=400,
@@ -3078,7 +3086,13 @@ async def buy_property(body: PropertyBuyInput, user: dict = Depends(get_current_
         db, pid, "property_buy", -price, "clean", fresh_player["clean_money"],
         f"Compra de {pt['name']} — {market['zone']}",
     )
-    return {"ok": True, "price": price, "market_zone": market["zone"], "market_multiplier": market["multiplier"]}
+    return {
+        "ok": True,
+        "price": price,
+        "market_zone": market["zone"],
+        "market_multiplier": market["multiplier"],
+        "starter_discount": starter_discount,
+    }
 
 
 @router.post("/properties/sell")
