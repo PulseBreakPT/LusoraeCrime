@@ -21,7 +21,7 @@ const STAGE_LABELS = {
   events: "Registo de atividade",
   quests: "Missões",
   catalogo: "Catálogo",
-  processamento: "Sincronização final",
+  processamento: "Finalizar",
 };
 
 const getStageLabel = (key) => STAGE_LABELS[key] || key;
@@ -36,14 +36,14 @@ export function LoadingScreen() {
   if (error) {
     return (
       <LoadingBackdrop>
-        <TacticalFrame header="Falha de uplink" status="Interrompido" tone="error">
+        <TacticalFrame header="Erro de ligação" status="Interrompido" tone="error">
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <span className="sub-alert-icon">
                 <AlertTriangle className="h-8 w-8 flex-shrink-0 text-destructive" />
               </span>
               <div>
-                <p className="font-display font-bold uppercase tracking-wide text-white">Falha na ligação à organização</p>
+                <p className="font-display font-bold uppercase tracking-wide text-white">Não foi possível carregar o jogo</p>
                 <p className="mt-1 font-mono text-xs text-zinc-400">{getStageLabel(error.stage)}</p>
               </div>
             </div>
@@ -72,12 +72,12 @@ export function LoadingScreen() {
         <div className="space-y-5">
           <TacticalRadar />
           <BootWordmark
-            statusText={currentStage ? getStageLabel(currentStage.key) : "A preparar operações…"}
+            statusText={currentStage ? getStageLabel(currentStage.key) : "A carregar…"}
           />
           <UplinkProgress
             progress={progress}
-            label="A ligar à organização"
-            meta={`${String(doneCount).padStart(2, "0")}/${String(stages.length).padStart(2, "0")} módulos`}
+            label="A carregar"
+            meta={`${String(doneCount).padStart(2, "0")}/${String(stages.length).padStart(2, "0")} etapas`}
           />
           <TerminalLog rows={rows} />
           <FlavorRotator />
