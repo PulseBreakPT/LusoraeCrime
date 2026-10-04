@@ -5,7 +5,7 @@ import { cn } from "../../lib/utils";
 import {
   fmtMoney, SPEC_LABELS, ATTR_FULL, conditionBand, weaponCompatibility, matchesSearch, LARGE_PURCHASE_THRESHOLD,
   weaponTier, WEAPON_STATS, weaponStatValue, weaponJamRisk, weaponConditionFactor, weaponSkillInfo,
-  weaponWearPerMission, weaponAdequacy,
+  weaponWearPerMission, weaponAdequacy, weaponModelWithUpgrades, weaponAmmoInfo,
 } from "../../lib/game";
 import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
@@ -167,7 +167,8 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
   const avgCondition = weapons.length ? Math.round(weapons.reduce((a, w) => a + w.condition, 0) / weapons.length) : 0;
   const equippedCount = weapons.filter((w) => w.employee_id).length;
   const maxJam = weapons.reduce((a, w) => {
-    const m = catalog?.weapon_models?.[w.model_key];
+    const base = catalog?.weapon_models?.[w.model_key];
+    const m = base ? weaponModelWithUpgrades(base, w, catalog) : null;
     return m ? Math.max(a, weaponJamRisk(m, w.condition, meta)) : a;
   }, 0);
   const jamWarn = meta.jam_warn_risk ?? 0.15;
@@ -262,8 +263,10 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
             </button>
           )}
           {sortedWeapons.map((w) => {
-            const model = catalog?.weapon_models?.[w.model_key];
-            if (!model) return null;
+            const baseModel = catalog?.weapon_models?.[w.model_key];
+            if (!baseModel) return null;
+            const model = weaponModelWithUpgrades(baseModel, w, catalog);
+            const ammo = weaponAmmoInfo(w, model, catalog);
             const tier = weaponTier(model);
             const emp = employeeOf(w);
             const busy = weaponBusy(w);
@@ -306,6 +309,21 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
                         <Crosshair size={9} /> {w.missions_done ?? 0} op.
                       </span>
                     </Tip>
+                    {ammo.ammoKey && (
+                      <Tip tip={`Munições carregadas: ${ammo.loaded}/${ammo.capacity}. Recarrega no painel Organização.`}>
+                        <span className={cn(
+                          "inline-flex items-center gap-0.5 font-mono text-[10px]",
+                          ammo.fraction < 0.3 ? "text-red-400" : "text-zinc-500"
+                        )}>
+                          <Crosshair size={9} /> {ammo.loaded}/{ammo.capacity}
+                        </span>
+                      </Tip>
+                    )}
+                    {(w.upgrades || []).length > 0 && (
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-cyan-400">
+                        <Wand2 size={9} /> {w.upgrades.length} mod.
+                      </span>
+                    )}
                   </div>
                 </div>
 
