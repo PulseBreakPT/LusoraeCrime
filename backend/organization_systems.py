@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from economy_constants import (
+    PRESTIGE_ITEMS, GOVERNMENT_CORRUPTION_BASE, GOVERNMENT_CORRUPTION_PER_EMPLOYEE,
+    GOVERNMENT_CORRUPTION_PER_PROPERTY, GOVERNMENT_CORRUPTION_UNLOCK_LEVEL,
+)
 
 # 18 stocks transversais. Valores são de balanceamento ficcional.
 SUPPLY_CATALOG = {
@@ -100,6 +104,8 @@ TRAITS = [
     "disciplinado", "ambicioso", "prudente", "leal", "competitivo",
     "metodico", "resiliente", "impulsivo", "reservado", "social",
 ]
+
+PRESTIGE_CATALOG = PRESTIGE_ITEMS
 
 INJURY_SEVERITIES = {
     "ligeiro": {"recovery_s": 180, "performance": 0.96},
@@ -234,7 +240,8 @@ def logistics_cost_multiplier(player: dict) -> float:
 
 def raid_risk_multiplier(player: dict, properties: list[dict]) -> float:
     investigation = max(0.70, 1.0 - department_level(player, "investigacao") * 0.10)
-    return investigation * property_security_factor(properties)
+    protection = 0.72 if protection_active(player) else 1.0
+    return investigation * property_security_factor(properties) * protection
 
 
 def loadout_effect(loadout: dict, category: str) -> dict:
@@ -283,3 +290,40 @@ def weapon_ammo_status(model_key: str, model: dict, weapon: dict) -> dict:
     loaded = max(0, min(capacity, int((weapon or {}).get("ammo_loaded", 0) or 0)))
     fraction = loaded / max(1, capacity)
     return {"ammo_key": ammo_key, "capacity": capacity, "loaded": loaded, "fraction": fraction}
+
+
+def prestige_effects(player: dict) -> dict:
+    owned = set(player.get("prestige_items") or [])
+    out = {
+        "dirty_cap_increase": 0, "mission_bonus": 0.0, "spec_bonus": 0.0,
+        "lab_bonus": 0.0, "laundry_bonus": 0.0, "heat_decay_bonus": 0.0,
+    }
+    for key in owned:
+        cfg = PRESTIGE_ITEMS.get(key) or {}
+        for field in out:
+            if field in cfg:
+                out[field] += cfg[field]
+    return out
+
+
+def protection_active(player: dict, now: datetime | None = None) -> bool:
+    until = (player.get("governance") or {}).get("protection_until")
+    if not until:
+        return False
+    try:
+        dt = datetime.fromisoformat(until)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt > (now or datetime.now(timezone.utc))
+    except (TypeError, ValueError):
+        return False
+
+
+def protection_cost(player: dict, employee_count: int, property_count: int) -> int:
+    if int(player.get("level", 1) or 1) < GOVERNMENT_CORRUPTION_UNLOCK_LEVEL:
+        return 0
+    return int(
+        GOVERNMENT_CORRUPTION_BASE
+        + max(0, employee_count) * GOVERNMENT_CORRUPTION_PER_EMPLOYEE
+        + max(0, property_count) * GOVERNMENT_CORRUPTION_PER_PROPERTY
+    )
