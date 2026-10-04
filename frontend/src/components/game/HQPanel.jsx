@@ -390,6 +390,8 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                   const unlockLevel = unlockTier?.level || 1;
                   const unlocked = hq.level >= unlockLevel;
                   const Icon = DEPARTMENT_ICONS[key] || Lock;
+                  const deptLevel = Number(state.organization?.departments?.[key] || 0);
+                  const maxLevel = Number(catalog.organization?.departments?.[key]?.max_level || 3);
                   return (
                     <Card key={key} data-testid={`hq-dept-${key}`} className="flex items-center gap-2 sub-card p-2.5 shadow-none">
                       <Icon size={16} className={unlocked ? "text-cyan-400" : "text-zinc-600"} />
@@ -397,9 +399,17 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                         <p className={`text-[12px] font-semibold ${unlocked ? "text-white" : "text-zinc-500"}`}>{dept.name}</p>
                         <p className="text-[10px] text-zinc-600">{dept.desc}</p>
                       </div>
-                      <span className={`shrink-0 font-mono text-[10px] uppercase ${unlocked ? "text-emerald-400" : "text-zinc-600"}`}>
-                        {unlocked ? "Em breve" : `Nível ${unlockLevel}`}
-                      </span>
+                      {unlocked ? (
+                        <button
+                          type="button"
+                          onClick={() => onNavigate && onNavigate("organization")}
+                          className="shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[0.06] px-2 py-1 font-mono text-[10px] uppercase text-emerald-400"
+                        >
+                          N{deptLevel}/{maxLevel}
+                        </button>
+                      ) : (
+                        <span className="shrink-0 font-mono text-[10px] uppercase text-zinc-600">Nível {unlockLevel}</span>
+                      )}
                     </Card>
                   );
                 })}

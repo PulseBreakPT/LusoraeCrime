@@ -224,8 +224,11 @@ export const CHAPTER_LABELS = {
 export const OPP_URGENT_SECONDS = 120;
 
 export function effectiveSpeed(v) {
-  if (v.condition >= 50) return v.speed;
-  return v.speed * (0.6 + (0.4 * v.condition) / 50);
+  const condition = Math.max(0, Math.min(100, Number(v?.condition ?? 100))) / 100;
+  const conditionFactor = 0.6 + 0.4 * Math.pow(condition, 0.9);
+  const tires = Math.max(0, Math.min(100, Number(v?.tires_pct ?? 100))) / 100;
+  const tireFactor = 0.82 + 0.18 * tires;
+  return Number(v?.speed || 0) * conditionFactor * tireFactor;
 }
 
 export function chanceColor(c) {
@@ -391,6 +394,29 @@ export function weaponCombatScore(wm, category, categoryWeights) {
   );
 }
 
+
+// Aplica as modificações persistidas usando o mesmo catálogo do backend.
+export function weaponModelWithUpgrades(wm, weaponDoc, catalog) {
+  const model = { ...(wm || {}) };
+  const upgrades = catalog?.organization?.weapon_upgrades || {};
+  (weaponDoc?.upgrades || []).forEach((installed) => {
+    const cfg = upgrades[installed?.key];
+    if (!cfg) return;
+    ["reliability", "use_speed", "accuracy", "range", "discretion", "power", "durability", "weight"].forEach((stat) => {
+      if (cfg[stat] != null) model[stat] = Math.max(0, Number(model[stat] || 0) + Number(cfg[stat]));
+    });
+  });
+  return model;
+}
+
+export function weaponAmmoInfo(weaponDoc, wm, catalog) {
+  const ammoKey = catalog?.organization?.weapon_ammo?.[weaponDoc?.model_key];
+  const capacity = Math.max(0, Number(wm?.magazine_capacity || 0));
+  if (!ammoKey) return { ammoKey: null, capacity, loaded: capacity, fraction: 1 };
+  const loaded = Math.max(0, Math.min(capacity, Number(weaponDoc?.ammo_loaded || 0)));
+  return { ammoKey, capacity, loaded, fraction: loaded / Math.max(1, capacity) };
+}
+
 // Espelho de engine.weapon_condition_factor: linear até ao joelho
 // (condition_soft_knee), quadrática abaixo — a 20% a arma é quase sucata.
 export function weaponConditionFactor(condition, meta) {
@@ -446,6 +472,7 @@ export function weaponCompatFactor(emp, wm, meta) {
 // best_for × condição × fiabilidade × compatibilidade × habilidade + proficiência.
 export function weaponEffectiveScore(emp, weaponDoc, wm, category, catalog) {
   if (!wm) return 0;
+  wm = weaponModelWithUpgrades(wm, weaponDoc, catalog);
   const meta = catalog?.weapon_meta || {};
   const score = weaponCombatScore(wm, category, catalog?.weapon_category_weights);
   const bestForMult = (wm.best_for || []).includes(category) ? 1.3 : 0.7;
@@ -456,7 +483,9 @@ export function weaponEffectiveScore(emp, weaponDoc, wm, category, catalog) {
   const profMax = meta.proficiency_max ?? 100;
   const prof = (emp?.weapon_proficiency || {})[wm.category] || 0;
   const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
-  return score * bestForMult * condition * reliability * compat * skill * (meta.combat_score_scale ?? 0.15) + profBonus;
+  const ammo = weaponAmmoInfo(weaponDoc, wm, catalog);
+  const ammoFactor = ammo.ammoKey == null ? 1 : 0.2 + 0.8 * ammo.fraction;
+  return score * bestForMult * condition * reliability * compat * skill * ammoFactor * (meta.combat_score_scale ?? 0.15) + profBonus;
 }
 
 // Desgaste base de condição por missão deste modelo (antes do risco da
@@ -809,7 +838,9 @@ export function passiveRates(state, catalog, now = Date.now()) {
     const t = pt[p.type_key];
     if (!t) return;
     if (p.upgrading_until && Date.parse(p.upgrading_until) > now) return;
-    const factor = (p.condition ?? 100) / 100;
+    const condition = (p.condition ?? 100) / 100;
+    const operations = 1 + Number(p.operations_level || 0) * 0.05 + Math.min(4, (p.staff_employee_ids || []).length) * 0.02;
+    const factor = condition * operations;
     dirtyPerH += (t.dirty_per_h || 0) * p.level * factor;
     launderPerH += (t.launder_per_h || 0) * p.level * factor;
     heatPerH += (t.heat_per_h || 0) * p.level * factor;
@@ -859,6 +890,9 @@ export function teamReadiness(state, catalog, team, { opp = null, now = Date.now
   if (!vehicle) return { ok: false, reason: "Sem veículo" };
   if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > now) {
     return { ok: false, reason: "Veículo indisponível" };
+  }
+  if (vehicle.seized_until && Date.parse(vehicle.seized_until) > now) {
+    return { ok: false, reason: "Veículo apreendido" };
   }
   if (vehicle.condition < 30) return { ok: false, reason: "Veículo avariado" };
   if (vehicle.refueling_until && Date.parse(vehicle.refueling_until) > now) {
@@ -1314,11 +1348,13 @@ export function vehicleAdequacy(vm, catalog) {
 
 // Espelho de engine.effective_speed: curva contínua da condição
 // (floor + span × (condição/100)^exp) — um veículo a 65% já se ressente.
-export function vehicleSpeedFactor(condition, meta) {
+export function vehicleSpeedFactor(condition, meta, tiresPct = 100) {
   const floor = meta?.speed_floor ?? 0.6;
   const exp = meta?.speed_curve_exp ?? 0.9;
   const c = Math.max(0, Math.min(100, condition ?? 100)) / 100;
-  return floor + (1 - floor) * Math.pow(c, exp);
+  const conditionFactor = floor + (1 - floor) * Math.pow(c, exp);
+  const tires = Math.max(0, Math.min(100, tiresPct ?? 100)) / 100;
+  return conditionFactor * (0.82 + 0.18 * tires);
 }
 
 // ============ QI do Património (SSS v6) — espelhos do motor passivo ============

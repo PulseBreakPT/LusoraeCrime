@@ -235,7 +235,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
             const repairCost = Math.max(50, Math.round((100 - v.condition) * v.price * 0.002));
             const sellValue = Math.round(v.price * (fleetMeta.sell_fraction ?? 0.4) * (v.condition / 100));
             const effSpeed = effectiveSpeed(v);
-            const speedFactor = vehicleSpeedFactor(v.condition, fleetMeta);
+            const speedFactor = vehicleSpeedFactor(v.condition, fleetMeta, v.tires_pct ?? 100);
             const speedReduced = effSpeed < v.speed - 0.05;
             const band = conditionBand(v.condition);
             const modelName = model?.name || v.model_key;

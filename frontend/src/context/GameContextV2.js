@@ -40,6 +40,13 @@ const ACTION_SOUNDS = [
   ["mastermind/market/trade", "cash"],
   ["mastermind/bounty", "notify"],
   ["mastermind/cache/scan", "success"],
+  ["org/inventory", "cash"],
+  ["org/vehicles", "repair"],
+  ["org/weapons", "repair"],
+  ["org/properties", "repair"],
+  ["org/departments", "success"],
+  ["org/territories", "success"],
+  ["org/prestige", "cash"],
 ];
 
 function soundForAction(path) {
@@ -81,6 +88,7 @@ export function GameProvider({ children }) {
   const prevLevelRef = useRef(null);
   const prevChaseIdsRef = useRef(new Set());
   const returnedTimersRef = useRef(new Set());  // timeouts pendentes de justReturnedTeamIds
+  const pendingActionsRef = useRef(new Set());   // dedupe de duplo toque enquanto a mutação está em curso
 
   // Cancela quaisquer timeouts pendentes ao desmontar (evita setState-após-unmount).
   useEffect(() => () => {
@@ -404,8 +412,17 @@ export function GameProvider({ children }) {
 
   const action = useCallback(
     async (path, payload, successMsg) => {
+      const actionKey = `${path}:${JSON.stringify(payload || {})}`;
+      if (pendingActionsRef.current.has(actionKey)) return { ok: false, duplicate: true };
+      pendingActionsRef.current.add(actionKey);
       try {
-        const { data } = await api.post(`/game/${path}`, payload);
+        const requestId = typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const body = payload && typeof payload === "object"
+          ? { ...payload, request_id: requestId }
+          : { request_id: requestId };
+        const { data } = await api.post(`/game/${path}`, body);
         if (successMsg) {
           toast.success(successMsg);
           haptics.success();
@@ -422,6 +439,8 @@ export function GameProvider({ children }) {
         haptics.error();
         audio.sfx.error();
         return { ok: false };
+      } finally {
+        pendingActionsRef.current.delete(actionKey);
       }
     },
     [refresh]
@@ -727,6 +746,58 @@ export function GameProvider({ children }) {
     "Não existem recursos para otimizar."
   );
 
+  // Organização integrada — logística, ciclo de ativos e late game.
+  const buySupply = (itemKey, packs = 1) =>
+    action("org/inventory/buy", { item_key: itemKey, packs }, "Stock recebido");
+  const sellSupply = (itemKey, packs = 1) =>
+    action("org/inventory/sell", { item_key: itemKey, packs }, "Stock vendido");
+  const renameTeam = (teamId, name) =>
+    action("org/teams/rename", { team_id: teamId, name }, "Equipa renomeada");
+  const setTeamDoctrine = (teamId, doctrine) =>
+    action("org/teams/doctrine", { team_id: teamId, doctrine }, "Doutrina atualizada");
+  const setTeamPolicies = (teamId, policies) =>
+    action("org/teams/policies", { team_id: teamId, policies }, "Políticas atualizadas");
+  const setTeamLoadout = (teamId, loadout) =>
+    action("org/teams/loadout", { team_id: teamId, loadout }, "Loadout guardado");
+  const dissolveTeam = (teamId) =>
+    action("org/teams/dissolve", { id: teamId }, "Equipa dissolvida");
+  const reloadWeapon = (weaponId) =>
+    action("org/weapons/reload", { id: weaponId }, "Arma recarregada");
+  const upgradeWeaponMod = (weaponId, upgradeKey) =>
+    action("org/weapons/upgrade", { weapon_id: weaponId, upgrade_key: upgradeKey }, "Upgrade instalado");
+  const serviceVehicle = (vehicleId) =>
+    action("org/vehicles/service", { id: vehicleId }, "Revisão concluída");
+  const replaceVehicleTires = (vehicleId) =>
+    action("org/vehicles/tires", { id: vehicleId }, "Pneus substituídos");
+  const insureVehicle = (vehicleId) =>
+    action("org/vehicles/insurance", { id: vehicleId }, "Seguro renovado");
+  const inspectVehicle = (vehicleId) =>
+    action("org/vehicles/inspection", { id: vehicleId }, "Inspeção concluída");
+  const upgradePropertyModule = (propertyId, moduleKey) =>
+    action("org/properties/module", { property_id: propertyId, module_key: moduleKey }, "Módulo melhorado");
+  const assignPropertyStaff = (propertyId, employeeIds) =>
+    action("org/properties/staff", { property_id: propertyId, employee_ids: employeeIds }, "Equipa da base atualizada");
+  const upgradeDepartment = (departmentKey) =>
+    action("org/departments/upgrade", { department_key: departmentKey }, "Departamento melhorado");
+  const claimTerritory = (district) =>
+    action("org/territories/claim", { district }, "Presença territorial criada");
+  const consolidateTerritory = (district) =>
+    action("org/territories/consolidate", { district }, "Território consolidado");
+  const defendTerritory = (district) =>
+    action("org/territories/defend", { district }, "Defesa territorial reforçada");
+  const buyPrestige = (itemKey) =>
+    action("org/prestige/buy", { item_key: itemKey }, "Investimento adquirido");
+  const buyProtection = () =>
+    action("org/governance/protection", {}, "Rede de proteção renovada");
+  const fetchFinanceSummary = useCallback(async () => {
+    try {
+      const { data } = await api.get("/game/org/finance/summary");
+      return { ok: true, data };
+    } catch (_e) {
+      return { ok: false };
+    }
+  }, []);
+
   // Mastermind — grandes golpes, mercado negro, caçadores rivais e caches.
   const scoutMastermindTarget = (payload) => action("mastermind/heists/intel", payload, "Dossiê atualizado");
   const createMastermindHeist = (payload) => action("mastermind/heists/create", payload, "Plano criado");
@@ -902,6 +973,28 @@ export function GameProvider({ children }) {
         repairFleetAll,
         repairWeaponsAll,
         optimizeOrganization,
+        buySupply,
+        sellSupply,
+        renameTeam,
+        setTeamDoctrine,
+        setTeamPolicies,
+        setTeamLoadout,
+        dissolveTeam,
+        reloadWeapon,
+        upgradeWeaponMod,
+        serviceVehicle,
+        replaceVehicleTires,
+        insureVehicle,
+        inspectVehicle,
+        upgradePropertyModule,
+        assignPropertyStaff,
+        upgradeDepartment,
+        claimTerritory,
+        consolidateTerritory,
+        defendTerritory,
+        buyPrestige,
+        buyProtection,
+        fetchFinanceSummary,
         scoutMastermindTarget,
         createMastermindHeist,
         startHeistPrep,

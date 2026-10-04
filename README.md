@@ -333,6 +333,9 @@ O modelo de armas considera:
 - condição;
 - desgaste por missão;
 - risco de encravamento;
+- munição carregada e stock logístico por categoria;
+- recarga a partir do inventário da organização;
+- cinco linhas de modificações persistentes (fiabilidade, ergonomia, precisão, perfil discreto e reforço);
 - impacto no calor e na probabilidade da missão.
 
 ---
@@ -361,7 +364,11 @@ O modelo de armas considera:
 - propriedades influenciam economia, capacidade e operações;
 - calor elevado pode criar risco de rusga;
 - existe otimização de propriedades;
+- cada imóvel pode desenvolver **Segurança, Armazenamento e Operações**;
+- até quatro operacionais livres podem ser destacados para uma instalação e aumentar a sua eficiência;
+- o preço regional efetivamente pago é usado também nas melhorias automáticas;
 - o QG possui sistema próprio de upgrades, prioridades e cosméticos;
+- os departamentos Financeiro, RH, Logística, Investigação e Comunicações têm três níveis e efeitos reais;
 - nível máximo atual do QG: **8**.
 
 ---
@@ -375,7 +382,7 @@ O jogo trabalha com duas moedas operacionais:
 
 Valores de arranque definidos atualmente no motor:
 
-- **75 000 € limpos**;
+- **100 000 € limpos**;
 - **5 000 € sujos**.
 
 Outros sistemas:
@@ -397,9 +404,13 @@ Outros sistemas:
 - registo de transações;
 - escalonamento de recompensas;
 - distância e dificuldade;
-- bónus permanentes por marcos de sucesso.
+- bónus permanentes por marcos de sucesso;
+- centro financeiro de 30 dias com receitas, despesas, resultado e valor dos ativos;
+- três níveis de controlo territorial com custo de defesa e rendimento passivo;
+- investimentos de prestígio de late game;
+- rede de proteção temporária contra rusgas.
 
-No tuning atual, o ciclo de folha salarial está definido para **120 minutos** no backend. Os valores de economia são centralizados em `backend/economy_constants.py`, para manter o balanceamento auditável.
+O fecho económico acontece **todas as segundas-feiras às 20:00, Europe/Lisbon**. Cobra salários brutos, TSU patronal, a fração semanal dos custos fixos da frota, manutenção imobiliária e defesa territorial. Combustível e reparações continuam a ser custos variáveis. Os valores são centralizados em `backend/economy_constants.py`.
 
 ---
 
@@ -439,50 +450,27 @@ O sistema suporta:
 
 ---
 
-## Cidade Viva
+## Organização, território e cidade
 
-O módulo **Cidade Viva** adiciona um sandbox paralelo integrado no mesmo jogador/economia.
+O núcleo urbano atual está integrado diretamente no estado principal do jogador.
 
-### Mecânicas principais
+### Sistemas implementados
 
-- procurado de **0 a 5 estrelas**;
-- busca policial com countdown;
-- scanner policial em direto;
-- eventos urbanos em janelas de **30 minutos**;
-- reputação de rua própria;
-- **6 ranks** de reputação;
-- influência por distrito;
-- conquista de território;
-- 3 níveis de consolidação territorial;
-- pressão rival persistente;
-- defesa territorial;
+- procurado de **0 a 5 estrelas** e camada policial no mapa;
+- conquista de zonas operacionais a partir do nível 5;
+- **3 níveis de consolidação territorial**;
+- pressão rival e defesa persistentes;
+- custo semanal de defesa territorial;
 - rendimento passivo territorial;
-- 4 contactos;
-- favores e cooldowns;
-- corridas clandestinas;
-- apostas;
-- séries de vitórias;
-- entregas à desmontagem;
-- contrabando;
-- três abordagens: **Fantasma, Calculado e Impacto**;
-- três planos de fuga: **Baixo Perfil, Velocidade e Isca**;
-- equipamento consumível;
-- notoriedade por veículo;
-- matrículas frias;
-- seguro, apreensão e recuperação.
+- bónus local de recompensa por controlo;
+- **18 stocks consumíveis** com capacidade de armazenamento;
+- loadouts de equipa consumidos no despacho;
+- notoriedade persistente por veículo;
+- pneus, revisões, seguro e inspeção;
+- apreensão temporária de veículos com recuperação mais rápida quando segurados;
+- doutrinas de equipa: Equilibrada, Segurança Máxima, Baixo Perfil e Impacto.
 
-### Contactos
-
-- **A Ponte** — Intermediário;
-- **Oficina 24** — Mecânico;
-- **Linha Cinzenta** — Advogada;
-- **Olho Norte** — Informador.
-
-### Atividades
-
-- Corrida Clandestina;
-- Entrega à Desmontagem;
-- Rota Clandestina.
+Contactos de rua, corridas, apostas e outras atividades urbanas descritas em propostas antigas **não são anunciadas como implementadas enquanto não tiverem ciclo backend → estado → UI completo**.
 
 ---
 
@@ -860,16 +848,34 @@ A API é organizada por domínio.
 </details>
 
 <details>
-<summary><strong>Cidade Viva — /api/game/street</strong></summary>
+<summary><strong>Organização — /api/game/org</strong></summary>
 
-- `GET /state`
-- `POST /plan`
-- `POST /gear/buy`
-- `POST /territory`
-- `POST /contacts/call`
-- `POST /garage`
-- `POST /activities/start`
-- `POST /activities/claim`
+- `GET /catalog`
+- `GET /finance/summary`
+- `POST /inventory/buy`
+- `POST /inventory/sell`
+- `POST /teams/rename`
+- `POST /teams/doctrine`
+- `POST /teams/policies`
+- `POST /teams/loadout`
+- `POST /teams/dissolve`
+- `POST /weapons/reload`
+- `POST /weapons/upgrade`
+- `POST /vehicles/service`
+- `POST /vehicles/tires`
+- `POST /vehicles/insurance`
+- `POST /vehicles/inspection`
+- `GET /vehicles/{vehicle_id}/lifecycle`
+- `POST /properties/module`
+- `POST /properties/staff`
+- `POST /departments/upgrade`
+- `POST /territories/claim`
+- `POST /territories/consolidate`
+- `POST /territories/defend`
+- `POST /prestige/buy`
+- `POST /governance/protection`
+
+Todas as mutações deste router aceitam `request_id` e usam recibos idempotentes com TTL para impedir cobrança duplicada em retries de rede.
 
 </details>
 

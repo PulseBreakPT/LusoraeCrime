@@ -15,6 +15,7 @@ import { IntelPanel } from "../components/game/IntelPanel";
 import { QuestsPanel } from "../components/game/QuestsPanel";
 import { OpportunitiesPanel } from "../components/game/OpportunitiesPanel";
 import { ShopPanel } from "../components/game/ShopPanel";
+import { OrganizationPanel } from "../components/game/OrganizationPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { MastermindPanel } from "../components/game/MastermindPanel";
 import { CommandCenter } from "../components/game/CommandCenter";
@@ -26,7 +27,7 @@ import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { orgAlerts, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon } from "lucide-react";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, Network } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -315,6 +316,7 @@ export default function GamePage() {
                     <NavAction testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300" onClick={() => openFromNav("shop")} />
                     <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
                     <NavAction testId="map-legend-toggle" icon={MapIcon} label="Legenda" color="text-zinc-300" active={mapLegendOpen} onClick={() => { setNavGroup(null); setMapLegendOpen((value) => !value); }} />
+                    <NavAction testId="open-organization-button" icon={Network} label="Organização" color="text-cyan-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("organization")} />
                     <NavAction testId="open-settings-button" icon={Settings} label="Definições" color="text-zinc-400" onClick={() => openFromNav("settings")} />
                   </div>
 
@@ -386,7 +388,7 @@ export default function GamePage() {
               label="Menu"
               color="text-zinc-200"
               alert={alerts.total > 0 || wantedStars >= 3}
-              active={navGroup === "menu" || ["intel", "shop", "settings"].includes(openPanel) || commandOpen || mapLegendOpen}
+              active={navGroup === "menu" || ["intel", "shop", "organization", "settings"].includes(openPanel) || commandOpen || mapLegendOpen}
               onClick={() => toggleNavGroup("menu")}
             />
           </div>
@@ -401,6 +403,7 @@ export default function GamePage() {
         onSelectOpp={(opp) => { setSelectedOpp(opp); setOpenPanel(null); }}
       />
       <ShopPanel open={openPanel === "shop"} onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />
+      <OrganizationPanel open={openPanel === "organization"} onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />
       <OpportunitiesPanel
         open={openPanel === "operations"}
         onOpenChange={(o) => setOpenPanel(o ? "operations" : null)}
