@@ -432,8 +432,19 @@ def quote_action(
                 reasons.append(f"Requer nível {cfg['min_level']}.")
     elif action == "vehicle_service":
         missing = max(0.0, 100 - float(entity.get("condition", 100) or 0))
-        cost = max(120, int(float(entity.get("price", 0) or 0) * VEHICLE_LIFECYCLE["service_base_pct"] + missing * 8))
+        base_cost = max(120, int(float(entity.get("price", 0) or 0) * VEHICLE_LIFECYCLE["service_base_pct"] + missing * 8))
+        inv = normalize_inventory(player)
+        use_fluids = int(inv.get("service_fluids", 0) or 0) > 0
+        use_parts = missing >= 20 and int(inv.get("vehicle_parts", 0) or 0) > 0
+        material_credit = (
+            (int(SUPPLY_CATALOG["service_fluids"]["price"]) if use_fluids else 0)
+            + (int(SUPPLY_CATALOG["vehicle_parts"]["price"]) if use_parts else 0)
+        )
+        cost = max(60, base_cost - int(material_credit * 0.70))
+        materials = [name for flag, name in ((use_fluids, "consumíveis"), (use_parts, "peças")) if flag]
         effect = f"Condição +{min(18, round(missing))}% e revisão reiniciada"
+        if materials:
+            effect += " · usa " + " + ".join(materials)
     elif action == "vehicle_tires":
         inv = normalize_inventory(player)
         cost = 0 if inv.get("tire_set", 0) > 0 else int(SUPPLY_CATALOG["tire_set"]["price"])
