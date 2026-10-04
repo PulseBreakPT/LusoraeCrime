@@ -395,37 +395,43 @@ export default function GamePage() {
         </div>
       )}
 
-      <MastermindPanel open={openPanel === "mastermind"} onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />
-      <CommandCenter
-        open={commandOpen}
-        onOpenChange={setCommandOpen}
-        onNavigate={navigateTo}
-        onSelectOpp={(opp) => { setSelectedOpp(opp); setOpenPanel(null); }}
-      />
-      <ShopPanel open={openPanel === "shop"} onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />
-      <OrganizationPanel open={openPanel === "organization"} onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />
-      <OpportunitiesPanel
-        open={openPanel === "operations"}
-        onOpenChange={(o) => setOpenPanel(o ? "operations" : null)}
-        onSelectOpp={(o) => { setSelectedOpp(o); setOpenPanel(null); }}
-      />
-      <TeamsPanel open={openPanel === "teams"} onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "teams" ? focusTarget : null} />
-      <QuestsPanel
-        open={openPanel === "quests"}
-        onOpenChange={(o) => setOpenPanel(o ? "quests" : null)}
-        onNavigate={navigateTo}
-        focusTab={questsFocusTab}
-        focusTarget={focusTarget?.panel === "quests" ? focusTarget : null}
-        onFocusTabConsumed={() => setQuestsFocusTab(null)}
-      />
-      <EmpirePanel open={openPanel === "empire"} onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} focusTarget={focusTarget?.panel === "empire" ? focusTarget : null} />
-      <EmployeesPanel open={openPanel === "employees"} onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "employees" ? focusTarget : null} />
-      <FleetPanel open={openPanel === "fleet"} onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "fleet" ? focusTarget : null} />
-      <PropertiesPanel open={openPanel === "properties"} onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "properties" ? focusTarget : null} />
-      <WeaponsPanel open={openPanel === "weapons"} onOpenChange={(o) => setOpenPanel(o ? "weapons" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "weapons" ? focusTarget : null} />
-      <HQPanel open={openPanel === "hq"} onOpenChange={(o) => setOpenPanel(o ? "hq" : null)} onNavigate={navigateTo} />
-      <IntelPanel open={openPanel === "intel"} onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={navigateTo} />
-      <SettingsPanel open={openPanel === "settings"} onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />
+      {openPanel === "mastermind" && <MastermindPanel open onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />}
+      {commandOpen && (
+        <CommandCenter
+          open
+          onOpenChange={setCommandOpen}
+          onNavigate={navigateTo}
+          onSelectOpp={(opp) => { setSelectedOpp(opp); setOpenPanel(null); }}
+        />
+      )}
+      {openPanel === "shop" && <ShopPanel open onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />}
+      {openPanel === "organization" && <OrganizationPanel open onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />}
+      {openPanel === "operations" && (
+        <OpportunitiesPanel
+          open
+          onOpenChange={(o) => setOpenPanel(o ? "operations" : null)}
+          onSelectOpp={(o) => { setSelectedOpp(o); setOpenPanel(null); }}
+        />
+      )}
+      {openPanel === "teams" && <TeamsPanel open onOpenChange={(o) => setOpenPanel(o ? "teams" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "teams" ? focusTarget : null} />}
+      {openPanel === "quests" && (
+        <QuestsPanel
+          open
+          onOpenChange={(o) => setOpenPanel(o ? "quests" : null)}
+          onNavigate={navigateTo}
+          focusTab={questsFocusTab}
+          focusTarget={focusTarget?.panel === "quests" ? focusTarget : null}
+          onFocusTabConsumed={() => setQuestsFocusTab(null)}
+        />
+      )}
+      {openPanel === "empire" && <EmpirePanel open onOpenChange={(o) => setOpenPanel(o ? "empire" : null)} focusTarget={focusTarget?.panel === "empire" ? focusTarget : null} />}
+      {openPanel === "employees" && <EmployeesPanel open onOpenChange={(o) => setOpenPanel(o ? "employees" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "employees" ? focusTarget : null} />}
+      {openPanel === "fleet" && <FleetPanel open onOpenChange={(o) => setOpenPanel(o ? "fleet" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "fleet" ? focusTarget : null} />}
+      {openPanel === "properties" && <PropertiesPanel open onOpenChange={(o) => setOpenPanel(o ? "properties" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "properties" ? focusTarget : null} />}
+      {openPanel === "weapons" && <WeaponsPanel open onOpenChange={(o) => setOpenPanel(o ? "weapons" : null)} onNavigate={navigateTo} focusTarget={focusTarget?.panel === "weapons" ? focusTarget : null} />}
+      {openPanel === "hq" && <HQPanel open onOpenChange={(o) => setOpenPanel(o ? "hq" : null)} onNavigate={navigateTo} />}
+      {openPanel === "intel" && <IntelPanel open onOpenChange={(o) => setOpenPanel(o ? "intel" : null)} onNavigate={navigateTo} />}
+      {openPanel === "settings" && <SettingsPanel open onOpenChange={(o) => setOpenPanel(o ? "settings" : null)} />}
 
       {/* Disclaimer de ficção — mostrado uma única vez por conta (primeira
           entrada; fonte de verdade: user.disclaimer_accepted no servidor),

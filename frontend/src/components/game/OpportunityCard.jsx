@@ -646,8 +646,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                       <span className="text-amber-400"> ({preview.split_penalty_pct}% saque dividido)</span>
                     </Tip>
                   )}
+                  {preview.repeat_penalty_pct < 0 && (
+                    <Tip tip="Repetir consecutivamente o mesmo tipo de operação reduz o retorno e trava farming automático.">
+                      <span className="text-amber-400"> ({preview.repeat_penalty_pct}% repetição)</span>
+                    </Tip>
+                  )}
                   <span className="text-[#0A84FF]"> · +{opp.respect} resp.</span>
-                  {" · "}{preview.fuel_needed}L comb. · ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
+                  {preview.operation_profile_label && <span className="text-zinc-300"> · {preview.operation_profile_label}</span>}
+                  {" · "}{preview.fuel_needed}L comb.
+                  {preview.distance_km > 0 && <span> · {preview.distance_km} km ida+volta</span>}
+                  {" · "}ETA {fmtDuration(preview.eta_s)} · op. {fmtDuration(preview.duration_s)}
                 </p>
 
                 {modifiers.length > 0 && (

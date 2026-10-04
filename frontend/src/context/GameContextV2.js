@@ -527,10 +527,27 @@ export function GameProvider({ children }) {
     action("missions/decision", { mission_id: missionId, option_id: optionId });
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
-      const { data } = await api.post("/game/dispatch/preview", {
-        opportunity_id: opportunityId,
-        team_id: teamId,
-      });
+      const opp = state?.opportunities?.find((item) => item.id === opportunityId);
+      const team = state?.teams?.find((item) => item.id === teamId);
+      const vehicle = state?.vehicles?.find((item) => item.id === team?.vehicle_id);
+      const property = vehicle?.property_id
+        ? state?.properties?.find((item) => item.id === vehicle.property_id)
+        : null;
+      const source = property || state?.player?.hq;
+      const origin = source ? { lat: Number(source.lat), lng: Number(source.lng) } : null;
+      const target = opp ? { lat: Number(opp.lat), lng: Number(opp.lng) } : null;
+      const payload = { opportunity_id: opportunityId, team_id: teamId };
+      if (origin && target && [origin.lat, origin.lng, target.lat, target.lng].every(Number.isFinite)) {
+        const [roadOutward, roadInward] = await Promise.all([
+          fetchRoute(origin, target),
+          fetchRoute(target, origin),
+        ]);
+        if (!roadOutward?.unavailable && !roadInward?.unavailable) {
+          payload.route_outward = roadOutward;
+          payload.route_inward = roadInward;
+        }
+      }
+      const { data } = await api.post("/game/dispatch/preview", payload);
       return { ok: true, data };
     } catch (e) {
       return {
@@ -538,7 +555,7 @@ export function GameProvider({ children }) {
         error: formatApiErrorDetail(e.response?.data?.detail) || e.message,
       };
     }
-  }, []);
+  }, [state]);
   const recommendOpportunityForTeam = useCallback(async (teamId) => {
     try {
       const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId });

@@ -133,6 +133,7 @@ const makeVehicle = (modelKey, teamId = null) => {
 const makeTeam = () => ({
   id: uid("team"), name: "Crew Alfa", spec: "assalto", status: "idle", vehicle_id: null,
   missions_done: 0, streak: 0, category_missions: {}, roster_missions: 0,
+  last_type_key: null, repeat_type_count: 0,
   available_at: null, roster_stable_since: nowIso(), emblem_key: null,
 });
 
@@ -150,6 +151,55 @@ const makeDistricts = (lat, lng) => {
 };
 
 const oppTypes = Object.entries(LOCAL_CATALOG.opportunity_types);
+
+const OPERATION_PROFILE_LABELS = {
+  confrontation:"Confronto", mobility:"Mobilidade", digital:"Digital", stealth:"Furtivo", influence:"Influência",
+};
+const OPERATION_PROFILE_RULES = [
+  ["digital",["hack","ciber","phishing","cartoes","dados","ddos","cript","servidor","semafor"]],
+  ["mobility",["transporte","entrega","rota","carga","contrabando","porto","frota"]],
+  ["stealth",["infiltr","fantasma","vigilancia","espion","encoberta","obra_arte","museu"]],
+  ["influence",["suborno","chantag","acordo","imprensa","protecao","boato","diplomat","leilao"]],
+  ["confrontation",["assalto","roubo","emboscada","guerra","sequestro","resgate","assassinato","ataque"]],
+];
+const operationProfileOf = (typeKey, category) => {
+  const key=String(typeKey||"").toLowerCase();
+  for(const [profile,tokens] of OPERATION_PROFILE_RULES){
+    if(tokens.some((token)=>key.includes(token))) return profile;
+  }
+  return {assalto:"confrontation",logistica:"mobility",tecnica:"digital",influencia:"influence",especial:"stealth"}[category]||"confrontation";
+};
+const operationProfileEffect = (save, opp, members, vehicle) => {
+  const profile=opp.profile||operationProfileOf(opp.type_key,opp.category);
+  const roleSets={
+    digital:new Set(["hacker","criptografo","engenheiro_social","falsificador"]),
+    mobility:new Set(["motorista","piloto","estafeta","contrabandista"]),
+    stealth:new Set(["espiao","arrombador","falsificador","informador"]),
+    influence:new Set(["negociador","advogado","chantagista","relacoes_publicas","informador"]),
+    confrontation:new Set(["assaltante","seguranca","franco_atirador","arrombador"]),
+  };
+  const attrSets={digital:["hack","inteligencia"],mobility:["conducao","discricao"],stealth:["discricao","sangue_frio"],influence:["negociacao","sangue_frio"],confrontation:["tiro","forca"]};
+  const attrs=attrSets[profile]||["sangue_frio"];
+  const values=members.flatMap((m)=>attrs.map((a)=>Number(m.attrs?.[a]||0)));
+  const avg=values.length?values.reduce((a,b)=>a+b,0)/values.length:0;
+  const specialist=members.some((m)=>roleSets[profile]?.has(m.role_key));
+  let delta=(avg-5)*.007+(specialist?.025:-.012);
+  const model=LOCAL_CATALOG.vehicle_models[vehicle?.model_key]||{};
+  if(profile==="stealth"){
+    if(Number(model.discretion||50)>=70) delta+=.015;
+    const loud=members.some((m)=>{
+      const w=(save.weapons||[]).find((x)=>x.id===m.weapon_id);
+      return w && LOCAL_CATALOG.weapon_models[w.model_key]?.loud;
+    });
+    if(loud) delta-=.02;
+  }else if(profile==="mobility"){
+    delta+=clamp((Number(vehicle?.condition??100)-70)/1500,-.015,.02);
+  }else if(profile==="confrontation"&&members.length){
+    const armed=members.filter((m)=>m.weapon_id).length;
+    delta+=(armed/members.length-.5)*.025;
+  }
+  return {profile,label:OPERATION_PROFILE_LABELS[profile]||profile,delta:clamp(delta,-.06,.07)};
+};
 
 const shuffle = (items) => {
   const out = [...items];
@@ -264,6 +314,7 @@ const makeOpportunities = (save, count = 5) => {
 
     generated.push({
       id: uid("opp"), type_key: typeKey, name: cfg.name, category: cfg.category,
+      profile: operationProfileOf(typeKey,cfg.category),
       description: "Oportunidade disponível nesta zona.",
       district: district.name || "Zona operacional", district_key: districtKey,
       lat: point.lat, lng: point.lng,
@@ -631,6 +682,7 @@ const missionChance = (save, opp, team) => {
   if (team.spec === opp.category) chance += 0.08;
   if (members.length >= (opp.min_members || 1)) chance += 0.04;
   if (vehicle) chance += clamp((vehicle.condition-50)/500, -0.1, 0.1);
+  chance += operationProfileEffect(save,opp,members,vehicle).delta;
   return clamp(chance,0.08,0.95);
 };
 
@@ -1075,7 +1127,11 @@ const mutateGame=(save,path,payload)=>{
     const pulse=localWorldPulse();
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
-    return {chance,reward:Math.round(opp.reward*pulseRewardMult),reward_bonus_pct:Math.round((pulseRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
+    const repeatCount=team.last_type_key===opp.type_key?Number(team.repeat_type_count||0)+1:0;
+    const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
+    const profile=operationProfileEffect(save,opp,members,vehicle);
+    return {chance,reward:Math.round(opp.reward*pulseRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
+      repeat_count:repeatCount,repeat_penalty_pct:Math.round((repeatMult-1)*1000)/10,operation_profile:profile.profile,operation_profile_label:profile.label,distance_km:Math.round(opp.dist_km*2*10)/10,
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       fuel_needed:vehicle?Math.max(1,Math.round((opp.dist_km*2*vehicle.cons/100)*10)/10):0,
       eta_s:10+Math.round(opp.dist_km*2),duration_s:opp.duration_s||24,
@@ -1134,8 +1190,12 @@ const mutateGame=(save,path,payload)=>{
     const pulse=localWorldPulse(start);
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
+    const repeatCount=team.last_type_key===opp.type_key?Number(team.repeat_type_count||0)+1:0;
+    const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
+    const profile=operationProfileEffect(save,opp,members,vehicle);
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
-      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult),pays:opp.pays,
+      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult*repeatMult),pays:opp.pays,
+      repeat_type:repeatCount>0,repeat_count:repeatCount,operation_profile:profile.profile,
       fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:baseChance,success_chance:baseChance,
       live_chance_delta:0,decision_reward_mult:1,phase:"en_route",
       depart_at:departAt,started_at:departAt,arrive_at:arriveAt,finish_at:finishAt,return_at:returnAt,
@@ -1145,8 +1205,8 @@ const mutateGame=(save,path,payload)=>{
       decision:localMissionDecision(opp.category,opp.risk,arriveAt,finishAt),
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
-        reward:Math.round(opp.reward*pulseRewardMult),risk:opp.risk,heat:opp.heat,pays:opp.pays}};
-    team.status="on_mission";members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
+        reward:Math.round(opp.reward*pulseRewardMult*repeatMult),risk:opp.risk,heat:opp.heat,pays:opp.pays,profile:profile.profile}};
+    team.status="on_mission";team.last_type_key=opp.type_key;team.repeat_type_count=repeatCount;members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
     addEvent(save,"dispatch",`${team.name} saiu para ${opp.name}.`);return {ok:true,mission_id:mission.id};
