@@ -531,8 +531,25 @@ async def delete_account(body: DeleteAccountInput, response: Response, user: dic
         await db.city_chat_reports.delete_many({
             "$or": [{"reporter_id": pid}, {"target_player_id": pid}],
         })
-        await db.city_alliances.update_many({"member_ids": pid}, {"$pull": {"member_ids": pid}})
-        await db.city_alliances.delete_many({"member_ids": {"$size": 0}})
+        alliance = await db.city_alliances.find_one({"member_ids": pid})
+        if alliance:
+            remaining = [member_id for member_id in (alliance.get("member_ids") or []) if member_id != pid]
+            if not remaining:
+                await db.city_alliances.delete_one({"_id": alliance["_id"]})
+            elif alliance.get("leader_id") == pid:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$set": {
+                        "member_ids": remaining,
+                        "leader_id": remaining[0],
+                        "leadership_changed_at": now_utc().isoformat(),
+                    }},
+                )
+            else:
+                await db.city_alliances.update_one(
+                    {"_id": alliance["_id"]},
+                    {"$set": {"member_ids": remaining}},
+                )
         await db.players.delete_one({"_id": player["_id"]})
     await db.action_receipts.delete_many({"key": {"$regex": f"^{re.escape(user['_id'])}:"}})
     await db.login_attempts.delete_many({"identifier": {"$regex": f":{re.escape(full_user['email'])}$"}})
