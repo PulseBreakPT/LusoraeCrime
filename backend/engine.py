@@ -3364,6 +3364,11 @@ async def advance(db, player):
         # Automação é uma conveniência: nunca pode derrubar o tick principal.
         logger.exception("Falha na automação da organização (player %s)", pid)
 
+    # Territórios e Cidade Viva partilham a mesma rede rival persistente.
+    # Saves antigos sem city_key continuam a usar o rival determinístico local.
+    city_rival_docs = await db.city_rivals.find({"player_id": pid}).to_list(20)
+    city_rivals_by_key = {str(r.get("key")): r for r in city_rival_docs if r.get("key")}
+
     # Territórios: rendimento passivo com pressão rival crescente e defesa que
     # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
     territory_rate = territory_income_per_hour(player)
@@ -3382,13 +3387,36 @@ async def advance(db, player):
             pressure = float(data.get("pressure", 0) or 0)
             defense = float(data.get("defense", 100) or 0)
             rival = dict(data.get("rival") or rival_profile(district))
+            city_rival = city_rivals_by_key.get(str(rival.get("city_key") or rival.get("key") or ""))
+            if city_rival:
+                power = float(city_rival.get("power", rival.get("strength", 50)) or 50)
+                hostility = float(city_rival.get("hostility", 40) or 40)
+                rival.update({
+                    "city_key": city_rival.get("key"),
+                    "key": city_rival.get("key"),
+                    "name": city_rival.get("name", rival.get("name")),
+                    "style": city_rival.get("style", rival.get("style")),
+                    "strength": max(20, min(100, round(power * 0.72 + hostility * 0.28))),
+                    "relation": city_rival.get("relation", "neutral"),
+                })
             data["rival"] = {
-                "key": rival.get("key"), "name": rival.get("name"), "style": rival.get("style"),
+                "key": rival.get("key"), "city_key": rival.get("city_key"),
+                "name": rival.get("name"), "style": rival.get("style"),
                 "strength": max(20, min(100, int(rival.get("strength", 50) or 50))),
+                "relation": rival.get("relation", "neutral"),
+                "pressure_mult": float(rival.get("pressure_mult", 1.0) or 1.0),
+                "defense_mult": float(rival.get("defense_mult", 1.0) or 1.0),
             }
             rival_strength = float(data["rival"]["strength"])
             rival_pressure_mult = float(rival.get("pressure_mult", 1.0) or 1.0)
             rival_defense_mult = float(rival.get("defense_mult", 1.0) or 1.0)
+            relation = rival.get("relation", "neutral")
+            if relation == "allied":
+                rival_pressure_mult *= 0.25
+                rival_defense_mult *= 0.65
+            elif relation == "truce":
+                rival_pressure_mult *= 0.50
+                rival_defense_mult *= 0.80
             pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
             pressure_gain *= (0.72 + rival_strength / 180.0) * rival_pressure_mult
             pressure_gain *= float(organization_specialization_effects(player).get("territory_pressure_mult", 1.0) or 1.0)
