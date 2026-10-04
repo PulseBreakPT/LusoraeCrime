@@ -473,6 +473,19 @@ const orgTerritoryIncome = (save) => {
 const orgProtectionCost = (save) =>
   save.player.level < 5 ? 0 : 25000 + (save.employees?.length || 0) * 1000 + (save.properties?.length || 0) * 2000;
 
+const GUEST_RIVALS=[
+  {key:"vibora",name:"Víbora",style:"agressiva"},
+  {key:"consorcio",name:"Consórcio",style:"financeira"},
+  {key:"fantasmas",name:"Fantasmas",style:"furtiva"},
+  {key:"linha_vermelha",name:"Linha Vermelha",style:"territorial"},
+  {key:"atlas",name:"Atlas",style:"logística"},
+];
+const guestRivalProfile=(district)=>{
+  const seed=String(district||"zona").split("").reduce((sum,ch,index)=>sum+(index+1)*ch.charCodeAt(0),0);
+  const base=GUEST_RIVALS[seed%GUEST_RIVALS.length];
+  return {...base,strength:42+(seed%37)};
+};
+
 const guestLogisticsMult=(save)=>Math.max(.70,1-Number(save.player.departments?.logistica||0)*.06);
 
 const guestOrgPolicy=(save)=>({
@@ -543,7 +556,7 @@ const guestOrgIntelligence=(save)=>{
   });
   const territories=Object.entries(save.player.territories||{}).map(([district,info])=>{
     const tier=Number(info.tier||1),cfg=org.territory_tiers?.[tier]||{},next=org.territory_tiers?.[tier+1];
-    return {district,tier,defense:Number(info.defense||0),pressure:Number(info.pressure||0),score:Math.round(clamp(Number(info.defense||0)*.65+(100-Number(info.pressure||0))*.35,0,100)),costs:{defend:Math.max(500,Math.trunc(Number(cfg.defense_weekly||0)*1.5)),consolidate:next?Number(next.cost||0):null}};
+    return {district,tier,defense:Number(info.defense||0),pressure:Number(info.pressure||0),score:Math.round(clamp(Number(info.defense||0)*.65+(100-Number(info.pressure||0))*.35,0,100)),rival:{...(info.rival||guestRivalProfile(district))},costs:{defend:Math.max(500,Math.trunc(Number(cfg.defense_weekly||0)*1.5)),consolidate:next?Number(next.cost||0):null}};
   });
   const fleetScore=fleet.length?fleet.reduce((a,v)=>a+v.score,0)/fleet.length:45;
   const propertyScore=properties.length?properties.reduce((a,p)=>a+p.score,0)/properties.length:55;
@@ -1786,7 +1799,7 @@ const mutateGame=(save,path,payload)=>{
       if(save.player.level<5)fail(400,"Requer nível 5");
       if(save.player.territories[p.district])fail(400,"Território já controlado");
       const cost=Number(tiers[1]?.cost||55000); chargeClean(save,cost,`Expansão territorial — ${p.district}`);
-      save.player.territories[p.district]={tier:1,defense:55,pressure:10,claimed_at:nowIso()}; return {ok:true,cost};
+      save.player.territories[p.district]={tier:1,defense:55,pressure:10,claimed_at:nowIso(),rival:guestRivalProfile(p.district)}; return {ok:true,cost};
     }
     if(path==="org/territories/consolidate"){
       const info=save.player.territories[p.district]; if(!info)fail(404,"Território não controlado");
