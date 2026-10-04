@@ -845,6 +845,8 @@ export function GameProvider({ children }) {
     action("org/policy", policy, "Política da organização atualizada");
   const runOrganizationAutomation = () =>
     action("org/automation/run", {}, "Automação da organização executada");
+  const resolveOrganizationEvent = (eventId, choice) =>
+    action("org/events/resolve", { event_id: eventId, choice }, "Decisão da organização aplicada");
 
   // Mastermind — grandes golpes, mercado negro, caçadores rivais e caches.
   const scoutMastermindTarget = (payload) => action("mastermind/heists/intel", payload, "Dossiê atualizado");
@@ -1048,6 +1050,7 @@ export function GameProvider({ children }) {
         quoteOrganizationAction,
         setOrganizationPolicy,
         runOrganizationAutomation,
+        resolveOrganizationEvent,
         scoutMastermindTarget,
         createMastermindHeist,
         startHeistPrep,
