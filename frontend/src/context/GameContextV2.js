@@ -779,6 +779,8 @@ export function GameProvider({ children }) {
     action("org/teams/policies", { team_id: teamId, policies }, "Políticas atualizadas");
   const setTeamLoadout = (teamId, loadout) =>
     action("org/teams/loadout", { team_id: teamId, loadout }, "Loadout guardado");
+  const applyTeamPreset = (teamId, presetKey) =>
+    action("org/teams/preset", { team_id: teamId, preset_key: presetKey }, "Preset da crew aplicado");
   const dissolveTeam = (teamId) =>
     action("org/teams/dissolve", { id: teamId }, "Equipa dissolvida");
   const reloadWeapon = (weaponId) =>
@@ -1029,6 +1031,7 @@ export function GameProvider({ children }) {
         setTeamDoctrine,
         setTeamPolicies,
         setTeamLoadout,
+        applyTeamPreset,
         dissolveTeam,
         reloadWeapon,
         upgradeWeaponMod,
