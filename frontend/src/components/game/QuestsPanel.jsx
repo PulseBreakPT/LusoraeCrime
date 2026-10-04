@@ -339,7 +339,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTar
         )}
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-4 bg-black/40">
+          <TabsList className="grid w-full grid-cols-2 gap-1 bg-black/40 sm:grid-cols-4">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t.key}
