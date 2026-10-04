@@ -90,7 +90,7 @@ from city_systems import (
     operation_world_modifier, business_network_effect, boss_leadership_modifier,
     ensure_rivals, advance_rival_world,
 )
-from game_data import operation_profile_of, OPERATION_PROFILE_LABELS
+from game_data import operation_profile_of, OPERATION_PROFILE_LABELS, ORG_LEVEL_UNLOCKS, MAX_ORG_LEVEL
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
@@ -439,6 +439,8 @@ def _oid(v, msg):
 @router.get("/catalog")
 async def catalog():
     return {
+        "max_org_level": MAX_ORG_LEVEL,
+        "org_level_unlocks": ORG_LEVEL_UNLOCKS,
         "team_specs": TEAM_SPECS,
         "team_create_cost": TEAM_CREATE_COST,
         "specializations": SPECIALIZATIONS,
@@ -1580,6 +1582,7 @@ async def recommend_repeat(body: TeamIdInput, user: dict = Depends(get_current_u
 
 
 @router.post("/opportunities/favorite")
+@idempotent("opportunities_favorite")
 async def toggle_favorite_type(body: TypeKeyInput, user: dict = Depends(get_current_user)):
     """Marca/desmarca um tipo de operação como favorito — favoritos aparecem
     primeiro no mapa e na lista de oportunidades."""
@@ -3408,6 +3411,7 @@ async def upgrade_hq(body: Optional[MutationInput] = None, user: dict = Depends(
 
 
 @router.post("/hq/priority")
+@idempotent("hq_priority")
 async def set_hq_priority(body: PriorityInput, user: dict = Depends(get_current_user)):
     if body.priority not in HQ_PRIORITIES:
         raise HTTPException(status_code=400, detail="Prioridade inválida")
@@ -3497,6 +3501,7 @@ class SettingsUpdateInput(BaseModel):
 
 
 @router.post("/settings")
+@idempotent("settings_update")
 async def update_settings(body: SettingsUpdateInput, user: dict = Depends(get_current_user)):
     """Guarda as preferências de automatização — só estas afetam o servidor
     (as restantes definições de interface/jogabilidade vivem só no dispositivo)."""
@@ -3739,6 +3744,7 @@ async def _consume_shop_timer(player_id, cost: int, collection, query, update):
 
 
 @router.post("/shop/speedup")
+@idempotent("shop_speedup")
 async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_user)):
     """Acelera um temporizador já existente (nunca cria lógica de conclusão
     nova) — só antecipa o timestamp relevante para agora. O próximo advance()
@@ -3849,6 +3855,7 @@ async def shop_speedup(body: ShopSpeedupInput, user: dict = Depends(get_current_
 
 
 @router.post("/shop/buy_slot")
+@idempotent("shop_buy_slot")
 async def shop_buy_slot(body: ShopBuySlotInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3879,6 +3886,7 @@ async def shop_buy_slot(body: ShopBuySlotInput, user: dict = Depends(get_current
 
 
 @router.post("/shop/vip")
+@idempotent("shop_vip")
 async def shop_buy_vip(body: ShopVipInput, user: dict = Depends(get_current_user)):
     plan = VIP_PLANS.get(body.plan_key)
     if not plan:
@@ -3911,6 +3919,7 @@ _COSMETIC_CATALOGS = {"vehicle_paint": VEHICLE_PAINTS, "team_emblem": TEAM_EMBLE
 
 
 @router.post("/shop/cosmetic")
+@idempotent("shop_cosmetic")
 async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_current_user)):
     catalog_map = _COSMETIC_CATALOGS.get(body.category)
     if not catalog_map or body.key not in catalog_map:
@@ -3939,6 +3948,7 @@ async def shop_buy_cosmetic(body: ShopCosmeticInput, user: dict = Depends(get_cu
 
 
 @router.post("/vehicles/equip_paint")
+@idempotent("vehicle_equip_paint")
 async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3954,6 +3964,7 @@ async def equip_vehicle_paint(body: VehicleEquipPaintInput, user: dict = Depends
 
 
 @router.post("/teams/equip_emblem")
+@idempotent("team_equip_emblem")
 async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -3969,6 +3980,7 @@ async def equip_team_emblem(body: TeamEquipEmblemInput, user: dict = Depends(get
 
 
 @router.post("/hq/equip_skin")
+@idempotent("hq_equip_skin")
 async def equip_hq_skin(body: HqEquipSkinInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
