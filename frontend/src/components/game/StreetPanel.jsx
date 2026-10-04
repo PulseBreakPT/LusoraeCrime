@@ -277,7 +277,7 @@ const RadarTab = ({ street, now }) => {
           <Info label="Alerta" value={street.scanner.alert} />
           <Info label="Pressão máxima" value={street.scanner.hot_district || "Sem sinal"} />
           <Info
-            label="Inteligência"
+            label="Informação"
             value={street.scanner.intel_active ? `Ativa · ${fmtDuration(street.scanner.intel_remaining_s)}` : "Normal"}
             accent={street.scanner.intel_active}
           />
@@ -353,7 +353,7 @@ const TerritoriesTab = ({ districts, onAction }) => (
 
 const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
   <div className="mt-4 space-y-3">
-    <SectionHeader icon={Contact} label="Rede de contactos" />
+    <SectionHeader icon={Contact} label="Contactos" />
     <p className="text-[10px] leading-relaxed text-zinc-500">
       Cada favor aumenta a relação. Os contactos têm recarga própria e produzem efeitos imediatos no mundo.
     </p>
