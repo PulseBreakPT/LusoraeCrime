@@ -90,7 +90,7 @@ export function UplinkProgress({ progress, label = "A carregar", meta }) {
       <div className="mt-2 flex items-center gap-3">
         <div className="sub-progress-track flex-1">
           <div className="sub-progress-shell">
-            <div className="sub-progress-fill h-full" style={{ width: `${pct}%` }} />
+            <div className="sub-progress-fill h-full" style={{ transform: `scaleX(${pct / 100})` }} />
           </div>
           <span className="sub-progress-head" style={{ left: `${pct}%` }} aria-hidden="true" />
         </div>
