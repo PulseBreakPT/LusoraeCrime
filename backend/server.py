@@ -16,6 +16,7 @@ from routes_game import router as game_router
 from routes_mastermind import router as mastermind_router
 from routes_admin import router as admin_router
 from routes_legal import router as legal_router
+from routes_organization import router as organization_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
 from road_routing import road_router
@@ -27,6 +28,7 @@ app.include_router(game_router)
 app.include_router(mastermind_router)
 app.include_router(admin_router)
 app.include_router(legal_router)
+app.include_router(organization_router)
 
 
 @app.get("/api/")
@@ -110,10 +112,13 @@ async def startup():
     await db.employees.create_index("player_id")
     await db.candidates.create_index("player_id")
     await db.vehicles.create_index("player_id")
+    await db.weapons.create_index("player_id")
+    await db.weapons.create_index([("player_id", 1), ("employee_id", 1)])
     await db.properties.create_index("player_id")
     await db.opportunities.create_index([("player_id", 1), ("status", 1)])
     await db.missions.create_index([("player_id", 1), ("phase", 1)])
     await db.events.create_index([("player_id", 1), ("ts", -1)])
+    await db.transactions.create_index([("player_id", 1), ("ts", -1)])
     await db.quests.create_index([("player_id", 1), ("status", 1)])
     await db.road_routes.create_index("key", unique=True)
     await db.road_routes.create_index("expires_at")
