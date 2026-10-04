@@ -23,7 +23,7 @@ from organization_intelligence import (
 from organization_automation import run_organization_automation
 from organization_events import parse_dt as parse_org_event_dt
 from organization_systems import (
-    SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
+    SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES, TEAM_PRESETS,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
@@ -178,6 +178,11 @@ class TeamLoadoutInput(MutationInput):
     loadout: dict[str, int] = Field(default_factory=dict)
 
 
+class TeamPresetInput(MutationInput):
+    team_id: str
+    preset_key: str
+
+
 class EntityIdInput(MutationInput):
     id: str
 
@@ -231,6 +236,7 @@ async def organization_catalog():
         "weapon_upgrades": WEAPON_UPGRADES,
         "team_doctrines": TEAM_DOCTRINES,
         "team_policies": TEAM_POLICIES,
+        "team_presets": TEAM_PRESETS,
         "departments": DEPARTMENTS,
         "territory_tiers": TERRITORY_TIERS,
         "property_modules": PROPERTY_MODULES,
@@ -649,6 +655,47 @@ async def set_loadout(body: TeamLoadoutInput, user: dict = Depends(get_current_u
     if not result.matched_count:
         raise HTTPException(status_code=400, detail="Equipa inexistente ou ocupada")
     return {"ok": True, "loadout": loadout}
+
+
+@router.post("/teams/preset")
+@idempotent("teams.preset")
+async def apply_team_preset(body: TeamPresetInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    preset = TEAM_PRESETS.get(body.preset_key)
+    if not preset:
+        raise HTTPException(status_code=400, detail="Preset inválido")
+    team = await db.teams.find_one({
+        "_id": _oid(body.team_id, "Equipa inválida"),
+        "player_id": pid,
+    })
+    if not team:
+        raise HTTPException(status_code=404, detail="Equipa não encontrada")
+    if team.get("status") != "idle":
+        raise HTTPException(status_code=400, detail="A equipa está em operação")
+    inventory = normalize_inventory(player)
+    loadout = {}
+    skipped = []
+    for key in preset.get("loadout") or []:
+        if int(inventory.get(key, 0) or 0) > 0:
+            loadout[key] = 1
+        else:
+            skipped.append(key)
+    policies = {**default_team_policies(), **(preset.get("policies") or {})}
+    await db.teams.update_one({"_id": team["_id"]}, {"$set": {
+        "doctrine": preset["doctrine"],
+        "policies": policies,
+        "loadout": loadout,
+    }})
+    return {
+        "ok": True,
+        "preset_key": body.preset_key,
+        "preset_name": preset["name"],
+        "doctrine": preset["doctrine"],
+        "policies": policies,
+        "loadout": loadout,
+        "skipped_out_of_stock": skipped,
+    }
 
 
 @router.post("/teams/dissolve")
