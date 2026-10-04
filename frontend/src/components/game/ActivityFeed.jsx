@@ -180,15 +180,15 @@ function useLiveOps(state, onFresh) {
 
 // ---------- Separadores da central (partilhados desktop/mobile) ----------
 const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) => (
-  <div className="flex border-b border-white/[0.06]" role="tablist" aria-label="Atividade">
+  <div className="sub-notify-tabs flex border-b border-white/[0.06]" role="tablist" aria-label="Notificações">
     <button
       type="button"
       role="tab"
       aria-selected={tab === "live"}
       data-testid={`${idPrefix}-tab-live`}
       onClick={() => onTab("live")}
-      className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] transition-colors ${
-        tab === "live" ? "bg-red-500/10 text-red-300" : "text-zinc-500 hover:text-zinc-300"
+      className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+        tab === "live" ? "text-white" : "text-zinc-500 hover:text-zinc-300"
       }`}
     >
       <span className="sub-lo-rec" style={liveCount === 0 ? { animation: "none", opacity: 0.25, boxShadow: "none" } : undefined} />
@@ -207,7 +207,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
       data-testid={`${idPrefix}-tab-log`}
       onClick={() => onTab("log")}
       className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] transition-colors ${
-        tab === "log" ? "bg-white/[0.05] text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
+        tab === "log" ? "text-white" : "text-zinc-500 hover:text-zinc-300"
       }`}
     >
       Registos
@@ -220,7 +220,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
 
 // ---------- Chips de filtro (partilhados desktop/mobile) ----------
 const FilterChips = ({ counts, filter, onFilter }) => (
-  <div className="sub-feed-chiprow px-2 pt-1.5" role="tablist" aria-label="Filtrar registos">
+  <div className="sub-feed-chiprow sub-notify-filters px-2.5 pt-2" role="tablist" aria-label="Filtrar notificações">
     {CATEGORIES.filter((c) => c.key === "all" || counts[c.key]).map((c) => (
       <button
         key={c.key}
@@ -248,7 +248,7 @@ const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
       data-sev={e.sev}
       onClick={() => onNavigate && onNavigate(e.dest.panel, e.dest)}
       title={`${KIND_LABELS[e.kind] || e.kind} — abrir ${PANEL_LABELS[e.dest.panel] || e.dest.panel} · ${fullTime(e.ts)}`}
-      className={`sub-feed-row flex w-full items-start gap-2 px-1.5 py-1 text-left ${flash ? "sub-feed-new" : ""}`}
+      className={`sub-feed-row flex w-full items-start gap-2.5 px-2.5 py-2.5 text-left ${flash ? "sub-feed-new" : ""}`}
     >
       <span
         className="sub-feed-ico mt-0.5"
@@ -341,21 +341,26 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   return (
     <div
       data-testid="activity-feed"
-      className={`sub-panel sub-hud-solid pointer-events-auto absolute bottom-20 left-2 z-20 w-[24rem] animate-slide-up overflow-hidden rounded-xl border shadow-2xl ${
+      className={`sub-panel sub-hud-solid sub-notification-panel pointer-events-auto absolute bottom-20 left-2 z-20 w-[25rem] animate-slide-up overflow-hidden rounded-2xl border shadow-2xl ${
         suppressed ? "hidden xl:block" : "hidden md:block"
       }`}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+      <div className="sub-notify-head flex items-center justify-between gap-3 border-b border-white/[0.07] px-3.5 py-3">
         <button
           type="button"
           data-testid="feed-collapse-toggle"
           onClick={toggleCollapsed}
           title={collapsed ? "Abrir a atividade" : "Encolher a atividade"}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
         >
-          <span className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-destructive" />
-          <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-            Atividade
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.035] text-zinc-300">
+            <Bell size={14} />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-200">
+              Notificações
+            </span>
+            <span className="block text-[9px] text-zinc-600">{events.length} recentes</span>
           </span>
           {collapsed && liveCount > 0 && (
             <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold uppercase text-red-300">
@@ -373,7 +378,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
           />
         </button>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="font-mono text-[9px] text-zinc-600">{events.length} registos</span>
+          <span className="text-[9px] tabular-nums text-zinc-600">{events.length}</span>
           {!collapsed && (
             <button
               type="button"
@@ -477,14 +482,16 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
       {open && (
         <Card
           data-testid="activity-feed-mobile-list"
-          className="sub-panel pointer-events-auto absolute inset-x-0 bottom-full mb-2 animate-slide-up overflow-hidden border-border bg-[#0a0a0c]/95 p-0 shadow-2xl"
+          className="sub-panel sub-notification-panel pointer-events-auto absolute inset-x-0 bottom-full mb-2 animate-slide-up overflow-hidden rounded-2xl border-border bg-[#0a0a0c]/95 p-0 shadow-2xl"
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-            <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
-              Atividade
+          <div className="sub-notify-head flex items-center justify-between border-b border-white/[0.07] px-3.5 py-3">
+            <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-200">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.035] text-zinc-300">
+                <Bell size={14} />
+              </span>
+              Notificações
             </p>
-            <span className="font-mono text-[9px] text-zinc-600">{events.length} registos</span>
+            <span className="text-[9px] tabular-nums text-zinc-600">{events.length}</span>
           </div>
           <ConsoleTabs tab={tab} onTab={setTab} liveCount={liveCount} unread={unread} idPrefix="console-m" />
           {tab === "live" ? (
@@ -540,9 +547,9 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           data-testid="activity-feed-mobile-toggle"
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="sub-hud-btn pointer-events-auto relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300"
-          aria-label={open ? "Fechar Atividade" : "Abrir Atividade"}
-          title="Atividade"
+          className="sub-hud-btn sub-notification-trigger pointer-events-auto relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-zinc-300"
+          aria-label={open ? "Fechar notificações" : "Abrir notificações"}
+          title="Notificações"
         >
           <Bell size={17} />
           {(unread > 0 || liveCount > 0) && !open && (
