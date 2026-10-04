@@ -95,6 +95,19 @@ async def migrate_integrated_org():
     await db.players.update_many({"territories": {"$exists": False}}, {"$set": {"territories": {}}})
     await db.players.update_many({"prestige_items": {"$exists": False}}, {"$set": {"prestige_items": []}})
     await db.players.update_many({"governance": {"$exists": False}}, {"$set": {"governance": {}}})
+    await db.players.update_many({"organization_policy": {"$exists": False}}, {"$set": {
+        "organization_policy": {
+            "reserve_cash": 25000,
+            "max_single_spend_pct": 0.35,
+            "stock_targets": {},
+            "automation": {
+                "enabled": False,
+                "auto_restock": False,
+                "renew_insurance": False,
+                "preventive_service": False,
+            },
+        },
+    }})
     await db.teams.update_many({"doctrine": {"$exists": False}}, {"$set": {"doctrine": "balanced"}})
     await db.teams.update_many({"policies": {"$exists": False}}, {"$set": {"policies": {
         "abort_below_pct": 0, "protect_injured": True,
@@ -109,6 +122,8 @@ async def migrate_integrated_org():
     await db.properties.update_many({"storage_level": {"$exists": False}}, {"$set": {"storage_level": 0}})
     await db.properties.update_many({"operations_level": {"$exists": False}}, {"$set": {"operations_level": 0}})
     await db.properties.update_many({"staff_employee_ids": {"$exists": False}}, {"$set": {"staff_employee_ids": []}})
+    await db.properties.update_many({"staff_roles": {"$exists": False}}, {"$set": {"staff_roles": {}}})
+    await db.properties.update_many({"staff_effectiveness": {"$exists": False}}, {"$set": {"staff_effectiveness": 0.0}})
     await db.vehicles.update_many({"last_service_km": {"$exists": False}}, {"$set": {"last_service_km": 0.0}})
     await db.vehicles.update_many({"tires_pct": {"$exists": False}}, {"$set": {"tires_pct": 100.0}})
     await db.vehicles.update_many({"notoriety": {"$exists": False}}, {"$set": {"notoriety": 0.0}})
@@ -159,6 +174,7 @@ async def startup():
     await db.transactions.create_index([("player_id", 1), ("ts", -1)])
     await db.action_receipts.create_index("key", unique=True)
     await db.action_receipts.create_index("expires_at", expireAfterSeconds=0)
+    await db.organization_audit.create_index([("player_user_id", 1), ("ts", -1)])
     await db.quests.create_index([("player_id", 1), ("status", 1)])
     await db.road_routes.create_index("key", unique=True)
     await db.road_routes.create_index("expires_at")
