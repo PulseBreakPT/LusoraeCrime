@@ -20,6 +20,7 @@ from economy_constants import (
 from organization_intelligence import (
     build_organization_intelligence, quote_action, organization_policy,
 )
+from organization_automation import run_organization_automation
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
@@ -334,6 +335,14 @@ async def set_organization_policy(body: OrganizationPolicyInput, user: dict = De
     }
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"organization_policy": policy}})
     return {"ok": True, "policy": organization_policy({**player, "organization_policy": policy})}
+
+
+@router.post("/automation/run")
+async def run_automation_now(user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    return await run_organization_automation(
+        db, player, now=now_utc(), add_event=add_event, record_tx=record_tx, force=True,
+    )
 
 
 @router.get("/audit")
