@@ -183,7 +183,6 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
           <PanelWatermark icon={Swords} />
           <SheetTitle className="flex items-center gap-2 text-white">
             <Swords size={18} className="text-primary" /> Armamento
-            <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="weapons-count">{weapons.length}</span>
           </SheetTitle>
           <SheetDescription className="text-zinc-500">As ferramentas do ofício — compra, mantém e distribui com cabeça.</SheetDescription>
         </SheetHeader>
