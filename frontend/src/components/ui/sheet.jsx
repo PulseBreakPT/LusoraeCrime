@@ -55,7 +55,9 @@ const SheetContent = React.forwardRef(({ side = "right", className, children, ..
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
-      {children}
+      <div className="sub-sheet-scroll">
+        {children}
+      </div>
     </SheetPrimitive.Content>
   </SheetPortal>
 ))
