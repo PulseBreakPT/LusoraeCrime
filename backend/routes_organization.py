@@ -27,7 +27,8 @@ from organization_systems import (
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
-    PRESTIGE_CATALOG, protection_cost, fixed_cost_multiplier, territory_weekly_cost,
+    PRESTIGE_CATALOG, ORGANIZATION_SPECIALIZATIONS,
+    protection_cost, fixed_cost_multiplier, territory_weekly_cost,
     logistics_cost_multiplier, supply_cost_multiplier, rival_profile, property_staff_profile,
 )
 
@@ -228,6 +229,7 @@ async def organization_catalog():
         "property_modules": PROPERTY_MODULES,
         "vehicle_lifecycle": VEHICLE_LIFECYCLE,
         "prestige": PRESTIGE_CATALOG,
+        "specializations": ORGANIZATION_SPECIALIZATIONS,
     }
 
 
@@ -1132,6 +1134,10 @@ class PrestigeInput(MutationInput):
     item_key: str
 
 
+class SpecializationInput(MutationInput):
+    specialization_key: str
+
+
 @router.post("/prestige/buy")
 @idempotent("prestige.buy")
 async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_user)):
@@ -1154,6 +1160,52 @@ async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_use
     player["clean_money"] = fresh["clean_money"]
     await record_tx(db, str(player["_id"]), "prestige", -cost, "clean", fresh["clean_money"], cfg["name"])
     return {"ok": True, "cost": cost}
+
+
+@router.post("/specialization/choose")
+@idempotent("specialization.choose")
+async def choose_organization_specialization(body: SpecializationInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    cfg = ORGANIZATION_SPECIALIZATIONS.get(body.specialization_key)
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Especialização inválida")
+    if int(player.get("level", 1) or 1) < int(cfg.get("unlock_level", 9) or 9):
+        raise HTTPException(status_code=400, detail=f"Desbloqueia no nível {cfg.get('unlock_level', 9)}")
+    if player.get("organization_specialization"):
+        raise HTTPException(status_code=400, detail="A organização já escolheu uma especialização permanente")
+    cost = int(cfg["cost"])
+    fresh = await db.players.find_one_and_update(
+        {
+            "_id": player["_id"],
+            "clean_money": {"$gte": cost},
+            "$or": [
+                {"organization_specialization": None},
+                {"organization_specialization": {"$exists": False}},
+            ],
+        },
+        {
+            "$inc": {"clean_money": -cost, "stats.organization_specializations": 1},
+            "$set": {
+                "organization_specialization": body.specialization_key,
+                "organization_specialization_at": now_utc().isoformat(),
+            },
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=409, detail="A caixa ou especialização mudou; tenta novamente")
+    await record_tx(
+        db, str(player["_id"]), "organization_specialization", -cost, "clean",
+        fresh["clean_money"], cfg["name"],
+    )
+    await add_event(db, str(player["_id"]), "system", f"Especialização da organização definida: {cfg['name']}.")
+    return {
+        "ok": True,
+        "specialization_key": body.specialization_key,
+        "name": cfg["name"],
+        "cost": cost,
+        "effects": cfg.get("effects") or {},
+    }
 
 
 @router.post("/governance/protection")
