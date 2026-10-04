@@ -38,9 +38,9 @@ export const ResourceBar = () => {
       data-testid="resource-bar"
       className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down"
     >
-      <div className="lus-topbar mx-auto flex w-fit max-w-full items-center gap-2 px-1 py-1 sm:gap-3">
+      <div className="sub-topbar mx-auto flex w-fit max-w-full items-center gap-2 px-1 py-1 sm:gap-3">
         <Tip tip={respectTip} side="bottom" align="start">
-          <div className={`lus-minimal-stat lus-level-readout flex shrink-0 items-center gap-1.5 px-1 ${respectFlash ? "lus-flash-blue" : ""}`}>
+          <div className={`sub-minimal-stat sub-level-readout flex shrink-0 items-center gap-1.5 px-1 ${respectFlash ? "sub-flash-blue" : ""}`}>
             <span className="font-mono text-[13px] font-black leading-none text-red-400 sm:text-sm">
               LV {p.level}
             </span>
@@ -57,7 +57,7 @@ export const ResourceBar = () => {
           color="#10B981"
           value={<AnimatedNumber value={p.clean_money} format={fmtMoneyShort} />}
           tip="Dinheiro limpo disponível para compras, salários, reparações e subornos."
-          className={moneyFlash ? "lus-flash" : ""}
+          className={moneyFlash ? "sub-flash" : ""}
         />
 
         <Stat
@@ -66,7 +66,7 @@ export const ResourceBar = () => {
           color="#F59E0B"
           value={<AnimatedNumber value={p.dirty_money} format={fmtMoneyShort} />}
           tip="Dinheiro sujo. Lava-o no Império antes de o poderes gastar."
-          className={dirtyFlash ? "lus-flash-amber" : ""}
+          className={dirtyFlash ? "sub-flash-amber" : ""}
         />
 
       </div>
@@ -76,7 +76,7 @@ export const ResourceBar = () => {
 
 const Stat = ({ icon: Icon, color, value, tip, testId, className = "" }) => (
   <Tip tip={tip} side="bottom" className="min-w-0">
-    <div data-testid={testId} className={`lus-minimal-stat flex min-w-0 items-center gap-1.5 px-1 ${className}`}>
+    <div data-testid={testId} className={`sub-minimal-stat flex min-w-0 items-center gap-1.5 px-1 ${className}`}>
       <Icon size={15} className="shrink-0" style={{ color }} />
       <span className="truncate font-mono text-[13px] font-bold leading-none text-white sm:text-sm">
         {value}

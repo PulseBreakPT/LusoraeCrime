@@ -76,7 +76,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:max-w-xl" data-testid="mastermind-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:max-w-xl" data-testid="mastermind-panel">
         <SheetHeader>
           <PanelWatermark icon={Vault} />
           <PanelKicker>Rede Mastermind · Grandes Golpes</PanelKicker>
@@ -89,7 +89,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         {!mastermind ? (
-          <Card className="mt-5 lus-card p-5 text-center">
+          <Card className="mt-5 sub-card p-5 text-center">
             <RadioTower className="mx-auto animate-pulse text-violet-300" size={22} />
             <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               A desencriptar a rede Mastermind…
@@ -172,7 +172,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
 
 
 const RankCard = ({ rank }) => (
-  <Card className="lus-card p-4" data-testid="mastermind-rank">
+  <Card className="sub-card p-4" data-testid="mastermind-rank">
     <div className="flex items-start justify-between gap-3">
       <div>
         <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Estatuto Mastermind</p>
@@ -203,7 +203,7 @@ const BoardTab = ({
       {!active ? (
         <>
           <SectionHeader icon={BriefcaseBusiness} title="Configuração do plano" />
-          <Card className="lus-card p-3">
+          <Card className="sub-card p-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label="Equipa">
                 <select
@@ -302,7 +302,7 @@ const BoardTab = ({
 
 
 const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
-  <Card className={`lus-card p-4 ${target.unlocked ? "" : "opacity-55"}`} data-testid={`mastermind-target-${target.key}`}>
+  <Card className={`sub-card p-4 ${target.unlocked ? "" : "opacity-55"}`} data-testid={`mastermind-target-${target.key}`}>
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="font-display text-sm font-bold uppercase tracking-wide text-white">{target.name}</p>
@@ -361,7 +361,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
     return (
       <>
         <SectionHeader icon={Crosshair} title="Final em execução" />
-        <Card className="lus-card overflow-hidden p-4" data-testid="mastermind-finale">
+        <Card className="sub-card overflow-hidden p-4" data-testid="mastermind-finale">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-white">{active.target_name}</p>
@@ -400,7 +400,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
   return (
     <>
       <SectionHeader icon={ListChecks} title={active.target_name} meta={`${completed}/${active.preps.length} preparações`} />
-      <Card className="lus-card p-3">
+      <Card className="sub-card p-3">
         <div className="grid grid-cols-2 gap-2">
           <Info label="Equipa" value={active.team_name} />
           <Info label="Veículo" value={active.vehicle_name} />
@@ -424,7 +424,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
         const canClaim = isCurrent && active.current_prep?.status === "ready";
         const running = isCurrent && active.current_prep?.status === "running";
         return (
-          <Card key={prep.key} className="lus-card p-3" data-testid={`mastermind-prep-${prep.key}`}>
+          <Card key={prep.key} className="sub-card p-3" data-testid={`mastermind-prep-${prep.key}`}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-bold text-white">{prep.name}</p>
@@ -477,7 +477,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
 const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
   <div className="mt-4 space-y-3">
     <SectionHeader icon={Coins} title="Mercado negro dinâmico" meta={`${market.used}/${market.capacity} espaço`} />
-    <Card className="lus-card p-3">
+    <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[9px] uppercase text-zinc-500">Armazenamento clandestino</p>
@@ -516,7 +516,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
       const TrendIcon = good.trend === "up" ? TrendingUp : good.trend === "down" ? TrendingDown : Gauge;
       const totalSpace = good.space * quantity;
       return (
-        <Card key={good.key} className={`lus-card p-3 ${good.unlocked ? "" : "opacity-55"}`}>
+        <Card key={good.key} className={`sub-card p-3 ${good.unlocked ? "" : "opacity-55"}`}>
           <div className="flex items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/40">
               <Package size={16} className="text-amber-300" />
@@ -564,7 +564,7 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
 const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
   <div className="mt-4 space-y-3">
     <SectionHeader icon={ShieldAlert} title="Resposta aos caçadores" />
-    <Card className="lus-card overflow-hidden p-4" data-testid="mastermind-bounty">
+    <Card className="sub-card overflow-hidden p-4" data-testid="mastermind-bounty">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Recompensa rival</p>
@@ -579,7 +579,7 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
       </div>
     </Card>
 
-    <Card className="lus-card p-3">
+    <Card className="sub-card p-3">
       <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-zinc-400">
         <Users size={11} /> Contraemboscada
       </p>
@@ -612,7 +612,7 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
 const CachesTab = ({ caches, onScan }) => (
   <div className="mt-4 space-y-3">
     <SectionHeader icon={RadioTower} title="Rede de sinais" meta={`${caches.collected}/${caches.total}`} />
-    <Card className="lus-card p-3">
+    <Card className="sub-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="font-mono text-[9px] uppercase text-zinc-500">Cifragem territorial</p>
@@ -629,7 +629,7 @@ const CachesTab = ({ caches, onScan }) => (
     </Card>
 
     {caches.districts.map((district) => (
-      <Card key={district.key} className="lus-card p-3" data-testid={`signal-cache-${district.key}`}>
+      <Card key={district.key} className="sub-card p-3" data-testid={`signal-cache-${district.key}`}>
         <div className="flex items-start gap-3">
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
             district.collected ? "border-emerald-500/25 bg-emerald-500/5" : "border-white/10 bg-black/40"

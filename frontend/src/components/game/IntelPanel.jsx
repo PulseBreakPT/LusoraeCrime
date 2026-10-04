@@ -125,7 +125,7 @@ const RecommendedActions = ({ onNavigate }) => {
       ) : (
         <div className="space-y-1.5">
           {recs.map((r) => (
-            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 lus-card px-3 py-2 shadow-none">
+            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 sub-card px-3 py-2 shadow-none">
               <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
               <Button
                 data-testid={`intel-rec-action-${r.id}`}
@@ -163,7 +163,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={BrainCircuit} />
           <PanelKicker>Rede · Relatórios</PanelKicker>
@@ -253,7 +253,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
               const outcome = m.chase_outcome === "caught" ? "police" : m.outcome;
               const paidReward = Number(m.pending_reward || 0);
               return (
-                <Card key={m.id} className="flex items-center justify-between lus-card px-2.5 py-1.5 shadow-none">
+                <Card key={m.id} className="flex items-center justify-between sub-card px-2.5 py-1.5 shadow-none">
                   <div>
                     <p className="text-xs font-semibold text-white">
                       {m.opportunity.name} <span className="font-mono text-[9px] text-zinc-500">{m.opportunity.district}</span>
@@ -294,7 +294,7 @@ const Grid = ({ children }) => <div className="grid grid-cols-2 gap-2">{children
 
 const Cell = ({ label, value, color = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full lus-card p-2.5 shadow-none">
+    <Card className="h-full sub-card p-2.5 shadow-none">
       <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
     </Card>

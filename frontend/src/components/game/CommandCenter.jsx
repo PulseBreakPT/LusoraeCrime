@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
 
-const RECENT_KEY = "lusorae.command-recent";
+const RECENT_KEY = "submundo.command-recent";
 
 const fold = (value) => String(value || "")
   .normalize("NFD")
@@ -75,7 +75,7 @@ const downloadTransactions = async (fetchTransactions) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `lusorae-extrato-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `submundo-extrato-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -88,7 +88,7 @@ const copyBriefing = async (state) => {
   const ready = teamsReadiness(state);
   const active = (state.missions || []).filter((mission) => mission.phase !== "done").length;
   const briefing = [
-    `Lusorae · ${state.player.org_name}`,
+    `SUBMUNDO · ${state.player.org_name}`,
     `Nível ${state.player.level} · Respeito ${state.player.respect}`,
     `Dinheiro limpo: ${fmtMoney(state.player.clean_money)}`,
     `Dinheiro sujo: ${fmtMoney(state.player.dirty_money)}`,

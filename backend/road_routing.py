@@ -1,4 +1,4 @@
-"""Road routing for LusoraeCrime.
+"""Road routing for SUBMUNDO.
 
 The browser must not depend directly on the public OSRM instance during a
 dispatch. Routes are resolved server-side, throttled, cached in MongoDB and
@@ -120,7 +120,7 @@ class RoadRouter:
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(10.0, connect=4.0),
             headers={
-                "User-Agent": "LusoraeCrime-RoadRouting/1.0",
+                "User-Agent": "SUBMUNDO-RoadRouting/1.0",
                 "Accept": "application/json",
             },
         )

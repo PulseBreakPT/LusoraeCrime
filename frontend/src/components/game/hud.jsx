@@ -1,6 +1,6 @@
 // Blocos partilhados do centro de comando — tooltips, mini-barras, chips e células KPI.
 // Construídos sobre os primitivos shadcn/ui (Tooltip, Badge, Progress, Card) para que toda
-// a plataforma partilhe a mesma base visual, mantendo a estética escura/mono do Lusorae.
+// a plataforma partilhe a mesma base visual, mantendo a estética escura/mono do SUBMUNDO.
 
 import { useEffect, useRef, useState } from "react";
 import { Pencil, Check, X, Star, Loader2 } from "lucide-react";
@@ -94,7 +94,7 @@ export const Chip = ({ icon: Icon, label, value, color = "#A1A1AA", valueColor =
 
 export const Kpi = ({ icon: Icon, label, value, sub, color = "#FFFFFF", subColor = "#71717A", tip, side = "top", bar, barColor, testId }) => (
   <Tip tip={tip} side={side} block>
-    <Card data-testid={testId} className="h-full rounded-lg lus-card p-2.5 shadow-none">
+    <Card data-testid={testId} className="h-full rounded-lg sub-card p-2.5 shadow-none">
       <p className="flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500">
         {Icon && <Icon size={10} style={{ color }} />} <span className="truncate">{label}</span>
       </p>
@@ -154,7 +154,7 @@ export const PanelKicker = ({ children, className = "" }) => (
 // Ícone gigante e quase invisível no canto do header — identidade da secção
 // sem peso visual (marca de água).
 export const PanelWatermark = ({ icon: Icon }) => (
-  <span className="lus-watermark" aria-hidden="true">
+  <span className="sub-watermark" aria-hidden="true">
     <Icon strokeWidth={1.5} />
   </span>
 );
@@ -162,9 +162,9 @@ export const PanelWatermark = ({ icon: Icon }) => (
 // Empty state tático partilhado — moldura tracejada, ícone com glow e voz noir.
 // Substitui os <p> soltos "Sem X" espalhados pelos painéis.
 export const EmptyState = ({ icon: Icon, title, sub, testId, className = "", children }) => (
-  <div data-testid={testId} className={`lus-empty ${className}`}>
+  <div data-testid={testId} className={`sub-empty ${className}`}>
     {Icon && (
-      <span className="lus-empty-icon">
+      <span className="sub-empty-icon">
         <Icon size={17} />
       </span>
     )}

@@ -1,5 +1,5 @@
 # ============================================================================
-# LUSORAE CRIME - CENTRALIZED ECONOMY CONSTANTS
+# SUBMUNDO - CENTRALIZED ECONOMY CONSTANTS
 # All configurable economic values in one place for easy rebalancing
 # Redesigned to fix infinite money loops and add late-game money sinks
 # ============================================================================

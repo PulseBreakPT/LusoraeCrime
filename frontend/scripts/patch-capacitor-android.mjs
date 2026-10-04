@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
+// Android package path intentionally keeps the legacy applicationId so existing Play installs remain upgrade-compatible.
 const mainActivity = path.join(
   root,
   "android",

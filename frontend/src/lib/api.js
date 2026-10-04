@@ -2,8 +2,8 @@ import axios from "axios";
 import { isLocalGuestMode, localGuestRequest } from "../game/localGuestEngine";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-const TOKEN_KEY = "lusorae_access_token";
-const REFRESH_KEY = "lusorae_refresh_token";
+const TOKEN_KEY = "submundo_access_token";
+const REFRESH_KEY = "submundo_refresh_token";
 
 // Timeout evita que um pedido preso (CORS mal configurado, backend
 // bloqueado) deixe o ecrã em "a carregar" para sempre — ao fim de 15s
@@ -57,11 +57,11 @@ let refreshPromise = null;
 const expireSession = () => {
   clearTokens();
   try {
-    sessionStorage.setItem("lus_session_expired", "1");
+    sessionStorage.setItem("sub_session_expired", "1");
   } catch (_e) {
     // sessionStorage indisponível — o evento continua a ser emitido
   }
-  window.dispatchEvent(new CustomEvent("lus:session-expired"));
+  window.dispatchEvent(new CustomEvent("sub:session-expired"));
 };
 
 api.interceptors.response.use(

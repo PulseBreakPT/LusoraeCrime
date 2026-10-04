@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backend test suite for Lusorae - Authentication Bug Fix + Narrative Bank Testing
+Backend test suite for SUBMUNDO - Authentication Bug Fix + Narrative Bank Testing
 Tests according to priorities:
 1. Authentication (login admin + register new account)
 2. Narrative bank (live_log, live_chance_delta, anti-repetition, progression, recall)
@@ -756,7 +756,7 @@ def print_summary():
 def main():
     """Main test execution"""
     print("="*70)
-    print("LUSORAE - BACKEND TESTS")
+    print("SUBMUNDO - BACKEND TESTS")
     print("Authentication Bug Fix + Narrative Bank (Live Ops)")
     print("="*70)
     print(f"Backend URL: {BASE_URL}")

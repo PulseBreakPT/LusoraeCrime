@@ -16,7 +16,7 @@ import requests
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 ADMIN_EMAIL = "admin@lusorae.com"
-ADMIN_PASSWORD = "LusoraeAdmin2026!"
+ADMIN_PASSWORD = "SUBMUNDOAdmin2026!"
 TIMEOUT = 30
 
 

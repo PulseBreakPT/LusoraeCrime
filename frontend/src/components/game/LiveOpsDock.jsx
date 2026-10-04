@@ -136,7 +136,7 @@ export function LiveOpsPanel({ state, serverNow }) {
     return (
       <div className="flex items-center justify-between gap-2 px-3 py-3" data-testid="liveops-finished">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="lus-lo-rec" style={{ background: om.color, boxShadow: `0 0 8px ${om.color}` }} />
+          <span className="sub-lo-rec" style={{ background: om.color, boxShadow: `0 0 8px ${om.color}` }} />
           <div className="min-w-0">
             <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: om.color }}>
               Operação concluída — {om.label}
@@ -182,7 +182,7 @@ export function LiveOpsPanel({ state, serverNow }) {
       {/* Cabeçalho — alvo + seguir unidade no mapa */}
       <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-1.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="lus-lo-rec" />
+          <span className="sub-lo-rec" />
           <p className="truncate font-mono text-[10px] font-bold uppercase tracking-wider text-white">
             {sel.opportunity?.name}
             <span className="ml-1.5 font-normal text-zinc-500">· {sel.opportunity?.district}</span>
@@ -193,7 +193,7 @@ export function LiveOpsPanel({ state, serverNow }) {
             type="button"
             data-testid="liveops-follow"
             title="Seguir esta unidade no mapa"
-            onClick={() => window.dispatchEvent(new CustomEvent("lus:follow-mission", { detail: { id: sel.id } }))}
+            onClick={() => window.dispatchEvent(new CustomEvent("sub:follow-mission", { detail: { id: sel.id } }))}
             className="rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
           >
             <Crosshair size={11} />
@@ -240,8 +240,8 @@ export function LiveOpsPanel({ state, serverNow }) {
           <div className="mt-1 flex items-center gap-1">
             {segs.map((sg, i) => (
               <div key={i} className="flex-1">
-                <div className="lus-lo-seg">
-                  <div className="lus-lo-seg-fill" style={{ width: `${sg.f * 100}%`, background: sg.col }} />
+                <div className="sub-lo-seg">
+                  <div className="sub-lo-seg-fill" style={{ width: `${sg.f * 100}%`, background: sg.col }} />
                 </div>
                 <p className={`mt-0.5 text-center font-mono text-[8px] uppercase tracking-[0.2em] ${sg.f > 0 && sg.f < 1 ? "text-zinc-300" : "text-zinc-600"}`}>
                   {sg.label}
@@ -253,7 +253,7 @@ export function LiveOpsPanel({ state, serverNow }) {
         <div className="w-16 shrink-0 text-right" title="Chance ao vivo — a base do plano mais as complicações reveladas. É este o valor que decide o desfecho.">
           <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-zinc-500">Chance</p>
           <p
-            className={`font-mono text-lg font-bold leading-none tabular-nums ${recentComp ? "lus-lo-chance-pulse" : ""}`}
+            className={`font-mono text-lg font-bold leading-none tabular-nums ${recentComp ? "sub-lo-chance-pulse" : ""}`}
             style={{ color: chanceCol }}
             data-testid="liveops-chance"
           >
@@ -290,7 +290,7 @@ export function LiveOpsPanel({ state, serverNow }) {
       )}
 
       {/* Feed rádio — linhas reveladas pelo relógio do servidor */}
-      <div ref={feedRef} className="lus-lo-feed max-h-36 overflow-y-auto px-3 pb-2 pt-1 md:max-h-44" data-testid="liveops-feed">
+      <div ref={feedRef} className="sub-lo-feed max-h-36 overflow-y-auto px-3 pb-2 pt-1 md:max-h-44" data-testid="liveops-feed">
         {revealed.length === 0 && (
           <p className="py-2 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-600">
             <Radio size={11} className="mr-1.5 inline-block" />
@@ -302,7 +302,7 @@ export function LiveOpsPanel({ state, serverNow }) {
           const isLast = i === revealed.length - 1;
           const fresh = isLast && now - Date.parse(e.at) < 2600;
           return (
-            <div key={`${e.at}-${i}`} className="lus-lo-line flex items-baseline gap-1.5 py-[3px]" data-testid="liveops-line">
+            <div key={`${e.at}-${i}`} className="sub-lo-line flex items-baseline gap-1.5 py-[3px]" data-testid="liveops-line">
               <span className="shrink-0 font-mono text-[8.5px] tabular-nums text-zinc-600">{fmtHMS(e.at)}</span>
               <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider" style={{ color: e.pct != null ? meta.color : catColor }}>
                 {e.speaker}
@@ -319,7 +319,7 @@ export function LiveOpsPanel({ state, serverNow }) {
                     {Math.round(e.pct * 100)}% chance
                   </span>
                 )}
-                {fresh && <span className="lus-lo-caret" aria-hidden="true" />}
+                {fresh && <span className="sub-lo-caret" aria-hidden="true" />}
               </span>
             </div>
           );

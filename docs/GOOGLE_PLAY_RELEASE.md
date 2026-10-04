@@ -1,4 +1,4 @@
-# Lusorae — Google Play Release Guide (2026)
+# SUBMUNDO — Google Play Release Guide (2026)
 
 > Estado alvo: **Google Play Store**, Android 16 / API 36, Android App Bundle (AAB), Google Sign-In e backend FastAPI.
 
@@ -6,7 +6,7 @@
 
 | Campo | Valor |
 |---|---|
-| Nome | Lusorae |
+| Nome | SUBMUNDO |
 | Package / Application ID | `pt.lusorae.crime` |
 | Categoria sugerida | Jogo · Estratégia |
 | Público definido pelo projeto | 16+ |
@@ -60,12 +60,12 @@ O projeto usa Google Sign-In com:
 5. Verificação da audiência através de `GOOGLE_WEB_CLIENT_ID`.
 6. Verificação de email confirmado.
 7. Ligação segura a conta existente quando o mesmo email já existe.
-8. Criação de conta Lusorae e jogador quando é um utilizador novo.
-9. Emissão dos JWT access/refresh normais do Lusorae.
+8. Criação de conta SUBMUNDO e jogador quando é um utilizador novo.
+9. Emissão dos JWT access/refresh normais do SUBMUNDO.
 
 ### Dados Google minimizados
 
-O Lusorae não precisa de guardar foto de perfil nem nome real Google. Atualmente o fluxo persiste apenas o identificador Google necessário à associação da conta e o email verificado, além dos dados internos do jogo.
+O SUBMUNDO não precisa de guardar foto de perfil nem nome real Google. Atualmente o fluxo persiste apenas o identificador Google necessário à associação da conta e o email verificado, além dos dados internos do jogo.
 
 ## Configurar Google Cloud
 
@@ -75,7 +75,7 @@ Usar **o mesmo projeto Google Cloud** para os clientes OAuth.
 
 Configurar:
 
-- App name: `Lusorae`
+- App name: `SUBMUNDO`
 - Support email: email oficial
 - Developer contact: `geral@lusorae.pt`
 - Privacy policy: `https://pulsebreakpt.github.io/LusoraeCrime/privacy.html`
@@ -152,23 +152,23 @@ O `https://localhost` é a origem WebView utilizada pela configuração Capacito
 `Definições → Conta → Eliminar conta`
 
 - Contas email/password confirmam com a password atual.
-- Contas Google-only não possuem password Lusorae; usam a sessão autenticada.
+- Contas Google-only não possuem password SUBMUNDO; usam a sessão autenticada.
 - O backend elimina o utilizador e dados de jogo associados.
 
 ### Fora da app
 
 A página pública `delete-account.html` permite iniciar um pedido através de `geral@lusorae.pt`, sem enviar passwords/tokens.
 
-## Data Safety — mapa preliminar do Lusorae
+## Data Safety — mapa preliminar do SUBMUNDO
 
 A declaração final deve sempre refletir a versão efetivamente publicada.
 
 ### Dados tratados pela app
 
-| Categoria | Exemplo no Lusorae | Finalidade |
+| Categoria | Exemplo no SUBMUNDO | Finalidade |
 |---|---|---|
 | Personal info · Email address | Email da conta / Google | Account management, authentication |
-| User IDs | ID Lusorae + Google subject | Account management, authentication |
+| User IDs | ID SUBMUNDO + Google subject | Account management, authentication |
 | App activity | Progresso, ações, missões e estado do jogo | App functionality |
 | Other user-generated/internal game data | Organização, equipas, recursos | App functionality |
 | Security data | IP / tentativas de login / aceitação legal | Security, fraud prevention, legal |
@@ -195,7 +195,7 @@ Quando o utilizador escolhe Google Sign-In, a Google participa no fluxo de auten
 
 Responder ao questionário com base no conteúdo real, não na intenção.
 
-O Lusorae contém:
+O SUBMUNDO contém:
 
 - temática criminal ficcional;
 - referências a armas;
@@ -299,8 +299,8 @@ Gerar uma **upload key** e guardá-la fora do repositório:
 
 ```bash
 keytool -genkeypair -v \
-  -keystore lusorae-upload.jks \
-  -alias lusorae-upload \
+  -keystore submundo-upload.jks \
+  -alias submundo-upload \
   -keyalg RSA -keysize 4096 \
   -validity 10000
 ```
@@ -321,13 +321,13 @@ Depois de criares a upload key, adiciona estes valores em **Settings → Secrets
 Exemplo para obter o base64 localmente:
 
 ```bash
-base64 -w 0 lusorae-upload.jks
+base64 -w 0 submundo-upload.jks
 ```
 
 Em macOS:
 
 ```bash
-base64 < lusorae-upload.jks | tr -d '\n'
+base64 < submundo-upload.jks | tr -d '\n'
 ```
 
 O workflow nunca grava a upload key no repositório: reconstrói-a temporariamente no runner, gera o AAB e remove o ficheiro no final.
@@ -343,11 +343,11 @@ Se não existirem, a pipeline usa `1` e `1.0.0`.
 
 Com os quatro secrets de assinatura configurados, o artifact final chama-se:
 
-`lusorae-google-play-aab`
+`submundo-google-play-aab`
 
 Sem esses secrets, a pipeline continua a validar tudo e gera apenas:
 
-`lusorae-android-debug-aab`
+`submundo-android-debug-aab`
 
 ---
 

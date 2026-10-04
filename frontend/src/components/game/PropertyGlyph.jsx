@@ -126,7 +126,7 @@ export const PropertyGlyph = ({ typeKey, accent = "#A1A1AA", className = "" }) =
   const draw = GLYPHS[typeKey] || GLYPHS.esconderijo;
   const grad = `url(#pg-${uid})`;
   return (
-    <svg viewBox="0 0 96 44" className={`lus-doss-glyph ${className}`} aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 96 44" className={`sub-doss-glyph ${className}`} aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id={`pg-${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#E4E4E7" stopOpacity="0.95" />

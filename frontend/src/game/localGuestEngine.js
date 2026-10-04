@@ -1,9 +1,9 @@
 import { LOCAL_CATALOG, LOCAL_GUEST_SAVE_VERSION } from "./localGuestCatalog";
 import { propertyMarketPrice } from "../lib/propertyMarket";
 
-const MODE_KEY = "lusorae_guest_mode_v2";
-const SAVE_KEY = "lusorae_guest_save_v2";
-const SESSION_KEY = "lusorae_guest_session_v2";
+const MODE_KEY = "submundo_guest_mode_v2";
+const SAVE_KEY = "submundo_guest_save_v2";
+const SESSION_KEY = "submundo_guest_session_v2";
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const nowIso = () => new Date().toISOString();
@@ -52,7 +52,7 @@ const isMonday20Lisbon = (value) => {
 const normalizeRisk = (value) => {
   const n = Number(value) || 1;
   // v1 do modo convidado gravava uma pseudo-percentagem (29/40/51/62)
-  // onde toda a UI do Lusorae espera uma escala ordinal de 1 a 5.
+  // onde toda a UI do SUBMUNDO espera uma escala ordinal de 1 a 5.
   if (n > 5) return clamp(Math.round((n - 18) / 11), 1, 5);
   return clamp(Math.round(n), 1, 5);
 };

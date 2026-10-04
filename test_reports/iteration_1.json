@@ -1,5 +1,5 @@
 {
-  "summary": "First-round E2E testing of Lusorae MMORPG MVP. Backend pytest suite (17/17 PASS) covers auth (register/login/logout/me + unauth), game state/catalog, dispatch flow with busy-team validation, recruit + insufficient funds, buy vehicle, and launder validation. Frontend Playwright covers full happy path: register → HUD map with resource bar → click .opp-pin → OpportunityCard → select-team → dispatch-team-button → Teams panel recruit → Empire panel → logout. All critical flows work; polling & auto-tick spawning opportunities functional.",
+  "summary": "First-round E2E testing of SUBMUNDO MMORPG MVP. Backend pytest suite (17/17 PASS) covers auth (register/login/logout/me + unauth), game state/catalog, dispatch flow with busy-team validation, recruit + insufficient funds, buy vehicle, and launder validation. Frontend Playwright covers full happy path: register → HUD map with resource bar → click .opp-pin → OpportunityCard → select-team → dispatch-team-button → Teams panel recruit → Empire panel → logout. All critical flows work; polling & auto-tick spawning opportunities functional.",
   "backend_issues": {"critical": [], "minor": []},
   "frontend_issues": {
     "ui_bugs": [],

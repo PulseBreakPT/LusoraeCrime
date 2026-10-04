@@ -84,7 +84,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Warehouse} />
           <PanelKicker>Património · Território</PanelKicker>
@@ -184,10 +184,10 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
             const stacks = stackRank > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
             const paybackH = !maxed ? propertyUpgradePaybackH(pt, condition, upgradeCost) : null;
             return (
-              <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
+              <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 {/* Cabeçalho: placa com emblema + identidade */}
                 <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                  <div className="sub-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <PropertyGlyph typeKey={p.type_key} accent={tier.color} className="h-[44px] w-[96px]" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -321,9 +321,9 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       diminished ? ` Já tens ${ownedOfType} — esta unidade rende apenas ${nextStackPct}% do benefício (rendimentos decrescentes).` : ""
                     }`;
                 return (
-                  <Card key={key} data-testid={`market-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
+                  <Card key={key} data-testid={`market-card-${key}`} className={cn("h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
                     <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <div className="lus-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                      <div className="sub-doss-plate relative flex h-[52px] w-full sm:w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                         <PropertyGlyph typeKey={key} accent={tier.color} className={cn("h-[44px] w-[96px]", locked && "opacity-50 grayscale")} />
                         {locked && <Lock size={13} className="absolute text-zinc-400" />}
                       </div>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backend test suite for Lusorae - Disclaimer & Legal Endpoints
+Backend test suite for SUBMUNDO - Disclaimer & Legal Endpoints
 Test scope (11/07/2026):
 1. AUTH SMOKE: Login admin + register new disposable account
 2. NEW ENDPOINT POST /api/legal/disclaimer-ack: with/without token, accepted true/false, persistence, invalid body
@@ -409,7 +409,7 @@ def print_summary():
 def main():
     """Main test execution"""
     print("="*70)
-    print("LUSORAE - BACKEND TESTS: DISCLAIMER & LEGAL ENDPOINTS")
+    print("SUBMUNDO - BACKEND TESTS: DISCLAIMER & LEGAL ENDPOINTS")
     print("Test Date: 11/07/2026")
     print("="*70)
     print(f"Backend URL: {BASE_URL}")

@@ -1,6 +1,6 @@
 # Mastermind — 25 novas mecânicas de sandbox criminal
 
-Esta expansão é uma implementação original para o universo de **Lusorae**. Inspira-se apenas na escala, preparação e liberdade sistémica de grandes jogos de crime em mundo aberto; não reutiliza nomes, personagens, missões, mapas, arte ou texto de outras propriedades intelectuais.
+Esta expansão é uma implementação original para o universo de **SUBMUNDO**. Inspira-se apenas na escala, preparação e liberdade sistémica de grandes jogos de crime em mundo aberto; não reutiliza nomes, personagens, missões, mapas, arte ou texto de outras propriedades intelectuais.
 
 ## As 25 funcionalidades
 

@@ -300,7 +300,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Users} />
           <PanelKicker>Comando · Operações</PanelKicker>
@@ -399,12 +399,12 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
               <Card
                 key={t.id}
                 data-testid={`team-card-${t.id}`}
-                className={`lus-card lus-team-card p-2.5 shadow-none ${justReturned ? "lus-flash" : ""}`}
+                className={`sub-card sub-team-card p-2.5 shadow-none ${justReturned ? "sub-flash" : ""}`}
                 style={{ "--ttier": tier.color }}
               >
                 {/* Cabeçalho dossier: placa com emblema + identidade da unidade */}
                 <div className="relative z-[1] flex items-stretch gap-2.5">
-                  <div className="lus-team-plate relative flex h-[54px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
+                  <div className="sub-team-plate relative flex h-[54px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10">
                     <TeamGlyph
                       spec={t.spec} accent={tier.color}
                       emblemColor={catalog?.shop?.team_emblems?.[t.emblem_key]?.color}

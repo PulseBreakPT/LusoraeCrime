@@ -77,8 +77,8 @@ export default function GamePage() {
   // acoplar o OpportunityCard ao estado desta página.
   useEffect(() => {
     const onStamp = (ev) => setStamp({ team: ev.detail?.team || "Equipa", key: Date.now() });
-    window.addEventListener("lus:dispatch-stamp", onStamp);
-    return () => window.removeEventListener("lus:dispatch-stamp", onStamp);
+    window.addEventListener("sub:dispatch-stamp", onStamp);
+    return () => window.removeEventListener("sub:dispatch-stamp", onStamp);
   }, []);
   useEffect(() => {
     if (!stamp) return;
@@ -179,7 +179,7 @@ export default function GamePage() {
   return (
     <div
       data-testid="game-page"
-      className={`fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "lus-hud-awake" : "lus-hud-idle"}`}
+      className={`fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"}`}
     >
       <LiveMap
         state={mapState}
@@ -197,14 +197,14 @@ export default function GamePage() {
         onSelectProperty={() => openFromNav("properties")}
         baseFilter={baseFilter}
       />
-      <div className="lus-vignette" aria-hidden="true" />
-      <div className="lus-grid" aria-hidden="true" />
-      <div className="lus-hud-frame" aria-hidden="true">
+      <div className="sub-vignette" aria-hidden="true" />
+      <div className="sub-grid" aria-hidden="true" />
+      <div className="sub-hud-frame" aria-hidden="true">
         <span className="c-tl" /><span className="c-tr" /><span className="c-bl" /><span className="c-br" />
       </div>
       {stamp && (
-        <div key={stamp.key} className="lus-stamp" aria-hidden="true" data-testid="dispatch-stamp">
-          <div className="lus-stamp-box">
+        <div key={stamp.key} className="sub-stamp" aria-hidden="true" data-testid="dispatch-stamp">
+          <div className="sub-stamp-box">
             <p className="font-display text-2xl font-bold uppercase tracking-[0.25em] text-emerald-400">Equipa despachada</p>
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-emerald-200/70">{stamp.team} · em rota para o alvo</p>
           </div>
@@ -217,19 +217,19 @@ export default function GamePage() {
         <div
           role="status"
           data-testid="available-missions-hud"
-          className="lus-optional-hud lus-available-missions-hud pointer-events-none"
+          className="sub-optional-hud sub-available-missions-hud pointer-events-none"
           aria-label={`${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
           title="Indicador de operações disponíveis — usa o dock Operações para abrir."
         >
           <Target size={21} aria-hidden="true" />
-          <span className="lus-available-missions-count">{availableMissions.length}</span>
+          <span className="sub-available-missions-count">{availableMissions.length}</span>
         </div>
       )}
       {!focusMode && wantedStars > 0 && (
         <div
           role="status"
           data-testid="wanted-stars-hud"
-          className="lus-optional-hud pointer-events-none absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
+          className="sub-optional-hud pointer-events-none absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
           aria-label={`Nível de procurado: ${wantedStars} de 5 estrelas`}
           title="Indicador de procurado — gere a Cidade através do dock."
         >
@@ -274,7 +274,7 @@ export default function GamePage() {
           style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
         >
           {navGroup && (
-            <div className="lus-nav-tray absolute bottom-full left-1/2 mb-2 w-[min(92vw,25rem)] -translate-x-1/2">
+            <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2 w-[min(92vw,25rem)] -translate-x-1/2">
               {navGroup === "operations" && (
                 <div className="grid grid-cols-3 gap-1">
                   <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
@@ -341,7 +341,7 @@ export default function GamePage() {
             </div>
           )}
 
-          <div className="lus-dock flex items-center gap-2 px-1 py-1">
+          <div className="sub-dock flex items-center gap-2 px-1 py-1">
             <GroupButton
               testId="nav-group-operations"
               icon={Crosshair}
@@ -439,7 +439,7 @@ const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick 
       onClick={onClick}
       aria-label={label}
       aria-expanded={active}
-      className={`lus-hud-btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0 ${active ? "lus-hud-btn-active" : ""}`}
+      className={`sub-hud-btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0 ${active ? "sub-hud-btn-active" : ""}`}
     >
       <Icon size={19} className={color} />
       {alert && (
@@ -457,7 +457,7 @@ const NavAction = ({ testId, icon: Icon, label, color, alert, active, onClick })
     type="button"
     data-testid={testId}
     onClick={onClick}
-    className={`lus-nav-action relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-center ${active ? "is-active" : ""}`}
+    className={`sub-nav-action relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-center ${active ? "is-active" : ""}`}
   >
     <Icon size={17} className={color} />
     <span className="max-w-full truncate font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-300">

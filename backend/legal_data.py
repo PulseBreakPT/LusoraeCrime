@@ -1,4 +1,4 @@
-"""Documentos legais versionados do Lusorae (data-driven).
+"""Documentos legais versionados do SUBMUNDO (data-driven).
 
 Arquitetura preparada para futuras versões: cada documento tem uma lista de
 versões ordenada da mais antiga para a mais recente. A versão atual é sempre
@@ -20,20 +20,20 @@ LEGAL_DOCUMENTS = {
             {
                 "version": "1.0",
                 "effective_date": "2026-07-08",
-                "summary": "Regras de utilização da plataforma Lusorae, contas, conduta, propriedade intelectual e responsabilidade.",
+                "summary": "Regras de utilização da plataforma SUBMUNDO, contas, conduta, propriedade intelectual e responsabilidade.",
                 "sections": [
                     {
-                        "heading": "1. Sobre o Lusorae",
+                        "heading": "1. Sobre o SUBMUNDO",
                         "paragraphs": [
-                            "O Lusorae é um jogo de estratégia e gestão totalmente ficcional, ambientado numa versão imaginária de Lisboa. Todos os eventos, organizações, atividades e mecânicas do jogo são obra de ficção e destinam-se exclusivamente a entretenimento.",
-                            "O Lusorae não promove, incentiva ou glorifica qualquer atividade ilegal no mundo real. Qualquer semelhança com pessoas, organizações ou eventos reais é pura coincidência.",
-                            "Ao criar uma conta ou utilizar a plataforma, aceitas estes Termos de Serviço na íntegra. Se não concordares com alguma parte, não deves utilizar o Lusorae.",
+                            "O SUBMUNDO é um jogo de estratégia e gestão totalmente ficcional, ambientado numa versão imaginária de Lisboa. Todos os eventos, organizações, atividades e mecânicas do jogo são obra de ficção e destinam-se exclusivamente a entretenimento.",
+                            "O SUBMUNDO não promove, incentiva ou glorifica qualquer atividade ilegal no mundo real. Qualquer semelhança com pessoas, organizações ou eventos reais é pura coincidência.",
+                            "Ao criar uma conta ou utilizar a plataforma, aceitas estes Termos de Serviço na íntegra. Se não concordares com alguma parte, não deves utilizar o SUBMUNDO.",
                         ],
                     },
                     {
                         "heading": "2. Utilização da plataforma",
                         "paragraphs": [
-                            "O Lusorae é disponibilizado através do navegador web e, futuramente, de aplicações móveis. A utilização é pessoal e intransmissível.",
+                            "O SUBMUNDO é disponibilizado através do navegador web e, futuramente, de aplicações móveis. A utilização é pessoal e intransmissível.",
                         ],
                         "bullets": [
                             "Deves ter pelo menos 16 anos para criar uma conta.",
@@ -54,11 +54,11 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "4. Comportamento esperado",
                         "paragraphs": [
-                            "Queremos que o Lusorae seja um espaço de jogo justo e respeitador. Ao utilizar a plataforma comprometes-te a:",
+                            "Queremos que o SUBMUNDO seja um espaço de jogo justo e respeitador. Ao utilizar a plataforma comprometes-te a:",
                         ],
                         "bullets": [
                             "Escolher nomes de organização que não sejam ofensivos, discriminatórios ou que se façam passar por terceiros.",
-                            "Não assediar, ameaçar ou difamar outros utilizadores ou a equipa do Lusorae.",
+                            "Não assediar, ameaçar ou difamar outros utilizadores ou a equipa do SUBMUNDO.",
                             "Não publicar ou transmitir conteúdo ilegal, obsceno ou que viole direitos de terceiros.",
                             "Jogar de forma justa, sem recorrer a exploits, automatismos ou manipulação do cliente.",
                         ],
@@ -66,7 +66,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "5. Propriedade intelectual",
                         "paragraphs": [
-                            "Todo o conteúdo do Lusorae — incluindo o nome, logótipo, design, interface, textos, mecânicas de jogo, dados de jogo e código — é propriedade do Lusorae ou dos seus licenciadores e está protegido pela legislação de direitos de autor e propriedade industrial.",
+                            "Todo o conteúdo do SUBMUNDO — incluindo o nome, logótipo, design, interface, textos, mecânicas de jogo, dados de jogo e código — é propriedade do SUBMUNDO ou dos seus licenciadores e está protegido pela legislação de direitos de autor e propriedade industrial.",
                             "É-te concedida uma licença limitada, não exclusiva e revogável para utilizar a plataforma para fins pessoais e não comerciais. Esta licença não te transfere qualquer direito de propriedade.",
                             "O progresso de jogo, moedas virtuais, funcionários, veículos e propriedades dentro do jogo não têm valor monetário real e não constituem propriedade do utilizador.",
                         ],
@@ -74,7 +74,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "6. Disponibilidade e limitações",
                         "paragraphs": [
-                            "O Lusorae encontra-se em desenvolvimento ativo. A plataforma é fornecida \"tal como está\" e \"conforme disponível\".",
+                            "O SUBMUNDO encontra-se em desenvolvimento ativo. A plataforma é fornecida \"tal como está\" e \"conforme disponível\".",
                         ],
                         "bullets": [
                             "Podem ocorrer interrupções de serviço para manutenção, atualizações ou por causas técnicas imprevistas.",
@@ -101,7 +101,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "8. Responsabilidade",
                         "paragraphs": [
-                            "Na máxima medida permitida pela lei portuguesa, o Lusorae não se responsabiliza por danos indiretos, perda de dados de jogo, lucros cessantes ou quaisquer prejuízos decorrentes da utilização ou impossibilidade de utilização da plataforma.",
+                            "Na máxima medida permitida pela lei portuguesa, o SUBMUNDO não se responsabiliza por danos indiretos, perda de dados de jogo, lucros cessantes ou quaisquer prejuízos decorrentes da utilização ou impossibilidade de utilização da plataforma.",
                             "Nada nestes Termos exclui ou limita a responsabilidade que não possa ser excluída ou limitada por lei, incluindo os direitos que te assistem enquanto consumidor.",
                         ],
                     },
@@ -109,7 +109,7 @@ LEGAL_DOCUMENTS = {
                         "heading": "9. Alterações a estes Termos",
                         "paragraphs": [
                             "Podemos atualizar estes Termos para refletir alterações na plataforma, na lei ou nas nossas práticas. Cada versão tem um número e uma data de entrada em vigor.",
-                            "Alterações relevantes serão comunicadas na plataforma. A utilização continuada do Lusorae após a entrada em vigor de uma nova versão constitui aceitação da mesma.",
+                            "Alterações relevantes serão comunicadas na plataforma. A utilização continuada do SUBMUNDO após a entrada em vigor de uma nova versão constitui aceitação da mesma.",
                             "O histórico de versões destes documentos é preservado — a tua conta guarda sempre a versão que aceitaste e a data em que o fizeste.",
                         ],
                     },
@@ -136,7 +136,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "1. Introdução",
                         "paragraphs": [
-                            "Esta Política de Privacidade explica que informação o Lusorae recolhe, como a utiliza e que escolhas tens sobre os teus dados.",
+                            "Esta Política de Privacidade explica que informação o SUBMUNDO recolhe, como a utiliza e que escolhas tens sobre os teus dados.",
                             "Levamos a privacidade a sério: recolhemos apenas o mínimo necessário para a plataforma funcionar. Para informação detalhada sobre os teus direitos ao abrigo do RGPD, consulta a nossa página dedicada ao RGPD.",
                         ],
                     },
@@ -191,7 +191,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "6. Cookies",
                         "paragraphs": [
-                            "O Lusorae utiliza apenas cookies estritamente necessários ao funcionamento:",
+                            "O SUBMUNDO utiliza apenas cookies estritamente necessários ao funcionamento:",
                         ],
                         "bullets": [
                             "access_token — cookie de sessão (httpOnly) que te mantém autenticado. Expira em 1 hora.",
@@ -204,7 +204,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "7. Analytics",
                         "paragraphs": [
-                            "Atualmente o Lusorae não utiliza qualquer serviço de analytics de terceiros (como Google Analytics).",
+                            "Atualmente o SUBMUNDO não utiliza qualquer serviço de analytics de terceiros (como Google Analytics).",
                             "Se no futuro adotarmos ferramentas de medição de utilização, esta política será atualizada antes da sua ativação e serás informado na plataforma.",
                         ],
                     },
@@ -238,7 +238,7 @@ LEGAL_DOCUMENTS = {
                                 {
                                     "heading": "1. Introdução",
                                     "paragraphs": [
-                                        "Esta Política de Privacidade explica que informação o Lusorae recolhe, como a utiliza e que escolhas tens sobre os teus dados.",
+                                        "Esta Política de Privacidade explica que informação o SUBMUNDO recolhe, como a utiliza e que escolhas tens sobre os teus dados.",
                                         "Levamos a privacidade a sério: recolhemos apenas o mínimo necessário para a plataforma funcionar. Para informação detalhada sobre os teus direitos ao abrigo do RGPD, consulta a nossa página dedicada ao RGPD.",
                                     ],
                                 },
@@ -293,7 +293,7 @@ LEGAL_DOCUMENTS = {
                                 {
                                     "heading": "6. Cookies",
                                     "paragraphs": [
-                                        "Na versão web, o Lusorae utiliza apenas cookies/armazenamento estritamente necessários ao funcionamento. Na aplicação Android, os tokens de sessão são geridos pelo cliente e enviados por HTTPS:",
+                                        "Na versão web, o SUBMUNDO utiliza apenas cookies/armazenamento estritamente necessários ao funcionamento. Na aplicação Android, os tokens de sessão são geridos pelo cliente e enviados por HTTPS:",
                                     ],
                                     "bullets": [
                                         "access_token — cookie de sessão (httpOnly) que te mantém autenticado. Expira em 1 hora.",
@@ -306,7 +306,7 @@ LEGAL_DOCUMENTS = {
                                 {
                                     "heading": "7. Analytics",
                                     "paragraphs": [
-                                        "Atualmente o Lusorae não utiliza qualquer serviço de analytics de terceiros (como Google Analytics).",
+                                        "Atualmente o SUBMUNDO não utiliza qualquer serviço de analytics de terceiros (como Google Analytics).",
                                         "Se no futuro adotarmos ferramentas de medição de utilização, esta política será atualizada antes da sua ativação e serás informado na plataforma.",
                                     ],
                                 },
@@ -344,8 +344,8 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "1. O que é isto?",
                         "paragraphs": [
-                            "O RGPD (Regulamento Geral sobre a Proteção de Dados) é a lei europeia que protege os teus dados pessoais. Esta página explica, em linguagem simples, que dados o Lusorae recolhe, porquê, durante quanto tempo, e que direitos tens sobre eles.",
-                            "Responsável pelo tratamento: Lusorae. Contacto: " + CONTACT_EMAIL + ".",
+                            "O RGPD (Regulamento Geral sobre a Proteção de Dados) é a lei europeia que protege os teus dados pessoais. Esta página explica, em linguagem simples, que dados o SUBMUNDO recolhe, porquê, durante quanto tempo, e que direitos tens sobre eles.",
+                            "Responsável pelo tratamento: SUBMUNDO. O contacto de suporte oficial está disponível na aplicação.",
                         ],
                     },
                     {
@@ -428,7 +428,7 @@ LEGAL_DOCUMENTS = {
                     {
                         "heading": "10. Menores",
                         "paragraphs": [
-                            "O Lusorae destina-se a maiores de 16 anos. Não recolhemos conscientemente dados de menores de 16 anos. Se acreditas que um menor criou uma conta, contacta-nos para a sua remoção.",
+                            "O SUBMUNDO destina-se a maiores de 16 anos. Não recolhemos conscientemente dados de menores de 16 anos. Se acreditas que um menor criou uma conta, contacta-nos para a sua remoção.",
                         ],
                     },
                     {
@@ -448,8 +448,8 @@ LEGAL_DOCUMENTS = {
                                 {
                                     "heading": "1. O que é isto?",
                                     "paragraphs": [
-                                        "O RGPD (Regulamento Geral sobre a Proteção de Dados) é a lei europeia que protege os teus dados pessoais. Esta página explica, em linguagem simples, que dados o Lusorae recolhe, porquê, durante quanto tempo, e que direitos tens sobre eles.",
-                                        "Responsável pelo tratamento: Lusorae. Contacto: " + CONTACT_EMAIL + ".",
+                                        "O RGPD (Regulamento Geral sobre a Proteção de Dados) é a lei europeia que protege os teus dados pessoais. Esta página explica, em linguagem simples, que dados o SUBMUNDO recolhe, porquê, durante quanto tempo, e que direitos tens sobre eles.",
+                                        "Responsável pelo tratamento: SUBMUNDO. O contacto de suporte oficial está disponível na aplicação.",
                                     ],
                                 },
                                 {
@@ -532,7 +532,7 @@ LEGAL_DOCUMENTS = {
                                 {
                                     "heading": "10. Menores",
                                     "paragraphs": [
-                                        "O Lusorae destina-se a maiores de 16 anos. Não recolhemos conscientemente dados de menores de 16 anos. Se acreditas que um menor criou uma conta, contacta-nos para a sua remoção.",
+                                        "O SUBMUNDO destina-se a maiores de 16 anos. Não recolhemos conscientemente dados de menores de 16 anos. Se acreditas que um menor criou uma conta, contacta-nos para a sua remoção.",
                                     ],
                                 },
                                 {
@@ -622,7 +622,7 @@ CHANGELOG = [
                 "Eliminados estados de loading infinito em falhas de rede.",
             ],
             "interface": [
-                "Novo ecrã de autenticação premium com painel de identidade do Lusorae.",
+                "Novo ecrã de autenticação premium com painel de identidade do SUBMUNDO.",
                 "Estados de foco, erro e loading consistentes e acessíveis em todos os campos.",
             ],
         },
@@ -720,7 +720,7 @@ CHANGELOG = [
     {
         "version": "0.1.0",
         "date": "2026-06-28",
-        "title": "Temporada 0 — O Nascimento de Lusorae",
+        "title": "Temporada 0 — O Nascimento de SUBMUNDO",
         "sections": {
             "novidades": [
                 "Mapa vivo de Lisboa com 16 zonas e QG no Cais do Sodré.",

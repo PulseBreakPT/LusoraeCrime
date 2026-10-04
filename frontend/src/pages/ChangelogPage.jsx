@@ -52,7 +52,7 @@ export default function ChangelogPage() {
           <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.3em] text-red-500">
             <GitBranch size={13} aria-hidden="true" /> Registo de operações · Desenvolvimento
           </div>
-          <h1 data-testid="changelog-title" className="lus-title mt-3 font-display text-4xl font-bold uppercase tracking-tight text-white sm:text-5xl">
+          <h1 data-testid="changelog-title" className="sub-title mt-3 font-display text-4xl font-bold uppercase tracking-tight text-white sm:text-5xl">
             Changelog
           </h1>
           <div className="mt-3 h-0.5 w-20 bg-gradient-to-r from-red-600 via-red-600/60 to-transparent" />
@@ -66,11 +66,11 @@ export default function ChangelogPage() {
             {data.versions.map((v) => (
               <section key={v.version} data-testid={`changelog-version-${v.version}`} className="relative pl-8 sm:pl-12">
                 {/* Marcador */}
-                <span aria-hidden="true" className={`absolute left-0 top-5 flex h-[15px] w-[15px] items-center justify-center rounded-full border sm:h-[23px] sm:w-[23px] ${v.tag === "atual" ? "lus-node-current border-red-500/60 bg-red-500/20" : "border-white/15 bg-[#0d0d0d]"}`}>
+                <span aria-hidden="true" className={`absolute left-0 top-5 flex h-[15px] w-[15px] items-center justify-center rounded-full border sm:h-[23px] sm:w-[23px] ${v.tag === "atual" ? "sub-node-current border-red-500/60 bg-red-500/20" : "border-white/15 bg-[#0d0d0d]"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${v.tag === "atual" ? "bg-red-500" : "bg-zinc-600"}`} />
                 </span>
 
-                <div className={`lus-version-card rounded-lg p-5 sm:p-6 ${v.tag === "atual" ? "lus-version-current" : ""}`}>
+                <div className={`sub-version-card rounded-lg p-5 sm:p-6 ${v.tag === "atual" ? "sub-version-current" : ""}`}>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <span className="font-display text-2xl font-bold tracking-tight text-white">v{v.version}</span>
                     {v.tag === "atual" && (

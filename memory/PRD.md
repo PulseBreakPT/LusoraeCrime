@@ -1,4 +1,4 @@
-# Lusorae — PRD
+# SUBMUNDO — PRD
 
 ## Problema original
 MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, Crime.Life e GTA Online mas totalmente original. Simulador de gestão de organização criminosa — o jogador controla um império inteiro através de uma dashboard moderna e um mapa vivo (centro da experiência). Oportunidades criminosas em tempo real, equipas/veículos com deslocação automática, economia viva, mundo vivo, progressão profunda. Interface premium, dark theme, mobile-first, mapa fullscreen, menus flutuantes, cartões compactos, animações suaves. Arquitetura extremamente modular para evolução por temporadas/anos.
@@ -45,7 +45,7 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Migração v4 automática de funcionários do schema antigo
 - Testes: backend 29/29 pytest + frontend Playwright 100% (iteration_2)
 ### UI "Centro de Comando" (03/07/2026)
-- Infra partilhada `components/game/hud.jsx`: Tip (tooltip CSS `.lus-tip`, sides/align), MiniBar, Chip, Kpi, SummaryStrip
+- Infra partilhada `components/game/hud.jsx`: Tip (tooltip CSS `.sub-tip`, sides/align), MiniBar, Chip, Kpi, SummaryStrip
 - Helpers `lib/game.js`: heatStatus (Calmo/Vigiado/Alerta/Crítico), ATTR_FULL, vehicleRangeKm, refuel/repair/sellValueOf, passiveRates, teamsReadiness, orgAlerts
 - ResourceBar: nível c/ barra de respeito, fluxos passivos €/h, calor c/ estado+minibar, equipas prontas, ops ativas, salários+countdown — tudo c/ tooltips
 - HUD buttons c/ badges inteligentes (RH problemas, Frota avarias/combustível, Missões por reclamar, Equipas ocupadas, alertas pulsantes Império/Imóveis) + Intel c/ total de alertas
@@ -54,14 +54,14 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 - Império: fluxo de caixa passivo c/ balanço €/h, calor c/ thresholds 70/90, quick-nav c/ alertas
 - Frota: autonomia km por veículo e no stand; RH: impacto na folha salarial ao contratar, tooltips raridade/atributos/estados; Imóveis: preview do benefício no próximo nível
 - Intel: fortuna total, valor frota, salários/ciclo, tooltips em todas as células; Quests: badges de contagem nas tabs; ActivityFeed: tempo relativo + nº registos
-### Botões SSS (07/07/2026)- `button.jsx`: variantes enriquecidas (gradientes com via-stops, sombras em camadas, focus ring vermelho, disabled dessaturado) + classe base `lus-btn`
-- `App.css`: física de interação (spring easing, press-down translateY+scale+brightness), sheen sweep no hover via background-position (não corta badges externos), orla metálica mask-ring 1px em primary/success (branco→dourado→sombra), icon glow currentColor nos `lus-hud-btn`, indicador luminoso sob o separador ativo do dock, tudo coberto por prefers-reduced-motion
+### Botões SSS (07/07/2026)- `button.jsx`: variantes enriquecidas (gradientes com via-stops, sombras em camadas, focus ring vermelho, disabled dessaturado) + classe base `sub-btn`
+- `App.css`: física de interação (spring easing, press-down translateY+scale+brightness), sheen sweep no hover via background-position (não corta badges externos), orla metálica mask-ring 1px em primary/success (branco→dourado→sombra), icon glow currentColor nos `sub-hud-btn`, indicador luminoso sob o separador ativo do dock, tudo coberto por prefers-reduced-motion
 - `tabs.jsx`: TabsTrigger ativo com gradiente rico + ring inset + inner shadow; hover nos inativos; active:scale
 - Fixes de intenção de cor (bg-color tapado pelo gradiente do variant default): OpportunityCard dispatch→success (corrigida regressão via-red-600), EmpirePanel lavar/subornar→outline, SettingsPanel claim-admin→âmbar sólido, LiveMap placement-confirm→success, AdminPanel 5 botões→variants corretos
 - NOTA infra: .env recriados pós-fork; CORS exige origens explícitas (não "*" c/ credentials); testar via preview URL
 
 ### Responsividade mobile (10/07/2026)
-- Controlos de câmara do mapa (+/−/centrar/enquadrar) removidos — zoom por gestos (pinch) / roda do rato; CSS `.lus-map-ctrl` eliminado
+- Controlos de câmara do mapa (+/−/centrar/enquadrar) removidos — zoom por gestos (pinch) / roda do rato; CSS `.sub-map-ctrl` eliminado
 - Legenda do mapa: max-height `min(100dvh-9rem, 34rem)` + scroll interno + largura limitada ao viewport; parágrafo narrativo gigante do fim removido (antes transbordava 140px acima do ecrã)
 - Tooltips `Tip` (hud.jsx): em ecrãs táteis, tap em botões de ação já não abre/prende o popover; chips informativos mantêm tap-para-ver; hover desktop inalterado
 - ResourceBar: `fmtMoneyShort` ("75k €") abaixo de 640px via hook `useNarrow` — sem truncações; `SummaryStrip` cols=4 → 2 colunas em mobile; dock inferior com anti-overflow (max-w + scroll-x invisível)
@@ -101,11 +101,11 @@ Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
 - NOTA infra: fork 12/07 — .env recriados (preview c3baec4c-7bfe-4277-937b-58977a0d3545), credenciais em /app/memory/test_credentials.md
 
 ### UI Uniformization Pass (07/07/2026)
-- Design system CSS: `.lus-panel` (shell vidro escuro de todos os Sheets + OpportunityCard), `.lus-card` (cartão interno standard, substituiu `border-white/10 bg-white/[0.03]` em 11 ficheiros), `.lus-topbar` (ResourceBar)
+- Design system CSS: `.sub-panel` (shell vidro escuro de todos os Sheets + OpportunityCard), `.sub-card` (cartão interno standard, substituiu `border-white/10 bg-white/[0.03]` em 11 ficheiros), `.sub-topbar` (ResourceBar)
 - sheet.jsx: overlay c/ blur, header c/ barra vermelha de destaque + border-b, título uppercase display, close button circular — afeta os 10 painéis
 - button.jsx: default/success c/ glow + border, outline elevado, active:scale press effect — afeta todos os botões
-- hud.jsx: Kpi (lus-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
-- ResourceBar: lus-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)
+- hud.jsx: Kpi (sub-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
+- ResourceBar: sub-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)
 
 ### Central da rede + fix de sobreposições (10/07/2026)
 - Fusão "Em direto" + "Últimos registos" num só painel: ActivityFeed é agora a "Central da rede" com separadores EM DIRETO (transmissão: fases, chance ao vivo, rádio — LiveOpsPanel embutível, ex-LiveOpsDock) e REGISTOS (filtros/não lidos); auto-switch para EM DIRETO ao despachar; mobile: barra única com estado ao vivo + popover com as mesmas tabs
@@ -119,6 +119,6 @@ Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
 ### SSS Ronda 8 — Cockpit Cinemático + Voz Noir (08/07/2026)
 - Mapa: radar tático CSS a emanar do QG (marcador não-interativo 170px), grelha tática visível nas bordas (mask radial), moldura HUD com 4 cantos vermelhos no viewport
 - Topbar: relógio da rede (hora do servidor + "Lisboa · 38.72N 9.14W"), flashes âmbar (dinheiro sujo) e azul (respeito) quando os valores sobem
-- Juice: toasts sonner redesenhados (.lus-toast — vidro escuro, barra lateral por tipo success/error/warning/info, mono), flash vermelho no registo mais recente do feed (lus-feed-new, desktop+mobile), carimbo de celebração "EQUIPA DESTACADA" (lus-stamp, CustomEvent lus:dispatch-stamp disparado pelo OpportunityCard, GamePage renderiza 1.7s)
-- Textos/Títulos: PanelKicker (micro-etiqueta laser vermelha) + PanelWatermark (ícone marca de água) em todos os 10 painéis, títulos com gradiente metálico (lus-sheet-title), taglines noir reescritas (ex. Império: "O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe."), EmptyState tático partilhado (hud.jsx), copy noir em empty states (feed "Silêncio na rede. Por agora.", quests "Contratos diários esgotados — novos ao nascer do dia.") e AuthPage
+- Juice: toasts sonner redesenhados (.sub-toast — vidro escuro, barra lateral por tipo success/error/warning/info, mono), flash vermelho no registo mais recente do feed (sub-feed-new, desktop+mobile), carimbo de celebração "EQUIPA DESTACADA" (sub-stamp, CustomEvent sub:dispatch-stamp disparado pelo OpportunityCard, GamePage renderiza 1.7s)
+- Textos/Títulos: PanelKicker (micro-etiqueta laser vermelha) + PanelWatermark (ícone marca de água) em todos os 10 painéis, títulos com gradiente metálico (sub-sheet-title), taglines noir reescritas (ex. Império: "O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe."), EmptyState tático partilhado (hud.jsx), copy noir em empty states (feed "Silêncio na rede. Por agora.", quests "Contratos diários esgotados — novos ao nascer do dia.") e AuthPage
 - NOTA infra: fork 08/07 — .env recriados (preview 881ea282-260f-4851-99f8-c7e53f1369fd), credenciais em /app/memory/test_credentials.md

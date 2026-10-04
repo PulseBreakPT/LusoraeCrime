@@ -1,4 +1,4 @@
-"""Lusorae backend regression tests — iteration 2 (HR/Funcionários overhaul).
+"""SUBMUNDO backend regression tests — iteration 2 (HR/Funcionários overhaul).
 
 Covers new employee schema (14 specs, 9 attrs, rarity, rank, salary, loyalty, morale,
 fatigue, talents, history), recruit via candidates, refresh pool, train, rest, promote,
@@ -12,7 +12,7 @@ import requests
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 ADMIN_EMAIL = "admin@lusorae.com"
-ADMIN_PASSWORD = "LusoraeAdmin2026!"
+ADMIN_PASSWORD = "SUBMUNDOAdmin2026!"
 TIMEOUT = 30
 
 ATTR_KEYS_9 = {"forca", "inteligencia", "discricao", "conducao", "tiro", "hack",

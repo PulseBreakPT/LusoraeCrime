@@ -337,7 +337,7 @@ const sim = {
   lastSaveAt: 0,
 };
 
-const SS_KEY = "lus:police:v2";
+const SS_KEY = "sub:police:v2";
 
 const bump = () => { sim.version++; };
 

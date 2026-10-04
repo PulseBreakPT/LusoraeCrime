@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# LusoraeCrime — Deploy manual (alternativa ao comando `lusoraecrime`)
+# SUBMUNDO — Deploy manual (alternativa ao comando `submundo`)
 # =============================================================================
 # Corre este script no VPS para puxar o código mais recente e fazer rebuild.
 #

@@ -1,4 +1,4 @@
-name: Deploy LusoraeCrime to GitHub Pages
+name: Deploy SUBMUNDO to GitHub Pages
 
 on:
   push:

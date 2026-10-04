@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================================
-# LUSORAE CRIME - ECONOMIC SIMULATOR
+# SUBMUNDO - ECONOMIC SIMULATOR
 # Validates the redesigned economy by simulating different playstyles
 # ============================================================================
 

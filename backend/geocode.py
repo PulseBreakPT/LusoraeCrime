@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-USER_AGENT = "Lusorae/1.0 (jogo de estrategia; suporte@lusorae.pt)"
+USER_AGENT = "SUBMUNDO/1.0 (jogo de estrategia; geral@lusorae.pt)"
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 PHOTON_URL = "https://photon.komoot.io/reverse"

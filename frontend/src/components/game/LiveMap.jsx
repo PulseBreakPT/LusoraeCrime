@@ -101,7 +101,7 @@ const PROP_ICONS = {
 };
 
 const makeDivIcon = (html, size, className = "") =>
-  L.divIcon({ html, className: `lus-marker ${className}`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+  L.divIcon({ html, className: `sub-marker ${className}`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 
 const oppIcon = (opp, selected, favorite, urgent) => {
   const Icon = TYPE_ICONS[opp.type_key] || TYPE_ICONS.assalto;
@@ -179,7 +179,7 @@ const opIconCached = (kind, employeeName, showName = true) => {
         ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
         <span class="op-carry-badge"></span>
       </div>`;
-    icon = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
+    icon = L.divIcon({ html, className: "sub-marker sub-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
     opIconCache.set(key, icon);
   }
   return icon;
@@ -200,7 +200,7 @@ const missionTargetIconCached = (hot) => {
         <span class="mission-target-cross"></span>
         <span class="mission-target-dot"></span>
       </div>`;
-    icon = L.divIcon({ html, className: "lus-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
+    icon = L.divIcon({ html, className: "sub-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
     missionTargetIconCache.set(key, icon);
   }
   return icon;
@@ -286,8 +286,8 @@ const FollowChip = ({ name, onStop }) => {
     if (ref.current) L.DomEvent.disableClickPropagation(ref.current);
   }, []);
   return (
-    <div ref={ref} className="lus-follow-chip" data-testid="map-follow-chip">
-      <span className="lus-follow-dot" aria-hidden="true" />
+    <div ref={ref} className="sub-follow-chip" data-testid="map-follow-chip">
+      <span className="sub-follow-dot" aria-hidden="true" />
       A seguir {name}
       <button type="button" data-testid="map-follow-stop" title="Parar de seguir" aria-label="Parar de seguir" onClick={onStop}>
         <X size={12} strokeWidth={2.5} />
@@ -714,7 +714,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         zIndexOffset={340}
         opacity={dim ? 0.25 : 1}
       >
-        <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
+        <LTooltip direction="top" offset={[0, -12]} opacity={1} className="sub-map-tip">
           <div className="min-w-[150px]">
             <p className="text-[11px] font-bold text-red-400">{mission.opportunity?.name}</p>
             <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
@@ -807,7 +807,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         opacity={dim ? 0.25 : 1}
         eventHandlers={{ click: () => onToggleFollow && onToggleFollow() }}
       >
-        <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
+        <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
           <div className="min-w-[150px]">
             <p className="text-[11px] font-bold text-white">{mission.team_name}</p>
             <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: chased ? "#EF4444" : STATUS_COLORS[pos.phase] || "#22D3EE" }}>
@@ -945,7 +945,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
         </>
       )}
       <Marker ref={markerRef} position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={480} opacity={dim ? 0.25 : 1}>
-        <LTooltip direction="top" offset={[0, -12]} opacity={1} className="lus-map-tip">
+        <LTooltip direction="top" offset={[0, -12]} opacity={1} className="sub-map-tip">
           <div className="min-w-[140px]">
             <p className="text-[11px] font-bold text-white">{vehicle.name}</p>
             <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: TRANSFER_COLOR }}>
@@ -993,8 +993,8 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
   // O dock "Operação em Direto" pode pedir para a câmara seguir uma unidade.
   useEffect(() => {
     const onFollow = (ev) => setFollowId(ev.detail?.id || null);
-    window.addEventListener("lus:follow-mission", onFollow);
-    return () => window.removeEventListener("lus:follow-mission", onFollow);
+    window.addEventListener("sub:follow-mission", onFollow);
+    return () => window.removeEventListener("sub:follow-mission", onFollow);
   }, []);
 
   // Guard defensivo (depois de todos os hooks): sem QG não há mapa do jogo —
@@ -1010,7 +1010,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       center={[hq.lat, hq.lng]}
       zoom={13}
       zoomControl={false}
-      className="lus-dark-map absolute inset-0 z-0 h-full w-full"
+      className="sub-dark-map absolute inset-0 z-0 h-full w-full"
       attributionControl={true}
     >
       <MapBaseLayer />
@@ -1026,7 +1026,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
         opacity={baseFilter === "all" || baseFilter === "hq" ? 1 : 0.25}
         eventHandlers={{ click: () => onSelectHQ && onSelectHQ() }}
       >
-        <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">
+        <LTooltip direction="top" offset={[0, -18]} opacity={1} className="sub-map-tip">
           <div className="min-w-[130px]">
             <p className="text-[11px] font-bold text-white">{hq.name}</p>
             <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">Quartel-general · {state.player.org_name}</p>
@@ -1045,7 +1045,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             opacity={baseFilter === "all" || baseFilter === p.id ? 1 : 0.25}
             eventHandlers={{ click: () => onSelectProperty && onSelectProperty(p) }}
           >
-            <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
+            <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
               <div className="min-w-[140px]">
                 <p className="text-[11px] font-bold text-white">{p.name}</p>
                 <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
@@ -1093,7 +1093,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             zIndexOffset={isFavorite ? 400 : urgent ? 350 : 0}
             eventHandlers={{ click: () => { setFollowId(null); onSelectOpp(opp); } }}
           >
-            <LTooltip direction="top" offset={[0, -18]} opacity={1} className="lus-map-tip">
+            <LTooltip direction="top" offset={[0, -18]} opacity={1} className="sub-map-tip">
               <div className="min-w-[150px]">
                 <p className="text-[11px] font-bold text-white">{opp.name}</p>
                 <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: CATEGORY_COLORS[opp.category] }}>
@@ -1307,7 +1307,7 @@ export const PlacementControls = () => {
       className="pointer-events-auto absolute left-1/2 z-40 w-[calc(100vw-1rem)] max-w-md -translate-x-1/2"
       style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
-      <div className="lus-panel animate-slide-up rounded-xl border p-3 shadow-2xl">
+      <div className="sub-panel animate-slide-up rounded-xl border p-3 shadow-2xl">
         <div className="flex items-center gap-1.5">
           <span className={`inline-block h-1.5 w-1.5 animate-pulse rounded-full ${placement.checking ? "bg-amber-400" : invalid ? "bg-red-500" : "bg-emerald-400"}`} />
           <p className={`font-mono text-[9px] font-bold uppercase tracking-[0.24em] ${placement.checking ? "text-amber-300" : invalid ? "text-red-400" : "text-emerald-300"}`}>

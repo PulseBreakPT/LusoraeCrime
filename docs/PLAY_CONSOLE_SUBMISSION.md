@@ -1,4 +1,4 @@
-# Lusorae — Play Console Submission Sheet
+# SUBMUNDO — Play Console Submission Sheet
 
 Documento operacional para preencher a Play Console de forma consistente com a implementação atual.
 
@@ -8,7 +8,7 @@ Documento operacional para preencher a Play Console de forma consistente com a i
 
 ### App name
 
-**Lusorae**
+**SUBMUNDO**
 
 ### Short description
 
@@ -16,7 +16,7 @@ Documento operacional para preencher a Play Console de forma consistente com a i
 
 ### Full description
 
-> **Lusorae** é um jogo de estratégia e gestão criminal inteiramente ficcional, construído à volta de um mapa vivo de Portugal.
+> **SUBMUNDO** é um jogo de estratégia e gestão criminal inteiramente ficcional, construído à volta de um mapa vivo de Portugal.
 >
 > Não controlas apenas uma personagem. Geres uma organização inteira: Quartel-General, equipas, operacionais, frota, armamento, propriedades, economia, influência e risco policial.
 >
@@ -36,7 +36,7 @@ Documento operacional para preencher a Play Console de forma consistente com a i
 > • presença policial PSP/GNR simulada conforme a área;  
 > • interface tática mobile-first.
 >
-> Lusorae é uma obra de ficção destinada exclusivamente a entretenimento. Não ensina nem incentiva atividades ilegais reais.
+> SUBMUNDO é uma obra de ficção destinada exclusivamente a entretenimento. Não ensina nem incentiva atividades ilegais reais.
 
 ### Category
 
@@ -56,10 +56,10 @@ A app requer autenticação para guardar progresso.
 Texto sugerido para reviewers:
 
 > The app can be accessed with Google Sign-In.  
-> 1. Open Lusorae.  
+> 1. Open SUBMUNDO.  
 > 2. Tap “Continuar com Google”.  
 > 3. Select a Google account.  
-> 4. The app creates or restores the Lusorae account automatically.  
+> 4. The app creates or restores the SUBMUNDO account automatically.  
 > 5. For a new account, choose a Headquarters location on land in Portugal using the in-game map. No device GPS permission is required.  
 > 6. The main game is then available.
 >
@@ -89,7 +89,7 @@ Se forem adicionados SDKs de anúncios no futuro, atualizar esta declaração e 
 #### User IDs
 
 - Collected: **Yes**
-- Examples: Lusorae user ID, Google subject identifier.
+- Examples: SUBMUNDO user ID, Google subject identifier.
 - Purpose: **App functionality / Account management / Security**
 
 #### App activity / gameplay
@@ -129,13 +129,13 @@ A Política de Privacidade já explica o uso da Google como fornecedor de identi
 
 **Definições → Conta → Eliminar conta**
 
-A ação apaga a conta Lusorae e o progresso associado.
+A ação apaga a conta SUBMUNDO e o progresso associado.
 
 ### Web resource
 
 `https://pulsebreakpt.github.io/LusoraeCrime/delete-account.html`
 
-A página permite iniciar o pedido através do email oficial e identifica explicitamente Lusorae/PulseBreakPT.
+A página permite iniciar o pedido através do email oficial e identifica explicitamente SUBMUNDO/PulseBreakPT.
 
 ## Content rating / IARC
 

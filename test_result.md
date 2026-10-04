@@ -103,7 +103,7 @@
 #====================================================================================================
 
 user_problem_statement: >
-  Redesenho completo AAA da experiência de Login/Registo/Autenticação do Lusorae:
+  Redesenho completo AAA da experiência de Login/Registo/Autenticação do SUBMUNDO:
   validação em tempo real, força da palavra-passe, Caps Lock, mostrar/esconder password,
   aceitação obrigatória de Termos/Privacidade com registo de data+hora+versão, páginas
   públicas Termos/Privacidade/RGPD/Changelog (pt-PT, servidas pelo backend, versionadas),
@@ -286,7 +286,7 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Tooltips CSS-only (.lus-tip, sides top/bottom, align start/center/end), verificados por screenshot."
+        comment: "Tooltips CSS-only (.sub-tip, sides top/bottom, align start/center/end), verificados por screenshot."
   - task: "ResourceBar centro de comando (nível+progresso, fluxos /h, calor c/ estado, prontas, ops, salários+countdown)"
     implemented: true
     working: true
@@ -452,7 +452,7 @@ agent_communication:
       rotas públicas /termos /privacidade /rgpd /changelog, interceptor 401→refresh→retry em api.js.
       Testar backend primeiro; frontend só com autorização do utilizador.
 frontend:
-  - task: "UI uniformization pass (shared sheet/button/hud/lus-* CSS classes)"
+  - task: "UI uniformization pass (shared sheet/button/hud/sub-* CSS classes)"
     implemented: true
     working: true
     file: "components/ui/sheet.jsx, components/ui/button.jsx, components/game/hud.jsx, ResourceBar.jsx, GamePage.jsx, App.css"
@@ -462,14 +462,14 @@ frontend:
     status_history:
         - working: true
           agent: "main"
-          comment: "Global visual pass via shared components: premium panel shell (all 10 sheets), refined button variants, unified lus-card cards, readable topbar/KPIs, active state on bottom nav. Verified via screenshots (map + Empire + Employees panels). No backend changes."
+          comment: "Global visual pass via shared components: premium panel shell (all 10 sheets), refined button variants, unified sub-card cards, readable topbar/KPIs, active state on bottom nav. Verified via screenshots (map + Empire + Employees panels). No backend changes."
 
 agent_communication:
     - agent: "main"
-      message: "07/07/2026 — CSS-only/visual uniformization through shared components (sheet.jsx, button.jsx, hud.jsx, App.css lus-panel/lus-card/lus-topbar). No API or logic changes; verified visually with screenshots."
+      message: "07/07/2026 — CSS-only/visual uniformization through shared components (sheet.jsx, button.jsx, hud.jsx, App.css sub-panel/sub-card/sub-topbar). No API or logic changes; verified visually with screenshots."
 
 frontend:
-  - task: "SSS-tier design overhaul (Noir Tático): Rajdhani display font, film grain global, gradient-border topbar/dock com laser sweep, dock unificado da nav inferior, laser line em todos os lus-panel, pins com glow/anel rotativo, tiles do mapa com color grade, AuthPage cinemático (ken burns + título gradiente), ActivityFeed em lus-panel"
+  - task: "SSS-tier design overhaul (Noir Tático): Rajdhani display font, film grain global, gradient-border topbar/dock com laser sweep, dock unificado da nav inferior, laser line em todos os sub-panel, pins com glow/anel rotativo, tiles do mapa com color grade, AuthPage cinemático (ken burns + título gradiente), ActivityFeed em sub-panel"
     implemented: true
     working: true
     file: "App.css, index.css, GamePage.jsx, AuthPage.jsx, ActivityFeed.jsx"
@@ -480,7 +480,7 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Frontend-only. .env recriados pós-fork (backend+frontend) e credenciais em /app/memory/test_credentials.md. Verificado por screenshots (auth, mapa, painel Império). Lint limpo. Sem alterações de lógica/API."
-  - task: "SSS tier ronda 2: button.jsx variantes gradiente+glow, tabs.jsx segmented tático (ativo vermelho), input.jsx foco com glow, sheet.jsx overlay/header/título refinados, BootScreen+LoadingScreen cinematográficos (lus-boot-bg grelha tática, logo pulsante, barra lus-progress-fill com sheen)"
+  - task: "SSS tier ronda 2: button.jsx variantes gradiente+glow, tabs.jsx segmented tático (ativo vermelho), input.jsx foco com glow, sheet.jsx overlay/header/título refinados, BootScreen+LoadingScreen cinematográficos (sub-boot-bg grelha tática, logo pulsante, barra sub-progress-fill com sheen)"
     implemented: true
     working: true
     file: "components/ui/button.jsx, tabs.jsx, input.jsx, sheet.jsx, components/BootScreen.jsx, LoadingScreen.jsx, App.css"
@@ -502,7 +502,7 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshot em live (cartão aberto com equipa recomendada, preview 72% e CTA premium). Sem alterações de lógica. Lint limpo."
-  - task: "SSS tier ronda 4 (loading): radar tático animado (feixe conic + blip), moldura com 4 cantos HUD (lus-frame/lus-corner-*), scanline vertical no ecrã, reveal do logo (lus-logo-in), cursor terminal (lus-cursor), frases de ambiente rotativas CSS-only (lus-flavor) em BootScreen+LoadingScreen"
+  - task: "SSS tier ronda 4 (loading): radar tático animado (feixe conic + blip), moldura com 4 cantos HUD (sub-frame/sub-corner-*), scanline vertical no ecrã, reveal do logo (sub-logo-in), cursor terminal (sub-cursor), frases de ambiente rotativas CSS-only (sub-flavor) em BootScreen+LoadingScreen"
     implemented: true
     working: true
     file: "components/BootScreen.jsx, components/LoadingScreen.jsx, App.css"
@@ -513,7 +513,7 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Capturado em live durante o boot real (radar, cantos, cursor, flavor text visíveis). Lógica de fases/erros preservada. Lint limpo. prefers-reduced-motion respeitado."
-  - task: "SSS tier ronda 5 (botões): física de interação .lus-btn (spring transitions, press-down translateY+scale, sheen sweep por background-position que não corta badges), orla metálica mask-ring em primary/success, variantes button.jsx enriquecidas (via- stops, sombras em camadas, focus ring vermelho, disabled dessaturado), TabsTrigger com gradiente+ring inset+hover, icon glow nos lus-hud-btn, indicador luminoso no separador ativo do dock; fixes de intenção de cor: OpportunityCard dispatch (variant success — corrigida regressão via-red-600), EmpirePanel lavar/subornar (outline), SettingsPanel claim-admin (âmbar sólido), LiveMap placement-confirm (success), AdminPanel 5 botões (success/destructive/gradientes)"
+  - task: "SSS tier ronda 5 (botões): física de interação .sub-btn (spring transitions, press-down translateY+scale, sheen sweep por background-position que não corta badges), orla metálica mask-ring em primary/success, variantes button.jsx enriquecidas (via- stops, sombras em camadas, focus ring vermelho, disabled dessaturado), TabsTrigger com gradiente+ring inset+hover, icon glow nos sub-hud-btn, indicador luminoso no separador ativo do dock; fixes de intenção de cor: OpportunityCard dispatch (variant success — corrigida regressão via-red-600), EmpirePanel lavar/subornar (outline), SettingsPanel claim-admin (âmbar sólido), LiveMap placement-confirm (success), AdminPanel 5 botões (success/destructive/gradientes)"
     implemented: true
     working: true
     file: "components/ui/button.jsx, components/ui/tabs.jsx, App.css, components/game/OpportunityCard.jsx, components/game/EmpirePanel.jsx, components/game/SettingsPanel.jsx, components/game/LiveMap.jsx, pages/AdminPanel.jsx"
@@ -535,7 +535,7 @@ frontend:
         - working: true
           agent: "main"
           comment: "07/07/2026 — Verificado por screenshots (Equipas c/ dropdown aberto: dark-glass + item vermelho; Definições: switches/inputs). Lint limpo nos ficheiros tocados (calendar/command têm erros stock pré-existentes). Sem alterações de lógica/API."
-  - task: "SSS tier ronda 8 (Cockpit Cinemático + Voz Noir): radar tático a emanar do QG (marcador CSS não-interativo), grelha tática nas bordas do viewport, moldura HUD com 4 cantos, relógio da rede na topbar (hora servidor + coordenadas Lisboa), flashes âmbar/azul em sujo/respeito, toasts sonner redesenhados (transmissão tática c/ barra lateral por tipo), flash vermelho no registo mais recente do feed (desktop+mobile), carimbo de celebração 'EQUIPA DESTACADA' no despacho (CustomEvent lus:dispatch-stamp), headers de todos os 10 painéis com PanelKicker (micro-etiqueta laser) + PanelWatermark (ícone marca de água) + títulos com gradiente metálico (lus-sheet-title) + taglines noir reescritas, EmptyState tático partilhado (Operacionais/Intel), copy noir em todos os empty states e AuthPage"
+  - task: "SSS tier ronda 8 (Cockpit Cinemático + Voz Noir): radar tático a emanar do QG (marcador CSS não-interativo), grelha tática nas bordas do viewport, moldura HUD com 4 cantos, relógio da rede na topbar (hora servidor + coordenadas Lisboa), flashes âmbar/azul em sujo/respeito, toasts sonner redesenhados (transmissão tática c/ barra lateral por tipo), flash vermelho no registo mais recente do feed (desktop+mobile), carimbo de celebração 'EQUIPA DESTACADA' no despacho (CustomEvent sub:dispatch-stamp), headers de todos os 10 painéis com PanelKicker (micro-etiqueta laser) + PanelWatermark (ícone marca de água) + títulos com gradiente metálico (sub-sheet-title) + taglines noir reescritas, EmptyState tático partilhado (Operacionais/Intel), copy noir em todos os empty states e AuthPage"
     implemented: true
     working: true
     file: "App.css, hud.jsx, sheet.jsx, App.js, GamePage.jsx, LiveMap.jsx, ResourceBar.jsx, ActivityFeed.jsx, OpportunityCard.jsx, 10 painéis, AuthPage.jsx"
@@ -546,7 +546,7 @@ frontend:
         - working: true
           agent: "main"
           comment: "08/07/2026 — Fork: .env recriados (backend+frontend, preview 881ea282...), credenciais em /app/memory/test_credentials.md. Verificado em live por screenshots: header Operacionais (kicker+watermark+gradiente+tagline), despacho real com carimbo+toast+flash no feed+relógio. Lint limpo (só warnings pré-existentes). Sem alterações de lógica/API. prefers-reduced-motion coberto."
-  - task: "SSS tier ronda 7 (juice de jogo, CSS-only): entrada do HUD, pins com bounce, halo QG, cascata staggered dos lus-card, prefers-reduced-motion"
+  - task: "SSS tier ronda 7 (juice de jogo, CSS-only): entrada do HUD, pins com bounce, halo QG, cascata staggered dos sub-card, prefers-reduced-motion"
     implemented: true
     working: true
     file: "App.css (secção 'SSS ronda 7')"
@@ -559,7 +559,7 @@ frontend:
           comment: "07/07/2026 — Verificado por screenshots: topbar centrada sem salto, dock/pins/halo QG corretos no mapa; painel Frota com todos os cartões visíveis pós-cascata. 1 edição CSS, zero JS/lógica."
 
 frontend:
-  - task: "SSS ronda 5 — páginas de documento (Termos/Privacidade/RGPD/Changelog) alinhadas com identidade Noir Tático: fundo grelha tática + glows (lus-page-grid/glow), header vidro com laser sweep (lus-page-header) e wordmark gradiente, nav ativa com sublinhado laser, TOC vidro numerado (lus-toc), headings com marcador laser (lus-sec-heading), sumário com cantos HUD (lus-doc-summary), changelog em cartões vidro com nó pulsante e realce da versão atual (lus-version-card/current, lus-node-current), hairlines gradiente, prefers-reduced-motion coberto. Pós-fork: .env backend/frontend recriados e test_credentials.md reposto."
+  - task: "SSS ronda 5 — páginas de documento (Termos/Privacidade/RGPD/Changelog) alinhadas com identidade Noir Tático: fundo grelha tática + glows (sub-page-grid/glow), header vidro com laser sweep (sub-page-header) e wordmark gradiente, nav ativa com sublinhado laser, TOC vidro numerado (sub-toc), headings com marcador laser (sub-sec-heading), sumário com cantos HUD (sub-doc-summary), changelog em cartões vidro com nó pulsante e realce da versão atual (sub-version-card/current, sub-node-current), hairlines gradiente, prefers-reduced-motion coberto. Pós-fork: .env backend/frontend recriados e test_credentials.md reposto."
     implemented: true
     working: true
     file: "App.css, components/legal/LegalShell.jsx, pages/LegalPage.jsx, pages/ChangelogPage.jsx"
@@ -805,7 +805,7 @@ backend:
         comment: "10/07/2026 — Aditivo, sem alteração de lógica de jogo. Verificado localmente: /api/game/catalog devolve weapon_meta com 25 chaves (sell_fraction 0.4, wear_per_mission 3.0, combat_score_scale 0.15). Falta teste formal de regressão dos endpoints de armas."
 
 frontend:
-  - task: "WeaponsPanel redesenhado SSS: cartões dossier com silhueta SVG por modelo (WeaponGlyph.jsx, 9 silhuetas), tier por nível (Rua/Profissional/Militar/Pesado com cor na moldura via --wtier), grelha de 6 stats (potência/precisão/alcance/leveza/velocidade/carregador), adequação por operação (5 mini-barras, best_for realçado), chip de encravamento (nunca encrava/[x]% com aviso), condição com eficácia real (curva não-linear), desgaste/missão, bloco do portador (habilidade por atributo + proficiência com bónus %), summary 4 KPIs (equipadas/condição/encravar/revenda), botão Otimizar arsenal (novo optimizeWeapons no GameContextV2 → POST /weapons/optimize), loja Arsenal com o mesmo tratamento + chips fiab./desgaste/discrição/manutenção + 'no arsenal: N'. Helpers em lib/game.js espelham EXATAMENTE engine.py (weaponCombatScore, weaponConditionFactor, weaponJamRisk, weaponSkillInfo, weaponCompatFactor, weaponEffectiveScore, weaponWearPerMission, weaponAdequacy, weaponTier). CSS: .lus-weapon-card/.lus-weapon-plate (orla tier, grelha diagonal, sheen hover, reduced-motion)."
+  - task: "WeaponsPanel redesenhado SSS: cartões dossier com silhueta SVG por modelo (WeaponGlyph.jsx, 9 silhuetas), tier por nível (Rua/Profissional/Militar/Pesado com cor na moldura via --wtier), grelha de 6 stats (potência/precisão/alcance/leveza/velocidade/carregador), adequação por operação (5 mini-barras, best_for realçado), chip de encravamento (nunca encrava/[x]% com aviso), condição com eficácia real (curva não-linear), desgaste/missão, bloco do portador (habilidade por atributo + proficiência com bónus %), summary 4 KPIs (equipadas/condição/encravar/revenda), botão Otimizar arsenal (novo optimizeWeapons no GameContextV2 → POST /weapons/optimize), loja Arsenal com o mesmo tratamento + chips fiab./desgaste/discrição/manutenção + 'no arsenal: N'. Helpers em lib/game.js espelham EXATAMENTE engine.py (weaponCombatScore, weaponConditionFactor, weaponJamRisk, weaponSkillInfo, weaponCompatFactor, weaponEffectiveScore, weaponWearPerMission, weaponAdequacy, weaponTier). CSS: .sub-weapon-card/.sub-weapon-plate (orla tier, grelha diagonal, sheen hover, reduced-motion)."
     implemented: true
     working: NA
     file: "frontend/src/components/game/WeaponsPanel.jsx, frontend/src/components/game/WeaponGlyph.jsx, frontend/src/lib/game.js, frontend/src/context/GameContextV2.js, frontend/src/App.css"
@@ -865,7 +865,7 @@ backend:
         comment: "10/07/2026 — Testes backend SSS das Equipas concluídos com SUCESSO (26 passed, 0 failed, 2 warnings). RESULTADOS: ✓ GET /api/game/catalog contém team_meta com 38 chaves (leader_min_rank='chefe_equipa', no_leader_penalty=0.03, clutch_save_max=0.18, category_attrs com assalto/logistica/tecnica/influencia). ✓ weapon_meta presente (regressão OK). ✓ GET /api/game/state: equipa Crew Alfa tem streak (int), roster_missions (int), category_missions (dict). ✓ POST /api/game/teams/create: nova equipa criada com streak=0, roster_missions=0, category_missions={}. ✓ Endpoints de recomendação (recommend_opportunity/team/repeat) → 200 sem 500. ✓ POST /api/game/dispatch/preview → 200 com breakdown e chance. ✓ Login intacto. AVISOS (não-críticos): Sem funcionários/veículos livres para testes de atribuição (conta admin com recursos limitados). CONCLUSÃO: Implementação SSS v4 das equipas está FUNCIONAL — campos persistidos corretamente, endpoints operacionais, sem crashes."
 
 frontend:
-  - task: "TeamsPanel redesenhado SSS 'dossier de unidade': placa com emblema SVG por especialização (TeamGlyph.jsx, 4 emblemas), tier pela experiência (Recruta<8/Operacional<25/Veterana<60/Lendária, cor na moldura via --ttier), chip de momentum (série vitórias/derrotas com % do motor), chip de química (cobertura+diversidade), 5 chips de papéis a bordo (líder+clutch %, condutor −viagem/+fuga, médico, advogado, estratega INT) acesos/apagados com fórmulas nas dicas, barra de entrosamento (50% tempo+50% missões juntos, ao segundo), fila de familiaridade por 5 categorias (curva sqrt, mestria ★, espec realçada), vitais médios moral/lealdade/fadiga com curvas do motor, KPI 'Série' no summary, cartões de formação com emblemas. Helpers em lib/game.js espelham EXATAMENTE engine.py (teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES). CSS: .lus-team-card/.lus-team-plate (padrão .lus-weapon-card, reduced-motion coberto)."
+  - task: "TeamsPanel redesenhado SSS 'dossier de unidade': placa com emblema SVG por especialização (TeamGlyph.jsx, 4 emblemas), tier pela experiência (Recruta<8/Operacional<25/Veterana<60/Lendária, cor na moldura via --ttier), chip de momentum (série vitórias/derrotas com % do motor), chip de química (cobertura+diversidade), 5 chips de papéis a bordo (líder+clutch %, condutor −viagem/+fuga, médico, advogado, estratega INT) acesos/apagados com fórmulas nas dicas, barra de entrosamento (50% tempo+50% missões juntos, ao segundo), fila de familiaridade por 5 categorias (curva sqrt, mestria ★, espec realçada), vitais médios moral/lealdade/fadiga com curvas do motor, KPI 'Série' no summary, cartões de formação com emblemas. Helpers em lib/game.js espelham EXATAMENTE engine.py (teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES). CSS: .sub-team-card/.sub-team-plate (padrão .sub-weapon-card, reduced-motion coberto)."
     implemented: true
     working: NA
     file: "frontend/src/components/game/TeamsPanel.jsx, frontend/src/components/game/TeamGlyph.jsx, frontend/src/lib/game.js, frontend/src/App.css"
@@ -960,7 +960,7 @@ backend:
         comment: "10/07/2026 — Delta aplicado antes do roll de jams; final_chance = chance efetiva final. Return script gerado no tick lazy quando now >= finish_at."
 
 frontend:
-  - task: "LiveOpsDock — dock inferior 'transmissão em direto' (REC pulsante, tabs multi-operação, timeline Ida/Ação/Volta, chance ao vivo = success_chance + pct revelados, feed rádio com reveal por relógio do servidor + caret terminal, faixa de desfecho/perseguição, cartão de conclusão 8s, colapsável, botão seguir câmara via CustomEvent lus:follow-mission)"
+  - task: "LiveOpsDock — dock inferior 'transmissão em direto' (REC pulsante, tabs multi-operação, timeline Ida/Ação/Volta, chance ao vivo = success_chance + pct revelados, feed rádio com reveal por relógio do servidor + caret terminal, faixa de desfecho/perseguição, cartão de conclusão 8s, colapsável, botão seguir câmara via CustomEvent sub:follow-mission)"
     implemented: true
     working: NA
     file: "frontend/src/components/game/LiveOpsDock.jsx, frontend/src/pages/GamePage.jsx, frontend/src/components/game/LiveMap.jsx, frontend/src/App.css"
@@ -970,7 +970,7 @@ frontend:
     status_history:
       - working: NA
         agent: "main"
-        comment: "10/07/2026 — Novo componente + integração no GamePage + listener follow no LiveMap + estilos .lus-lo-* com prefers-reduced-motion. Compila sem erros novos."
+        comment: "10/07/2026 — Novo componente + integração no GamePage + listener follow no LiveMap + estilos .sub-lo-* com prefers-reduced-motion. Compila sem erros novos."
 
 test_plan:
   current_focus:
@@ -1073,7 +1073,7 @@ agent_communication:
       bloquear o admin. Frontend só com autorização do utilizador.
 
 frontend:
-  - task: "Responsividade mobile — remoção dos controlos de câmara do mapa (+/−/centrar QG/enquadrar): componente MapControls eliminado do LiveMap (zoom por gestos/roda), testids map-zoom-in/out/center-hq/fit-all removidos, CSS .lus-map-ctrl apagado"
+  - task: "Responsividade mobile — remoção dos controlos de câmara do mapa (+/−/centrar QG/enquadrar): componente MapControls eliminado do LiveMap (zoom por gestos/roda), testids map-zoom-in/out/center-hq/fit-all removidos, CSS .sub-map-ctrl apagado"
     implemented: true
     working: true
     file: "frontend/src/components/game/LiveMap.jsx, frontend/src/App.css"

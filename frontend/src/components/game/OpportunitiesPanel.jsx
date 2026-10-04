@@ -98,7 +98,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
           <PanelKicker>Comando · Operações</PanelKicker>
@@ -195,7 +195,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                 key={opp.id}
                 data-testid={`opp-row-${opp.id}`}
                 onClick={() => onSelectOpp(opp)}
-                className="lus-card flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none transition-colors hover:bg-white/[0.07]"
+                className="sub-card flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none transition-colors hover:bg-white/[0.07]"
               >
                 <span
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"

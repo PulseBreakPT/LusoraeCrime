@@ -21,8 +21,8 @@ export class ErrorBoundary extends Component {
   }
 
   handleLogout = () => {
-    localStorage.removeItem("lusorae_access_token");
-    localStorage.removeItem("lusorae_refresh_token");
+    localStorage.removeItem("submundo_access_token");
+    localStorage.removeItem("submundo_refresh_token");
     window.location.href = "/auth";
   };
 

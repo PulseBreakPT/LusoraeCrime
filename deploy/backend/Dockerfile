@@ -1,5 +1,5 @@
 # =============================================================================
-# LusoraeCrime backend — Dockerfile de produção
+# SUBMUNDO backend — Dockerfile de produção
 # =============================================================================
 # Python 3.11 slim + uvicorn com 1 worker único.
 # =============================================================================
@@ -14,8 +14,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1001 lusoraecrime \
-    && useradd --system --uid 1001 --gid lusoraecrime --home /app --shell /usr/sbin/nologin lusoraecrime
+    && groupadd --system --gid 1001 submundo \
+    && useradd --system --uid 1001 --gid submundo --home /app --shell /usr/sbin/nologin submundo
 
 WORKDIR /app
 
@@ -23,9 +23,9 @@ COPY deploy/backend/requirements.production.txt /app/requirements.txt
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -r /app/requirements.txt
 
-COPY --chown=lusoraecrime:lusoraecrime backend/ /app/
+COPY --chown=submundo:submundo backend/ /app/
 
-USER lusoraecrime
+USER submundo
 
 EXPOSE 8001
 

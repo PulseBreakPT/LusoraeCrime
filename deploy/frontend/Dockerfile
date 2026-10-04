@@ -1,5 +1,5 @@
 # =============================================================================
-# LusoraeCrime frontend — build React (CRA/Craco) e servir via Caddy
+# SUBMUNDO frontend — build React (CRA/Craco) e servir via Caddy
 # =============================================================================
 # Stage 1: compila o React para ficheiros estáticos.
 # Stage 2: Caddy serve os estáticos + faz reverse-proxy de /api para o

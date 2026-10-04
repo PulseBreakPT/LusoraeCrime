@@ -13,7 +13,7 @@ import { isLocalGuestMode } from "../game/localGuestEngine";
 
 const OSRM_BASE = "https://router.project-osrm.org/route/v1/driving";
 const ROUTE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const STORAGE_KEY = "lusorae_road_route_cache_v3";
+const STORAGE_KEY = "submundo_road_route_cache_v3";
 const MAX_PERSISTED_ROUTES = 40;
 
 const routeCache = new Map();
@@ -136,7 +136,7 @@ function normalizeRoute(data) {
 function normalizePreparedRoute(data) {
   if (!data) throw new Error("Percurso rodoviário vazio");
 
-  // O backend Lusorae já devolve o formato final consumido pelo mapa.
+  // O backend SUBMUNDO já devolve o formato final consumido pelo mapa.
   if (Array.isArray(data.latlngs)) {
     const latlngs = data.latlngs
       .map((point) => [Number(point?.[0]), Number(point?.[1])])

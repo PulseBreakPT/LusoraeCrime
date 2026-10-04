@@ -18,7 +18,7 @@ const PANEL_SHORTCUTS = {
   "8": "weapons",
   "9": "shop",
 };
-const LAST_PANEL_KEY = "lusorae.last-panel";
+const LAST_PANEL_KEY = "submundo.last-panel";
 
 export function initialGamePanel() {
   if (typeof window === "undefined") return null;
@@ -100,10 +100,10 @@ export function useGameShell({
   useEffect(() => {
     const root = document.documentElement;
     const classes = {
-      "lus-reduced-motion": settings.reducedMotion,
-      "lus-high-contrast": settings.highContrast,
-      "lus-compact-hud": settings.compactHud,
-      "lus-focus-mode": settings.focusMode,
+      "sub-reduced-motion": settings.reducedMotion,
+      "sub-high-contrast": settings.highContrast,
+      "sub-compact-hud": settings.compactHud,
+      "sub-focus-mode": settings.focusMode,
     };
     Object.entries(classes).forEach(([name, active]) => root.classList.toggle(name, Boolean(active)));
     return () => Object.keys(classes).forEach((name) => root.classList.remove(name));
@@ -151,8 +151,8 @@ export function useGameShell({
   // O separador mostra a urgência mesmo quando o jogo está em segundo plano.
   useEffect(() => {
     const total = alerts?.total || 0;
-    document.title = total > 0 ? `(${total}) Lusorae` : "Lusorae";
-    return () => { document.title = "Lusorae"; };
+    document.title = total > 0 ? `(${total}) SUBMUNDO` : "SUBMUNDO";
+    return () => { document.title = "SUBMUNDO"; };
   }, [alerts?.total]);
 
   // Notificação de sistema para o evento mais recente quando o separador está oculto.
@@ -173,9 +173,9 @@ export function useGameShell({
       typeof Notification !== "undefined" &&
       Notification.permission === "granted"
     ) {
-      new Notification("Lusorae", {
+      new Notification("SUBMUNDO", {
         body: parseActivityMessage(latest.message),
-        tag: `lusorae-${latest.kind || "event"}`,
+        tag: `submundo-${latest.kind || "event"}`,
       });
     }
     if (latest.ts > previousEventTs.current) previousEventTs.current = latest.ts;

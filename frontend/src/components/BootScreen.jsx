@@ -34,7 +34,7 @@ export function BootScreen() {
         <TacticalFrame header="Falha de uplink" status="Interrompido" tone="error">
           <div className="space-y-5">
             <div className="flex items-center gap-4">
-              <span className="lus-alert-icon">
+              <span className="sub-alert-icon">
                 <AlertTriangle className="h-9 w-9 flex-shrink-0 text-destructive" />
               </span>
               <div>

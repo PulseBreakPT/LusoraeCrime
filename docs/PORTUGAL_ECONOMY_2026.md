@@ -1,4 +1,4 @@
-# Lusorae — Economia Portugal 2026
+# SUBMUNDO — Economia Portugal 2026
 
 Referência de balanceamento aplicada em outubro de 2026.
 
@@ -37,7 +37,7 @@ INE, trimestre terminado em junho de 2026:
 - remuneração regular média: 1.436 €;
 - remuneração base média: 1.342 €.
 
-Os salários Lusorae são custos semanais de simulação e incluem um prémio ficcional para especialização, disponibilidade e risco.
+Os salários SUBMUNDO são custos semanais de simulação e incluem um prémio ficcional para especialização, disponibilidade e risco.
 
 Fonte: https://www.ine.pt/
 
@@ -53,7 +53,7 @@ Referências:
 
 ### Veículos
 
-| Tipo | Preço Lusorae |
+| Tipo | Preço SUBMUNDO |
 |---|---:|
 | Sedan usado | 12.500 € |
 | Moto rápida | 9.000 € |
@@ -89,7 +89,7 @@ Os valores representam **aquisição operacional + preparação inicial + adapta
 
 Em Faro, anúncios recentes de armazéns mostram referências próximas de 7–11 €/m²/mês, enquanto Lisboa tende a ser mais cara.
 
-A progressão Lusorae usa:
+A progressão SUBMUNDO usa:
 
 | Operação imobiliária | Entrada |
 |---|---:|
@@ -131,7 +131,7 @@ A lavagem manual devolve 78% na taxa base e pode melhorar até 90% com especiali
 
 ### Armamento
 
-Os preços do armamento no Lusorae são **inteiramente de balanceamento ficcional**. Não são apresentados como preços reais de mercado ilegal.
+Os preços do armamento no SUBMUNDO são **inteiramente de balanceamento ficcional**. Não são apresentados como preços reais de mercado ilegal.
 
 Os custos refletem apenas:
 - categoria;

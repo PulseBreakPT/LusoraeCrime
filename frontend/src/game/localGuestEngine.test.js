@@ -221,13 +221,13 @@ describe("offline guest engine", () => {
       lng: -9.1393,
     });
 
-    const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
+    const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
     raw.version = 1;
     raw.opportunities[0].risk = 29;
     raw.opportunities[1].risk = 40;
     raw.opportunities[2].risk = 51;
     raw.opportunities[3].risk = 62;
-    localStorage.setItem("lusorae_guest_save_v2", JSON.stringify(raw));
+    localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
 
     const state = (await localGuestRequest("get", "/game/state")).data;
     expect(state.opportunities.slice(0, 4).map((o) => o.risk)).toEqual([1, 2, 3, 4]);
@@ -240,7 +240,7 @@ describe("offline guest engine", () => {
       lat: 38.7223,
       lng: -9.1393,
     });
-    const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
+    const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
     raw.events = [
       {
         id: "legacy-event",
@@ -249,7 +249,7 @@ describe("offline guest engine", () => {
         ts: new Date().toISOString(),
       },
     ];
-    localStorage.setItem("lusorae_guest_save_v2", JSON.stringify(raw));
+    localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
 
     const state = (await localGuestRequest("get", "/game/state")).data;
     expect(state.events[0].kind).toBe("system");
@@ -263,11 +263,11 @@ describe("offline guest engine", () => {
       lng: -9.1393,
     });
 
-    const raw = JSON.parse(localStorage.getItem("lusorae_guest_save_v2"));
+    const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
     raw.version = 2;
     raw.employees[0].salary = 260;
     raw.vehicles[0].price = 6000;
-    localStorage.setItem("lusorae_guest_save_v2", JSON.stringify(raw));
+    localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
 
     const state = (await localGuestRequest("get", "/game/state")).data;
     expect(state.employees[0].salary).toBeGreaterThan(260);

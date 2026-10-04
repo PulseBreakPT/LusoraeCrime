@@ -21,7 +21,7 @@ from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_s
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY
 from road_routing import road_router
 
-app = FastAPI(title="Lusorae API")
+app = FastAPI(title="SUBMUNDO API")
 
 app.include_router(auth_router)
 app.include_router(game_router)
@@ -33,7 +33,7 @@ app.include_router(legal_router)
 
 @app.get("/api/")
 async def root():
-    return {"message": "Lusorae API", "status": "operational"}
+    return {"message": "SUBMUNDO API", "status": "operational"}
 
 
 app.add_middleware(

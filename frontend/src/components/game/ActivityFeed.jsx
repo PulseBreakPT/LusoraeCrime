@@ -137,7 +137,7 @@ function useFeedData(events, filter, nowMs) {
 
 // ---------- Não lidos: último ts visto guardado por jogador ----------
 function useUnread(events, playerId) {
-  const key = `lus-feed-seen:${playerId || "anon"}`;
+  const key = `sub-feed-seen:${playerId || "anon"}`;
   // ts mais recente (não assume events[0]) — o "marcar como visto" tem de gravar
   // o mais novo, senão eventos ficariam eternamente por ler.
   const firstTs = (events || []).reduce((m, e) => (e?.ts && (!m || e.ts > m) ? e.ts : m), "");
@@ -191,7 +191,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
         tab === "live" ? "bg-red-500/10 text-red-300" : "text-zinc-500 hover:text-zinc-300"
       }`}
     >
-      <span className="lus-lo-rec" style={liveCount === 0 ? { animation: "none", opacity: 0.25, boxShadow: "none" } : undefined} />
+      <span className="sub-lo-rec" style={liveCount === 0 ? { animation: "none", opacity: 0.25, boxShadow: "none" } : undefined} />
       Em direto
       {liveCount > 0 && (
         <span className="rounded-full border border-red-500/40 bg-red-500/10 px-1.5 font-mono text-[9px] font-bold text-red-300">
@@ -212,7 +212,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
     >
       Registos
       {unread > 0 && (
-        <span className="lus-feed-unread font-mono">{unread > 9 ? "9+" : unread}</span>
+        <span className="sub-feed-unread font-mono">{unread > 9 ? "9+" : unread}</span>
       )}
     </button>
   </div>
@@ -220,7 +220,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
 
 // ---------- Chips de filtro (partilhados desktop/mobile) ----------
 const FilterChips = ({ counts, filter, onFilter }) => (
-  <div className="lus-feed-chiprow px-2 pt-1.5" role="tablist" aria-label="Filtrar registos">
+  <div className="sub-feed-chiprow px-2 pt-1.5" role="tablist" aria-label="Filtrar registos">
     {CATEGORIES.filter((c) => c.key === "all" || counts[c.key]).map((c) => (
       <button
         key={c.key}
@@ -229,10 +229,10 @@ const FilterChips = ({ counts, filter, onFilter }) => (
         aria-selected={filter === c.key}
         data-testid={`feed-filter-${c.key}`}
         onClick={() => onFilter(c.key)}
-        className={`lus-feed-chip font-mono ${filter === c.key ? "is-active" : ""}`}
+        className={`sub-feed-chip font-mono ${filter === c.key ? "is-active" : ""}`}
       >
         {c.label}
-        <span className="lus-feed-chip-n">{counts[c.key] || 0}</span>
+        <span className="sub-feed-chip-n">{counts[c.key] || 0}</span>
       </button>
     ))}
   </div>
@@ -248,10 +248,10 @@ const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
       data-sev={e.sev}
       onClick={() => onNavigate && onNavigate(e.dest.panel, e.dest)}
       title={`${KIND_LABELS[e.kind] || e.kind} — abrir ${PANEL_LABELS[e.dest.panel] || e.dest.panel} · ${fullTime(e.ts)}`}
-      className={`lus-feed-row flex w-full items-start gap-2 px-1.5 py-1 text-left ${flash ? "lus-feed-new" : ""}`}
+      className={`sub-feed-row flex w-full items-start gap-2 px-1.5 py-1 text-left ${flash ? "sub-feed-new" : ""}`}
     >
       <span
-        className="lus-feed-ico mt-0.5"
+        className="sub-feed-ico mt-0.5"
         style={{ color: e.dest.color, background: `${e.dest.color}14`, borderColor: `${e.dest.color}33` }}
       >
         <Icon size={11} strokeWidth={2.2} />
@@ -264,7 +264,7 @@ const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
           </span>
           <span>·</span>
           <span>{e.group === "old" ? `${shortDate(e.ts)} ${clockTime(e.ts)}` : clockTime(e.ts)}</span>
-          {e.count > 1 && <span className="lus-feed-xn">×{e.count}</span>}
+          {e.count > 1 && <span className="sub-feed-xn">×{e.count}</span>}
         </p>
       </div>
       <span className="shrink-0 pt-0.5 font-mono text-[9px] text-zinc-600">{relTime(e.ts, nowMs)}</span>
@@ -283,7 +283,7 @@ const FeedList = ({ rows, nowMs, onNavigate, firstId, newFlash }) => {
         return (
           <Fragment key={e.id}>
             {showSep && (
-              <div className="lus-feed-sep font-mono">
+              <div className="sub-feed-sep font-mono">
                 <span>{GROUP_LABELS[e.group]}</span>
               </div>
             )}
@@ -305,7 +305,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   const [filter, setFilter] = useState("all");
   const [tab, setTab] = useState("log");
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem("lus-feed-collapsed") === "1"; } catch { return false; }
+    try { return localStorage.getItem("sub-feed-collapsed") === "1"; } catch { return false; }
   });
   const [expanded, setExpanded] = useState(false);
   const nowMs = serverNow();
@@ -331,7 +331,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   const toggleCollapsed = () => {
     setCollapsed((c) => {
       const next = !c;
-      try { localStorage.setItem("lus-feed-collapsed", next ? "1" : "0"); } catch { /* noop */ }
+      try { localStorage.setItem("sub-feed-collapsed", next ? "1" : "0"); } catch { /* noop */ }
       return next;
     });
   };
@@ -341,7 +341,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
   return (
     <div
       data-testid="activity-feed"
-      className={`lus-panel lus-hud-solid pointer-events-auto absolute bottom-20 left-2 z-20 w-[24rem] animate-slide-up overflow-hidden rounded-xl border shadow-2xl ${
+      className={`sub-panel sub-hud-solid pointer-events-auto absolute bottom-20 left-2 z-20 w-[24rem] animate-slide-up overflow-hidden rounded-xl border shadow-2xl ${
         suppressed ? "hidden xl:block" : "hidden md:block"
       }`}
     >
@@ -363,7 +363,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
             </span>
           )}
           {unread > 0 && (
-            <span data-testid="feed-unread-badge" className="lus-feed-unread font-mono">
+            <span data-testid="feed-unread-badge" className="sub-feed-unread font-mono">
               {unread > 9 ? "9+" : unread} {unread === 1 ? "novo" : "novos"}
             </span>
           )}
@@ -380,7 +380,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
               data-testid="feed-expand-toggle"
               onClick={() => setExpanded((x) => !x)}
               title={expanded ? "Reduzir a altura da central" : "Aumentar a altura da central"}
-              className="lus-feed-iconbtn"
+              className="sub-feed-iconbtn"
             >
               {expanded ? <Minimize2 size={10} /> : <Maximize2 size={10} />}
             </button>
@@ -477,7 +477,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
       {open && (
         <Card
           data-testid="activity-feed-mobile-list"
-          className="lus-panel pointer-events-auto absolute inset-x-0 bottom-full mb-2 animate-slide-up overflow-hidden border-border bg-[#0a0a0c]/95 p-0 shadow-2xl"
+          className="sub-panel pointer-events-auto absolute inset-x-0 bottom-full mb-2 animate-slide-up overflow-hidden border-border bg-[#0a0a0c]/95 p-0 shadow-2xl"
         >
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
@@ -524,9 +524,9 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
               setTickerVisible(false);
               onNavigate && onNavigate(latestDest.panel, latestDest);
             }}
-            className="lus-activity-ticker pointer-events-auto flex min-w-0 flex-1 items-center gap-2 text-left"
+            className="sub-activity-ticker pointer-events-auto flex min-w-0 flex-1 items-center gap-2 text-left"
           >
-            <span className="lus-feed-ico shrink-0" style={{ color: latestDest.color }}>
+            <span className="sub-feed-ico shrink-0" style={{ color: latestDest.color }}>
               <LatestIcon size={11} strokeWidth={2.2} />
             </span>
             <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-zinc-300">
@@ -540,7 +540,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           data-testid="activity-feed-mobile-toggle"
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="lus-hud-btn pointer-events-auto relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300"
+          className="sub-hud-btn pointer-events-auto relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300"
           aria-label={open ? "Fechar Central da rede" : "Abrir Central da rede"}
           title="Central da rede"
         >

@@ -1,6 +1,6 @@
-[🌐 **ABRIR LUSORAE AO VIVO**](https://pulsebreakpt.github.io/LusoraeCrime/)
+[🌐 **ABRIR SUBMUNDO AO VIVO**](https://pulsebreakpt.github.io/LusoraeCrime/)
 
-# LUSORAE — Império Criminoso de Portugal
+# SUBMUNDO — Império Criminoso de Portugal
 
 [![Deploy GitHub Pages](https://github.com/PulseBreakPT/LusoraeCrime/actions/workflows/pages.yml/badge.svg)](https://github.com/PulseBreakPT/LusoraeCrime/actions/workflows/pages.yml)
 ![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
@@ -8,11 +8,11 @@
 ![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-**Lusorae** é um simulador persistente de estratégia e gestão criminal, pensado para Web e com interface mobile-first. O jogador não controla uma única personagem: controla uma organização inteira, o seu Quartel-General, equipas, operacionais, frota, armamento, imóveis, dinheiro, influência, risco policial e operações em tempo real.
+**SUBMUNDO** é um simulador persistente de estratégia e gestão criminal, pensado para Web e com interface mobile-first. O jogador não controla uma única personagem: controla uma organização inteira, o seu Quartel-General, equipas, operacionais, frota, armamento, imóveis, dinheiro, influência, risco policial e operações em tempo real.
 
 O mapa é o centro da experiência. O mundo nasce à volta do Quartel-General escolhido pelo jogador em território português, as oportunidades surgem dinamicamente, as equipas deslocam-se pelo mapa, as operações evoluem por fases e a economia continua a produzir consequências enquanto a organização cresce.
 
-> **Projeto ficcional.** Lusorae é uma obra original de estratégia/gestão inspirada apenas no género de sandbox criminal. Não reutiliza personagens, missões, mapas, arte, áudio ou texto de outras propriedades intelectuais.
+> **Projeto ficcional.** SUBMUNDO é uma obra original de estratégia/gestão inspirada apenas no género de sandbox criminal. Não reutiliza personagens, missões, mapas, arte, áudio ou texto de outras propriedades intelectuais.
 
 ---
 
@@ -29,6 +29,8 @@ O mapa é o centro da experiência. O mundo nasce à volta do Quartel-General es
 | Backend completo | FastAPI + MongoDB, destinado à stack Docker/VPS |
 | Deploy de produção | Docker Compose + Caddy + HTTPS automático |
 | Modo atual | Single-player persistente; multiplayer está documentado como evolução futura |
+
+**Compatibilidade de deployment:** o caminho `LusoraeCrime` que ainda aparece no URL do GitHub Pages é apenas o identificador legado do repositório/deploy atual; a marca do produto é exclusivamente **SUBMUNDO**.
 
 A build pública do GitHub Pages usa `REACT_APP_AUTH_UI_ENABLED=false`. Isto esconde o ecrã de login/registo sem apagar a implementação. Para uma build privada ou de produção, a interface pode voltar a ser exposta alterando a flag.
 
@@ -933,7 +935,7 @@ Cria `backend/.env` com valores teus:
 
 ```env
 MONGO_URL=mongodb://localhost:27017
-DB_NAME=lusorae
+DB_NAME=submundo
 JWT_SECRET=trocar-por-um-segredo-forte
 CORS_ORIGINS=http://localhost:3000
 ADMIN_EMAIL=admin@example.com
@@ -1042,7 +1044,7 @@ O projeto já inclui várias medidas:
 ## Estrutura do repositório
 
 ```text
-LusoraeCrime/
+SUBMUNDO/
 ├── .github/
 │   └── workflows/
 │       └── pages.yml
@@ -1156,7 +1158,7 @@ Por isso, o número mostrado no changelog público e as versões dos pacotes de 
 
 ## Android / Google Play
 
-O projeto está preparado para distribuição Android através de **Capacitor 8**, com package ID `pt.lusorae.crime`, **target/compile SDK 36**, minSdk 24 e pipeline GitHub Actions que gera um Android App Bundle de validação.
+O projeto está preparado para distribuição Android através de **Capacitor 8**, com package ID legado `pt.lusorae.crime` (mantido para compatibilidade de atualização na Google Play), **target/compile SDK 36**, minSdk 24 e pipeline GitHub Actions que gera um Android App Bundle de validação.
 
 - Google Sign-In via Credential Manager / Social Login.
 - Google ID token validado no backend antes da criação da sessão.
@@ -1194,6 +1196,6 @@ Neste momento o repositório não contém um ficheiro `LICENSE`. Não assumas qu
 ---
 
 <p align="center">
-  <strong>LUSORAE</strong><br>
+  <strong>SUBMUNDO</strong><br>
   Um império não se controla com um gatilho. Controla-se com informação, logística, dinheiro e decisões.
 </p>

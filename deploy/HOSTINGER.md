@@ -1,4 +1,4 @@
-# Deploy do LusoraeCrime na Hostinger (VPS Ubuntu) — Guia rápido
+# Deploy do SUBMUNDO na Hostinger (VPS Ubuntu) — Guia rápido
 
 Stack **100% Docker**, um único comando. Sem CloudPanel, sem Nginx manual,
 sem build de frontend à parte. O Caddy trata do HTTPS automaticamente.
@@ -73,8 +73,8 @@ privada correspondente, gera uma nova e adiciona-a lá antes deste passo).
 ssh root@195.200.14.60
 
 # 2. Clonar o repositório (SSH — não pede password)
-git clone git@github.com:PulseBreakPT/LusoraeCrime.git lusoraecrime-app
-cd lusoraecrime-app
+git clone git@github.com:PulseBreakPT/SUBMUNDO.git submundo-app
+cd submundo-app
 
 # 3. Correr o setup (instala Docker, gera segredos, faz build e arranca tudo)
 sudo bash deploy/hostinger-setup.sh
@@ -96,7 +96,7 @@ Compra o domínio, aponta o registo `A` para `195.200.14.60`, espera o DNS
 propagar e re-corre:
 
 ```bash
-cd ~/lusoraecrime-app
+cd ~/submundo-app
 sudo SITE_DOMAIN=oteudominio.pt ACME_EMAIL=tu@email.com bash deploy/hostinger-setup.sh
 ```
 
@@ -109,7 +109,7 @@ Alternativa mais rápida, sem correr o script todo outra vez (usa isto se
 o `.env.production` já existir e só quiseres trocar o domínio):
 
 ```bash
-cd ~/lusoraecrime-app/deploy
+cd ~/submundo-app/deploy
 sed -i 's/^SITE_DOMAIN=.*/SITE_DOMAIN=oteudominio.pt/' .env.production
 sed -i 's|^CORS_ORIGINS=.*|CORS_ORIGINS=https://oteudominio.pt,https://www.oteudominio.pt|' .env.production
 docker compose --env-file .env.production up -d --build --remove-orphans backend web
@@ -125,7 +125,7 @@ sem afetar o domínio principal).
 ## Operações do dia-a-dia
 
 ```bash
-cd ~/lusoraecrime-app/deploy
+cd ~/submundo-app/deploy
 
 # Ver logs
 docker compose --env-file .env.production logs -f
@@ -145,13 +145,13 @@ docker compose --env-file .env.production up -d
 
 ### Atualizar após mudanças no GitHub
 
-O setup instala um comando global `lusoraecrime` — é o teu novo
-`sudo lusorae web` de sempre:
+O setup instala um comando global `submundo` — é o teu novo
+`sudo submundo web` de sempre:
 
 ```bash
-sudo lusoraecrime              # atualiza tudo (backend + frontend)
-sudo lusoraecrime backend      # só API (mais rápido)
-sudo lusoraecrime web          # só frontend
+sudo submundo              # atualiza tudo (backend + frontend)
+sudo submundo backend      # só API (mais rápido)
+sudo submundo web          # só frontend
 ```
 
 Faz `git fetch` + `git reset --hard origin/main` + rebuild dos containers
@@ -165,7 +165,7 @@ sudo bash deploy/scripts/backup-mongo.sh
 
 # Cron diário às 03:30
 ( sudo crontab -l 2>/dev/null | grep -v backup-mongo.sh;
-  echo "30 3 * * * /bin/bash ~/lusoraecrime-app/deploy/scripts/backup-mongo.sh >> /var/log/lusoraecrime-backup.log 2>&1"
+  echo "30 3 * * * /bin/bash ~/submundo-app/deploy/scripts/backup-mongo.sh >> /var/log/lusoraecrime-backup.log 2>&1"
 ) | sudo crontab -
 ```
 

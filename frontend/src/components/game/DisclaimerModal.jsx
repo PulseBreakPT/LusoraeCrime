@@ -12,7 +12,7 @@ import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2, Hourglass } from
 // absurdo se o texto mudar. O botão "Não concordo" fica sempre clicável.
 // ---------------------------------------------------------------------------
 const NOTICE_PLAIN_TEXT = [
-  "O Lusorae é uma obra de ficção. Todos os crimes, esquemas, personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual.",
+  "O SUBMUNDO é uma obra de ficção. Todos os crimes, esquemas, personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual.",
   "Nada do que acontece no jogo deve ser repetido, imitado ou servir de inspiração na vida real. Atividades criminosas reais causam danos a pessoas e comunidades e têm consequências legais graves.",
   "Ao continuar, comprometes-te a tratar tudo isto como puro entretenimento e a nunca replicar na vida real o que vês ou fazes no jogo.",
   "Assumes este compromisso?",
@@ -25,7 +25,7 @@ export const READ_SECONDS = Math.min(20, Math.max(8, Math.ceil((WORD_COUNT / WOR
  * Disclaimer de ficção — mostrado UMA única vez por conta, na primeira
  * entrada no jogo (registo/primeiro login). Prática padrão da indústria (à
  * imagem dos avisos de ficção de jogos AAA): lembra o jogador de que tudo no
- * Lusorae é fictício e pede um compromisso explícito de nunca replicar nada
+ * SUBMUNDO é fictício e pede um compromisso explícito de nunca replicar nada
  * na vida real.
  *
  * Fluxo:
@@ -157,14 +157,14 @@ export function DisclaimerModal() {
                 <h2 id="disclaimer-title" className="font-display text-xl font-bold uppercase tracking-wide text-white md:text-2xl">
                   Isto é apenas um jogo
                 </h2>
-                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">Ficção interativa · Lusorae</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">Ficção interativa · SUBMUNDO</p>
               </div>
             </div>
 
             <div id="disclaimer-body" className="mt-5 space-y-3 text-sm leading-relaxed text-zinc-300">
               <p>
                 {"O "}
-                <span className="font-semibold text-white">Lusorae é uma obra de ficção</span>
+                <span className="font-semibold text-white">SUBMUNDO é uma obra de ficção</span>
                 {". Todos os crimes, esquemas, personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual."}
               </p>
               <p>
@@ -258,7 +258,7 @@ export function DisclaimerModal() {
 
             <div className="mt-5 space-y-3 text-sm leading-relaxed text-zinc-300">
               <p>
-                {"O acesso à rede Lusorae depende deste compromisso — é uma "}
+                {"O acesso à rede SUBMUNDO depende deste compromisso — é uma "}
                 <span className="font-semibold text-white">condição de utilização</span>
                 {". Sem ele, não podemos deixar-te continuar."}
               </p>

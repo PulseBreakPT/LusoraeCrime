@@ -1,4 +1,4 @@
-# Auth Testing Playbook (Lusorae)
+# Auth Testing Playbook (SUBMUNDO)
 
 ## Step 1: MongoDB Verification
 ```

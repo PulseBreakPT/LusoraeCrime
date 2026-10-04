@@ -1,4 +1,4 @@
-"""Calendário económico do Lusorae.
+"""Calendário económico do SUBMUNDO.
 
 Todos os custos fixos são liquidados uma vez por semana, à segunda-feira às
 20:00 na timezone Europe/Lisbon. A função converte sempre para UTC antes de

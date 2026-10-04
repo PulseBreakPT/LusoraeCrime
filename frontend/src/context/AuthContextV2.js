@@ -190,8 +190,8 @@ export function AuthProvider({ children }) {
       );
 
       if (res.data.access_token) {
-        localStorage.setItem("lusorae_access_token", res.data.access_token);
-        localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
+        localStorage.setItem("submundo_access_token", res.data.access_token);
+        localStorage.setItem("submundo_refresh_token", res.data.refresh_token || "");
       }
       await startBoot(performBoot);
       return { ok: true };
@@ -203,14 +203,14 @@ export function AuthProvider({ children }) {
   const playAsGuest = useCallback(async () => {
     try {
       enableLocalGuestMode();
-      localStorage.setItem("lusorae_access_token", "local-guest");
-      localStorage.removeItem("lusorae_refresh_token");
+      localStorage.setItem("submundo_access_token", "local-guest");
+      localStorage.removeItem("submundo_refresh_token");
       resetBoot();
       await startBoot(performBoot);
       return { ok: true };
     } catch (err) {
       disableLocalGuestMode();
-      localStorage.removeItem("lusorae_access_token");
+      localStorage.removeItem("submundo_access_token");
       return buildAuthError(err);
     }
   }, [startBoot, performBoot, resetBoot, buildAuthError]);
@@ -221,8 +221,8 @@ export function AuthProvider({ children }) {
       try {
         const res = await api.post("/auth/login", { email, password }, { timeout: 8000 });
         if (res.data.access_token) {
-          localStorage.setItem("lusorae_access_token", res.data.access_token);
-          localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
+          localStorage.setItem("submundo_access_token", res.data.access_token);
+          localStorage.setItem("submundo_refresh_token", res.data.refresh_token || "");
         }
         // Start boot sequence
         await startBoot(performBoot);
@@ -244,8 +244,8 @@ export function AuthProvider({ children }) {
           { timeout: 10000 }
         );
         if (res.data.access_token) {
-          localStorage.setItem("lusorae_access_token", res.data.access_token);
-          localStorage.setItem("lusorae_refresh_token", res.data.refresh_token || "");
+          localStorage.setItem("submundo_access_token", res.data.access_token);
+          localStorage.setItem("submundo_refresh_token", res.data.refresh_token || "");
         }
         // Conta nova → user.disclaimer_accepted vem false do servidor e o
         // disclaimer de ficção aparece na primeira entrada no jogo.
@@ -289,12 +289,12 @@ export function AuthProvider({ children }) {
         await ensureGoogleInitialized();
         await SocialLogin.logout({ provider: "google" });
       } catch (_err) {
-        // A sessão Lusorae termina mesmo que a sessão Google já não exista.
+        // A sessão SUBMUNDO termina mesmo que a sessão Google já não exista.
       }
     }
 
-    localStorage.removeItem("lusorae_access_token");
-    localStorage.removeItem("lusorae_refresh_token");
+    localStorage.removeItem("submundo_access_token");
+    localStorage.removeItem("submundo_refresh_token");
     setUser(false);
     setGameState(null);
     setCatalog(null);
@@ -307,16 +307,16 @@ export function AuthProvider({ children }) {
     bootRef.current = true;
 
     if (isLocalGuestMode()) {
-      localStorage.setItem("lusorae_access_token", "local-guest");
+      localStorage.setItem("submundo_access_token", "local-guest");
       startBoot(performBoot).catch(() => {
         disableLocalGuestMode();
-        localStorage.removeItem("lusorae_access_token");
+        localStorage.removeItem("submundo_access_token");
         setUser(false);
       });
       return;
     }
 
-    const token = localStorage.getItem("lusorae_access_token");
+    const token = localStorage.getItem("submundo_access_token");
     if (!token) {
       setUser(false);
       return;
@@ -334,8 +334,8 @@ export function AuthProvider({ children }) {
       })
       .catch((_err) => {
         // Invalid token
-        localStorage.removeItem("lusorae_access_token");
-        localStorage.removeItem("lusorae_refresh_token");
+        localStorage.removeItem("submundo_access_token");
+        localStorage.removeItem("submundo_refresh_token");
         setUser(false);
       });
   }, [startBoot, performBoot]);
@@ -349,8 +349,8 @@ export function AuthProvider({ children }) {
       setCatalog(null);
       resetBoot();
     };
-    window.addEventListener("lus:session-expired", onExpired);
-    return () => window.removeEventListener("lus:session-expired", onExpired);
+    window.addEventListener("sub:session-expired", onExpired);
+    return () => window.removeEventListener("sub:session-expired", onExpired);
   }, [resetBoot]);
 
   const changePassword = useCallback(async (currentPassword, newPassword) => {
@@ -370,8 +370,8 @@ export function AuthProvider({ children }) {
     try {
       if (user?.is_guest || isLocalGuestMode()) {
         resetLocalGuestGame();
-        localStorage.removeItem("lusorae_access_token");
-        localStorage.removeItem("lusorae_refresh_token");
+        localStorage.removeItem("submundo_access_token");
+        localStorage.removeItem("submundo_refresh_token");
         setUser(false);
         setGameState(null);
         setCatalog(null);

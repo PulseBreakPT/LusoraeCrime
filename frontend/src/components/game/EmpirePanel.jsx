@@ -63,7 +63,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Building2} />
           <PanelKicker>Rede · Visão Geral</PanelKicker>
@@ -79,7 +79,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
         </div>
 
         <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : "Nível máximo alcançado — domínio total de Lisboa."} block>
-          <Card className="mt-2 lus-card p-3 shadow-none" data-testid="empire-level-card">
+          <Card className="mt-2 sub-card p-3 shadow-none" data-testid="empire-level-card">
             <div className="flex items-center justify-between gap-2">
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
                 Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
@@ -124,7 +124,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
           </Alert>
         )}
 
-        <Card className="mt-3 lus-card p-3 shadow-none" data-testid="empire-cashflow">
+        <Card className="mt-3 sub-card p-3 shadow-none" data-testid="empire-cashflow">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
             <TrendingUp size={11} className="text-emerald-400" /> Fluxo de caixa passivo
           </p>
@@ -176,7 +176,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 
         <div className="mt-6">
           <SectionHeader icon={MapPin} title="Quartel-general" />
-          <Card className="lus-card p-3 shadow-none">
+          <Card className="sub-card p-3 shadow-none">
             <p className="text-sm font-semibold text-white">{p.hq.name}</p>
             <p className="mt-0.5 font-mono text-[10px] text-zinc-500">Cais do Sodré, Lisboa</p>
           </Card>
@@ -185,7 +185,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Banknote} title="Lavagem de dinheiro" />
-          <Card className="lus-card p-3 shadow-none">
+          <Card className="sub-card p-3 shadow-none">
             <div className="flex items-baseline justify-between">
               <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Retorno base de 78% (22% de fricção), melhorável até 90%.</p>
               {state.caps?.dirty_money?.max > 0 && (
@@ -252,7 +252,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 
         <div className="mt-6">
           <SectionHeader icon={Siren} title="Polícia" meta={`${Math.round(p.heat)}%`} />
-          <Card className="lus-card p-3 shadow-none">
+          <Card className="sub-card p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <Tip tip={hs.desc}>
                 <span>Calor policial · <span style={{ color: hs.color }}>{hs.label}</span></span>
@@ -332,7 +332,7 @@ export const EmpirePanel = ({ open, onOpenChange }) => {
 
 const StatBox = ({ label, value, accent = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full lus-card p-3 shadow-none">
+    <Card className="h-full sub-card p-3 shadow-none">
       <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">{label}</p>
       <p className="mt-1 truncate font-mono text-lg font-bold leading-tight" style={{ color: accent }}>{value}</p>
     </Card>

@@ -1,6 +1,6 @@
 # Cidade Viva — 25 mecânicas sandbox (v1.3.0)
 
-Este pacote adapta ao LusoraeCrime o ritmo de um sandbox criminal urbano — perseguição, progressão de rua, território, contactos e veículos com memória — usando sistemas, nomes e conteúdo originais.
+Este pacote adapta ao SUBMUNDO o ritmo de um sandbox criminal urbano — perseguição, progressão de rua, território, contactos e veículos com memória — usando sistemas, nomes e conteúdo originais.
 
 1. **Nível de procurado com 0–5 estrelas**, calculado a partir do calor real da organização.
 2. **Janela de busca policial com contagem decrescente** quando o alerta chega a três estrelas.

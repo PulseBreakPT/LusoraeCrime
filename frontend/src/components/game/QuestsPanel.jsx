@@ -73,9 +73,9 @@ const QuestCard = ({ q, featured, onClose, onNavigate }) => {
   return (
     <Card
       data-testid={`quest-card-${q.id || q.quest_key}`}
-      className={`lus-quest-card relative overflow-hidden p-3 shadow-none ${
-        featured ? "lus-quest-featured" : "lus-card"
-      } ${q.status === "completed" ? "lus-quest-completed" : ""} ${locked ? "lus-quest-locked" : ""} ${dim || locked ? "opacity-50" : ""}`}
+      className={`sub-quest-card relative overflow-hidden p-3 shadow-none ${
+        featured ? "sub-quest-featured" : "sub-card"
+      } ${q.status === "completed" ? "sub-quest-completed" : ""} ${locked ? "sub-quest-locked" : ""} ${dim || locked ? "opacity-50" : ""}`}
       style={{ "--mk": q.status === "completed" ? "#10B981" : DIFFICULTY_COLORS[q.difficulty] || "#71717a" }}
     >
       {featured && (
@@ -274,7 +274,7 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel" data-testid="quests-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel" data-testid="quests-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
           <PanelKicker>Contratos · Objetivos</PanelKicker>
@@ -382,8 +382,8 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
             </p>
             <div className="space-y-2">
               {dailies.length === 0 && (
-                <div className="lus-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
-                  <Clock size={20} className="lus-empty-icon text-zinc-600" />
+                <div className="sub-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
+                  <Clock size={20} className="sub-empty-icon text-zinc-600" />
                   <p className="font-mono text-[11px] text-zinc-500">Contratos diários esgotados — novos ao nascer do dia.</p>
                 </div>
               )}
@@ -401,8 +401,8 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
             </p>
             <div className="space-y-2">
               {weeklies.length === 0 && (
-                <div className="lus-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
-                  <Clock size={20} className="lus-empty-icon text-zinc-600" />
+                <div className="sub-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
+                  <Clock size={20} className="sub-empty-icon text-zinc-600" />
                   <p className="font-mono text-[11px] text-zinc-500">Contratos semanais fechados — a próxima leva chega com a semana.</p>
                 </div>
               )}
@@ -416,8 +416,8 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, onFocusT
         {tab === "alertas" && (
           <div className="mt-3 space-y-2" data-testid="quests-alertas">
             {alerts.length === 0 && (
-              <div className="lus-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
-                <Target size={20} className="lus-empty-icon text-zinc-600" />
+              <div className="sub-empty flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/10 py-8 text-center">
+                <Target size={20} className="sub-empty-icon text-zinc-600" />
                 <p className="max-w-[240px] font-mono text-[11px] text-zinc-500">
                   Silêncio nos alertas. Missões sugeridas, eventos e decisões aparecem aqui quando o império mexer.
                 </p>

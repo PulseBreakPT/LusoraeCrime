@@ -30,7 +30,7 @@ const candidateIcon = (status) => {
     <div class="hq-pin" style="${invalid ? "background:linear-gradient(160deg,#3f1d1d 0%,#27090b 100%);color:#FCA5A5;border-color:#EF4444;" : ""}box-shadow:0 0 0 2px ${ring}, 0 0 22px rgba(0,0,0,0.5), 0 8px 18px rgba(0,0,0,0.6);">
       ${renderToStaticMarkup(<Home size={16} strokeWidth={2.5} />)}
     </div>`;
-  return L.divIcon({ html, className: "lus-marker", iconSize: [36, 36], iconAnchor: [18, 18] });
+  return L.divIcon({ html, className: "sub-marker", iconSize: [36, 36], iconAnchor: [18, 18] });
 };
 
 // Cada clique/toque no mapa reposiciona o pin candidato (arrastar também).
@@ -112,7 +112,7 @@ export default function HQOnboarding() {
         minZoom={5}
         zoomControl={false}
         attributionControl={true}
-        className="lus-dark-map absolute inset-0 z-0 h-full w-full"
+        className="sub-dark-map absolute inset-0 z-0 h-full w-full"
       >
         <MapBaseLayer />
         <ClickPicker onPick={pick} />
@@ -131,7 +131,7 @@ export default function HQOnboarding() {
           />
         )}
       </MapContainer>
-      <div className="lus-vignette" aria-hidden="true" />
+      <div className="sub-vignette" aria-hidden="true" />
 
       {/* Cabeçalho */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-3 pt-4">

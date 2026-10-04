@@ -99,7 +99,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:max-w-xl" data-testid="street-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:max-w-xl" data-testid="street-panel">
         <SheetHeader>
           <PanelWatermark icon={Radar} />
           <PanelKicker>Cidade Viva · Rede de Rua</PanelKicker>
@@ -112,7 +112,7 @@ export const StreetPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         {!street ? (
-          <Card className="mt-5 lus-card p-5 text-center">
+          <Card className="mt-5 sub-card p-5 text-center">
             <Activity className="mx-auto animate-pulse text-cyan-300" size={22} />
             <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               A sincronizar a rede urbana…
@@ -213,7 +213,7 @@ const RadarTab = ({ street, now }) => {
   const eventRemaining = Math.max(0, (Date.parse(street.event.ends_at) - now) / 1000);
   return (
     <div className="mt-4 space-y-3">
-      <Card className="lus-card overflow-hidden p-4" data-testid="wanted-level-card">
+      <Card className="sub-card overflow-hidden p-4" data-testid="wanted-level-card">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Nível de procurado</p>
@@ -243,7 +243,7 @@ const RadarTab = ({ street, now }) => {
         )}
       </Card>
 
-      <Card className="lus-card p-4" data-testid="street-rank-card">
+      <Card className="sub-card p-4" data-testid="street-rank-card">
         <div className="flex items-center justify-between">
           <div>
             <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Reputação de rua</p>
@@ -258,7 +258,7 @@ const RadarTab = ({ street, now }) => {
       </Card>
 
       <SectionHeader icon={Sparkles} label="Evento urbano" />
-      <Card className="lus-card p-4">
+      <Card className="sub-card p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="font-bold text-white">{street.event.name}</p>
           <span className="font-mono text-[9px] text-zinc-500">{fmtDuration(eventRemaining)}</span>
@@ -272,7 +272,7 @@ const RadarTab = ({ street, now }) => {
       </Card>
 
       <SectionHeader icon={RadioTower} label="Scanner policial" />
-      <Card className="lus-card p-4">
+      <Card className="sub-card p-4">
         <div className="grid grid-cols-2 gap-2">
           <Info label="Força na zona" value={street.scanner.force} />
           <Info label="Alerta" value={street.scanner.alert} />
@@ -299,7 +299,7 @@ const TerritoriesTab = ({ districts, onAction }) => (
       const reinforceNeed = 90 + district.tier * 20;
       const canReinforce = district.controlled && district.tier < 3 && district.influence >= reinforceNeed;
       return (
-        <Card key={district.key} className="lus-card p-3" data-testid={`street-district-${district.key}`}>
+        <Card key={district.key} className="sub-card p-3" data-testid={`street-district-${district.key}`}>
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-bold text-white">{district.name}</p>
@@ -361,7 +361,7 @@ const ContactsTab = ({ street, vehicles, vehicleId, setVehicleId, onCall }) => (
     {street.contacts.map((contact) => {
       const Icon = CONTACT_ICONS[contact.key] || Contact;
       return (
-        <Card key={contact.key} className={`lus-card p-3 ${contact.unlocked ? "" : "opacity-55"}`}>
+        <Card key={contact.key} className={`sub-card p-3 ${contact.unlocked ? "" : "opacity-55"}`}>
           <div className="flex items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/40">
               <Icon size={16} className="text-cyan-300" />
@@ -408,7 +408,7 @@ const ActivitiesTab = ({
     return (
       <div className="mt-4 space-y-3">
         <SectionHeader icon={Activity} label="Atividade em curso" />
-        <Card className="lus-card p-4" data-testid="street-active-job">
+        <Card className="sub-card p-4" data-testid="street-active-job">
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-white">{activeJob.name}</p>
@@ -471,7 +471,7 @@ const ActivitiesTab = ({
         const vehicle = vehicles.find((item) => item.id === vehicleId);
         const blocked = !job.unlocked || !vehicleId || meta.impounded || (vehicle && vehicle.condition < 35);
         return (
-          <Card key={job.key} className={`lus-card p-3 ${job.unlocked ? "" : "opacity-55"}`}>
+          <Card key={job.key} className={`sub-card p-3 ${job.unlocked ? "" : "opacity-55"}`}>
             <div className="flex items-start gap-3">
               <Icon size={17} className="mt-0.5 shrink-0 text-amber-300" />
               <div className="min-w-0 flex-1">
@@ -504,7 +504,7 @@ const GarageTab = ({ vehicles, vehicleMeta, onAction }) => (
     {vehicles.map((vehicle) => {
       const meta = vehicleMeta[vehicle.id] || {};
       return (
-        <Card key={vehicle.id} className="lus-card p-3">
+        <Card key={vehicle.id} className="sub-card p-3">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-bold text-white">{vehicle.name}</p>
@@ -579,7 +579,7 @@ const PlanningTab = ({ street, draft, setDraft, toggleGear, onBuy, onSave }) => 
         {street.gear_catalog.map((item) => {
           const selected = draft.gear_keys.includes(item.key);
           return (
-            <Card key={item.key} className={`lus-card p-3 ${item.unlocked ? "" : "opacity-55"}`}>
+            <Card key={item.key} className={`sub-card p-3 ${item.unlocked ? "" : "opacity-55"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-bold text-white">{item.name}</p>

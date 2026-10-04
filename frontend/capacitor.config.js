@@ -1,6 +1,6 @@
 const config = {
   appId: "pt.lusorae.crime",
-  appName: "Lusorae",
+  appName: "SUBMUNDO",
   webDir: "build",
   server: {
     androidScheme: "https",

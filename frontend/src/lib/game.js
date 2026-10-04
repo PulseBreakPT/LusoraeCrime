@@ -7,7 +7,7 @@ export const NOTIFY_COLOR = "#F97316";
 // Preferências de exibição (Definições > Interface) — estado global simples em
 // vez de prop-drilling, porque fmtMoney/fmtDuration são chamadas de dezenas de
 // sítios diferentes em toda a interface.
-const DISPLAY_PREFS_KEY = "lusorae.ui.displayPrefs";
+const DISPLAY_PREFS_KEY = "submundo.ui.displayPrefs";
 let displayPrefs = { compactNumbers: false, showSeconds: true };
 try {
   const raw = window.localStorage.getItem(DISPLAY_PREFS_KEY);

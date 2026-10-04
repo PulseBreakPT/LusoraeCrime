@@ -66,7 +66,7 @@ export const TeamGlyph = ({ spec, accent = "#A1A1AA", emblemColor, className = "
   const draw = EMBLEMS[spec] || EMBLEMS.assalto;
   const grad = `url(#tg-${uid})`;
   return (
-    <svg viewBox="0 0 96 44" className={`lus-team-glyph ${className}`} aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 96 44" className={`sub-team-glyph ${className}`} aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id={`tg-${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={emblemColor || "#E4E4E7"} stopOpacity="0.95" />

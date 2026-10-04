@@ -53,7 +53,7 @@ const Section = ({ icon: Icon, title, children, testId, hidden = false }) => {
     <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
       <Icon size={12} /> {title}
     </h3>
-    <Card className="space-y-2 lus-card p-3 shadow-none">{children}</Card>
+    <Card className="space-y-2 sub-card p-3 shadow-none">{children}</Card>
   </div>
   );
 };
@@ -258,11 +258,11 @@ const DeleteAccountForm = () => {
   return (
     <Card className="border-red-500/20 bg-red-500/5 p-2 shadow-none">
       <p className="text-[10px] leading-snug text-red-300">
-        Esta ação é irreversível: apaga a conta Lusorae, organização, efetivo, frota, imóveis e progresso associado.
+        Esta ação é irreversível: apaga a conta SUBMUNDO, organização, efetivo, frota, imóveis e progresso associado.
       </p>
       {!needsPassword && (
         <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
-          {user?.is_guest ? "Isto apaga apenas o save local deste dispositivo." : "A conta Google autenticada não precisa de uma palavra-passe Lusorae."}
+          {user?.is_guest ? "Isto apaga apenas o save local deste dispositivo." : "A conta Google autenticada não precisa de uma palavra-passe SUBMUNDO."}
         </p>
       )}
       {needsPassword && (
@@ -315,7 +315,7 @@ const ABOUT_ITEMS = [
     key: "terms", label: "Termos e Condições",
     content: (
       <p className="text-[10px] leading-snug text-zinc-500">
-        Lusorae é um jogo de simulação fictício, sem qualquer ligação a atividades reais. Ao usares a conta
+        SUBMUNDO é um jogo de simulação fictício, sem qualquer ligação a atividades reais. Ao usares a conta
         aceitas jogar de boa-fé, não abusar de falhas técnicas para vantagem indevida e que o progresso pode
         ser perdido em caso de manutenção ou reinício do servidor. A organização pode encerrar contas usadas
         de forma abusiva ou fraudulenta.
@@ -337,7 +337,7 @@ const ABOUT_ITEMS = [
     key: "credits", label: "Créditos",
     content: (
       <p className="text-[10px] leading-snug text-zinc-500">
-        Lusorae — criado e mantido por PulseBreakPT. Desenvolvido com FastAPI, MongoDB e React.
+        SUBMUNDO — criado e mantido por PulseBreakPT. Desenvolvido com FastAPI, MongoDB e React.
       </p>
     ),
   },
@@ -370,7 +370,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Settings} />
           <PanelKicker>Sistema · Preferências</PanelKicker>

@@ -24,12 +24,12 @@ export function LegalShell({ children, active }) {
   };
 
   return (
-    <div className="lus-page-bg min-h-screen text-zinc-200">
+    <div className="sub-page-bg min-h-screen text-zinc-200">
       {/* Fundo ambiente tático: grelha + glows */}
-      <div className="lus-page-grid" aria-hidden="true" />
-      <div className="lus-page-glow" aria-hidden="true" />
+      <div className="sub-page-grid" aria-hidden="true" />
+      <div className="sub-page-glow" aria-hidden="true" />
 
-      <header className="lus-page-header top-0 z-40">
+      <header className="sub-page-header top-0 z-40">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
           <button
             type="button"
@@ -49,7 +49,7 @@ export function LegalShell({ children, active }) {
               className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.65)] transition-transform group-hover:scale-110"
               aria-hidden="true"
             />
-            <span className="lus-title">Lusorae</span>
+            <span className="sub-title">SUBMUNDO</span>
           </Link>
 
           <nav aria-label="Documentos" className="hidden items-center gap-1 sm:flex">
@@ -60,7 +60,7 @@ export function LegalShell({ children, active }) {
                 aria-current={active === l.to ? "page" : undefined}
                 className={`rounded-md px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 ${
                   active === l.to
-                    ? "lus-doc-nav-active bg-red-500/10 text-red-400"
+                    ? "sub-doc-nav-active bg-red-500/10 text-red-400"
                     : "text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
                 }`}
               >
@@ -76,7 +76,7 @@ export function LegalShell({ children, active }) {
       <main className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-20 pt-10 sm:px-6">{children}</main>
 
       <footer className="relative z-10 py-8">
-        <div className="lus-hairline mx-auto max-w-5xl" aria-hidden="true" />
+        <div className="sub-hairline mx-auto max-w-5xl" aria-hidden="true" />
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pt-8">
           <nav aria-label="Documentos legais" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
             {NAV_LINKS.map((l, i) => (
@@ -87,7 +87,7 @@ export function LegalShell({ children, active }) {
             ))}
           </nav>
           <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-700">
-            Lusorae · Simulador de império criminoso · geral@lusorae.pt
+            SUBMUNDO · Simulador de império criminoso · Suporte
           </p>
         </div>
       </footer>

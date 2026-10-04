@@ -18,7 +18,7 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { Loader2, CheckCircle2, OctagonAlert, TriangleAlert, Info } from "lucide-react";
 
 const toastIcon = (Icon, spin = false) => (
-  <span className="lus-toast-ico">
+  <span className="sub-toast-ico">
     <Icon className={spin ? "h-[17px] w-[17px] animate-spin" : "h-[17px] w-[17px]"} strokeWidth={2.4} />
   </span>
 );
@@ -142,7 +142,7 @@ function App() {
               swipeDirections={["left", "right"]}
               icons={TOAST_ICONS}
               style={{ "--width": "300px" }}
-              toastOptions={{ className: "lus-toast", duration: 3200 }}
+              toastOptions={{ className: "sub-toast", duration: 3200 }}
             />
           </BrowserRouter>
         </LoadingProvider>

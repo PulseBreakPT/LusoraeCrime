@@ -214,7 +214,7 @@ async def unique_google_org_name(display_name: str | None, google_sub: str) -> s
     base = re.sub(r"\s+", " ", (display_name or "")).strip()
     base = ORG_NAME_FORBIDDEN.sub("", base)
     if len(base) < 3:
-        base = "Organização Lusorae"
+        base = "Organização SUBMUNDO"
     base = base[:40]
     if not await org_name_taken(base):
         return base
@@ -359,7 +359,7 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    "Já existe uma conta Lusorae com este email. "
+                    "Já existe uma conta SUBMUNDO com este email. "
                     "Entra com a palavra-passe existente antes de associares um fornecedor externo."
                 ),
             )
@@ -377,7 +377,7 @@ async def google_login(body: GoogleLoginInput, request: Request, response: Respo
     else:
         if not body.accept_terms:
             raise HTTPException(status_code=400, detail="É necessário aceitar os Termos de Serviço e a Política de Privacidade")
-        org_name = await unique_google_org_name("Império Lusorae", google_sub)
+        org_name = await unique_google_org_name("Império SUBMUNDO", google_sub)
         now = now_utc().isoformat()
         acceptance = terms_acceptance_record(ip)
         acceptance["source"] = "google_sign_in"
@@ -573,10 +573,10 @@ async def seed_admin():
     if existing is None:
         result = await db.users.insert_one({
             "email": admin_email, "password_hash": hash_password(admin_password),
-            "name": "Sindicato Lusorae", "role": "admin",
+            "name": "Sindicato SUBMUNDO", "role": "admin",
             "auth_provider": "password", "providers": ["password"],
             "created_at": now_utc().isoformat(),
         })
-        await create_player_for_user(str(result.inserted_id), "Sindicato Lusorae", with_default_hq=True)
+        await create_player_for_user(str(result.inserted_id), "Sindicato SUBMUNDO", with_default_hq=True)
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})

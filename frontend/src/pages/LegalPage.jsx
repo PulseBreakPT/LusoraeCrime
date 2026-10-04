@@ -63,7 +63,7 @@ export default function LegalPage() {
         <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
           {/* Índice (desktop) */}
           <aside className="hidden lg:block">
-            <nav aria-label="Índice" className="lus-toc sticky top-24 rounded-lg p-4">
+            <nav aria-label="Índice" className="sub-toc sticky top-24 rounded-lg p-4">
               <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                 <span className="h-1 w-1 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" aria-hidden="true" />
                 Índice
@@ -88,7 +88,7 @@ export default function LegalPage() {
             <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.3em] text-red-500">
               <FileText size={13} aria-hidden="true" /> {config.kicker}
             </div>
-            <h1 data-testid="legal-title" className="lus-title mt-3 font-display text-4xl font-bold uppercase tracking-tight text-white sm:text-5xl">
+            <h1 data-testid="legal-title" className="sub-title mt-3 font-display text-4xl font-bold uppercase tracking-tight text-white sm:text-5xl">
               {doc.title}
             </h1>
             <div className="mt-3 h-0.5 w-20 bg-gradient-to-r from-red-600 via-red-600/60 to-transparent" />
@@ -103,7 +103,7 @@ export default function LegalPage() {
             </div>
 
             {doc.summary && (
-              <p className="lus-doc-summary mt-6 rounded-md px-4 py-3.5 text-sm leading-relaxed text-zinc-300">
+              <p className="sub-doc-summary mt-6 rounded-md px-4 py-3.5 text-sm leading-relaxed text-zinc-300">
                 {doc.summary}
               </p>
             )}
@@ -111,7 +111,7 @@ export default function LegalPage() {
             <div className="mt-10 space-y-10">
               {doc.sections.map((section) => (
                 <section key={section.heading} id={slugify(section.heading)} className="scroll-mt-24">
-                  <h2 className="lus-sec-heading font-display text-lg font-bold uppercase tracking-wide text-white">
+                  <h2 className="sub-sec-heading font-display text-lg font-bold uppercase tracking-wide text-white">
                     {section.heading}
                   </h2>
                   <div className="mt-3 space-y-3">
@@ -138,7 +138,7 @@ export default function LegalPage() {
 
             {doc.available_versions?.length > 0 && (
               <div className="mt-14 pt-1">
-                <div className="lus-hairline mb-5" aria-hidden="true" />
+                <div className="sub-hairline mb-5" aria-hidden="true" />
                 <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-600">Histórico de versões</p>
                 <ul className="mt-2.5 space-y-1.5">
                   {doc.available_versions.slice().reverse().map((v) => (

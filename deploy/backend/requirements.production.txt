@@ -1,5 +1,5 @@
 # =============================================================================
-# LusoraeCrime backend — requirements de PRODUÇÃO
+# SUBMUNDO backend — requirements de PRODUÇÃO
 # =============================================================================
 # Apenas o que o código em backend/*.py realmente importa em runtime.
 # Diferenças vs backend/requirements.txt:

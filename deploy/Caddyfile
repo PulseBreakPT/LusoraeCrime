@@ -1,5 +1,5 @@
 # =============================================================================
-# LusoraeCrime — Caddy reverse proxy + static SPA com HTTPS automático
+# SUBMUNDO — Caddy reverse proxy + static SPA com HTTPS automático
 # =============================================================================
 # Variáveis injectadas pelo container (ver docker-compose.yml):
 #   {$SITE_DOMAIN}  ex.: srv1758509.hstgr.cloud (ou o teu domínio próprio)

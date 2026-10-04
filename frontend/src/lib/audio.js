@@ -1,4 +1,4 @@
-// Motor de áudio do Lusorae — tudo sintetizado com Web Audio API, sem
+// Motor de áudio do SUBMUNDO — tudo sintetizado com Web Audio API, sem
 // ficheiros externos. Estética noir: pads menores, sub-baixo, sinos esparsos,
 // sirenes de duas notas e "ka-ching" metálico para dinheiro.
 //

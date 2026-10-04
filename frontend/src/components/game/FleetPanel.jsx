@@ -128,7 +128,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Car} />
           <PanelKicker>Logística · Garagem</PanelKicker>
@@ -245,7 +245,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
               missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
             }
             return (
-              <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
+              <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
                 <div className="relative z-[1] min-w-0">
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="flex min-w-0 items-center gap-1.5">
@@ -501,7 +501,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                 const locked = state.player.level < m.min_level;
                 const owned = state.vehicles.filter((v) => v.model_key === key).length;
                 return (
-                  <Card key={key} data-testid={`stand-card-${key}`} className={cn("h-full min-w-0 lus-card lus-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
+                  <Card key={key} data-testid={`stand-card-${key}`} className={cn("h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--dtier": tier.color }}>
                     <div className="relative z-[1] min-w-0">
                         <div className="flex items-start justify-between gap-1.5">
                           <p className="truncate text-sm font-semibold text-white">{m.name}</p>

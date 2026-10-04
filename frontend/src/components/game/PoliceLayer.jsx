@@ -42,7 +42,7 @@ const policeCarIcon = (force, vtype = "carro") => {
         </span>
         <span class="police-force-badge">${badge}</span>
       </div>`;
-    carIconCache[key] = L.divIcon({ html, className: "lus-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
+    carIconCache[key] = L.divIcon({ html, className: "sub-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
   }
   return carIconCache[key];
 };
@@ -57,7 +57,7 @@ const policeOfficerIcon = (force) => {
         <span class="op-face-wrap" data-face><span class="op-face"></span></span>
         ${renderToStaticMarkup(<UserRound size={9} strokeWidth={3} />)}
       </div>`;
-    officerIconCache[key] = L.divIcon({ html, className: "lus-marker lus-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
+    officerIconCache[key] = L.divIcon({ html, className: "sub-marker sub-marker-op", iconSize: [14, 14], iconAnchor: [7, 7] });
   }
   return officerIconCache[key];
 };
@@ -246,7 +246,7 @@ export default function PoliceLayer({ state, serverNow }) {
               icon={policeCarIcon(p.force, p.vehicleType)}
               zIndexOffset={460}
             >
-              <LTooltip direction="top" offset={[0, -14]} opacity={1} className="lus-map-tip">
+              <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
                 <div className="min-w-[150px]">
                   <p className="text-[11px] font-bold" style={{ color: forceTint }}>Patrulha {p.id}</p>
                   <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color }}>{label}</p>

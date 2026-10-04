@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# LusoraeCrime — Backup do MongoDB (stack Docker)
+# SUBMUNDOCrime — Backup do MongoDB (stack Docker)
 # =============================================================================
 # - mongodump --archive --gzip dentro do container 'lusoraecrime-mongo'.
 # - Guarda em /var/backups/lusoraecrime/mongo/YYYY-MM-DD_HHMM.archive.gz

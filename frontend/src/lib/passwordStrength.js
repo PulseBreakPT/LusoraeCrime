@@ -1,5 +1,5 @@
 /**
- * Avaliação de força de palavras-passe do Lusorae.
+ * Avaliação de força de palavras-passe do SUBMUNDO.
  * Política (igual à do servidor): mínimo 8 caracteres, 1 minúscula,
  * 1 maiúscula e 1 número. A pontuação 0-4 é informativa e premeia
  * comprimento e símbolos extra.
@@ -14,7 +14,7 @@ export const PASSWORD_REQUIREMENTS = [
 
 const COMMON_PATTERNS = [
   "password", "palavrapasse", "12345678", "123456789", "qwerty",
-  "abcdefgh", "lusorae", "11111111", "00000000", "iloveyou",
+  "abcdefgh", "submundo", "11111111", "00000000", "iloveyou",
 ];
 
 const LABELS = ["Vazia", "Fraca", "Razoável", "Boa", "Excelente"];

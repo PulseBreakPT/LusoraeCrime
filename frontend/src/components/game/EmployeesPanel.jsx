@@ -134,7 +134,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const idle = e.status === "idle";
 
   return (
-    <Card data-testid={`employee-card-${e.id}`} className="h-full min-w-0 lus-card lus-doss-card p-2 sm:p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
+    <Card data-testid={`employee-card-${e.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2 sm:p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
       <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -464,7 +464,7 @@ const CandidateCard = ({ c }) => {
   if (lackMoney) blockers.push(`faltam ${fmtMoney(c.cost - state.player.clean_money)}`);
 
   return (
-    <Card data-testid={`candidate-card-${c.id}`} className="h-full min-w-0 lus-card p-2.5 sm:p-3 shadow-none">
+    <Card data-testid={`candidate-card-${c.id}`} className="h-full min-w-0 sub-card p-2.5 sm:p-3 shadow-none">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">
@@ -577,7 +577,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="employees-panel">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]" data-testid="employees-panel">
         <SheetHeader>
           <PanelWatermark icon={IdCard} />
           <PanelKicker>Recursos · Efetivo</PanelKicker>
@@ -599,7 +599,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
           </Alert>
         )}
 
-        <Card className="mt-3 flex items-center justify-between lus-card px-3 py-2 shadow-none">
+        <Card className="mt-3 flex items-center justify-between sub-card px-3 py-2 shadow-none">
           <div>
             <p className="text-[9px] uppercase tracking-wider text-zinc-500">Fecho semanal</p>
             <Tip tip={`Salários ${fmtMoney(weeklyBreakdown.gross_salaries || 0)} + TSU ${fmtMoney(weeklyBreakdown.employer_social_security || 0)} + frota ${fmtMoney(weeklyBreakdown.fleet_fixed || 0)} + imóveis ${fmtMoney(weeklyBreakdown.property_fixed || 0)}.`}>

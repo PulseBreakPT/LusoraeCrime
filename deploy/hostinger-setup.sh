@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# LusoraeCrime — Setup completo num único comando (Hostinger VPS / Ubuntu)
+# SUBMUNDO — Setup completo num único comando (Hostinger VPS / Ubuntu)
 # =============================================================================
 # O QUE FAZ:
 #   1. Instala Docker Engine + Compose (se faltar).
@@ -8,7 +8,7 @@
 #      (ex.: o projeto antigo "RedeSocial").
 #   3. Gera deploy/.env.production com segredos seguros (se ainda não existir).
 #   4. Faz build e arranca todo o stack: MongoDB + FastAPI + Caddy (HTTPS auto).
-#   5. Espera o backend ficar saudável e instala o comando global `lusoraecrime`.
+#   5. Espera o backend ficar saudável e instala o comando global `submundo`.
 #
 # PRÉ-REQUISITOS:
 #   - Ubuntu 22.04/24.04, acesso root (ou sudo).
@@ -111,10 +111,10 @@ ACME_EMAIL=${ACME_EMAIL}
 
 JWT_SECRET=${JWT}
 
-MONGO_INITDB_ROOT_USERNAME=lusoraecrime_admin
+MONGO_INITDB_ROOT_USERNAME=submundo_admin
 MONGO_INITDB_ROOT_PASSWORD=${MONGO_PW}
-MONGO_URL=mongodb://lusoraecrime_admin:${MONGO_PW}@mongo:27017/?authSource=admin
-DB_NAME=lusoraecrime
+MONGO_URL=mongodb://submundo_admin:${MONGO_PW}@mongo:27017/?authSource=admin
+DB_NAME=submundo
 BACKEND_PORT=8001
 
 ADMIN_EMAIL=${ACME_EMAIL}
@@ -168,16 +168,16 @@ if [[ "$HEALTHY" -ne 1 ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# 5. Instala comando global `lusoraecrime`
+# 5. Instala comando global `submundo`
 # -----------------------------------------------------------------------------
 APP_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
-cat > /usr/local/bin/lusoraecrime <<LUSORAECRIME
+cat > /usr/local/bin/submundo <<SUBMUNDOCLI
 #!/usr/bin/env bash
-# Atualiza o LusoraeCrime: git pull + rebuild
+# Atualiza o SUBMUNDO: git pull + rebuild
 # Uso:
-#   sudo lusoraecrime          — atualiza tudo (backend + frontend)
-#   sudo lusoraecrime backend  — só API (mais rápido)
-#   sudo lusoraecrime web      — só frontend
+#   sudo submundo          — atualiza tudo (backend + frontend)
+#   sudo submundo backend  — só API (mais rápido)
+#   sudo submundo web      — só frontend
 set -euo pipefail
 APP_DIR="$APP_ROOT"
 COMPOSE_FILE="\$APP_DIR/deploy/docker-compose.yml"
@@ -220,9 +220,11 @@ echo ""
 docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" ps
 echo ""
 ok "Deploy concluído em \$(date '+%H:%M:%S')."
-LUSORAECRIME
-chmod +x /usr/local/bin/lusoraecrime
-ok "Comando 'lusoraecrime' instalado — corre a partir de qualquer diretória."
+SUBMUNDOCLI
+chmod +x /usr/local/bin/submundo
+# Alias legado para instalações/cron antigos; não é branding público.
+ln -sf /usr/local/bin/submundo /usr/local/bin/lusoraecrime
+ok "Comando 'submundo' instalado — corre a partir de qualquer diretória."
 
 # -----------------------------------------------------------------------------
 # 6. Estado final
@@ -241,4 +243,4 @@ echo "   para o IP deste VPS e que as portas 80/443 estão abertas."
 echo
 echo "   Ver logs:     docker compose --env-file ${ENV_FILE} logs -f"
 echo "   Reiniciar:    docker compose --env-file ${ENV_FILE} restart"
-echo "   Atualizar:    lusoraecrime"
+echo "   Atualizar:    submundo"

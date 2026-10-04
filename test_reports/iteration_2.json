@@ -1,5 +1,5 @@
 {
-  "summary": "Full E2E regression on Lusorae HR (Funcionários) overhaul + fleet/properties/police/launder. Backend pytest 29/29 PASS (28 fast + 1 slow training-completion). Frontend Playwright: register → HUD map → RH panel (roster, salary-total, payroll-countdown, employee cards with rarity/rank/attrs, expand Gerir, Bonus toast, Train UI, Recruit tab with candidates, hire flow, refresh-pool visible). All HUD panels (Frota/Imóveis/Equipas/Intel/Império) open without errors.",
+  "summary": "Full E2E regression on SUBMUNDO HR (Funcionários) overhaul + fleet/properties/police/launder. Backend pytest 29/29 PASS (28 fast + 1 slow training-completion). Frontend Playwright: register → HUD map → RH panel (roster, salary-total, payroll-countdown, employee cards with rarity/rank/attrs, expand Gerir, Bonus toast, Train UI, Recruit tab with candidates, hire flow, refresh-pool visible). All HUD panels (Frota/Imóveis/Equipas/Intel/Império) open without errors.",
   "backend_issues": {"critical": [], "minor": []},
   "frontend_issues": {
     "ui_bugs": [],

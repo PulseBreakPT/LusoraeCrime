@@ -1,5 +1,5 @@
 # =============================================================================
-# LusoraeCrime — Stack completo auto-contido (Hostinger VPS)
+# SUBMUNDOCrime — Stack completo auto-contido (Hostinger VPS)
 # =============================================================================
 # Tudo corre em Docker: MongoDB + FastAPI + Caddy (serve o React e faz
 # reverse-proxy de /api, com HTTPS automático). Não precisa de CloudPanel,

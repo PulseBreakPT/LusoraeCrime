@@ -10,7 +10,7 @@ describe("keyless map provider", () => {
     expect(MAP_TILE_URL).toContain("openstreetmap.org");
     expect(MAP_TILE_URL).not.toMatch(/api[_-]?key|access[_-]?token|carto/i);
     expect(MAP_TILE_ATTRIBUTION).toContain("OpenStreetMap");
-    expect(MAP_TILE_CLASS).toBe("lus-osm-base-tile");
+    expect(MAP_TILE_CLASS).toBe("sub-osm-base-tile");
   });
 
   test("changes cartographic detail as the player zooms in", () => {

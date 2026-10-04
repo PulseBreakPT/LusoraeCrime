@@ -171,7 +171,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto lus-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
+      <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Swords} />
           <PanelKicker>Arsenal · Equipamento</PanelKicker>
@@ -272,7 +272,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
             const profMax = meta.proficiency_max ?? 100;
             const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
             return (
-              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
+              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 sub-card sub-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
                 <div className="relative z-[1] min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="min-w-0 truncate text-sm font-bold text-white">{w.name}</p>
@@ -434,7 +434,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                 const owned = weapons.filter((w) => w.model_key === key).length;
                 const wear = weaponWearPerMission(m, meta);
                 return (
-                  <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("h-full min-w-0 lus-card lus-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
+                  <Card key={key} data-testid={`arsenal-card-${key}`} className={cn("h-full min-w-0 sub-card sub-weapon-card p-2.5 shadow-none", locked && "opacity-80")} style={{ "--wtier": tier.color }}>
                     <div className="relative z-[1] min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="min-w-0 truncate text-sm font-semibold text-white">{m.name}</p>

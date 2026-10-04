@@ -45,7 +45,7 @@ export default function DevLoadingPreview() {
         <TacticalFrame header="Falha de uplink" status="Interrompido" tone="error">
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <span className="lus-alert-icon">
+              <span className="sub-alert-icon">
                 <AlertTriangle className="h-8 w-8 flex-shrink-0 text-destructive" />
               </span>
               <div>

@@ -32,9 +32,9 @@ export const FpsMeter = () => {
   }, []);
 
   return (
-    <div className="lus-fps" data-testid="fps-meter" aria-hidden="true">
-      <span ref={valRef} className="lus-fps-value">—</span>
-      <span className="lus-fps-label">FPS</span>
+    <div className="sub-fps" data-testid="fps-meter" aria-hidden="true">
+      <span ref={valRef} className="sub-fps-value">—</span>
+      <span className="sub-fps-label">FPS</span>
     </div>
   );
 };

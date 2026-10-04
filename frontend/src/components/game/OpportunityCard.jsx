@@ -212,7 +212,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     setBusy(false);
     if (res.ok) {
       const teamName = state.teams.find((t) => t.id === selectedTeamId)?.name;
-      window.dispatchEvent(new CustomEvent("lus:dispatch-stamp", { detail: { team: teamName } }));
+      window.dispatchEvent(new CustomEvent("sub:dispatch-stamp", { detail: { team: teamName } }));
       onClose();
     }
   };
@@ -271,7 +271,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
         maxHeight: "min(calc(100dvh - 10rem), 40rem)",
       }}
-      className="lus-opp-card pointer-events-auto absolute left-2 right-2 z-30 mx-auto flex max-w-sm animate-slide-up flex-col lus-panel p-4 shadow-2xl"
+      className="sub-opp-card pointer-events-auto absolute left-2 right-2 z-30 mx-auto flex max-w-sm animate-slide-up flex-col sub-panel p-4 shadow-2xl"
     >
       <div className="flex shrink-0 items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -502,7 +502,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                     className={`flex w-full flex-col gap-1 rounded-md border px-2.5 py-1.5 text-left shadow-none transition-colors ${
                       selectedTeamId === t.id
                         ? "border-primary/50 bg-primary/10"
-                        : "lus-card hover:bg-white/[0.07]"
+                        : "sub-card hover:bg-white/[0.07]"
                     } ${r.ok ? "cursor-pointer" : ""}`}
                   >
                     <div className="flex w-full items-center justify-between gap-2">
@@ -596,7 +596,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             }
             const categoryOrder = Object.keys(MODIFIER_CATEGORY_LABELS).filter((cat) => byCategory[cat]?.length);
             return (
-              <Card ref={previewRef} data-testid="dispatch-preview" className="mt-2 animate-slide-up lus-card p-2.5 shadow-none">
+              <Card ref={previewRef} data-testid="dispatch-preview" className="mt-2 animate-slide-up sub-card p-2.5 shadow-none">
                 <div className="flex items-baseline justify-between">
                   <p className="text-[9px] uppercase tracking-wider text-zinc-500">Probabilidade de sucesso</p>
                   <div className="flex items-center gap-1.5">
@@ -731,7 +731,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
 const Metric = ({ icon: Icon, label, value, color, tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full lus-card p-2 shadow-none">
+    <Card className="h-full sub-card p-2 shadow-none">
       <div className="flex items-center gap-1">
         <Icon size={10} style={{ color }} />
         <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
