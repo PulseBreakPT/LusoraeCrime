@@ -382,29 +382,32 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           </SheetTitle>
         </SheetHeader>
 
-        <Button
-          type="button"
-          variant="outline"
-          data-testid="settings-advanced-toggle"
-          onClick={() => setAdvancedOpen((value) => !value)}
-          className="sub-settings-advanced mt-1 w-full justify-between border-white/[0.08] bg-[#111114] text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 hover:bg-[#17171b] hover:text-zinc-200"
-        >
-          <span>{advancedOpen ? "Ocultar avançado" : "Mostrar avançado"}</span>
-          <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-        </Button>
-
-        <Section icon={UserCog} title="Conta" testId="settings-section-account" hidden={!advancedOpen}>
-          <ChangePasswordForm />
-          <ClaimAdminForm />
-          <Button
-            data-testid="logout-button"
-            onClick={logout}
-            variant="destructive"
-            className="w-full text-xs font-bold uppercase tracking-wider"
-          >
-            <LogOut size={14} className="mr-1.5" /> Terminar sessão
-          </Button>
-          <DeleteAccountForm />
+        <Section icon={Gamepad2} title="Jogabilidade" testId="settings-section-gameplay">
+          <Row label="Selecionar automaticamente a melhor equipa" testId="settings-row-auto-team">
+            <ToggleSwitch testId="settings-toggle-auto-team" checked={autoSelectBestTeam} onChange={setAutoSelectBestTeam} />
+          </Row>
+          <Row label="Selecionar automaticamente o melhor veículo" testId="settings-row-auto-vehicle">
+            <ToggleSwitch testId="settings-toggle-auto-vehicle" checked={autoSelectBestVehicle} onChange={setAutoSelectBestVehicle} />
+          </Row>
+          <Row label="Ocultar operações impossíveis" hint="Esconde do mapa as que nenhuma equipa consegue cumprir agora" testId="settings-row-hide-impossible">
+            <ToggleSwitch testId="settings-toggle-hide-impossible" checked={hideImpossibleMissions} onChange={setHideImpossibleMissions} />
+          </Row>
+          <Row label="Repetir automaticamente a última configuração" testId="settings-row-repeat-config" hidden={!advancedOpen}>
+            <ToggleSwitch testId="settings-toggle-repeat-config" checked={repeatLastConfig} onChange={setRepeatLastConfig} />
+          </Row>
+          <Row label="Abrir automaticamente o relatório da operação" hint="Abre os Relatórios quando uma equipa regressa" testId="settings-row-auto-report" hidden={!advancedOpen}>
+            <ToggleSwitch testId="settings-toggle-auto-report" checked={autoOpenReport} onChange={setAutoOpenReport} />
+          </Row>
+          <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success" hidden={!advancedOpen}>
+            <Input
+              data-testid="settings-low-success-input"
+              aria-label="Limiar de probabilidade baixa"
+              type="number" min="10" max="95" step="5"
+              value={Math.round(lowSuccessThreshold * 100)}
+              onChange={(e) => setLowSuccessThreshold(Math.max(0.10, Math.min(0.95, (parseInt(e.target.value, 10) || 70) / 100)))}
+              className="h-auto w-14 border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white"
+            />
+          </Row>
         </Section>
 
         <Section icon={Monitor} title="Interface" testId="settings-section-interface">
@@ -451,96 +454,6 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <Row label="Reduzir animações" hint="Desativa movimento decorativo e transições longas" testId="settings-row-reduced-motion">
             <ToggleSwitch testId="settings-toggle-reduced-motion" checked={reducedMotion} onChange={setReducedMotion} />
           </Row>
-        </Section>
-
-        <Section icon={Gamepad2} title="Jogabilidade" testId="settings-section-gameplay">
-          <Row label="Selecionar automaticamente a melhor equipa" testId="settings-row-auto-team">
-            <ToggleSwitch testId="settings-toggle-auto-team" checked={autoSelectBestTeam} onChange={setAutoSelectBestTeam} />
-          </Row>
-          <Row label="Selecionar automaticamente o melhor veículo" testId="settings-row-auto-vehicle">
-            <ToggleSwitch testId="settings-toggle-auto-vehicle" checked={autoSelectBestVehicle} onChange={setAutoSelectBestVehicle} />
-          </Row>
-          <Row label="Ocultar operações impossíveis" hint="Esconde do mapa as que nenhuma equipa consegue cumprir agora" testId="settings-row-hide-impossible">
-            <ToggleSwitch testId="settings-toggle-hide-impossible" checked={hideImpossibleMissions} onChange={setHideImpossibleMissions} />
-          </Row>
-          <Row label="Repetir automaticamente a última configuração" testId="settings-row-repeat-config" hidden={!advancedOpen}>
-            <ToggleSwitch testId="settings-toggle-repeat-config" checked={repeatLastConfig} onChange={setRepeatLastConfig} />
-          </Row>
-          <Row label="Abrir automaticamente o relatório da operação" hint="Abre os Relatórios quando uma equipa regressa" testId="settings-row-auto-report" hidden={!advancedOpen}>
-            <ToggleSwitch testId="settings-toggle-auto-report" checked={autoOpenReport} onChange={setAutoOpenReport} />
-          </Row>
-          <Row label="Avisar quando a probabilidade de sucesso é baixa" hint={`Abaixo de ${Math.round(lowSuccessThreshold * 100)}%`} testId="settings-row-low-success" hidden={!advancedOpen}>
-            <Input
-              data-testid="settings-low-success-input"
-              aria-label="Limiar de probabilidade baixa"
-              type="number" min="10" max="95" step="5"
-              value={Math.round(lowSuccessThreshold * 100)}
-              onChange={(e) => setLowSuccessThreshold(Math.max(0.10, Math.min(0.95, (parseInt(e.target.value, 10) || 70) / 100)))}
-              className="h-auto w-14 border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white"
-            />
-          </Row>
-        </Section>
-
-        <Section icon={Cog} title="Automatizações" testId="settings-section-automations" hidden={!advancedOpen}>
-          <Row label="Reparar veículos automaticamente" hint="Abaixo da durabilidade indicada" testId="settings-row-auto-repair">
-            <div className="flex items-center gap-2">
-              <ThresholdInput
-                testId="settings-auto-repair-threshold"
-                ariaLabel="Durabilidade mínima para reparação automática"
-                value={settings.auto_repair_threshold ?? 30}
-                disabled={!settings.auto_repair_enabled}
-                onChange={(v) => patchAutomation({ auto_repair_threshold: v })}
-              />
-              <ToggleSwitch
-                testId="settings-toggle-auto-repair"
-                checked={!!settings.auto_repair_enabled}
-                onChange={(v) => patchAutomation({ auto_repair_enabled: v })}
-              />
-            </div>
-          </Row>
-          <Row label="Abastecer veículos automaticamente" hint="Abaixo do combustível indicado" testId="settings-row-auto-refuel">
-            <div className="flex items-center gap-2">
-              <ThresholdInput
-                testId="settings-auto-refuel-threshold"
-                ariaLabel="Combustível mínimo para abastecimento automático"
-                value={settings.auto_refuel_threshold ?? 20}
-                disabled={!settings.auto_refuel_enabled}
-                onChange={(v) => patchAutomation({ auto_refuel_threshold: v })}
-              />
-              <ToggleSwitch
-                testId="settings-toggle-auto-refuel"
-                checked={!!settings.auto_refuel_enabled}
-                onChange={(v) => patchAutomation({ auto_refuel_enabled: v })}
-              />
-            </div>
-          </Row>
-          <Row label="Pôr operacionais a descansar automaticamente" hint="Abaixo da energia indicada" testId="settings-row-auto-rest">
-            <div className="flex items-center gap-2">
-              <ThresholdInput
-                testId="settings-auto-rest-threshold"
-                ariaLabel="Energia mínima para descanso automático"
-                value={settings.auto_rest_threshold ?? 20}
-                disabled={!settings.auto_rest_enabled}
-                onChange={(v) => patchAutomation({ auto_rest_threshold: v })}
-              />
-              <ToggleSwitch
-                testId="settings-toggle-auto-rest"
-                checked={!!settings.auto_rest_enabled}
-                onChange={(v) => patchAutomation({ auto_rest_enabled: v })}
-              />
-            </div>
-          </Row>
-          <Row label="Recolher automaticamente recompensas de missões concluídas" testId="settings-row-auto-claim">
-            <ToggleSwitch
-              testId="settings-toggle-auto-claim"
-              checked={!!settings.auto_claim_quests}
-              onChange={(v) => patchAutomation({ auto_claim_quests: v })}
-            />
-          </Row>
-          <p className="flex items-center gap-1.5 pt-1 text-[10px] text-zinc-600">
-            <Wrench size={9} /> <Fuel size={9} /> <BedDouble size={9} /> <Gift size={9} />
-            Corre mesmo com a app fechada — os custos são os mesmos das ações manuais.
-          </p>
         </Section>
 
         <Section icon={Volume2} title="Áudio" testId="settings-section-audio">
@@ -618,6 +531,93 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
               />
             </Row>
           ))}
+        </Section>
+
+        <Button
+          type="button"
+          variant="outline"
+          data-testid="settings-advanced-toggle"
+          onClick={() => setAdvancedOpen((value) => !value)}
+          className="sub-settings-advanced mt-1 w-full justify-between border-white/[0.08] bg-[#111114] text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400 hover:bg-[#17171b] hover:text-zinc-200"
+        >
+          <span>{advancedOpen ? "Ocultar avançado" : "Mostrar avançado"}</span>
+          <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+        </Button>
+
+        <Section icon={Cog} title="Automatizações" testId="settings-section-automations" hidden={!advancedOpen}>
+          <Row label="Reparar veículos automaticamente" hint="Abaixo da durabilidade indicada" testId="settings-row-auto-repair">
+            <div className="flex items-center gap-2">
+              <ThresholdInput
+                testId="settings-auto-repair-threshold"
+                ariaLabel="Durabilidade mínima para reparação automática"
+                value={settings.auto_repair_threshold ?? 30}
+                disabled={!settings.auto_repair_enabled}
+                onChange={(v) => patchAutomation({ auto_repair_threshold: v })}
+              />
+              <ToggleSwitch
+                testId="settings-toggle-auto-repair"
+                checked={!!settings.auto_repair_enabled}
+                onChange={(v) => patchAutomation({ auto_repair_enabled: v })}
+              />
+            </div>
+          </Row>
+          <Row label="Abastecer veículos automaticamente" hint="Abaixo do combustível indicado" testId="settings-row-auto-refuel">
+            <div className="flex items-center gap-2">
+              <ThresholdInput
+                testId="settings-auto-refuel-threshold"
+                ariaLabel="Combustível mínimo para abastecimento automático"
+                value={settings.auto_refuel_threshold ?? 20}
+                disabled={!settings.auto_refuel_enabled}
+                onChange={(v) => patchAutomation({ auto_refuel_threshold: v })}
+              />
+              <ToggleSwitch
+                testId="settings-toggle-auto-refuel"
+                checked={!!settings.auto_refuel_enabled}
+                onChange={(v) => patchAutomation({ auto_refuel_enabled: v })}
+              />
+            </div>
+          </Row>
+          <Row label="Pôr operacionais a descansar automaticamente" hint="Abaixo da energia indicada" testId="settings-row-auto-rest">
+            <div className="flex items-center gap-2">
+              <ThresholdInput
+                testId="settings-auto-rest-threshold"
+                ariaLabel="Energia mínima para descanso automático"
+                value={settings.auto_rest_threshold ?? 20}
+                disabled={!settings.auto_rest_enabled}
+                onChange={(v) => patchAutomation({ auto_rest_threshold: v })}
+              />
+              <ToggleSwitch
+                testId="settings-toggle-auto-rest"
+                checked={!!settings.auto_rest_enabled}
+                onChange={(v) => patchAutomation({ auto_rest_enabled: v })}
+              />
+            </div>
+          </Row>
+          <Row label="Recolher automaticamente recompensas de missões concluídas" testId="settings-row-auto-claim">
+            <ToggleSwitch
+              testId="settings-toggle-auto-claim"
+              checked={!!settings.auto_claim_quests}
+              onChange={(v) => patchAutomation({ auto_claim_quests: v })}
+            />
+          </Row>
+          <p className="flex items-center gap-1.5 pt-1 text-[10px] text-zinc-600">
+            <Wrench size={9} /> <Fuel size={9} /> <BedDouble size={9} /> <Gift size={9} />
+            Corre mesmo com a app fechada — os custos são os mesmos das ações manuais.
+          </p>
+        </Section>
+
+        <Section icon={UserCog} title="Conta" testId="settings-section-account" hidden={!advancedOpen}>
+          <ChangePasswordForm />
+          <ClaimAdminForm />
+          <Button
+            data-testid="logout-button"
+            onClick={logout}
+            variant="destructive"
+            className="w-full text-xs font-bold uppercase tracking-wider"
+          >
+            <LogOut size={14} className="mr-1.5" /> Terminar sessão
+          </Button>
+          <DeleteAccountForm />
         </Section>
 
         <Section icon={Info} title="Sobre" testId="settings-section-about" hidden={!advancedOpen}>
