@@ -45,6 +45,16 @@ class ChatInput(MutationInput):
     message: str = Field(min_length=1, max_length=280)
 
 
+class ChatReportInput(MutationInput):
+    message_id: str
+    reason: str = Field(min_length=3, max_length=160)
+
+
+class ChatBlockInput(MutationInput):
+    player_id: str
+    blocked: bool = True
+
+
 class TogglePvpInput(MutationInput):
     enabled: bool
 
@@ -384,6 +394,60 @@ async def post_chat(body: ChatInput, user: dict = Depends(get_current_user)):
     }
     await db.city_chat.insert_one(doc)
     return {"ok": True}
+
+
+@router.post("/social/chat/report")
+@idempotent("city_chat_report")
+async def report_chat(body: ChatReportInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    reporter_id = str(player["_id"])
+    message = await db.city_chat.find_one({"_id": _oid(body.message_id, "Mensagem")})
+    if not message:
+        raise HTTPException(status_code=404, detail="Mensagem não encontrada")
+    target_id = str(message.get("player_id") or "")
+    if target_id == reporter_id:
+        raise HTTPException(status_code=400, detail="Não podes denunciar a tua própria mensagem")
+    existing = await db.city_chat_reports.find_one({
+        "reporter_id": reporter_id,
+        "message_id": str(message["_id"]),
+        "status": {"$in": ["open", "reviewing"]},
+    })
+    if existing:
+        raise HTTPException(status_code=409, detail="Esta mensagem já foi denunciada por ti")
+    await db.city_chat_reports.insert_one({
+        "reporter_id": reporter_id,
+        "target_player_id": target_id,
+        "message_id": str(message["_id"]),
+        "message_snapshot": str(message.get("message") or "")[:280],
+        "reason": body.reason.strip(),
+        "status": "open",
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}
+
+
+@router.post("/social/chat/block")
+@idempotent("city_chat_block")
+async def block_chat_player(body: ChatBlockInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    target_id = str(body.player_id or "").strip()
+    if target_id == pid:
+        raise HTTPException(status_code=400, detail="Não podes bloquear a tua própria organização")
+    target = await db.players.find_one({"_id": _oid(target_id, "Jogador")})
+    if not target:
+        raise HTTPException(status_code=404, detail="Organização não encontrada")
+    if body.blocked:
+        await db.players.update_one(
+            {"_id": player["_id"]},
+            {"$addToSet": {"city_blocked_player_ids": target_id}},
+        )
+    else:
+        await db.players.update_one(
+            {"_id": player["_id"]},
+            {"$pull": {"city_blocked_player_ids": target_id}},
+        )
+    return {"ok": True, "player_id": target_id, "blocked": bool(body.blocked)}
 
 
 def _alliance_code():
