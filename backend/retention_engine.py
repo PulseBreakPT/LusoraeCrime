@@ -347,17 +347,34 @@ def build_retention_snapshot(
 
     # Long-term account memory: records make past play visible and personal.
     completed = [m for m in history if m.get("outcome") in ("success", "partial", "failure", "police")]
+    persisted_records = player.get("records") or {}
     best_mission = max(completed, key=lambda m: int(m.get("pending_reward", 0) or 0), default=None)
     veteran = max(employees, key=lambda e: int(e.get("missions_done", 0) or 0), default=None)
     road_car = max(vehicles, key=lambda v: float(v.get("km_total", v.get("km", 0)) or 0), default=None)
     top_team = max(teams, key=lambda t: int(t.get("missions_done", 0) or 0), default=None)
     records = []
-    if best_mission:
+    persisted_best = persisted_records.get("best_mission") or {}
+    if persisted_best:
+        records.append({
+            "key": "best_mission",
+            "label": "Maior saque",
+            "value": int(persisted_best.get("value", 0) or 0),
+            "detail": f"{persisted_best.get('team_name', 'Equipa')} · {persisted_best.get('operation', 'Operação')}",
+        })
+    elif best_mission:
         records.append({
             "key": "best_mission",
             "label": "Maior saque",
             "value": int(best_mission.get("pending_reward", 0) or 0),
             "detail": f"{best_mission.get('team_name', 'Equipa')} · {(best_mission.get('opportunity') or {}).get('name', 'Operação')}",
+        })
+    clutch = persisted_records.get("lowest_chance_success") or {}
+    if clutch:
+        records.append({
+            "key": "clutch_success",
+            "label": "Golpe mais improvável",
+            "value": round(float(clutch.get("chance", 0) or 0) * 100, 1),
+            "detail": f"{clutch.get('team_name', 'Equipa')} · {clutch.get('operation', 'Operação')}",
         })
     if veteran:
         records.append({
