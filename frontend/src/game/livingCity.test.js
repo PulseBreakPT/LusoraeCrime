@@ -1,4 +1,4 @@
-import { ensureLocalCity, localCitySnapshot, localBusinessChance, handleLocalCityRequest } from "./livingCity";
+import { ensureLocalCity, advanceLocalCity, localCitySnapshot, localBusinessChance, localBossLeadership, handleLocalCityRequest } from "./livingCity";
 
 const baseSave = () => ({
   player:{
@@ -42,4 +42,33 @@ test("city actions include rivals and casino without allowing negative balance",
   expect(game.handled).toBe(true);
   expect(save.player.clean_money).toBeGreaterThanOrEqual(0);
   expect(save.player.clean_money).toBeLessThanOrEqual(before+750);
+});
+
+
+test("boss custody affects operations and autonomous city state has an initial grace slot", () => {
+  const save=baseSave();
+  ensureLocalCity(save);
+  save.city.boss.sentence_until=new Date(Date.now()+20*60000).toISOString();
+  save.city.boss.stress=80;
+  expect(localBossLeadership(save).chance_delta).toBeLessThan(0);
+  expect(save.city.last_rival_slot).toBeNull();
+  advanceLocalCity(save);
+  expect(save.city.last_rival_slot).not.toBeNull();
+});
+
+test("old local seasons settle exactly once and pay the podium", () => {
+  const save=baseSave();
+  ensureLocalCity(save);
+  save.city.season.id="S000";
+  save.city.season.points=999999;
+  const cleanBefore=save.player.clean_money;
+  const respectBefore=save.player.respect;
+  advanceLocalCity(save);
+  expect(save.city.claimed_seasons).toContain("S000");
+  expect(save.city.last_season_reward.rank).toBe(1);
+  expect(save.player.clean_money).toBe(cleanBefore+120000);
+  expect(save.player.respect).toBe(respectBefore+1600);
+  const after=save.player.clean_money;
+  advanceLocalCity(save);
+  expect(save.player.clean_money).toBe(after);
 });
