@@ -284,7 +284,8 @@ def property_security_factor(properties: list[dict]) -> float:
     if not labs:
         return 1.0
     avg = sum(int(p.get("security_level", 0) or 0) for p in labs) / len(labs)
-    return max(0.55, 1.0 - avg * 0.12)
+    staff = sum(float(p.get("staff_effectiveness", 0) or 0) for p in labs) / len(labs)
+    return max(0.48, 1.0 - avg * 0.12 - staff * 0.10)
 
 
 def default_team_policies() -> dict[str, Any]:
@@ -454,6 +455,35 @@ def protection_risk_multiplier(player: dict, now: datetime | None = None) -> flo
     trust = max(0.0, min(100.0, float(governance.get("trust", 0) or 0)))
     exposure = max(0.0, min(100.0, float(governance.get("exposure", 0) or 0)))
     return max(0.50, min(0.92, 0.78 - trust * 0.0018 + exposure * 0.0015))
+
+
+def property_staff_profile(employees: list[dict]) -> tuple[dict[str, str], float]:
+    """Assign staff to best-fit property roles from live attributes and wellbeing."""
+    role_attrs = {
+        "security": ("forca", "tiro", "sangue_frio"),
+        "operations": ("inteligencia", "discricao", "sangue_frio"),
+        "logistics": ("conducao", "inteligencia", "discricao"),
+        "management": ("negociacao", "inteligencia", "sangue_frio"),
+    }
+    remaining = set(role_attrs)
+    roles: dict[str, str] = {}
+    scores: list[float] = []
+    for emp in sorted(employees, key=lambda e: float(e.get("level", 1) or 1), reverse=True):
+        attrs = emp.get("attrs") or {}
+        choices = remaining or set(role_attrs)
+        best_role = max(
+            choices,
+            key=lambda role: sum(float(attrs.get(key, 0) or 0) for key in role_attrs[role]),
+        )
+        raw = sum(float(attrs.get(key, 0) or 0) for key in role_attrs[best_role]) / (10 * len(role_attrs[best_role]))
+        morale = max(0.4, min(1.0, float(emp.get("morale", 70) or 70) / 100))
+        fatigue = max(0.45, 1.0 - float(emp.get("fatigue", 0) or 0) / 140)
+        injury = 0.72 if emp.get("status") == "injured" else 1.0
+        score = max(0.0, min(1.0, raw * morale * fatigue * injury))
+        roles[str(emp.get("_id") or emp.get("id"))] = best_role
+        scores.append(score)
+        remaining.discard(best_role)
+    return roles, round(sum(scores) / len(scores), 3) if scores else 0.0
 
 
 def property_operations_factor(prop: dict) -> float:
