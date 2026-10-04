@@ -6,7 +6,7 @@ import {
   propertyUpgradePaybackH,
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
-import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
 import { PropertyGlyph } from "./PropertyGlyph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
@@ -87,7 +87,6 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:!w-[44rem] sm:!max-w-[96vw] lg:!w-[60rem]">
         <SheetHeader>
           <PanelWatermark icon={Warehouse} />
-          <PanelKicker>Património · Território</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Warehouse size={18} className="text-primary" /> Imóveis
             <span className="ml-auto font-mono text-xs text-zinc-500" data-testid="properties-count">{props.length}</span>
