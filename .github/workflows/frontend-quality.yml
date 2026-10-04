@@ -1,0 +1,70 @@
+name: Frontend quality gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/src/**"
+      - "frontend/public/**"
+      - "frontend/package.json"
+      - "frontend/yarn.lock"
+      - "frontend/craco.config.js"
+      - "frontend/tailwind.config.js"
+      - "frontend/postcss.config.js"
+      - "design_guidelines.json"
+      - "PRODUCT.md"
+      - "DESIGN.md"
+      - ".github/workflows/frontend-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Test and build frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Cache installed dependencies
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('frontend/package.json', 'frontend/yarn.lock') }}
+
+      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: yarn install --prefer-offline --non-interactive
+
+      - name: Run frontend regression tests
+        env:
+          CI: "true"
+        run: yarn test --watchAll=false --runInBand --runTestsByPath src/game/localGuestEngine.test.js src/lib/mapTiles.test.js src/lib/game.activity.test.js src/lib/routing.test.js src/lib/uiActionOwnership.test.js
+
+      - name: Build production bundle
+        env:
+          CI: "false"
+          GENERATE_SOURCEMAP: "false"
+          REACT_APP_BACKEND_URL: ${{ vars.PUBLIC_BACKEND_URL || 'https://lusora-patrols.preview.emergentagent.com' }}
+          REACT_APP_AUTH_UI_ENABLED: "true"
+          REACT_APP_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: yarn build
