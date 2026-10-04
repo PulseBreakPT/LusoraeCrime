@@ -16,7 +16,7 @@ const SheetPortal = SheetPrimitive.Portal
 const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
+      "fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
       className
     )}
     {...props}
@@ -37,7 +37,7 @@ const sheetVariants = cva(
           "inset-x-0 bottom-0 border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
         left: "inset-y-0 left-0 h-full w-full border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
         right:
-          "inset-x-2 bottom-[4.9rem] max-h-[calc(100dvh-6rem)] w-auto rounded-2xl border data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-3 sm:inset-x-auto sm:left-1/2 sm:right-auto sm:bottom-[4.9rem] sm:h-auto sm:max-h-[min(76vh,46rem)] sm:w-[min(34rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:border",
+          "left-1/2 top-1/2 h-auto max-h-[min(82dvh,48rem)] w-[min(46rem,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
       },
     },
     defaultVariants: {
