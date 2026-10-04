@@ -37,6 +37,15 @@ export const LOCAL_BUSINESS_TYPES = {
   hotel:{name:"Hotel",price:420000,clean_h:1680,dirty_h:260,heat_h:.08,security:55,max_level:5,effects:{influencia:.016,logistica:.008},description:"Rede de contactos, alojamento e cobertura logística."},
   marina:{name:"Marina",price:520000,clean_h:1820,dirty_h:520,heat_h:.16,security:58,max_level:5,effects:{logistica:.026},description:"Late game logístico com forte capacidade de circulação."},
 };
+const LOCAL_BUSINESS_UNLOCK_LEVELS = {
+  bar:5, oficina_privada:10, discoteca:15, transportadora:25,
+  empresa_seguranca:35, imobiliaria:45, casa_apostas:55,
+  empresa_tecnologia:65, hotel:75, marina:90,
+};
+Object.entries(LOCAL_BUSINESS_UNLOCK_LEVELS).forEach(([key, level]) => {
+  if (LOCAL_BUSINESS_TYPES[key]) LOCAL_BUSINESS_TYPES[key].min_level = level;
+});
+
 const RIVAL_NAMES = [
   ["Ordem do Norte","disciplina","assalto"],["Linha Cinzenta","logística","logistica"],
   ["Vértice","tecnologia","tecnica"],["Círculo Dourado","influência","influencia"],
@@ -142,6 +151,7 @@ export const ensureLocalCity = (save) => {
     {id:uid("chat"),org_name:"Rádio de Rua",message:"Movimento normal. Atenção às alterações no pulso da cidade.",ts:nowIso()},
   ];
   save.city.social.pvp_challenges ||= [];
+  save.city.social.pvp_history ||= {};
   save.city.boss ||= {health:100,stress:0,hospital_until:null,sentence_until:null};
   return save;
 };
@@ -282,6 +292,7 @@ export const localCitySnapshot = (save) => {
     news:news.slice(0,12),
     rivals:save.city.rivals.map((r)=>({...clone(r),threat:clamp(Math.round(r.power+r.hostility*.35-playerPower*.35),0,100)})),
     businesses,business_catalog:clone(LOCAL_BUSINESS_TYPES),business_totals:totals,
+    rival_actions:clone(ACTIONS),
     social:{
       alliance:clone(save.city.social.alliance),
       chat:clone(save.city.social.chat||[]).slice(0,20),
@@ -289,7 +300,11 @@ export const localCitySnapshot = (save) => {
       pvp_players:save.city.rivals.map((r)=>({player_id:r.id,org_name:r.name,level:Math.max(1,Math.round(r.power/12)),respect:r.power*180,heat:r.hostility/2})),
       pvp_challenges:clone(save.city.social.pvp_challenges||[]),
     },
-    boss:clone(save.city.boss),
+    boss:(()=>{
+      const b=clone(save.city.boss);
+      const recoveryCost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0)+(!b.hospital_until&&!b.sentence_until&&Number(b.stress||0)>=35?1000:0);
+      return {...b,recovery_cost:recoveryCost};
+    })(),
   };
 };
 
@@ -310,6 +325,7 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
 
   if(verb==="post"&&path==="/game/city/businesses/buy"){
     const cfg=LOCAL_BUSINESS_TYPES[payload.type_key];if(!cfg)fail(404,"Tipo de negócio inexistente");
+    if(Number(save.player.level||1)<Number(cfg.min_level||1))fail(400,`Este negócio desbloqueia no nível ${cfg.min_level}`);
     const owned=save.city.businesses.length,same=save.city.businesses.filter(x=>x.type_key===payload.type_key).length;
     const price=Math.round(cfg.price*(1+owned*.08+same*.12));spend(save,price,`Compra de negócio: ${cfg.name}`,"city_business_buy");
     const b={id:uid("biz"),type_key:payload.type_key,name:cfg.name,level:1,condition:100,security:cfg.security,reputation:50,bought_at:nowIso(),last_collect_at:nowIso(),total_clean:0,total_dirty:0};
@@ -353,13 +369,22 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
     if(payout){save.player.clean_money+=payout;pushTx(save,"city_casino_payout",payout,"clean",`Prémio: ${payload.game}`);}const net=payout-bet;pushEvent(save,"system",`Casino: ${payload.game} terminou com resultado líquido de ${net>=0?"+":""}${net.toLocaleString("pt-PT")} €.`);
     return {handled:true,data:{ok:true,payout,net,...detail}};
   }
-  if(verb==="post"&&path==="/game/city/social/pvp"){save.city.social.pvp_opt_in=!!payload.enabled;return {handled:true,data:{ok:true,enabled:save.city.social.pvp_opt_in}};}
+  if(verb==="post"&&path==="/game/city/social/pvp"){if(payload.enabled&&Number(save.player.level||1)<15)fail(400,"PvP desbloqueia no nível 15");save.city.social.pvp_opt_in=!!payload.enabled;return {handled:true,data:{ok:true,enabled:save.city.social.pvp_opt_in}};}
   if(verb==="post"&&path==="/game/city/social/pvp/challenge"){
     if(!save.city.social.pvp_opt_in)fail(400,"Ativa primeiro o PvP");
+    if(Number(save.player.level||1)<15)fail(400,"PvP desbloqueia no nível 15");
     const defender=save.city.rivals.find((r)=>r.id===payload.defender_player_id);if(!defender)fail(404,"Rival PvP indisponível");
+    const now=Date.now(),key=defender.id,history=(save.city.social.pvp_history[key]||[]).map(Number).filter(Number.isFinite);
+    const last24=history.filter((ts)=>now-ts<86400000),last7=history.filter((ts)=>now-ts<7*86400000);
+    if(last24.length>=3)fail(429,"Limite diário atingido contra este rival");
+    if(history.some((ts)=>now-ts<6*3600000))fail(429,"Este confronto está em cooldown durante 6 horas");
     const a=Number(save.player.level||1)*12+Number(save.player.respect||0)/350+Number(save.player.stats?.missions_success||0)*.7+Math.random()*22;
     const d=Math.max(1,defender.power/8)*12+defender.power*.5+Math.random()*22;
-    const won=a>=d;save.city.season.points=Number(save.city.season.points||0)+(won?80:20);
+    const won=a>=d,farmMult=[1,.5,.25][last7.length]??.1;
+    const points=Math.max(won?8:2,Math.round((won?80:20)*farmMult));
+    save.city.season.points=Number(save.city.season.points||0)+points;
+    save.city.social.pvp_history[key]=[...last7,now].slice(-20);
+    if(save.city.social.alliance)save.city.social.alliance.season_points=Number(save.city.social.alliance.season_points||0)+points;
     if(!won) save.city.boss.stress=clamp(Number(save.city.boss.stress||0)+8,0,100);
     let consequence=null;
     if(!won&&Number(save.player.heat||0)>=75&&Math.random()<.06){
@@ -367,8 +392,8 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
     }else if(!won&&Math.random()<.08){
       save.city.boss.hospital_until=new Date(Date.now()+(10+Math.floor(Math.random()*21))*60000).toISOString();save.city.boss.health=55+Math.floor(Math.random()*26);consequence="hospital";
     }
-    pushEvent(save,won?"system":"warning",`Conflito PvP ${won?"vencido":"perdido"} contra ${defender.name}.`);
-    return {handled:true,data:{ok:true,winner_id:won?save.player.id:defender.id,winner_name:won?save.player.org_name:defender.name,consequence}};
+    pushEvent(save,won?"system":"warning",`Conflito PvP ${won?"vencido":"perdido"} contra ${defender.name} (+${points} pts).`);
+    return {handled:true,data:{ok:true,winner_id:won?save.player.id:defender.id,winner_name:won?save.player.org_name:defender.name,consequence,points}};
   }
   if(verb==="post"&&path==="/game/city/social/pvp/accept")fail(404,"Sem desafios PvP recebidos no modo convidado");
   if(verb==="post"&&path==="/game/city/social/pvp/decline")fail(404,"Sem desafios PvP recebidos no modo convidado");
