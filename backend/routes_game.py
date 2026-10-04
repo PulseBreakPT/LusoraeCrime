@@ -1581,7 +1581,10 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         employees = await db.employees.find({"_id": {"$in": employee_oids}, "player_id": pid}).to_list(TEAM_MAX_MEMBERS)
         if len(employees) != len(employee_ids):
             raise HTTPException(status_code=404, detail="Um ou mais operacionais não foram encontrados")
-        blocked = [employee["name"] for employee in employees if employee.get("status") != "idle" or employee.get("team_id")]
+        blocked = [
+            employee["name"] for employee in employees
+            if employee.get("status") != "idle" or employee.get("team_id") or employee.get("stationed_property_id")
+        ]
         if blocked:
             raise HTTPException(status_code=400, detail=f"Operacionais indisponíveis: {', '.join(blocked)}")
 
@@ -1608,6 +1611,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         "available_at": None, "roster_stable_since": created,
         # SSS v4: memória da equipa — momentum, familiaridade e entrosamento.
         "streak": 0, "category_missions": {}, "roster_missions": 0,
+        "doctrine": "balanced", "policies": default_team_policies(), "loadout": {},
     }
     result = await db.teams.insert_one(team_doc)
     team_id = str(result.inserted_id)
@@ -1715,7 +1719,16 @@ async def assign_employee(body: AssignEmployeeInput, user: dict = Depends(get_cu
         if current >= TEAM_MAX_MEMBERS:
             raise HTTPException(status_code=400, detail=f"A equipa já está no limite de {TEAM_MAX_MEMBERS} membros")
     old_team_id = emp.get("team_id")
-    await db.employees.update_one({"_id": emp["_id"]}, {"$set": {"team_id": body.team_id}})
+    station = emp.get("stationed_property_id")
+    if body.team_id and station:
+        await db.properties.update_one(
+            {"_id": ObjectId(station), "player_id": pid},
+            {"$pull": {"staff_employee_ids": body.employee_id}},
+        )
+    await db.employees.update_one(
+        {"_id": emp["_id"]},
+        {"$set": {"team_id": body.team_id, **({"stationed_property_id": None} if body.team_id else {})}},
+    )
     # Mudar o plantel de uma equipa quebra a coordenação: reinicia a veterania e
     # aplica um pequeno cooldown de reorganização antes do próximo despacho.
     affected_ids = {tid for tid in (old_team_id, body.team_id) if tid}
@@ -1874,6 +1887,11 @@ async def fire_employee(body: EmployeeIdInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=f"Indemnização de {severance:,} € — dinheiro limpo insuficiente")
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -severance}})
     await _unlink_employee_weapon(db, emp["_id"])
+    if emp.get("stationed_property_id"):
+        await db.properties.update_one(
+            {"_id": ObjectId(emp["stationed_property_id"]), "player_id": pid},
+            {"$pull": {"staff_employee_ids": body.employee_id}},
+        )
     await db.employees.delete_one({"_id": emp["_id"]})
     await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": -3}})
     await db.employees.update_many({"player_id": pid, "morale": {"$lt": 0}}, {"$set": {"morale": 0.0}})
@@ -1910,7 +1928,10 @@ async def optimize_employees(user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
     employees = await db.employees.find({"player_id": pid}).to_list(300)
-    free = [e for e in employees if e.get("status") == "idle" and not e.get("team_id")]
+    free = [
+        e for e in employees
+        if e.get("status") == "idle" and not e.get("team_id") and not e.get("stationed_property_id")
+    ]
     if not free:
         raise HTTPException(status_code=400, detail="Nenhum operacional disponível sem equipa para colocar")
     teams = await db.teams.find({"player_id": pid, "status": "idle"}).to_list(100)
@@ -2640,6 +2661,11 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
         )
         if stranded:
             await add_event(db, pid, "property", f"{len(stranded)} veículo(s) realojado(s) no Quartel-General após venda de {prop['name']}.")
+    if prop.get("staff_employee_ids"):
+        await db.employees.update_many(
+            {"player_id": pid, "_id": {"$in": [ObjectId(eid) for eid in prop.get("staff_employee_ids", [])]}},
+            {"$set": {"stationed_property_id": None}},
+        )
     await db.properties.delete_one({"_id": prop["_id"]})
     await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": value}})
     await add_event(db, pid, "property", f"{prop['name']} vendido por {value:,} €.")
