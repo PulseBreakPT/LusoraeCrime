@@ -235,7 +235,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
         {employeeAdequacy(e, catalog).map((c) => (
           <Tip
             key={c.category}
-            tip={`${c.label}: aptidão ${Math.round(c.score * 100)}%${c.best ? " — especialização deste operacional (match ×1.25 no motor)" : ""}. ${c.attrs.length ? `Pondera ${c.attrs.map((a) => ATTR_FULL[a] || a).join(" + ")} — ` : ""}a mesma régua da eficácia de missão e do botão Otimizar.`}
+            tip={`${c.label}: aptidão ${Math.round(c.score * 100)}%${c.best ? " — melhor especialização para este operacional." : "."}`}
             block
           >
             <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
@@ -699,7 +699,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     />
                   </div>
                   <Tip tip={canOptimize
-                    ? `Coloca os ${freeIdleCount} operacional(is) sem equipa nas ${openTeamsCount} equipa(s) com vagas, maximizando a aptidão à especialização — a mesma régua da eficácia de missão (atributo ponderado 60/40 × match ×1.25 × nível). Nunca move membros entre equipas (protege o entrosamento); colocar novos membros reinicia a coordenação da equipa.`
+                    ? `Distribui os ${freeIdleCount} operacionais sem equipa pelas ${openTeamsCount} equipas com vagas, procurando a melhor especialização. Não move membros que já estejam numa equipa.`
                     : freeIdleCount === 0 ? "Nenhum operacional disponível sem equipa para colocar." : "Nenhuma equipa disponível com vagas."}>
                     <button
                       data-testid="employees-optimize"
