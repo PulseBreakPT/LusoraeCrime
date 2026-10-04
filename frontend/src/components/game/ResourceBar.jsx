@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoneyShort } from "../../lib/game";
 import { Tip, AnimatedNumber, useFlash } from "./hud";
-import { Banknote, Coins, Trophy, Shield } from "lucide-react";
+import { Banknote, Coins, Shield } from "lucide-react";
 
 export const ResourceBar = () => {
   const { state } = useGame();
@@ -43,17 +43,8 @@ export const ResourceBar = () => {
           testId="stat-level"
           icon={Shield}
           color="#F87171"
-          label="Nível"
-          value={p.level}
-          tip={respectTip}
-        />
-
-        <Stat
-          testId="stat-respect"
-          icon={Trophy}
-          color="#7DD3FC"
-          label="Pontos"
-          value={<AnimatedNumber value={p.respect} />}
+          label={`Nível ${p.level}`}
+          value={<><AnimatedNumber value={p.respect} /> pontos</>}
           tip={respectTip}
           className={respectFlash ? "sub-flash-blue" : ""}
         />
