@@ -170,7 +170,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
             />
           </div>
           <Tip tip={canOptimize
-            ? `Redistribui os veículos disponíveis pelas ${idleTeamsCount} equipa(s) disponível(is), maximizando a adequação global — a mesma régua da chance de missão (velocidade/discrição da especialização, best_for, condição, combustível e lugares). Nunca deixa uma equipa com menos lugares que membros.`
+            ? `Redistribui os veículos disponíveis pelas ${idleTeamsCount} equipas livres, escolhendo os mais adequados e garantindo lugares para todos os membros.`
             : state.vehicles.length === 0 ? "Sem veículos na frota." : "Nenhuma equipa disponível para receber veículos."}>
             <button
               data-testid="fleet-optimize"
