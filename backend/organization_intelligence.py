@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from math import ceil
 from typing import Any
 
+from organization_events import public_event
 from organization_systems import (
     SUPPLY_CATALOG,
     WEAPON_UPGRADES,
@@ -454,6 +455,7 @@ def build_organization_intelligence(
             "info": sum(a["severity"] == "info" for a in alerts),
         },
         "recommendations": recommendations,
+        "event": public_event(player.get("organization_event")),
         "policy": policy,
     }
 
