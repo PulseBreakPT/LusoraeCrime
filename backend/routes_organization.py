@@ -381,11 +381,13 @@ async def resolve_organization_event(body: OrganizationEventResolveInput, user: 
     choice = body.choice
     result = {"type": kind, "choice": choice}
     cost = 0
+    debited = 0
     try:
         if kind == "supplier_shock":
             if choice == "stockpile":
                 cost = 6000
                 await _debit(claimed, cost)
+                debited = cost
                 await db.players.update_one({"_id": player["_id"]}, {"$inc": {
                     "inventory.service_fluids": 2,
                     "inventory.safehouse_supplies": 2,
@@ -406,6 +408,7 @@ async def resolve_organization_event(body: OrganizationEventResolveInput, user: 
             if choice == "bonus":
                 cost = max(1200, count * 300)
                 await _debit(claimed, cost)
+                debited = cost
                 await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": 8, "loyalty": 5}})
                 await db.employees.update_many({"player_id": pid, "morale": {"$gt": 100}}, {"$set": {"morale": 100}})
                 await db.employees.update_many({"player_id": pid, "loyalty": {"$gt": 100}}, {"$set": {"loyalty": 100}})
@@ -423,6 +426,7 @@ async def resolve_organization_event(body: OrganizationEventResolveInput, user: 
             if choice == "reinforce":
                 cost = 7500
                 await _debit(claimed, cost)
+                debited = cost
                 for district, info in territories.items():
                     data = dict(info or {})
                     data["pressure"] = max(0.0, float(data.get("pressure", 0) or 0) - 15)
@@ -445,6 +449,7 @@ async def resolve_organization_event(body: OrganizationEventResolveInput, user: 
             if choice == "contain":
                 cost = 12000
                 await _debit(claimed, cost)
+                debited = cost
                 new_heat = max(0.0, current_heat - 8)
                 result["effect"] = "Calor -8."
             elif choice == "absorb":
@@ -459,6 +464,7 @@ async def resolve_organization_event(body: OrganizationEventResolveInput, user: 
             if choice == "preventive":
                 cost = 5000
                 await _debit(claimed, cost)
+                debited = cost
                 delta = 8
                 result["effect"] = "Condição das bases +8."
             elif choice == "defer":
@@ -472,9 +478,12 @@ async def resolve_organization_event(body: OrganizationEventResolveInput, user: 
         else:
             raise HTTPException(status_code=400, detail="Evento desconhecido")
     except Exception:
+        update = {"$set": {"organization_event.status": "pending"}}
+        if debited:
+            update["$inc"] = {"clean_money": debited}
         await db.players.update_one(
             {"_id": player["_id"], "organization_event.id": body.event_id, "organization_event.status": "resolving"},
-            {"$set": {"organization_event.status": "pending"}},
+            update,
         )
         raise
 
