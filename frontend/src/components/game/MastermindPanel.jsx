@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtDuration, fmtMoney } from "../../lib/game";
-import { MiniBar, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { MiniBar, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -79,7 +79,6 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel sm:max-w-xl" data-testid="mastermind-panel">
         <SheetHeader>
           <PanelWatermark icon={Vault} />
-          <PanelKicker>Rede Mastermind · Grandes Golpes</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Vault size={18} className="text-violet-300" /> Sala de Planeamento
           </SheetTitle>
@@ -92,7 +91,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
           <Card className="mt-5 sub-card p-5 text-center">
             <RadioTower className="mx-auto animate-pulse text-violet-300" size={22} />
             <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-              A desencriptar a rede Mastermind…
+              A carregar…
             </p>
           </Card>
         ) : (
