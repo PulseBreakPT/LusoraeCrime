@@ -22,7 +22,7 @@ import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
-  Swords, ShieldAlert, Loader2,
+  Swords, ShieldAlert, Loader2, UserPlus, ArrowUpDown, WalletCards,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -94,11 +94,10 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const xpArr = catalog.emp_level_xp || [];
   const nextXp = e.level < maxLevel && e.level < xpArr.length ? xpArr[e.level] : null;
   const prevXp = xpArr[e.level - 1] || 0;
-  const xpPct = nextXp ? Math.min(100, ((e.xp - prevXp) / (nextXp - prevXp)) * 100) : 100;
+  const xpPct = nextXp ? Math.min(100, ((e.xp - prevXp) / Math.max(1, nextXp - prevXp)) * 100) : 100;
 
   const untilIso = e.status === "training" ? e.training?.ends_at : e.status_until;
   const remaining = untilIso ? Math.max(0, (Date.parse(untilIso) - serverNow()) / 1000) : null;
-
   const newbieRampS = catalog?.newbie_ramp_s || 3600;
   const isNewbie = e.hired_at ? (serverNow() - Date.parse(e.hired_at)) / 1000 < newbieRampS : false;
   const heavyUseThreshold = catalog?.employee_heavy_use_threshold || 30;
@@ -119,7 +118,6 @@ const EmployeeCard = ({ e, onNavigate }) => {
     missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
   }
 
-  const isNearExhausted = e.status === "idle" && e.fatigue >= 55 && e.fatigue < 70;
   const rankIdx = Math.max(0, catalog.ranks.indexOf(e.rank));
   const isTopRank = rankIdx >= catalog.ranks.length - 1;
   const nextRankReq = isTopRank ? null : catalog.rank_req_level[rankIdx + 1];
@@ -133,308 +131,326 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const fireCost = e.salary * 3;
   const money = state.player.clean_money;
   const idle = e.status === "idle";
+  const isNearExhausted = idle && e.fatigue >= 55 && e.fatigue < 70;
+
+  const preferredKeys = sp.attrs || [];
+  const rankedAttrs = Object.entries(e.attrs || {}).sort((a, b) => b[1] - a[1]);
+  const keyAttrs = [
+    ...preferredKeys.map((key) => [key, e.attrs?.[key]]).filter(([, value]) => value != null),
+    ...rankedAttrs.filter(([key]) => !preferredKeys.includes(key)),
+  ].slice(0, 3);
 
   return (
-    <Card data-testid={`employee-card-${e.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2 sm:p-3 shadow-none" style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}>
-      <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
+    <Card
+      data-testid={`employee-card-${e.id}`}
+      className="min-w-0 sub-card sub-doss-card p-3 shadow-none"
+      style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
             <InlineRename
               testId={`emp-rename-${e.id}`} value={e.name} onSave={(name) => renameEmployee(e.id, name)}
               textClassName="text-sm font-bold text-white"
             />
-            <Tip tip={`Nível ${e.level} de ${maxLevel} (máximo para a raridade ${RARITY_LABELS[e.rarity]}).`}>
-              <span data-testid={`employee-level-${e.id}`} className="shrink-0 font-mono text-[10px] font-bold text-cyan-400">N{e.level}/{maxLevel}</span>
-            </Tip>
-            <span className="shrink-0 font-mono text-[10px] font-normal text-zinc-500">{e.age} anos</span>
-            {isNewbie && (
-              <Tip tip="Recém-recrutado — ainda se está a adaptar, com um pequeno desempenho reduzido que desaparece na primeira hora ao serviço.">
-                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-lime-400">
-                  <Leaf size={9} /> novato
-                </span>
-              </Tip>
-            )}
-            {isHeavyUse && (
-              <Tip tip={`Muito solicitado (${e.missions_done} operações) — cansa-se mais depressa e precisa de descansar com mais frequência.`}>
-                <span className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-orange-400">
-                  <BatteryMedium size={9} /> veterano
-                </span>
-              </Tip>
-            )}
-            {isNearExhausted && (
-              <Tip tip="Fadiga a aproximar-se do limiar de exaustão (70%) — manda descansar antes que fique indisponível.">
-                <span data-testid={`emp-near-exhausted-${e.id}`} className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] uppercase text-amber-400">
-                  <BatteryMedium size={9} /> cansado
-                </span>
-              </Tip>
-            )}
+            <span data-testid={`employee-level-${e.id}`} className="shrink-0 font-mono text-[10px] font-bold text-cyan-400">N{e.level}/{maxLevel}</span>
+            <span className="shrink-0 font-mono text-[10px] text-zinc-600">{e.age} anos</span>
           </div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.10em] text-zinc-500">
             {sp.name || e.role_key} · {RANK_LABELS[e.rank] || e.rank}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+
+        <div className="flex shrink-0 flex-col items-end gap-1">
           <RarityBadge rarity={e.rarity} rar={rar} />
           <Tip
-            tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · conclui em ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
+            tip={mission ? `${mission.opportunity?.name || "Operação"} · ${missionPhaseLabel} · ${fmtDuration(missionEtaS)}` : EMP_STATUS_TIPS[e.status]}
             align="end"
           >
             <Badge
               data-testid={`employee-status-${e.id}`}
               variant="outline"
-              className="rounded-full border-transparent px-2 py-0.5 text-right font-mono text-[10px] font-bold uppercase"
+              className="max-w-[160px] rounded-full border-transparent px-2 py-0.5 text-right font-mono text-[10px] font-bold uppercase"
               style={{ color: EMP_STATUS_COLORS[e.status], background: `${EMP_STATUS_COLORS[e.status]}1a` }}
             >
-              {mission ? mission.opportunity?.name || EMP_STATUS_LABELS[e.status] : EMP_STATUS_LABELS[e.status] || e.status}
-              {mission ? <> · {fmtDuration(missionEtaS)}</> : remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
+              <span className="truncate">
+                {mission ? mission.opportunity?.name || EMP_STATUS_LABELS[e.status] : EMP_STATUS_LABELS[e.status] || e.status}
+                {mission ? <> · {fmtDuration(missionEtaS)}</> : remaining !== null && remaining > 0 && <> · {fmtDuration(remaining)}</>}
+              </span>
             </Badge>
           </Tip>
         </div>
       </div>
 
-      <div className="mt-2">
-        <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-500">
-          <span>XP</span>
-          <span>{nextXp ? `${e.xp}/${nextXp}` : "MAX"}</span>
+      <div className="mt-2.5">
+        <div className="flex justify-between font-mono text-[10px] uppercase text-zinc-600">
+          <span>Progresso</span>
+          <span>{nextXp ? `${e.xp}/${nextXp} XP` : "Nível máximo"}</span>
         </div>
-        <MiniBar value={xpPct} color="#22D3EE" className="mt-0.5" />
+        <MiniBar value={xpPct} color="#22D3EE" className="mt-1" />
       </div>
 
-      <div className="mt-2 grid grid-cols-3 gap-2">
+      <div className="mt-2.5 grid grid-cols-3 gap-2">
         <StatBar label="Moral" value={e.morale} color={goodBarColor(e.morale)} />
         <StatBar label="Lealdade" value={e.loyalty} color={goodBarColor(e.loyalty)} />
         <StatBar label="Fadiga" value={e.fatigue} color={fatigueColor(e.fatigue)} />
       </div>
 
-      {e.betrayal_risk >= 25 && (
-        <p className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-red-400" data-testid={`betrayal-warning-${e.id}`}>
-          <AlertTriangle size={10} /> Risco de traição: {e.betrayal_risk}% — paga um bónus ou promove-o
-        </p>
+      {(isNewbie || isHeavyUse || isNearExhausted || e.betrayal_risk >= 25) && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {isNewbie && <span className="rounded bg-lime-500/10 px-1.5 py-0.5 font-mono text-[10px] text-lime-400"><Leaf size={9} className="mr-1 inline" />Novato</span>}
+          {isHeavyUse && <span className="rounded bg-orange-500/10 px-1.5 py-0.5 font-mono text-[10px] text-orange-400">Muito utilizado</span>}
+          {isNearExhausted && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">Precisa de descanso</span>}
+          {e.betrayal_risk >= 25 && (
+            <span data-testid={`betrayal-warning-${e.id}`} className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] text-red-400">
+              <AlertTriangle size={9} className="mr-1 inline" />Traição {e.betrayal_risk}%
+            </span>
+          )}
+        </div>
       )}
 
-      <div className="relative z-[1] mt-2 grid grid-cols-5 gap-1">
-        {Object.entries(e.attrs || {}).map(([k, v]) => {
-          const key = (sp.attrs || []).includes(k);
-          return (
-            <Tip key={k} tip={`${ATTR_FULL[k] || k}: ${v}${key ? " — atributo-chave desta especialização, pesa mais nas operações." : ""}`} block>
-              <div
-                className={`rounded px-1 py-0.5 text-center font-mono text-[10px] ${
-                  key ? "bg-red-500/15 text-red-300" : "bg-black/40 text-zinc-500"
-                }`}
-              >
-                {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
-              </div>
-            </Tip>
-          );
-        })}
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+        <div className="min-w-0 rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">Equipa</p>
+          <p className="truncate font-mono text-[10px] font-semibold text-zinc-300">{team?.name || "Sem equipa"}</p>
+        </div>
+        <div className="min-w-0 rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">Arma</p>
+          <p className={cn("truncate font-mono text-[10px] font-semibold", weaponModel ? "text-zinc-300" : "text-amber-400")}>
+            {weaponModel?.name || "Sem arma"}
+          </p>
+        </div>
+        <div className="min-w-0 rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">Semanal</p>
+          <p className="truncate font-mono text-[10px] font-semibold text-zinc-300">{fmtMoney(e.salary)}</p>
+        </div>
       </div>
 
-      {/* Aptidão por categoria de operação — a MESMA régua de team_effectiveness
-          (atributo relevante ponderado 60/40 × match de especialização). */}
-      <div data-testid={`emp-adequacy-${e.id}`} className="relative z-[1] mt-1.5 grid grid-cols-5 gap-1">
-        {employeeAdequacy(e, catalog).map((c) => (
-          <Tip
-            key={c.category}
-            tip={`${c.label}: aptidão ${Math.round(c.score * 100)}%${c.best ? " — melhor especialização para este operacional." : "."}`}
-            block
-          >
-            <div className={cn("rounded-sm border px-1 py-0.5", c.best ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/5 bg-black/30")}>
-              <p className={cn("truncate text-center font-mono text-[10px] uppercase tracking-wide", c.best ? "text-emerald-400" : "text-zinc-600")}>
-                {c.label.slice(0, 3)}
-              </p>
-              <MiniBar value={c.score * 100} color={c.best ? "#34D399" : "#71717A"} className="mt-0.5" />
-            </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {keyAttrs.map(([key, value]) => (
+          <Tip key={key} tip={`${ATTR_FULL[key] || key}: ${value}`}>
+            <span className={cn(
+              "rounded border px-1.5 py-0.5 font-mono text-[10px]",
+              preferredKeys.includes(key)
+                ? "border-red-500/20 bg-red-500/[0.08] text-red-300"
+                : "border-white/[0.06] bg-black/20 text-zinc-400"
+            )}>
+              {ATTR_LABELS[key] || key} <b className="text-white">{value}</b>
+            </span>
+          </Tip>
+        ))}
+        {(e.talents || []).slice(0, 2).map((talent) => (
+          <Tip key={talent} tip={catalog.talents[talent]?.desc}>
+            <span className="rounded border border-amber-500/20 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
+              <Sparkles size={9} className="mr-1 inline" />{catalog.talents[talent]?.name || talent}
+            </span>
           </Tip>
         ))}
       </div>
-
-      {(e.talents || []).length > 0 && (
-        <div className="relative z-[1] mt-1.5 flex flex-wrap gap-1">
-          {e.talents.map((t) => (
-            <Tip key={t} tip={catalog.talents[t]?.desc}>
-              <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
-                <Sparkles size={9} /> {catalog.talents[t]?.name || t}
-              </span>
-            </Tip>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-        <Select
-          value={e.team_id || "__none__"}
-          disabled={!idle}
-          onValueChange={(tid) => assignEmployee(e.id, tid === "__none__" ? null : tid)}
-        >
-          <SelectTrigger data-testid={`emp-team-select-${e.id}`} className="h-7 w-full flex-1 border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__" className="font-mono text-xs">Sem equipa</SelectItem>
-            {state.teams.map((t) => {
-              const memberCount = state.employees.filter((x) => x.team_id === t.id).length;
-              const label = t.name + " · " + memberCount + " membros";
-              return <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{label}</SelectItem>;
-            })}
-          </SelectContent>
-        </Select>
-        <Tip tip={`Salário bruto semanal: ${fmtMoney(e.salary)}. No fecho de segunda-feira às 20:00 a organização suporta ainda 23,75% de TSU patronal. Promoções aumentam o salário em 10%.`} align="end">
-          <span className="shrink-0 font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/semana</span>
-        </Tip>
-      </div>
-      {vehicle && (
-        <Tip tip={`Veículo atribuído à equipa ${team.name}: ${vehicle.name}.`}>
-          <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-500">
-            <Car size={10} className="shrink-0 text-cyan-400" /> {vehicle.name}
-          </p>
-        </Tip>
-      )}
-
-      {weapon && weaponModel ? (
-        <div className="mt-1.5 rounded-md border border-white/5 bg-black/20 px-2 py-1.5">
-          <div className="flex items-center justify-between gap-1">
-            <Tip tip={`Arma equipada: ${weaponModel.name} (${Math.round(weapon.condition)}% condição).`}>
-              <p className="flex min-w-0 items-center gap-1 font-mono text-[10px] text-zinc-400">
-                <Swords size={10} className="shrink-0 text-cyan-400" />
-                <span className="truncate">{weaponModel.name}</span>
-                <span style={{ color: conditionBand(weapon.condition).color }}>{Math.round(weapon.condition)}%</span>
-              </p>
-            </Tip>
-            <button type="button"
-              data-testid={`emp-unassign-weapon-${e.id}`}
-              onClick={() => unassignWeapon(e.id)}
-              disabled={!idle}
-              className="shrink-0 font-mono text-[10px] text-red-400 underline-offset-2 hover:underline disabled:opacity-40 disabled:no-underline"
-            >
-              desatribuir
-            </button>
-          </div>
-          {weaponProficiency > 0 && (
-            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">Proficiência: {Math.round(weaponProficiency)}%</p>
-          )}
-          {weaponCompat && !weaponCompat.compatible && (
-            <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-amber-400">
-              <ShieldAlert size={9} /> pouco compatível ({weaponCompat.missing.join(", ")})
-            </p>
-          )}
-        </div>
-      ) : (
-        <button type="button"
-          data-testid={`emp-nav-weapons-${e.id}`}
-          onClick={() => onNavigate && onNavigate("weapons")}
-          className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-white hover:underline"
-        >
-          <Swords size={10} /> Sem arma equipada — atribuir em Armamento
-        </button>
-      )}
 
       {e.status === "injured" && (
         <div className="mt-2">
           <ActionBtn testId={`emp-heal-${e.id}`} icon={Cross} label={`Clínica ${fmtMoney(healCost)}`}
             onClick={() => healEmployee(e.id)} disabled={money < healCost}
-            title="Recupera o operacional ferido — volta a ficar disponível." blockedReasons={money < healCost ? ["Dinheiro insuficiente."] : []} />
+            title="Recupera o operacional ferido." blockedReasons={money < healCost ? ["Dinheiro insuficiente."] : []} />
         </div>
       )}
       {e.status === "arrested" && (
         <div className="mt-2">
           <ActionBtn testId={`emp-release-${e.id}`} icon={Gavel} label={`Advogado ${fmtMoney(releaseCost)}`}
             onClick={() => releaseEmployee(e.id)} disabled={money < releaseCost}
-            title="Liberta o operacional preso — volta a ficar disponível." blockedReasons={money < releaseCost ? ["Dinheiro insuficiente."] : []} />
+            title="Liberta o operacional preso." blockedReasons={money < releaseCost ? ["Dinheiro insuficiente."] : []} />
         </div>
       )}
 
-      <button type="button"
+      <button
+        type="button"
         data-testid={`emp-manage-toggle-${e.id}`}
         onClick={() => setManage(!manage)}
-        className="mt-2 flex w-full items-center justify-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
+        className="mt-2.5 flex min-h-10 w-full items-center justify-center gap-1 rounded-md border border-white/[0.07] bg-white/[0.025] font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-400 transition-colors hover:border-white/15 hover:bg-white/[0.05] hover:text-white"
       >
-        Opções <ChevronDown size={11} className={`transition-transform ${manage ? "rotate-180" : ""}`} />
+        {manage ? "Fechar gestão" : "Gerir operacional"}
+        <ChevronDown size={11} className={`transition-transform ${manage ? "rotate-180" : ""}`} />
       </button>
 
       {manage && (
-        <div className="mt-1.5 space-y-2 border-t border-white/10 pt-2">
-          <div className="flex gap-1.5">
-            <Select value={course} onValueChange={setCourse}>
-              <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="h-7 flex-1 border-white/10 bg-black/60 font-mono text-[10px] text-white">
-                <SelectValue placeholder="Escolher formação..." />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(catalog.training_courses).map(([k, c]) => {
-                  const label = c.name + " · " + fmtMoney(c.cost) + (c.spec && c.spec === e.spec ? " ★" : "");
-                  return <SelectItem key={k} value={k} className="font-mono text-xs">{label}</SelectItem>;
-                })}
-              </SelectContent>
-            </Select>
-            <ActionBtn
-              testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar"
-              onClick={() => { trainEmployee(e.id, course); setCourse(""); }}
-              disabled={!idle || !course || money < (catalog.training_courses[course]?.cost || Infinity)}
-              title="Envia o operacional para a formação escolhida."
-              blockedReasons={[
-                !idle ? "Operacional indisponível (em missão, ferido ou preso)." : null,
-                idle && !course ? "Escolhe uma formação." : null,
-                idle && course && money < (catalog.training_courses[course]?.cost || Infinity) ? "Dinheiro insuficiente." : null,
-              ].filter(Boolean)}
-            />
+        <div className="mt-3 space-y-4 border-t border-white/10 pt-3">
+          <div>
+            <SectionHeader icon={UserCheck} title="Alocação" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Select
+                value={e.team_id || "__none__"}
+                disabled={!idle}
+                onValueChange={(teamId) => assignEmployee(e.id, teamId === "__none__" ? null : teamId)}
+              >
+                <SelectTrigger data-testid={`emp-team-select-${e.id}`} className="min-h-10 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="font-mono text-xs">Sem equipa</SelectItem>
+                  {state.teams.map((item) => {
+                    const memberCount = state.employees.filter((x) => x.team_id === item.id).length;
+                    return <SelectItem key={item.id} value={item.id} className="font-mono text-xs">{item.name} · {memberCount} membros</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+              <span className="flex min-h-10 items-center font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/semana</span>
+            </div>
+            {vehicle && (
+              <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-500">
+                <Car size={10} className="text-cyan-400" /> {vehicle.name}
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            <ActionBtn
-              testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar"
-              onClick={() => restEmployee(e.id)} disabled={!idle || e.fatigue < 15}
-              title="Recupera 50 de fadiga e +5 moral"
-              blockedReasons={[
-                !idle ? "Operacional indisponível." : null,
-                idle && e.fatigue < 15 ? "Fadiga já baixa — não precisa de descansar." : null,
-              ].filter(Boolean)}
-            />
-            <ActionBtn
-              testId={`emp-promote-${e.id}`} icon={ChevronUp}
-              label={isTopRank ? "Topo" : `Promover ${fmtMoney(promoteCost)}`}
-              onClick={() => promoteEmployee(e.id)}
-              disabled={isTopRank || e.status === "on_mission" || e.level < nextRankReq || money < promoteCost}
-              title={isTopRank ? "Já é o teu braço-direito" : `Requer nível ${nextRankReq} · +10 lealdade, +8 moral, +10% salário`}
-              blockedReasons={[
-                isTopRank ? "Já é o teu braço-direito." : null,
-                !isTopRank && e.status === "on_mission" ? "Operacional em missão." : null,
-                !isTopRank && e.status !== "on_mission" && e.level < nextRankReq ? `Requer Nível ${nextRankReq}.` : null,
-                !isTopRank && e.status !== "on_mission" && e.level >= nextRankReq && money < promoteCost ? "Dinheiro insuficiente." : null,
-              ].filter(Boolean)}
-            />
-            <ActionBtn
-              testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`}
-              onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
-              title="+15 moral, +10 lealdade"
-              blockedReasons={money < bonusCost ? ["Dinheiro insuficiente."] : []}
-            />
-            <ConfirmButton
-              testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?" color="text-red-400"
-              onConfirm={() => fireEmployee(e.id)} disabled={e.status === "on_mission" || money < fireCost}
-              tip={
-                e.status === "on_mission"
-                  ? "Operacional em missão."
-                  : money < fireCost
-                  ? "Dinheiro insuficiente."
-                  : "Indemnização de 3 salários. Baixa a moral dos restantes. Ação irreversível."
-              }
-            />
+          <div>
+            <SectionHeader icon={Swords} title="Equipamento" />
+            {weapon && weaponModel ? (
+              <div className="rounded-md border border-white/[0.07] bg-black/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
+                    {weaponModel.name} · <span style={{ color: conditionBand(weapon.condition).color }}>{Math.round(weapon.condition)}%</span>
+                  </p>
+                  <button
+                    type="button"
+                    data-testid={`emp-unassign-weapon-${e.id}`}
+                    onClick={() => unassignWeapon(e.id)}
+                    disabled={!idle}
+                    className="shrink-0 font-mono text-[10px] text-red-400 disabled:opacity-40"
+                  >
+                    Desatribuir
+                  </button>
+                </div>
+                {weaponProficiency > 0 && <p className="mt-1 font-mono text-[10px] text-zinc-500">Proficiência {Math.round(weaponProficiency)}%</p>}
+                {weaponCompat && !weaponCompat.compatible && (
+                  <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400">
+                    <ShieldAlert size={9} /> Compatibilidade baixa: {weaponCompat.missing.join(", ")}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid={`emp-nav-weapons-${e.id}`}
+                onClick={() => onNavigate && onNavigate("weapons")}
+                className="min-h-10 w-full rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-2 text-left font-mono text-[10px] text-amber-300"
+              >
+                Sem arma equipada · abrir Armamento
+              </button>
+            )}
+          </div>
+
+          <div>
+            <SectionHeader icon={IdCard} title="Perfil operacional" />
+            <div className="grid grid-cols-3 gap-1">
+              {Object.entries(e.attrs || {}).map(([key, value]) => (
+                <Tip key={key} tip={`${ATTR_FULL[key] || key}: ${value}`} block>
+                  <div className={cn(
+                    "rounded-md border px-1.5 py-1 text-center font-mono text-[10px]",
+                    preferredKeys.includes(key) ? "border-red-500/20 bg-red-500/[0.08] text-red-300" : "border-white/[0.06] bg-black/20 text-zinc-500"
+                  )}>
+                    {ATTR_LABELS[key] || key} <b className="text-white">{value}</b>
+                  </div>
+                </Tip>
+              ))}
+            </div>
+            <div data-testid={`emp-adequacy-${e.id}`} className="mt-2 grid grid-cols-2 gap-1 min-[430px]:grid-cols-5">
+              {employeeAdequacy(e, catalog).map((item) => (
+                <Tip key={item.category} tip={`${item.label}: aptidão ${Math.round(item.score * 100)}%`} block>
+                  <div className={cn("rounded-md border px-1.5 py-1", item.best ? "border-emerald-500/25 bg-emerald-500/[0.06]" : "border-white/[0.06] bg-black/20")}>
+                    <div className="flex items-center justify-between gap-1 font-mono text-[10px] uppercase">
+                      <span className={item.best ? "text-emerald-400" : "text-zinc-600"}>{item.label.slice(0, 3)}</span>
+                      <span className="text-zinc-400">{Math.round(item.score * 100)}%</span>
+                    </div>
+                    <MiniBar value={item.score * 100} color={item.best ? "#34D399" : "#71717A"} className="mt-1" />
+                  </div>
+                </Tip>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <SectionHeader icon={GraduationCap} title="Desenvolvimento" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Select value={course} onValueChange={setCourse}>
+                <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="min-h-10 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                  <SelectValue placeholder="Escolher formação..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(catalog.training_courses).map(([key, training]) => (
+                    <SelectItem key={key} value={key} className="font-mono text-xs">
+                      {training.name} · {fmtMoney(training.cost)}{training.spec === e.spec ? " ★" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ActionBtn
+                testId={`emp-train-btn-${e.id}`} icon={GraduationCap} label="Treinar"
+                onClick={() => { trainEmployee(e.id, course); setCourse(""); }}
+                disabled={!idle || !course || money < (catalog.training_courses[course]?.cost || Infinity)}
+                title="Envia o operacional para a formação escolhida."
+                blockedReasons={[
+                  !idle ? "Operacional indisponível." : null,
+                  idle && !course ? "Escolhe uma formação." : null,
+                  idle && course && money < (catalog.training_courses[course]?.cost || Infinity) ? "Dinheiro insuficiente." : null,
+                ].filter(Boolean)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <SectionHeader icon={Sparkles} title="Ações" />
+            <div className="grid grid-cols-2 gap-1.5">
+              <ActionBtn
+                testId={`emp-rest-${e.id}`} icon={BedDouble} label="Descansar"
+                onClick={() => restEmployee(e.id)} disabled={!idle || e.fatigue < 15}
+                title="Recupera 50 de fadiga e +5 moral."
+                blockedReasons={[!idle ? "Operacional indisponível." : null, idle && e.fatigue < 15 ? "Fadiga já baixa." : null].filter(Boolean)}
+              />
+              <ActionBtn
+                testId={`emp-promote-${e.id}`} icon={ChevronUp}
+                label={isTopRank ? "Patente máxima" : `Promover ${fmtMoney(promoteCost)}`}
+                onClick={() => promoteEmployee(e.id)}
+                disabled={isTopRank || e.status === "on_mission" || e.level < nextRankReq || money < promoteCost}
+                title={isTopRank ? "Já atingiu a patente máxima." : `Requer nível ${nextRankReq}.`}
+                blockedReasons={[
+                  isTopRank ? "Patente máxima." : null,
+                  !isTopRank && e.status === "on_mission" ? "Operacional em missão." : null,
+                  !isTopRank && e.level < nextRankReq ? `Requer nível ${nextRankReq}.` : null,
+                  !isTopRank && e.level >= nextRankReq && money < promoteCost ? "Dinheiro insuficiente." : null,
+                ].filter(Boolean)}
+              />
+              <ActionBtn
+                testId={`emp-bonus-${e.id}`} icon={Gift} label={`Bónus ${fmtMoney(bonusCost)}`}
+                onClick={() => bonusEmployee(e.id)} disabled={money < bonusCost}
+                title="+15 moral e +10 lealdade." blockedReasons={money < bonusCost ? ["Dinheiro insuficiente."] : []}
+              />
+              <ConfirmButton
+                testId={`emp-fire-${e.id}`} icon={UserX} label={`Despedir ${fmtMoney(fireCost)}`} confirmLabel="Despedir?"
+                color="text-red-400" onConfirm={() => fireEmployee(e.id)}
+                disabled={e.status === "on_mission" || money < fireCost}
+                tip={e.status === "on_mission" ? "Operacional em missão." : money < fireCost ? "Dinheiro insuficiente." : "Indemnização de 3 salários. Ação irreversível."}
+              />
+            </div>
           </div>
 
           {(e.history || []).length > 0 && (
             <div>
-              <button type="button"
+              <button
+                type="button"
                 data-testid={`emp-history-toggle-${e.id}`}
                 onClick={() => setShowHistory(!showHistory)}
-                className="flex items-center gap-1 font-mono text-[10px] uppercase text-zinc-500 hover:text-white"
+                className="flex min-h-9 items-center gap-1 font-mono text-[10px] uppercase text-zinc-500 hover:text-white"
               >
                 <History size={10} /> Histórico ({e.history.length})
+                <ChevronDown size={10} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
               </button>
               {showHistory && (
-                <div className="mt-1 space-y-0.5">
-                  {[...e.history].reverse().map((h, i) => (
-                    <p key={i} className="font-mono text-[10px] text-zinc-400">
-                      <span className="text-zinc-600">{new Date(h.ts).toLocaleDateString("pt-PT")}</span> {h.text}
+                <div className="space-y-1 rounded-md border border-white/[0.06] bg-black/20 p-2">
+                  {[...e.history].reverse().map((item, index) => (
+                    <p key={index} className="font-mono text-[10px] text-zinc-400">
+                      <span className="text-zinc-600">{new Date(item.ts).toLocaleDateString("pt-PT")}</span> {item.text}
                     </p>
                   ))}
                 </div>
@@ -447,7 +463,23 @@ const EmployeeCard = ({ e, onNavigate }) => {
   );
 };
 
-const CandidateCard = ({ c }) => {
+const candidateAssessment = (candidate, state, catalog) => {
+  const specialization = catalog.specializations[candidate.role_key] || {};
+  const keys = specialization.attrs || [];
+  const values = keys.map((key) => Number(candidate.attrs?.[key] || 0));
+  const skillScore = values.length ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) : 0;
+  const maxMembers = catalog.team_max_members || 4;
+  const vacancies = (state.teams || []).reduce((total, team) => {
+    if (team.status !== "idle" || team.spec !== candidate.spec) return total;
+    const used = state.employees.filter((employee) => employee.team_id === team.id).length;
+    return total + Math.max(0, maxMembers - used);
+  }, 0);
+  const talentCount = (candidate.talents || []).length;
+  const priority = Math.min(120, skillScore + Math.min(15, vacancies * 5) + Math.min(10, talentCount * 5));
+  return { skillScore, vacancies, priority };
+};
+
+const CandidateCard = ({ c, assessment, sourceName }) => {
   const { state, catalog, recruitEmployee } = useGame();
   const sp = catalog.specializations[c.role_key] || {};
   const caps = state.caps.employees;
@@ -459,67 +491,96 @@ const CandidateCard = ({ c }) => {
   const weeklyFixed = state.weekly_fixed_total || state.salary_total || 0;
   const candidateWeeklyCost = Math.round(c.salary * (1 + ssRate));
   const newWeeklyFixed = weeklyFixed + candidateWeeklyCost;
-  const blockers = [];
-  if (full) blockers.push("esconderijos cheios");
-  if (lackRespect) blockers.push(`faltam ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} de respeito`);
-  if (lackMoney) blockers.push(`faltam ${fmtMoney(c.cost - state.player.clean_money)}`);
+  const canRecruit = !lackRespect && !lackMoney && !full;
+  const blocker = full
+    ? "Capacidade de operacionais esgotada."
+    : lackRespect
+    ? `Faltam ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} pontos.`
+    : lackMoney
+    ? `Faltam ${fmtMoney(c.cost - state.player.clean_money)}.`
+    : null;
 
   return (
-    <Card data-testid={`candidate-card-${c.id}`} className="h-full min-w-0 sub-card p-2.5 sm:p-3 shadow-none">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <Card data-testid={`candidate-card-${c.id}`} className="min-w-0 sub-card p-3 shadow-none">
+      <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-white">
-            {c.name} <span className="font-mono text-[10px] font-normal text-zinc-500">{c.age} anos</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="text-sm font-bold text-white">{c.name}</p>
+            <span className="font-mono text-[10px] text-zinc-600">{c.age} anos</span>
+          </div>
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.10em] text-zinc-500">
+            {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec}
           </p>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-            {sp.name || c.role_key} · {SPEC_LABELS[c.spec] || c.spec} ·{" "}
-            <Tip tip={`Salário bruto ${fmtMoney(c.salary)}/semana + TSU patronal ${fmtMoney(candidateWeeklyCost - c.salary)}. O fecho fixo passa de ${fmtMoney(weeklyFixed)} para cerca de ${fmtMoney(newWeeklyFixed)}.`}>
-              <span>{fmtMoney(c.salary)}/semana</span>
-            </Tip>
-          </p>
+          <p className="mt-0.5 font-mono text-[10px] text-zinc-600">{sourceName}</p>
         </div>
-        <RarityBadge rarity={c.rarity} rar={catalog.rarities[c.rarity]} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <RarityBadge rarity={c.rarity} rar={catalog.rarities[c.rarity]} />
+          <span className={cn(
+            "rounded-full px-2 py-0.5 font-mono text-[10px] font-bold",
+            assessment.skillScore >= 75 ? "bg-emerald-500/10 text-emerald-400" :
+            assessment.skillScore >= 55 ? "bg-cyan-500/10 text-cyan-300" : "bg-zinc-500/10 text-zinc-400"
+          )}>
+            Aptidão {assessment.skillScore}%
+          </span>
+        </div>
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        {topAttrs.map(([k, v]) => (
-          <Tip key={k} tip={`${ATTR_FULL[k] || k}: ${v} — um dos melhores atributos deste candidato.`}>
-            <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
-              {ATTR_LABELS[k] || k} <span className="font-bold text-white">{v}</span>
+      <div className="mt-2.5 flex flex-wrap gap-1">
+        {assessment.vacancies > 0 ? (
+          <span className="rounded bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-emerald-400">
+            <UserCheck size={9} className="mr-1 inline" />{assessment.vacancies} vaga{assessment.vacancies === 1 ? "" : "s"} compatível{assessment.vacancies === 1 ? "" : "eis"}
+          </span>
+        ) : (
+          <span className="rounded bg-white/[0.035] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">Sem vaga prioritária</span>
+        )}
+        {topAttrs.map(([key, value]) => (
+          <Tip key={key} tip={`${ATTR_FULL[key] || key}: ${value}`}>
+            <span className="rounded border border-white/[0.06] bg-black/20 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
+              {ATTR_LABELS[key] || key} <b className="text-white">{value}</b>
             </span>
           </Tip>
         ))}
-        {(c.talents || []).map((t) => (
-          <Tip key={t} tip={catalog.talents[t]?.desc}>
-            <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
-              <Sparkles size={9} /> {catalog.talents[t]?.name || t}
+        {(c.talents || []).map((talent) => (
+          <Tip key={talent} tip={catalog.talents[talent]?.desc}>
+            <span className="rounded border border-amber-500/20 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
+              <Sparkles size={9} className="mr-1 inline" />{catalog.talents[talent]?.name || talent}
             </span>
           </Tip>
         ))}
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="font-mono text-[10px] text-zinc-500">
-          {c.min_respect > 0 && (
-            <Tip tip={`Requisito de reputação: ${c.min_respect.toLocaleString("pt-PT")} de respeito para este candidato confiar em ti.`}>
-              <span className={lackRespect ? "text-red-400" : "text-zinc-500"}>{c.min_respect.toLocaleString("pt-PT")} respeito</span>
-            </Tip>
-          )}
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+        <div className="rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">Entrada</p>
+          <p className="font-mono text-[10px] font-bold text-white">{fmtMoney(c.cost)}</p>
         </div>
-        <PurchaseButton
-          testId={`hire-candidate-${c.id}`}
-          label={fmtMoney(c.cost)}
-          can={!lackRespect && !lackMoney && !full}
-          blockedReasons={[
-            full ? "Esconderijos cheios." : null,
-            lackRespect ? `Requer ${(c.min_respect - state.player.respect).toLocaleString("pt-PT")} de respeito adicional.` : null,
-            lackMoney ? "Dinheiro insuficiente." : null,
-          ].filter(Boolean)}
-          availableTip={`Recrutar por ${fmtMoney(c.cost)} (custo único) + ${fmtMoney(c.salary)}/semana de salário bruto + TSU patronal.`}
-          onConfirm={() => recruitEmployee(c.id)}
-          className="w-auto shrink-0"
-        />
+        <div className="rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">Semanal c/ TSU</p>
+          <p className="font-mono text-[10px] font-bold text-white">{fmtMoney(candidateWeeklyCost)}</p>
+        </div>
+        <div className="rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">Novo fecho</p>
+          <p className="font-mono text-[10px] font-bold text-amber-300">{fmtMoney(newWeeklyFixed)}</p>
+        </div>
       </div>
+
+      {c.min_respect > 0 && (
+        <p className={cn("mt-2 font-mono text-[10px]", lackRespect ? "text-red-400" : "text-zinc-500")}>
+          Requer {c.min_respect.toLocaleString("pt-PT")} pontos de progressão
+        </p>
+      )}
+      {blocker && <p className="mt-1 font-mono text-[10px] text-red-400">{blocker}</p>}
+
+      <PurchaseButton
+        testId={`hire-candidate-${c.id}`}
+        icon={UserPlus}
+        label={`Recrutar · ${fmtMoney(c.cost)}`}
+        can={canRecruit}
+        blockedReasons={blocker ? [blocker] : []}
+        availableTip={`Contratação: ${fmtMoney(c.cost)} agora + cerca de ${fmtMoney(candidateWeeklyCost)}/semana com TSU.`}
+        onConfirm={() => recruitEmployee(c.id)}
+        className="mt-2.5 w-full"
+      />
     </Card>
   );
 };
