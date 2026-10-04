@@ -866,13 +866,29 @@ async def replace_tires(body: EntityIdInput, user: dict = Depends(get_current_us
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     inv = normalize_inventory(player)
+    used_stock = False
     if inv["tire_set"] > 0:
-        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"inventory.tire_set": -1}})
+        reserved = await db.players.update_one(
+            {"_id": player["_id"], "inventory.tire_set": {"$gte": 1}},
+            {"$inc": {"inventory.tire_set": -1}},
+        )
+        if reserved.matched_count != 1:
+            raise HTTPException(status_code=409, detail="O stock de pneus mudou; tenta novamente")
+        used_stock = True
         cost = 0
     else:
         cost = SUPPLY_CATALOG["tire_set"]["price"]
         await _debit(player, cost, stat="vehicle_tires")
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"tires_pct": 100.0}})
+    tire_result = await db.vehicles.update_one(
+        {"_id": vehicle["_id"], "player_id": pid, "tires_pct": vehicle.get("tires_pct", 100)},
+        {"$set": {"tires_pct": 100.0}},
+    )
+    if tire_result.matched_count != 1:
+        if used_stock:
+            await db.players.update_one({"_id": player["_id"]}, {"$inc": {"inventory.tire_set": 1}})
+        elif cost:
+            await _refund_debit(player, cost, stat="vehicle_tires")
+        raise HTTPException(status_code=409, detail="O veículo mudou antes da troca; nada foi perdido")
     if cost:
         await record_tx(db, pid, "vehicle_tires", -cost, "clean", player["clean_money"], f"Pneus de {vehicle.get('name','veículo')}")
     return {"ok": True, "cost": cost}
@@ -889,7 +905,16 @@ async def insure_vehicle(body: EntityIdInput, user: dict = Depends(get_current_u
     cost = max(80, int(vehicle.get("price", 0) * VEHICLE_LIFECYCLE["insurance_week_pct"] * 4))
     await _debit(player, cost, stat="vehicle_insurance")
     until = (now_utc() + timedelta(days=VEHICLE_LIFECYCLE["insurance_days"])).isoformat()
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"insurance_until": until}})
+    insurance_query = {"_id": vehicle["_id"], "player_id": pid}
+    old_insurance = vehicle.get("insurance_until")
+    if old_insurance is None:
+        insurance_query["$or"] = [{"insurance_until": None}, {"insurance_until": {"$exists": False}}]
+    else:
+        insurance_query["insurance_until"] = old_insurance
+    insurance_result = await db.vehicles.update_one(insurance_query, {"$set": {"insurance_until": until}})
+    if insurance_result.matched_count != 1:
+        await _refund_debit(player, cost, stat="vehicle_insurance")
+        raise HTTPException(status_code=409, detail="O seguro mudou noutra sessão; nada foi cobrado")
     await record_tx(db, pid, "vehicle_insurance", -cost, "clean", player["clean_money"], f"Seguro de {vehicle.get('name','veículo')}")
     return {"ok": True, "cost": cost, "insurance_until": until}
 
@@ -907,7 +932,16 @@ async def inspect_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
     cost = VEHICLE_LIFECYCLE["inspection_base"]
     await _debit(player, cost, stat="vehicle_inspections")
     until = (now_utc() + timedelta(days=VEHICLE_LIFECYCLE["inspection_days"])).isoformat()
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"inspection_due_at": until}})
+    inspection_query = {"_id": vehicle["_id"], "player_id": pid}
+    old_inspection = vehicle.get("inspection_due_at")
+    if old_inspection is None:
+        inspection_query["$or"] = [{"inspection_due_at": None}, {"inspection_due_at": {"$exists": False}}]
+    else:
+        inspection_query["inspection_due_at"] = old_inspection
+    inspection_result = await db.vehicles.update_one(inspection_query, {"$set": {"inspection_due_at": until}})
+    if inspection_result.matched_count != 1:
+        await _refund_debit(player, cost, stat="vehicle_inspections")
+        raise HTTPException(status_code=409, detail="A inspeção mudou noutra sessão; nada foi cobrado")
     await record_tx(db, pid, "vehicle_inspection", -cost, "clean", player["clean_money"], f"IPO de {vehicle.get('name','veículo')}")
     return {"ok": True, "cost": cost, "inspection_due_at": until}
 
@@ -929,7 +963,15 @@ async def upgrade_property_module(body: PropertyModuleInput, user: dict = Depend
         raise HTTPException(status_code=400, detail="Módulo já está no máximo")
     cost = int(cfg["base_cost"] * (1 + current * 0.75) * float(prop.get("market_multiplier", 1.0) or 1.0))
     await _debit(player, cost, stat="property_module_upgrades")
-    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {field: current + 1}})
+    module_query = {"_id": prop["_id"], "player_id": pid}
+    if current == 0:
+        module_query["$or"] = [{field: 0}, {field: {"$exists": False}}]
+    else:
+        module_query[field] = current
+    module_result = await db.properties.update_one(module_query, {"$set": {field: current + 1}})
+    if module_result.matched_count != 1:
+        await _refund_debit(player, cost, stat="property_module_upgrades")
+        raise HTTPException(status_code=409, detail="O módulo mudou noutra sessão; nada foi cobrado")
     await record_tx(db, pid, "property_module", -cost, "clean", player["clean_money"], f"{cfg['name']} em {prop.get('name','imóvel')}")
     return {"ok": True, "cost": cost, "level": current + 1}
 
