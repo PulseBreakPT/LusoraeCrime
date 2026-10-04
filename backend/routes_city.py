@@ -507,8 +507,7 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
         upsert=True,
     )
     consequence = None
-    loser_fields = {}
-    loser_inc = {"boss_stress": 8}
+    loser_fields = {"boss_stress": min(100, int(loser.get("boss_stress", 0) or 0) + 8)}
     if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:
         loser_fields["boss_sentence_until"] = (now_utc() + timedelta(minutes=rng.randint(15, 45))).isoformat()
         consequence = "sentence"
@@ -516,10 +515,7 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
         loser_fields["boss_hospital_until"] = (now_utc() + timedelta(minutes=rng.randint(10, 30))).isoformat()
         loser_fields["boss_health"] = rng.randint(55, 80)
         consequence = "hospital"
-    await db.players.update_one(
-        {"_id": loser["_id"]},
-        {"$set": loser_fields, "$inc": loser_inc} if loser_fields else {"$inc": loser_inc},
-    )
+    await db.players.update_one({"_id": loser["_id"]}, {"$set": loser_fields})
     await db.city_pvp_challenges.update_one(
         {"_id": challenge["_id"]},
         {"$set": {
