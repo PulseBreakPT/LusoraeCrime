@@ -87,6 +87,14 @@ export const localCityWorld = (save) => {
     next_event_at:new Date((eventSlot+1)*6*3600000).toISOString(),
   };
 };
+const localCityCalendar = (save, count=5) => {
+  const now=Date.now(),currentSlot=Math.floor(now/(6*3600000)),region=save.player?.region||"Portugal",keys=Object.keys(EVENTS);
+  return Array.from({length:Math.max(1,Math.min(8,count))},(_,offset)=>{
+    const slot=currentSlot+offset,key=keys[hash(`${region}|${slot}|event`)%keys.length],cfg=EVENTS[key],start=slot*6*3600000;
+    return {key,name:cfg.name,severity:cfg.severity,description:cfg.description,starts_at:new Date(start).toISOString(),ends_at:new Date(start+6*3600000).toISOString(),active:offset===0};
+  });
+};
+
 const seasonInfo = () => {
   const anchor=Date.parse("2026-01-01T00:00:00Z"),span=30*86400000,now=Date.now();
   const index=Math.max(0,Math.floor((now-anchor)/span)),start=anchor+index*span,end=start+span;
@@ -119,9 +127,13 @@ export const ensureLocalCity = (save) => {
     territory_pressure:10+(hash(name+"pressure")%25),last_action_at:null,
   }));
   save.city.season ||= {id:null,points:0,respect_checkpoint:Number(save.player?.respect||0),success_checkpoint:Number(save.player?.stats?.missions_success||0)};
-  save.city.social ||= {pvp_opt_in:false,alliance:null,chat:[
+  save.city.social ||= {};
+  if(save.city.social.pvp_opt_in==null) save.city.social.pvp_opt_in=false;
+  if(save.city.social.alliance===undefined) save.city.social.alliance=null;
+  save.city.social.chat ||= [
     {id:uid("chat"),org_name:"Rádio de Rua",message:"Movimento normal. Atenção às alterações no pulso da cidade.",ts:nowIso()},
-  ]};
+  ];
+  save.city.social.pvp_challenges ||= [];
   save.city.boss ||= {health:100,stress:0,hospital_until:null,sentence_until:null};
   return save;
 };
@@ -174,11 +186,18 @@ export const localCitySnapshot = (save) => {
   const playerPower=Math.max(10,Number(save.player.level||1)*7+Math.floor(Number(save.player.respect||0)/700));
   return {
     world,
+    calendar:localCityCalendar(save,5),
     season:{...season,your_points:Number(save.city.season.points||0),leaderboard:npcLeaderboard(save,season)},
     news:news.slice(0,12),
     rivals:save.city.rivals.map((r)=>({...clone(r),threat:clamp(Math.round(r.power+r.hostility*.35-playerPower*.35),0,100)})),
     businesses,business_catalog:clone(LOCAL_BUSINESS_TYPES),business_totals:totals,
-    social:{alliance:clone(save.city.social.alliance),chat:clone(save.city.social.chat||[]).slice(0,20),pvp_opt_in:!!save.city.social.pvp_opt_in},
+    social:{
+      alliance:clone(save.city.social.alliance),
+      chat:clone(save.city.social.chat||[]).slice(0,20),
+      pvp_opt_in:!!save.city.social.pvp_opt_in,
+      pvp_players:save.city.rivals.map((r)=>({player_id:r.id,org_name:r.name,level:Math.max(1,Math.round(r.power/12)),respect:r.power*180,heat:r.hostility/2})),
+      pvp_challenges:clone(save.city.social.pvp_challenges||[]),
+    },
     boss:clone(save.city.boss),
   };
 };
@@ -244,8 +263,21 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
     return {handled:true,data:{ok:true,payout,net,...detail}};
   }
   if(verb==="post"&&path==="/game/city/social/pvp"){save.city.social.pvp_opt_in=!!payload.enabled;return {handled:true,data:{ok:true,enabled:save.city.social.pvp_opt_in}};}
+  if(verb==="post"&&path==="/game/city/social/pvp/challenge"){
+    if(!save.city.social.pvp_opt_in)fail(400,"Ativa primeiro o PvP");
+    const defender=save.city.rivals.find((r)=>r.id===payload.defender_player_id);if(!defender)fail(404,"Rival PvP indisponível");
+    const a=Number(save.player.level||1)*12+Number(save.player.respect||0)/350+Number(save.player.stats?.missions_success||0)*.7+Math.random()*22;
+    const d=Math.max(1,defender.power/8)*12+defender.power*.5+Math.random()*22;
+    const won=a>=d;save.city.season.points=Number(save.city.season.points||0)+(won?80:20);
+    let consequence=null;if(!won&&Math.random()<.08){save.city.boss.hospital_until=new Date(Date.now()+(10+Math.floor(Math.random()*21))*60000).toISOString();save.city.boss.health=55+Math.floor(Math.random()*26);consequence="hospital";}
+    pushEvent(save,won?"system":"warning",`Conflito PvP ${won?"vencido":"perdido"} contra ${defender.name}.`);
+    return {handled:true,data:{ok:true,winner_id:won?save.player.id:defender.id,winner_name:won?save.player.org_name:defender.name,consequence}};
+  }
+  if(verb==="post"&&path==="/game/city/social/pvp/accept")fail(404,"Sem desafios PvP recebidos no modo convidado");
+  if(verb==="post"&&path==="/game/city/social/pvp/decline")fail(404,"Sem desafios PvP recebidos no modo convidado");
   if(verb==="post"&&path==="/game/city/social/chat"){const message=String(payload.message||"").trim();if(!message||message.length>280)fail(400,"Mensagem inválida");save.city.social.chat.unshift({id:uid("chat"),org_name:save.player.org_name,message,ts:nowIso()});save.city.social.chat=save.city.social.chat.slice(0,20);return {handled:true,data:{ok:true}};}
   if(verb==="post"&&path==="/game/city/social/alliance/create"){if(save.city.social.alliance)fail(409,"Já pertences a uma aliança");const name=String(payload.name||"").trim();if(name.length<3)fail(400,"Nome demasiado curto");save.city.social.alliance={id:uid("alliance"),name,code:"LOCAL"+String(Math.floor(Math.random()*900)+100),leader_id:save.player.id,member_ids:[save.player.id],season_points:0,created_at:nowIso()};return {handled:true,data:{ok:true,code:save.city.social.alliance.code}};}
+  if(verb==="post"&&path==="/game/city/social/alliance/join")fail(409,"Entrar numa aliança de outros jogadores requer uma conta online");
   if(verb==="post"&&path==="/game/city/social/alliance/leave"){save.city.social.alliance=null;return {handled:true,data:{ok:true}};}
   if(verb==="post"&&path==="/game/city/boss/recover"){const b=save.city.boss;if(!b.hospital_until&&!b.sentence_until&&b.health>=100)fail(400,"Não há nenhuma consequência ativa para tratar");const cost=(b.hospital_until?3500:0)+(b.sentence_until?7500:0);if(cost)spend(save,cost,"Recuperação do chefe","city_boss_recovery");Object.assign(b,{health:100,stress:Math.max(0,b.stress-30),hospital_until:null,sentence_until:null});pushEvent(save,"system","O chefe regressou à atividade.");return {handled:true,data:{ok:true,cost}};}
   return {handled:false};
