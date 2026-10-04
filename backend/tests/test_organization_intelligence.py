@@ -116,6 +116,38 @@ def test_supply_quote_includes_logistics_discount():
     assert quote["eligible"] is True
 
 
+def test_weekly_budgets_create_actionable_alerts_and_progression():
+    player = sample_player()
+    player["organization_policy"]["weekly_budgets"] = {
+        "supplies": 1000,
+        "fleet": 1000,
+        "infrastructure": 0,
+        "territory": 0,
+        "people": 0,
+    }
+    now = datetime.now(timezone.utc)
+    snapshot = build_organization_intelligence(
+        player=player,
+        teams=[],
+        employees=[{"_id": "e1", "salary": 1000, "fatigue": 0, "morale": 80, "loyalty": 80}],
+        vehicles=[],
+        weapons=[],
+        properties=[],
+        transactions=[
+            {"kind": "supply_buy", "amount": -850, "ts": now.isoformat()},
+            {"kind": "vehicle_service", "amount": -1200, "ts": now.isoformat()},
+        ],
+        weekly_fixed_total=1500,
+        now=now,
+    )
+    budgets = {row["key"]: row for row in snapshot["finance"]["budgets"]}
+    assert budgets["supplies"]["status"] == "warning"
+    assert budgets["fleet"]["status"] == "over"
+    assert any(alert["code"] == "budget:fleet" for alert in snapshot["alerts"])
+    assert snapshot["organization"]["level"] >= 1
+    assert 0 <= snapshot["organization"]["progression"]["progress_pct"] <= 100
+
+
 if __name__ == "__main__":
     tests = [value for name, value in globals().items() if name.startswith("test_") and callable(value)]
     for test in tests:
