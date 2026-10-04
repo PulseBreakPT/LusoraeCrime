@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
+import { usePanelFocus } from "../../hooks/usePanelFocus";
 import { fmtMoney, fmtDuration, passiveRates, heatStatus } from "../../lib/game";
 import { Tip, MiniBar, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
@@ -23,8 +24,9 @@ const TX_LABELS = {
   launder_out: "Lavagem (saída)", launder_in: "Lavagem (entrada)", team_create: "Nova equipa",
 };
 
-export const EmpirePanel = ({ open, onOpenChange }) => {
+export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
   const { state, catalog, serverNow, launder, bribePolice, fetchTransactions } = useGame();
+  usePanelFocus(open, focusTarget);
   const [amount, setAmount] = useState("");
   const [showLedger, setShowLedger] = useState(false);
   const [transactions, setTransactions] = useState([]);
