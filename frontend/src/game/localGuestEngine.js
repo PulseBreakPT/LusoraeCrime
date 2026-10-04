@@ -1614,7 +1614,9 @@ const mutateGame=(save,path,payload)=>{
       const cfg=LOCAL_CATALOG.property_types[p.type_key];if(!cfg)fail(400,"Tipo inválido");
       if(save.player.level<cfg.min_level)fail(400,"Nível insuficiente");
       const market=propertyMarketPrice(cfg.price,Number(p.lat),Number(p.lng));
-      chargeClean(save,market.price,`Compra de propriedade — ${market.zone}`);
+      const starterDiscount=p.type_key==="esconderijo"&&save.properties.length===0;
+      const finalPrice=starterDiscount?Math.min(market.price,Number(cfg.price)):market.price;
+      chargeClean(save,finalPrice,`Compra de propriedade — ${market.zone}`);
       const nearest=(save.player.districts||[]).slice().sort((a,b)=>{
         const da=(a.lat-Number(p.lat))**2+(a.lng-Number(p.lng))**2;
         const db=(b.lat-Number(p.lat))**2+(b.lng-Number(p.lng))**2;
@@ -1622,12 +1624,12 @@ const mutateGame=(save,path,payload)=>{
       })[0];
       const np={
         id:uid("prop"),type_key:p.type_key,name:cfg.name,district:nearest?.name||"Zona operacional",
-        lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,purchase_price:market.price,
+        lat:Number(p.lat),lng:Number(p.lng),level:1,price:cfg.price,purchase_price:finalPrice,
         market_zone:market.zone,market_multiplier:market.multiplier,condition:100,upgrading_until:null
       };
       save.properties.push(np);
-      addEvent(save,"property",`${cfg.name} comprado por ${market.price.toLocaleString("pt-PT")} € (${market.zone} ×${market.multiplier.toFixed(2)}).`);
-      return {ok:true,property_id:np.id,price:market.price,market_zone:market.zone,market_multiplier:market.multiplier};
+      addEvent(save,"property",`${cfg.name} comprado por ${finalPrice.toLocaleString("pt-PT")} € (${market.zone} ×${market.multiplier.toFixed(2)}).`);
+      return {ok:true,property_id:np.id,price:finalPrice,market_zone:market.zone,market_multiplier:market.multiplier,starter_discount:starterDiscount};
     }
     if(path==="properties/sell"){const basis=Number(pr.purchase_price||pr.price);const value=Math.round(basis*.7*pr.level);save.player.clean_money+=value;save.properties=save.properties.filter(x=>x.id!==pr.id);return {ok:true,value};}
     if(path==="properties/upgrade"){if(pr.level>=LOCAL_CATALOG.property_max_level)fail(400,"Nível máximo");const basis=Number(pr.purchase_price||pr.price);const cost=Math.round(basis*.6*(pr.level+1));chargeClean(save,cost,"Melhoria de propriedade");pr.upgrading_until=new Date(Date.now()+15000).toISOString();return {ok:true,cost};}
