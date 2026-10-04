@@ -214,7 +214,7 @@ export const LOCAL_CATALOG = {
     launder_max_rate:.90,
     launder_passive_rate:.82,
     mission_rewards:{
-      min:1500,max:90000,
+      min:1500,max:90000,max_late_per_level:2500,
       base_by_risk:{1:2500,2:4800,3:9000,4:16500,5:30000},
       org_level_per_level:.12,
       category_mult:{assalto:1.05,logistica:.95,tecnica:1.10,influencia:.90,especial:1.25},
