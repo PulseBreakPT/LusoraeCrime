@@ -848,16 +848,34 @@ A API é organizada por domínio.
 </details>
 
 <details>
-<summary><strong>Cidade Viva — /api/game/street</strong></summary>
+<summary><strong>Organização — /api/game/org</strong></summary>
 
-- `GET /state`
-- `POST /plan`
-- `POST /gear/buy`
-- `POST /territory`
-- `POST /contacts/call`
-- `POST /garage`
-- `POST /activities/start`
-- `POST /activities/claim`
+- `GET /catalog`
+- `GET /finance/summary`
+- `POST /inventory/buy`
+- `POST /inventory/sell`
+- `POST /teams/rename`
+- `POST /teams/doctrine`
+- `POST /teams/policies`
+- `POST /teams/loadout`
+- `POST /teams/dissolve`
+- `POST /weapons/reload`
+- `POST /weapons/upgrade`
+- `POST /vehicles/service`
+- `POST /vehicles/tires`
+- `POST /vehicles/insurance`
+- `POST /vehicles/inspection`
+- `GET /vehicles/{vehicle_id}/lifecycle`
+- `POST /properties/module`
+- `POST /properties/staff`
+- `POST /departments/upgrade`
+- `POST /territories/claim`
+- `POST /territories/consolidate`
+- `POST /territories/defend`
+- `POST /prestige/buy`
+- `POST /governance/protection`
+
+Todas as mutações deste router aceitam `request_id` e usam recibos idempotentes com TTL para impedir cobrança duplicada em retries de rede.
 
 </details>
 
