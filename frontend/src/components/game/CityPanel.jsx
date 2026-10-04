@@ -14,7 +14,7 @@ import { PanelWatermark } from "./hud";
 import {
   RadioTower, CloudRain, Newspaper, Skull, Building2, Users, Trophy, Clock3,
   ShieldAlert, Eye, Bomb, Handshake, TrendingUp, Coins, Dices, MessageCircle,
-  HeartPulse, RefreshCw, Zap, Landmark, Send, ArrowUpCircle,
+  HeartPulse, RefreshCw, Zap, Landmark, Send, ArrowUpCircle, Flag, UserX,
 } from "lucide-react";
 
 const TABS = [
@@ -462,9 +462,46 @@ export const CityPanel = ({ open, onOpenChange }) => {
                 <Card className="sub-card p-3 shadow-none">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-white"><MessageCircle size={13} className="text-sky-400" /> Frequência da cidade</p>
                   <div className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-md bg-black/25 p-2">
-                    {(city.social?.chat || []).map((m) => (
-                      <p key={m.id} className="text-[10px] leading-relaxed text-zinc-400"><b className="text-zinc-200">{m.org_name}:</b> {m.message}</p>
-                    ))}
+                    {(city.social?.chat || []).map((m) => {
+                      const own = String(m.player_id || "") === String(state?.player?.id || "");
+                      return (
+                        <div key={m.id} className="group flex items-start gap-1 rounded px-1 py-0.5 hover:bg-white/[0.03]">
+                          <p className="min-w-0 flex-1 text-[10px] leading-relaxed text-zinc-400">
+                            <b className="text-zinc-200">{m.org_name}:</b> {m.message}
+                          </p>
+                          {!own && m.player_id && (
+                            <div className="flex shrink-0 gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
+                              <button
+                                type="button"
+                                title="Denunciar mensagem"
+                                aria-label="Denunciar mensagem"
+                                disabled={!!busy}
+                                onClick={() => act(`report-${m.id}`, "social/chat/report", {
+                                  message_id:m.id,
+                                  reason:"Conteúdo impróprio, abusivo ou contrário às regras",
+                                }, "Mensagem denunciada")}
+                                className="rounded p-1 text-zinc-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
+                              >
+                                <Flag size={10} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Bloquear organização"
+                                aria-label="Bloquear organização"
+                                disabled={!!busy}
+                                onClick={() => act(`block-${m.player_id}`, "social/chat/block", {
+                                  player_id:m.player_id,
+                                  blocked:true,
+                                }, `${m.org_name} foi bloqueada no chat`)}
+                                className="rounded p-1 text-zinc-600 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-30"
+                              >
+                                <UserX size={10} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="mt-2 flex gap-2">
                     <Input value={chat} onChange={(e) => setChat(e.target.value)} maxLength={280} placeholder="Mensagem…" className="h-8 bg-black/30 text-xs" />
