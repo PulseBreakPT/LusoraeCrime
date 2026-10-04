@@ -45,6 +45,35 @@ def _oid(value: str, label: str):
         raise HTTPException(status_code=400, detail=label)
 
 
+def _property_staff_profile(employees: list[dict]) -> tuple[dict[str, str], float]:
+    """Assign people to the role where their real attributes add most value."""
+    role_attrs = {
+        "security": ("forca", "tiro", "sangue_frio"),
+        "operations": ("inteligencia", "discricao", "sangue_frio"),
+        "logistics": ("conducao", "inteligencia", "discricao"),
+        "management": ("negociacao", "inteligencia", "sangue_frio"),
+    }
+    remaining = set(role_attrs)
+    roles: dict[str, str] = {}
+    scores = []
+    for emp in sorted(employees, key=lambda e: float(e.get("level", 1) or 1), reverse=True):
+        attrs = emp.get("attrs") or {}
+        choices = remaining or set(role_attrs)
+        best_role = max(
+            choices,
+            key=lambda role: sum(float(attrs.get(key, 0) or 0) for key in role_attrs[role]),
+        )
+        raw = sum(float(attrs.get(key, 0) or 0) for key in role_attrs[best_role]) / (10 * len(role_attrs[best_role]))
+        morale = max(0.4, min(1.0, float(emp.get("morale", 70) or 70) / 100))
+        fatigue = max(0.45, 1.0 - float(emp.get("fatigue", 0) or 0) / 140)
+        score = max(0.0, min(1.0, raw * morale * fatigue))
+        roles[str(emp["_id"])] = best_role
+        scores.append(score)
+        remaining.discard(best_role)
+    effectiveness = sum(scores) / len(scores) if scores else 0.0
+    return roles, round(effectiveness, 3)
+
+
 async def _debit(player: dict, amount: int, *, stat: str | None = None) -> dict:
     inc = {"clean_money": -int(amount)}
     if stat:
@@ -538,15 +567,34 @@ async def service_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
         if team and team.get("status") != "idle":
             raise HTTPException(status_code=400, detail="Veículo ocupado")
     missing = max(0.0, 100 - float(vehicle.get("condition", 100) or 0))
-    cost = max(120, int(vehicle.get("price", 0) * VEHICLE_LIFECYCLE["service_base_pct"] + missing * 8))
+    base_cost = max(120, int(vehicle.get("price", 0) * VEHICLE_LIFECYCLE["service_base_pct"] + missing * 8))
+    inv = normalize_inventory(player)
+    use_fluids = int(inv.get("service_fluids", 0) or 0) > 0
+    use_parts = missing >= 20 and int(inv.get("vehicle_parts", 0) or 0) > 0
+    material_credit = (
+        (int(SUPPLY_CATALOG["service_fluids"]["price"]) if use_fluids else 0)
+        + (int(SUPPLY_CATALOG["vehicle_parts"]["price"]) if use_parts else 0)
+    )
+    cost = max(60, base_cost - int(material_credit * 0.70))
     await _debit(player, cost, stat="vehicle_services")
+    inventory_inc = {}
+    if use_fluids:
+        inventory_inc["inventory.service_fluids"] = -1
+    if use_parts:
+        inventory_inc["inventory.vehicle_parts"] = -1
+    if inventory_inc:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": inventory_inc})
     await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
         "condition": min(100.0, float(vehicle.get("condition", 100)) + 18),
         "last_service_km": float(vehicle.get("km_total", 0) or 0),
         "missions_since_repair": 0,
     }, "$inc": {"repair_spent_total": cost}})
-    await record_tx(db, pid, "vehicle_service", -cost, "clean", player["clean_money"], f"Revisão de {vehicle.get('name','veículo')}")
-    return {"ok": True, "cost": cost}
+    materials = [name for flag, name in ((use_fluids, "consumíveis"), (use_parts, "peças")) if flag]
+    note = f"Revisão de {vehicle.get('name','veículo')}"
+    if materials:
+        note += " · stock: " + " + ".join(materials)
+    await record_tx(db, pid, "vehicle_service", -cost, "clean", player["clean_money"], note)
+    return {"ok": True, "cost": cost, "base_cost": base_cost, "used_stock": materials}
 
 
 @router.post("/vehicles/tires")
@@ -651,13 +699,30 @@ async def assign_property_staff(body: PropertyStaffInput, user: dict = Depends(g
             {"player_id": pid, "_id": {"$in": [ObjectId(eid) for eid in old_ids]}},
             {"$set": {"stationed_property_id": None}},
         )
-    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"staff_employee_ids": ids}})
+    staff_roles, staff_effectiveness = _property_staff_profile(employees)
+    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {
+        "staff_employee_ids": ids,
+        "staff_roles": staff_roles,
+        "staff_effectiveness": staff_effectiveness,
+    }})
     if ids:
         await db.employees.update_many(
             {"player_id": pid, "_id": {"$in": [ObjectId(eid) for eid in ids]}},
             {"$set": {"stationed_property_id": body.property_id}},
         )
-    return {"ok": True, "staff_employee_ids": ids}
+    await db.organization_audit.insert_one({
+        "player_user_id": str(user["_id"]),
+        "action": "properties.staff_profile",
+        "payload": {"property_id": body.property_id},
+        "result": {"staff_roles": staff_roles, "staff_effectiveness": staff_effectiveness},
+        "ts": now_utc().isoformat(),
+    })
+    return {
+        "ok": True,
+        "staff_employee_ids": ids,
+        "staff_roles": staff_roles,
+        "staff_effectiveness": staff_effectiveness,
+    }
 
 
 @router.post("/departments/upgrade")
