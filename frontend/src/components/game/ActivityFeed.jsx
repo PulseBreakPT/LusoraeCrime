@@ -554,7 +554,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           <Bell size={17} />
           {(unread > 0 || liveCount > 0) && !open && (
             <span
-              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[8px] font-bold text-white"
+              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[9px] font-bold text-white"
               style={{ background: liveCount > 0 ? "#EF4444" : "#F59E0B" }}
             >
               {liveCount > 0 ? liveCount : unread > 9 ? "9+" : unread}
