@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 from city_data import (
-    WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES,
+    WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES, RIVAL_ACTIONS,
     SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO, SEASON_REWARDS,
 )
 
@@ -583,6 +583,16 @@ async def city_snapshot(db, player):
         d["config"] = BUSINESS_TYPES.get(doc.get("type_key"), {})
         business_out.append(d)
 
+    boss = boss_status(player, now)
+    recovery_cost = 0
+    if boss.get("hospital_until"):
+        recovery_cost += 3500
+    if boss.get("sentence_until"):
+        recovery_cost += 7500
+    if not boss.get("hospital_until") and not boss.get("sentence_until") and int(boss.get("stress", 0) or 0) >= 35:
+        recovery_cost += 1000
+    boss["recovery_cost"] = recovery_cost
+
     return {
         "world": ctx,
         "calendar": city_calendar(now, player.get("region") or "Portugal", 5),
@@ -594,6 +604,7 @@ async def city_snapshot(db, player):
         },
         "news": news[:12],
         "rivals": rival_out,
+        "rival_actions": RIVAL_ACTIONS,
         "businesses": business_out,
         "business_catalog": BUSINESS_TYPES,
         "business_totals": {
@@ -624,5 +635,5 @@ async def city_snapshot(db, player):
                 for x in pvp_challenges
             ],
         },
-        "boss": boss_status(player, now),
+        "boss": boss,
     }
