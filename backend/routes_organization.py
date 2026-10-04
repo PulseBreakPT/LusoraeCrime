@@ -1043,8 +1043,9 @@ async def upgrade_department(body: DepartmentInput, user: dict = Depends(get_cur
 @idempotent("territories.claim")
 async def claim_territory(body: TerritoryInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
-    if int(player.get("level", 1)) < 5:
-        raise HTTPException(status_code=400, detail="Controlo territorial desbloqueia no nível 5")
+    unlock_level = int(TERRITORY_TIERS[1].get("unlock_level", 20))
+    if int(player.get("level", 1)) < unlock_level:
+        raise HTTPException(status_code=400, detail=f"Controlo territorial desbloqueia no nível {unlock_level}")
     districts = {d.get("name") or d.get("key"): d for d in (player.get("districts") or [])}
     if body.district not in districts:
         raise HTTPException(status_code=400, detail="Distrito operacional inválido")
@@ -1081,6 +1082,9 @@ async def consolidate_territory(body: TerritoryInput, user: dict = Depends(get_c
     if current >= 3:
         raise HTTPException(status_code=400, detail="Território já está no máximo")
     nxt = current + 1
+    required_level = int(TERRITORY_TIERS[nxt].get("unlock_level", 1))
+    if int(player.get("level", 1)) < required_level:
+        raise HTTPException(status_code=400, detail=f"Este tier territorial desbloqueia no nível {required_level}")
     cost = TERRITORY_TIERS[nxt]["cost"]
     info.update({"tier": nxt, "pressure": min(100.0, float(info.get("pressure", 0)) + 12), "defense": 100.0})
     territory_path = f"territories.{body.district}"
