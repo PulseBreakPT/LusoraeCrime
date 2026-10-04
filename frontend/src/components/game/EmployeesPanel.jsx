@@ -377,24 +377,24 @@ const EmployeeCard = ({ e, onNavigate }) => {
               {(e.traits || []).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {(e.traits || []).map((trait) => (
-                    <span key={trait} className="rounded border border-sky-500/15 bg-sky-500/[0.05] px-1.5 py-0.5 font-mono text-[9px] uppercase text-sky-300">
+                    <span key={trait} className="rounded border border-sky-500/15 bg-sky-500/[0.05] px-1.5 py-0.5 font-mono text-[10px] uppercase text-sky-300">
                       {trait.replaceAll("_", " ")}
                     </span>
                   ))}
                 </div>
               )}
               {e.injury && (
-                <p className="mt-2 font-mono text-[9px] text-red-300">
+                <p className="mt-2 font-mono text-[10px] text-red-300">
                   Ferimento {e.injury.severity || "registado"} · {e.injury.source || "operação"}
                 </p>
               )}
               {e.sentence && (
-                <p className="mt-2 font-mono text-[9px] text-amber-300">
+                <p className="mt-2 font-mono text-[10px] text-amber-300">
                   Processo ativo · {e.sentence.reason || "detenção"}
                 </p>
               )}
               {e.stationed_property_id && (
-                <p className="mt-2 font-mono text-[9px] text-cyan-300">Destacado numa instalação da organização</p>
+                <p className="mt-2 font-mono text-[10px] text-cyan-300">Destacado numa instalação da organização</p>
               )}
             </div>
           </div>
