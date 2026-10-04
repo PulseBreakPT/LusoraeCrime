@@ -25,8 +25,6 @@ export function LegalShell({ children, active }) {
 
   return (
     <div className="sub-page-bg min-h-screen text-zinc-200">
-      {/* Fundo ambiente tático: grelha + glows */}
-      <div className="sub-page-grid" aria-hidden="true" />
       <div className="sub-page-glow" aria-hidden="true" />
 
       <header className="sub-page-header top-0 z-40">

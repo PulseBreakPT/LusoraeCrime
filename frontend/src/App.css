@@ -1872,8 +1872,8 @@ kbd {
 }
 
 /* ============================================================
-   SSS — Páginas de documento (Termos/Privacidade/RGPD/Changelog)
-   Mesma identidade Noir Tático do jogo, adaptada a leitura longa.
+   Páginas de documento (Termos/Privacidade/RGPD/Changelog)
+   Leitura longa com a mesma linguagem Noir operacional.
    ============================================================ */
 
 /* Scroll suave nas âncoras do índice */
@@ -1883,19 +1883,6 @@ html:has(.sub-page-bg) {
 
 .sub-page-bg {
     background-color: #060607;
-}
-
-/* Grelha tática desvanecida a partir do topo */
-.sub-page-grid {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-        linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-    background-size: 44px 44px;
-    -webkit-mask-image: radial-gradient(75% 60% at 50% 0%, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
-    mask-image: radial-gradient(75% 60% at 50% 0%, rgba(0, 0, 0, 0.85) 0%, transparent 78%);
 }
 
 /* Glows ambiente vermelho/ouro + vinheta inferior */
