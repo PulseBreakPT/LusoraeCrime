@@ -83,6 +83,14 @@ from economy_constants import (
 )
 from live_ops import build_dispatch_script, build_recall_script, update_memory
 from retention_engine import build_retention_snapshot, mission_decision, world_pulse
+from organization_systems import (
+    SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
+    DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
+    normalize_inventory, inventory_capacity, inventory_used, territory_weekly_cost,
+    territory_income_per_hour, territory_reward_bonus, fixed_cost_multiplier,
+    doctrine_effect, loadout_effect, default_team_policies, ensure_employee_profile,
+    apply_weapon_upgrades, weapon_ammo_status,
+)
 from economy_constants import (TEAM_LEADER_MIN_RANK, STEALTH_VEHICLE_DISCRETION_MIN,
                                DRIVER_ATTR_BASELINE, DRIVER_TRAVEL_REDUCTION_PER_POINT,
                                DRIVER_TRAVEL_REDUCTION_MAX,
@@ -488,6 +496,17 @@ async def catalog():
         },
         # Loja — tudo pago em dinheiro do jogo (clean_money), sem moeda
         # premium/pagamentos reais.
+        "organization": {
+            "supplies": SUPPLY_CATALOG,
+            "weapon_ammo": WEAPON_AMMO,
+            "weapon_upgrades": WEAPON_UPGRADES,
+            "team_doctrines": TEAM_DOCTRINES,
+            "team_policies": TEAM_POLICIES,
+            "departments": DEPARTMENTS,
+            "territory_tiers": TERRITORY_TIERS,
+            "property_modules": PROPERTY_MODULES,
+            "vehicle_lifecycle": VEHICLE_LIFECYCLE,
+        },
         "shop": {
             "speedup_cost_per_min": SPEEDUP_COST_PER_MIN,
             "speedup_cost_min": SPEEDUP_COST_MIN,
@@ -567,6 +586,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
 
     emp_dumps = []
     for e in employees:
+        e = ensure_employee_profile(e)
         d = Employee.from_mongo(e).model_dump()
         d["betrayal_risk"] = betrayal_risk_of(e)
         emp_dumps.append(d)
@@ -576,17 +596,19 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
 
     gross_salary = int(sum(e.get("salary", 0) for e in employees))
     employer_ss = int(round(gross_salary * EMPLOYER_SOCIAL_SECURITY_RATE))
+    fixed_mult = fixed_cost_multiplier(player)
     fleet_weekly = int(round(sum(
         VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
         for v in vehicles
-    )))
+    ) * fixed_mult))
     property_weekly = int(round(sum(
         (pr.get("purchase_price") or PROPERTY_TYPES[pr["type_key"]]["price"])
         * max(1, int(pr.get("level", 1)))
         * PROPERTY_MAINTENANCE_PCT_PER_WEEK
         for pr in properties
-    )))
-    weekly_fixed_total = gross_salary + employer_ss + fleet_weekly + property_weekly
+    ) * fixed_mult))
+    territory_weekly = int(round(territory_weekly_cost(player) * fixed_mult))
+    weekly_fixed_total = gross_salary + employer_ss + fleet_weekly + property_weekly + territory_weekly
     caps_out = {
         "employees": {"used": len(employees), "max": caps["employees"]},
         "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
@@ -631,6 +653,16 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
             "employer_social_security": employer_ss,
             "fleet_fixed": fleet_weekly,
             "property_fixed": property_weekly,
+            "territory_fixed": territory_weekly,
+            "finance_multiplier": fixed_mult,
+        },
+        "organization": {
+            "inventory": normalize_inventory(player),
+            "inventory_used": inventory_used(normalize_inventory(player)),
+            "inventory_capacity": inventory_capacity(player, properties),
+            "departments": player.get("departments") or {},
+            "territories": player.get("territories") or {},
+            "territory_income_h": territory_income_per_hour(player),
         },
         "fuel_prices": FUEL_PRICES,
         "hot_category": hot_category(now_utc()),
@@ -772,6 +804,20 @@ async def _prepare_dispatch(player, opp, team):
         "now": now,
     }
     chance, breakdown = chance_breakdown(chance_ctx)
+
+    # Organização integrada: doutrina, loadout e território afetam exatamente
+    # o preview que será persistido na missão.
+    doctrine = doctrine_effect(team, opp["category"])
+    loadout = dict(team.get("loadout") or {})
+    loadout_fx = loadout_effect(loadout, opp["category"])
+    doctrine_delta = float(doctrine.get("chance", 0.0))
+    loadout_delta = float(loadout_fx.get("chance", 0.0))
+    if doctrine_delta:
+        breakdown.append({"key": "doutrina", "label": f"Doutrina: {doctrine['name']}", "pct": doctrine_delta})
+    if loadout_delta:
+        breakdown.append({"key": "loadout", "label": "Equipamento preparado", "pct": loadout_delta})
+    chance = max(0.02, min(0.97, chance + doctrine_delta + loadout_delta))
+
     # Forense pré-falha (SSS v4): os 3 fatores mais negativos do despacho, para
     # o relatório de falha explicar PORQUÊ ("Fator crítico: ...").
     top_negatives = [
@@ -839,7 +885,11 @@ async def _prepare_dispatch(player, opp, team):
 
     # Aplicar multiplicadores existentes uma única vez. Antes, "mult" entrava
     # no reward_engine e voltava a ser multiplicado aqui, inflacionando o saque.
-    reward = int(reward_data["money"] * mult * pulse_reward_mult * age_mult * split_mult)
+    territory_bonus = territory_reward_bonus(player, opp.get("district"))
+    reward = int(
+        reward_data["money"] * mult * pulse_reward_mult * age_mult * split_mult
+        * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus)
+    )
     reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
 
     mission_pulse = {
@@ -871,6 +921,12 @@ async def _prepare_dispatch(player, opp, team):
         "weapon_jam_profile": weapon_jam_profile,
         "weapon_power_avg": weapon_power_avg,
         "weapon_alerts": weapon_alerts,
+        "doctrine": doctrine.get("key", "balanced"),
+        "doctrine_heat_mult": float(doctrine.get("heat", 1.0)) * float(loadout_fx.get("heat", 1.0)),
+        "doctrine_fatigue_mult": float(doctrine.get("fatigue", 1.0)),
+        "loadout": loadout,
+        "loadout_injury_mult": float(loadout_fx.get("injury", 1.0)),
+        "territory_bonus": territory_bonus,
     }
 
 
@@ -985,6 +1041,11 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "min_members_met": len(prep["members"]) >= prep["min_members"],
         "weapon_alerts": prep.get("weapon_alerts", []),
         "world_pulse": prep.get("world_pulse"),
+        "doctrine": prep.get("doctrine", "balanced"),
+        "doctrine_heat_mult": prep.get("doctrine_heat_mult", 1.0),
+        "doctrine_fatigue_mult": prep.get("doctrine_fatigue_mult", 1.0),
+        "loadout": loadout,
+        "loadout_injury_mult": prep.get("loadout_injury_mult", 1.0),
     }
 
 
@@ -1002,6 +1063,22 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     vehicle = prep["vehicle"]
     members = prep["members"]
     repeat_type = team.get("last_type_key") == opp["type_key"]
+
+    policies = {**default_team_policies(), **(team.get("policies") or {})}
+    threshold = max(0, min(60, int(policies.get("abort_below_pct", 0) or 0)))
+    if threshold and prep["chance"] * 100 < threshold:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Política da equipa impede o despacho abaixo de {threshold}% de sucesso",
+        )
+    loadout = dict(prep.get("loadout") or {})
+    inventory = normalize_inventory(player)
+    shortages = [
+        SUPPLY_CATALOG[key]["name"] for key, qty in loadout.items()
+        if int(qty or 0) > int(inventory.get(key, 0) or 0)
+    ]
+    if shortages:
+        raise HTTPException(status_code=400, detail="Stock insuficiente: " + ", ".join(shortages))
 
     # Resolve ida e regresso ANTES de alterar qualquer estado. A missão nasce
     # sempre com geometria real persistida; se o serviço rodoviário falhar,
@@ -1081,7 +1158,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "opportunity": {
             "type_key": opp["type_key"], "name": opp["name"], "category": opp["category"],
             "district": opp["district"], "reward": prep["reward"], "respect": opp["respect"],
-            "risk": opp["risk"], "heat": opp["heat"], "pays": opp["pays"], "min_level": opp["min_level"],
+            "risk": opp["risk"], "heat": round(opp["heat"] * prep.get("doctrine_heat_mult", 1.0), 3),
+            "pays": opp["pays"], "min_level": opp["min_level"],
             "police_force": opp.get("police_force") or police_force_for(opp["lat"], opp["lng"]),
         },
         # Dados de recompensa dinâmica para cálculo consistente de XP/reputação
@@ -1116,9 +1194,13 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
     # na memória da organização (mantida com um teto) — o regresso e as
     # próximas missões preferem voz nova.
     new_memory = update_memory(player.get("phrase_memory"), live_used_keys)
+    player_inc = {"stats.ops_dispatched": 1}
+    for key, qty in loadout.items():
+        if key in SUPPLY_CATALOG and int(qty or 0) > 0:
+            player_inc[f"inventory.{key}"] = -int(qty)
     await db.players.update_one(
         {"_id": player["_id"]},
-        {"$inc": {"stats.ops_dispatched": 1}, "$set": {"phrase_memory": new_memory}},
+        {"$inc": player_inc, "$set": {"phrase_memory": new_memory}},
     )
     await add_event(db, pid, "dispatch", f"{team['name']} ({len(members)} membros) destacada para {opp['name']} em {opp['district']}.")
     return {"mission_id": str(result.inserted_id)}
@@ -2214,7 +2296,9 @@ async def buy_weapon(body: WeaponBuyInput, user: dict = Depends(get_current_user
     await db.weapons.insert_one({
         "player_id": pid, "model_key": body.model_key, "name": model["name"],
         "condition": 100.0, "employee_id": None, "missions_since_repair": 0,
-        "missions_done": 0, "upgrades": [], "bought_at": now_utc().isoformat(),
+        "missions_done": 0, "upgrades": [],
+        "ammo_loaded": int(model.get("magazine_capacity", 0) or 0),
+        "bought_at": now_utc().isoformat(),
     })
     await add_event(db, pid, "weapon", f"{model['name']} adquirida por {model['price']:,} €.")
     await record_tx(db, pid, "weapon_buy", -model["price"], "clean", player["clean_money"] - model["price"], f"Compra de {model['name']}")
@@ -2612,7 +2696,7 @@ async def optimize_properties(user: dict = Depends(get_current_user)):
 
     def plan_for(p):
         pt = PROPERTY_TYPES[p["type_key"]]
-        cost = int(pt["price"] * 0.6 * (p["level"] + 1))
+        cost = int((p.get("purchase_price") or pt["price"]) * 0.6 * (p["level"] + 1))
         # Ganho por hora de subir 1 nível, usando a mesma taxa passiva do motor.
         rate = (pt.get("dirty_per_h") or 0) + (pt.get("launder_per_h") or 0) * LAUNDER_PASSIVE_RATE
         gain_h = rate * property_condition_factor(p)
