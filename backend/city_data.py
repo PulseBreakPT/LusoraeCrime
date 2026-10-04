@@ -167,6 +167,23 @@ BUSINESS_TYPES = {
     },
 }
 
+BUSINESS_UNLOCK_LEVELS = {
+    "bar": 5,
+    "oficina_privada": 10,
+    "discoteca": 15,
+    "transportadora": 25,
+    "empresa_seguranca": 35,
+    "imobiliaria": 45,
+    "casa_apostas": 55,
+    "empresa_tecnologia": 65,
+    "hotel": 75,
+    "marina": 90,
+}
+for _business_key, _unlock_level in BUSINESS_UNLOCK_LEVELS.items():
+    if _business_key in BUSINESS_TYPES:
+        BUSINESS_TYPES[_business_key]["min_level"] = _unlock_level
+
+
 RIVAL_ARCHETYPES = [
     {"name": "Ordem do Norte", "style": "disciplina", "focus": "assalto"},
     {"name": "Linha Cinzenta", "style": "logística", "focus": "logistica"},
