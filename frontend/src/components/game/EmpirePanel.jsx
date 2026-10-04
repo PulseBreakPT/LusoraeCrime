@@ -74,25 +74,20 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
           <SheetDescription className="text-zinc-500">O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe.</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-          <StatBox label="€ Limpo" value={fmtMoney(p.clean_money)} accent="#10B981" tip="Pronto a gastar: compras, salários, reparações e subornos." />
-          <StatBox label="€ Sujo" value={fmtMoney(p.dirty_money)} accent="#F59E0B" tip="Precisa de ser lavado antes de poder ser gasto. Lava abaixo ou usa empresas de fachada." />
-        </div>
-
-        <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : "Nível máximo alcançado — domínio total de Lisboa."} block>
-          <Card className="mt-2 sub-card p-3 shadow-none" data-testid="empire-level-card">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-                Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
-              </p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-                Respeito <span className="ml-1 font-mono text-sm font-bold text-white">{p.respect}</span>
-                {p.next_level_respect && <span className="text-zinc-600">/{p.next_level_respect}</span>}
-              </p>
-            </div>
-            <MiniBar value={p.next_level_respect ? (p.respect / p.next_level_respect) * 100 : 100} color="#DC2626" className="mt-2" height="h-1.5" />
-          </Card>
-        </Tip>
+        {liquidity && (
+          <Alert
+            data-testid="liquidity-warning"
+            variant={liquidity === "red" ? "destructive" : "default"}
+            className={`mt-2 py-2 ${liquidity === "red" ? "border-red-600/40 bg-red-600/10" : "border-amber-500/30 bg-amber-500/5"}`}
+          >
+            <AlertTriangle size={12} className={liquidity === "red" ? "text-red-400" : "text-amber-400"} />
+            <AlertDescription className={`font-mono text-[10px] ${liquidity === "red" ? "text-red-400" : "text-amber-400"}`}>
+              {liquidity === "red"
+                ? "Reserva crítica: podes não conseguir pagar o fecho semanal de segunda-feira às 20:00."
+                : "Reserva baixa: o dinheiro limpo está abaixo do próximo fecho semanal."}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {dirtyCap && (
           <Tip tip={`Limite de armazenamento de dinheiro sujo: ${fmtMoney(dirtyCap.max)}. Acima disto, a produção passiva e as recompensas de operações são desperdiçadas — lava regularmente para abrir espaço.`} block>
@@ -110,20 +105,10 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
           </p>
         )}
 
-        {liquidity && (
-          <Alert
-            data-testid="liquidity-warning"
-            variant={liquidity === "red" ? "destructive" : "default"}
-            className={`mt-2 py-2 ${liquidity === "red" ? "border-red-600/40 bg-red-600/10" : "border-amber-500/30 bg-amber-500/5"}`}
-          >
-            <AlertTriangle size={12} className={liquidity === "red" ? "text-red-400" : "text-amber-400"} />
-            <AlertDescription className={`font-mono text-[10px] ${liquidity === "red" ? "text-red-400" : "text-amber-400"}`}>
-              {liquidity === "red"
-                ? "Reserva crítica: podes não conseguir pagar o fecho semanal de segunda-feira às 20:00."
-                : "Reserva baixa: o dinheiro limpo está abaixo do próximo fecho semanal."}
-            </AlertDescription>
-          </Alert>
-        )}
+        <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+          <StatBox label="€ Limpo" value={fmtMoney(p.clean_money)} accent="#10B981" tip="Pronto a gastar: compras, salários, reparações e subornos." />
+          <StatBox label="€ Sujo" value={fmtMoney(p.dirty_money)} accent="#F59E0B" tip="Precisa de ser lavado antes de poder ser gasto. Lava abaixo ou usa empresas de fachada." />
+        </div>
 
         <Card className="mt-3 sub-card p-3 shadow-none" data-testid="empire-cashflow">
           <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
@@ -174,6 +159,21 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
             </Tip>
           </div>
         </Card>
+
+        <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : "Nível máximo alcançado — domínio total de Lisboa."} block>
+          <Card className="mt-2 sub-card p-3 shadow-none" data-testid="empire-level-card">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+                Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+                Respeito <span className="ml-1 font-mono text-sm font-bold text-white">{p.respect}</span>
+                {p.next_level_respect && <span className="text-zinc-600">/{p.next_level_respect}</span>}
+              </p>
+            </div>
+            <MiniBar value={p.next_level_respect ? (p.respect / p.next_level_respect) * 100 : 100} color="#DC2626" className="mt-2" height="h-1.5" />
+          </Card>
+        </Tip>
 
         <div className="mt-6">
           <SectionHeader icon={MapPin} title="Quartel-general" />
