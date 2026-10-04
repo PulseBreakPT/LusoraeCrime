@@ -296,7 +296,7 @@ const FeedList = ({ rows, nowMs, onNavigate, firstId, newFlash }) => {
 };
 
 export const ActivityFeed = ({ onNavigate, suppressed }) => {
-  const { state, serverNow } = useGame();
+  const { state, serverNow, resolveMissionDecision } = useGame();
   const events = state?.events || [];
   const firstId = events[0]?.id;
   // Flash vermelho no registo mais recente quando chega um novo — o feed é a
@@ -397,7 +397,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
           <ConsoleTabs tab={tab} onTab={setTab} liveCount={liveCount} unread={unread} />
           {tab === "live" ? (
             <div className="overflow-y-auto" style={{ maxHeight: expanded ? "26rem" : "19rem" }}>
-              <LiveOpsPanel state={state} serverNow={serverNow} />
+              <LiveOpsPanel state={state} serverNow={serverNow} onDecision={resolveMissionDecision} />
             </div>
           ) : (
             <>
@@ -420,7 +420,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
 };
 
 export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
-  const { state, serverNow } = useGame();
+  const { state, serverNow, resolveMissionDecision } = useGame();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("log");
   const [filter, setFilter] = useState("all");
@@ -496,7 +496,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
           <ConsoleTabs tab={tab} onTab={setTab} liveCount={liveCount} unread={unread} idPrefix="console-m" />
           {tab === "live" ? (
             <div className="max-h-72 overflow-y-auto">
-              <LiveOpsPanel state={state} serverNow={serverNow} />
+              <LiveOpsPanel state={state} serverNow={serverNow} onDecision={resolveMissionDecision} />
             </div>
           ) : (
             <>
