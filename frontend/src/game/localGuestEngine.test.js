@@ -325,6 +325,7 @@ describe("offline guest engine", () => {
 
     const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
     raw.teams[0].last_type_key = opportunity.type_key;
+    raw.teams[0].last_type_at = new Date().toISOString();
     raw.teams[0].repeat_type_count = 1;
     localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
 

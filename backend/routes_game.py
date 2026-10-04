@@ -845,7 +845,10 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
             road_router.get(origin, target_point),
             road_router.get(target_point, origin),
         )
-        metrics = road_mission_metrics(road_outward, road_inward, vehicle, speed)
+        try:
+            metrics = road_mission_metrics(road_outward, road_inward, vehicle, speed)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         dist = metrics["out_m"]
         round_km = metrics["round_km"]
         travel_s = metrics["travel_s"]
