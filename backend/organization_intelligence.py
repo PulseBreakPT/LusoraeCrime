@@ -210,11 +210,14 @@ def build_organization_intelligence(
         stock_value += (qty / pack) * unit_pack_price
         ratio = 1.0 if target <= 0 else qty / max(1, target)
         status = "ok" if target <= 0 or ratio >= 1 else ("low" if ratio >= 0.5 else "critical")
+        buy_price = max(1, int(unit_pack_price * logistics_cost_multiplier(player)))
         row = {
             "key": key, "name": cfg["name"], "qty": qty, "target": target,
             "reserved_per_dispatch": reserved.get(key, 0), "coverage_dispatches": None if reserved.get(key, 0) <= 0 else round(qty / max(1, reserved[key]), 1),
             "status": status, "packs_owned": round(packs_owned, 1),
             "reorder_packs": max(0, ceil(max(0, target - qty) / pack)),
+            "buy_price": buy_price,
+            "sell_value": int(unit_pack_price * 0.45),
         }
         stock_rows.append(row)
         if status == "critical":
@@ -245,11 +248,30 @@ def build_organization_intelligence(
     fleet_rows = []
     for vehicle in vehicles:
         score, reasons = _vehicle_health(vehicle, now)
+        condition = float(vehicle.get("condition", 100) or 0)
+        missing = max(0.0, 100 - condition)
+        service_base = max(120, int(float(vehicle.get("price", 0) or 0) * VEHICLE_LIFECYCLE["service_base_pct"] + missing * 8))
+        use_fluids = int(inventory.get("service_fluids", 0) or 0) > 0
+        use_parts = missing >= 20 and int(inventory.get("vehicle_parts", 0) or 0) > 0
+        material_credit = (
+            (int(SUPPLY_CATALOG["service_fluids"]["price"]) if use_fluids else 0)
+            + (int(SUPPLY_CATALOG["vehicle_parts"]["price"]) if use_parts else 0)
+        )
+        service_cost = max(60, service_base - int(material_credit * 0.70))
+        tire_cost = 0 if int(inventory.get("tire_set", 0) or 0) > 0 else int(SUPPLY_CATALOG["tire_set"]["price"])
+        insurance_cost = max(80, int(float(vehicle.get("price", 0) or 0) * VEHICLE_LIFECYCLE["insurance_week_pct"] * 4))
         fleet_rows.append({
             "id": str(vehicle.get("_id") or vehicle.get("id")), "name": vehicle.get("name", "Veículo"),
-            "score": round(score), "condition": round(float(vehicle.get("condition", 100) or 0), 1),
+            "score": round(score), "condition": round(condition, 1),
             "tires_pct": round(float(vehicle.get("tires_pct", 100) or 0), 1),
             "reasons": reasons,
+            "costs": {
+                "service": service_cost,
+                "service_base": service_base,
+                "tires": tire_cost,
+                "insurance": insurance_cost,
+                "inspection": int(VEHICLE_LIFECYCLE["inspection_base"]),
+            },
         })
     fleet_score = round(sum(v["score"] for v in fleet_rows) / len(fleet_rows), 1) if fleet_rows else 45.0
 
@@ -263,10 +285,18 @@ def build_organization_intelligence(
             + int(prop.get("operations_level", 0) or 0)
         ) / 9
         score = clamp(condition * 0.55 + staff_score * 0.25 + module_avg * 100 * 0.20)
+        module_costs = {}
+        for key, cfg in PROPERTY_MODULES.items():
+            level = int(prop.get(f"{key}_level", 0) or 0)
+            module_costs[key] = None if level >= int(cfg["max_level"]) else int(
+                cfg["base_cost"] * (1 + level * 0.75) * float(prop.get("market_multiplier", 1.0) or 1.0)
+            )
         property_rows.append({
             "id": str(prop.get("_id") or prop.get("id")), "name": prop.get("name", "Imóvel"),
             "score": round(score), "condition": round(condition), "staff_score": round(staff_score),
             "staff_count": len(prop.get("staff_employee_ids") or []),
+            "staff_roles": prop.get("staff_roles") or {},
+            "module_costs": module_costs,
         })
     property_score = round(sum(p["score"] for p in property_rows) / len(property_rows), 1) if property_rows else 55.0
 
@@ -276,9 +306,14 @@ def build_organization_intelligence(
         defense = clamp((info or {}).get("defense", 0))
         pressure = clamp((info or {}).get("pressure", 0))
         score = clamp(defense * 0.65 + (100 - pressure) * 0.35)
+        tier = int((info or {}).get("tier", 0) or 0)
         territory_rows.append({
-            "district": district, "tier": int((info or {}).get("tier", 0) or 0),
+            "district": district, "tier": tier,
             "defense": round(defense), "pressure": round(pressure), "score": round(score),
+            "costs": {
+                "defend": max(500, int(TERRITORY_TIERS[tier]["defense_weekly"] * 1.5)) if tier in TERRITORY_TIERS else None,
+                "consolidate": int(TERRITORY_TIERS[tier + 1]["cost"]) if tier + 1 in TERRITORY_TIERS else None,
+            },
         })
     territory_score = round(sum(t["score"] for t in territory_rows) / len(territory_rows), 1) if territory_rows else 70.0
 
@@ -371,6 +406,14 @@ def build_organization_intelligence(
         "management": round((finance_score + crew_score + property_score) / 3),
     }
 
+    department_quotes = {}
+    for key, cfg in DEPARTMENTS.items():
+        level = department_level(player, key)
+        department_quotes[key] = {
+            "level": level,
+            "next_cost": None if level >= int(cfg["max_level"]) else department_cost(key, level + 1),
+        }
+
     return {
         "health": {
             "score": overall, "grade": grade,
@@ -384,6 +427,11 @@ def build_organization_intelligence(
             "reserve_cash": policy["reserve_cash"], "available_above_reserve": max(0, cash - policy["reserve_cash"]),
         },
         "organization": {"score": org_power, "dimensions": dimensions},
+        "quotes": {
+            "departments": department_quotes,
+            "protection": protection_cost(player, len(employees), len(properties)),
+            "territory_claim": int(TERRITORY_TIERS[1]["cost"]),
+        },
         "storage": {"used": used, "capacity": cap, "pct": round(storage_ratio * 100, 1), "stock_value": round(stock_value)},
         "stock": stock_rows,
         "teams": team_rows,
