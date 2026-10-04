@@ -233,7 +233,7 @@ describe("offline guest engine", () => {
       id: weapon.data.weapon_id,
     });
     state = (await localGuestRequest("get", "/game/state")).data;
-    expect(state.weapons[0].loaded_rounds).toBe(15);
+    expect(state.weapons[0].ammo_loaded).toBe(15);
     expect(state.organization.inventory.ammo_sidearm).toBe(15);
 
     await localGuestRequest("post", "/game/org/teams/doctrine", {
