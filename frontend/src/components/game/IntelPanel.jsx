@@ -123,9 +123,9 @@ const RecommendedActions = ({ onNavigate }) => {
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="space-y-1.5">
+        <div className="sub-action-list overflow-hidden rounded-xl border border-white/[0.065]">
           {recs.map((r) => (
-            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="flex items-center justify-between gap-2 sub-card px-3 py-2 shadow-none">
+            <Card key={r.id} data-testid={`intel-rec-${r.id}`} className="sub-action-row flex items-center justify-between gap-2 rounded-none border-0 px-3 py-2.5 shadow-none">
               <p className="min-w-0 text-[11px] leading-snug text-zinc-300">{r.text}</p>
               <Button
                 data-testid={`intel-rec-action-${r.id}`}
@@ -289,11 +289,11 @@ const Section = ({ title, testId, children }) => (
   </div>
 );
 
-const Grid = ({ children }) => <div className="grid grid-cols-2 gap-2">{children}</div>;
+const Grid = ({ children }) => <div className="sub-kpi-grid grid grid-cols-2 overflow-hidden rounded-xl border border-white/[0.065]">{children}</div>;
 
 const Cell = ({ label, value, color = "#FFFFFF", tip }) => (
   <Tip tip={tip} block>
-    <Card className="h-full sub-card p-2.5 shadow-none">
+    <Card className="sub-kpi-cell h-full rounded-none border-0 sub-card p-2.5 shadow-none">
       <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{value}</p>
     </Card>
