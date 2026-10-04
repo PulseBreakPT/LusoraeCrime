@@ -740,7 +740,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                     </Tip>
                   )}
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="employees-list">
+                <div className="mt-2 flex flex-col gap-2" data-testid="employees-list">
                   {sortedEmployees.length === 0 && (
                     <p className="col-span-full font-mono text-[11px] text-zinc-600">Ninguém no plantel bate certo com esses filtros — limpa-os e tenta de novo.</p>
                   )}
