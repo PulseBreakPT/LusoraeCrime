@@ -61,6 +61,8 @@ class Player(BaseDocument):
     inventory: dict = {}
     departments: dict = {}
     territories: dict = {}
+    prestige_items: List[str] = []
+    governance: dict = {}
 
 
 class Team(BaseDocument):
