@@ -110,6 +110,11 @@ from economy_constants import (
     PROPERTY_CONDITION_RECOVERY_PER_WEEK, PROPERTY_CONDITION_DECAY_MISSED_WEEK,
 )
 from economy_calendar import next_weekly_settlement, is_weekly_settlement
+from organization_systems import (
+    apply_weapon_upgrades, weapon_ammo_status, territory_weekly_cost,
+    territory_income_per_hour, fixed_cost_multiplier, raid_risk_multiplier,
+    VEHICLE_LIFECYCLE, INJURY_SEVERITIES, ensure_employee_profile,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +415,7 @@ def employee_from_candidate(c, now_iso):
         "status": "idle", "status_until": None, "team_id": None, "training": None,
         "history": [{"ts": now_iso, "text": f"Recrutado ({RECRUIT_SOURCES[c['source']]['name']})."}],
         "hired_at": now_iso,
+        "stress": 8.0, "traits": [], "injury": None, "sentence": None, "relations": {},
     }
 
 
@@ -436,6 +442,10 @@ def vehicle_doc(pid, model_key, now_iso, team_id=None):
         "price": m["price"], "min_level": m["min_level"],
         "team_id": team_id, "km_total": 0.0, "bought_at": now_iso,
         "property_id": None, "transfer": None,
+        "last_service_km": 0.0, "tires_pct": 100.0,
+        "insurance_until": None,
+        "inspection_due_at": (parse_dt(now_iso) + timedelta(days=365)).isoformat(),
+        "notoriety": 0.0, "seized_until": None,
     }
 
 
@@ -1239,6 +1249,7 @@ def weapon_effective_score(emp, weapon_doc, model, category):
     É a MESMA régua em todo o lado: mod_weapon_score (chance de missão),
     /weapons/auto_assign e /weapons/optimize — o que o jogador vê no painel é
     o que a missão usa."""
+    model = apply_weapon_upgrades(model, weapon_doc)
     score = weapon_combat_score(model, category)
     best_for = model.get("best_for", [])
     best_for_mult = 1.3 if category in best_for else 0.7
@@ -1250,7 +1261,11 @@ def weapon_effective_score(emp, weapon_doc, model, category):
     # Curva de proficiência com raiz quadrada (SSS v2): ganhos rápidos no
     # início, rendimentos decrescentes perto da mestria.
     proficiency_bonus = math.sqrt(max(0.0, proficiency) / WEAPON_PROFICIENCY_MAX) * WEAPON_PROFICIENCY_BONUS_MAX_PCT
-    return score * best_for_mult * condition * reliability * compat * skill * WEAPON_COMBAT_SCORE_SCALE + proficiency_bonus
+    ammo = weapon_ammo_status((weapon_doc or {}).get("model_key", ""), model, weapon_doc or {})
+    # Uma arma vazia deixa de contribuir poder de fogo; stock baixo perde
+    # eficácia gradualmente sem transformar o sistema num bloqueio binário.
+    ammo_factor = 1.0 if ammo["ammo_key"] is None else (0.20 + 0.80 * ammo["fraction"])
+    return score * best_for_mult * condition * reliability * compat * skill * ammo_factor * WEAPON_COMBAT_SCORE_SCALE + proficiency_bonus
 
 
 # ---------------- Modificadores de chance (sistema modular) ----------------
@@ -2262,7 +2277,8 @@ async def _crew_returns(db, player, m, outcome):
             fat_mult *= EMPLOYEE_HEAVY_USE_FATIGUE_MULT
         sets = {
             "xp": xp, "level": new_level,
-            "fatigue": min(100.0, emp["fatigue"] + (12 + t["risk"] * 4) * fat_mult),
+            "fatigue": min(100.0, emp["fatigue"] + (12 + t["risk"] * 4) * fat_mult * float(m.get("doctrine_fatigue_mult", 1.0))),
+            "stress": max(0.0, min(100.0, float(emp.get("stress", 10) or 0) + t["risk"] * (2.2 if outcome in {"failure", "police"} else 0.8))),
             "morale": max(0.0, min(100.0, emp.get("morale", 70) + d_morale)),
             "loyalty": max(0.0, min(100.0, emp.get("loyalty", 70) + d_loyal)),
             "last_mission_at": now_utc().isoformat(),
@@ -2303,7 +2319,7 @@ async def _crew_returns(db, player, m, outcome):
         await db.employees.update_one({"_id": emp["_id"]}, {"$set": sets})
         await push_history(db, emp["_id"], f"{t['name']} em {t['district']}: {OUTCOME_PT[outcome]}.")
         if weapon:
-            w_model = WEAPON_MODELS.get(weapon["model_key"], {})
+            w_model = apply_weapon_upgrades(WEAPON_MODELS.get(weapon["model_key"], {}), weapon)
             # Durabilidade finalmente ligada (SSS v5): modelos robustos desgastam
             # devagar, modelos frágeis desfazem-se depressa — e uma arma que
             # encravou durante a ação perde condição extra.
@@ -2313,8 +2329,14 @@ async def _crew_returns(db, player, m, outcome):
             if str(weapon["_id"]) in jammed_ids:
                 wear += WEAPON_JAM_EXTRA_WEAR
             new_w_condition = max(0.0, weapon.get("condition", 100.0) - wear)
+            ammo = weapon_ammo_status(weapon.get("model_key", ""), w_model, weapon)
+            ammo_used = 0
+            if ammo["ammo_key"] is not None:
+                # Consumo abstrato por operação, proporcional ao risco e limitado
+                # ao carregador atual. Não modela balística real.
+                ammo_used = min(ammo["loaded"], max(1, int(1 + t["risk"] * 1.5)))
             await db.weapons.update_one({"_id": weapon["_id"]}, {
-                "$set": {"condition": new_w_condition},
+                "$set": {"condition": new_w_condition, "ammo_loaded": max(0, ammo["loaded"] - ammo_used)},
                 "$inc": {"missions_done": 1, "missions_since_repair": 1},
             })
 
@@ -2327,11 +2349,15 @@ async def _crew_returns(db, player, m, outcome):
             has_medic = m.get("has_medic", False)
             if has_medic:
                 p *= MEDIC_INJURY_MULT
+            p *= float(m.get("loadout_injury_mult", 1.0))
             if random.random() < p:
-                duration = 300 * (1 - bonuses["heal"]) * (MEDIC_RECOVERY_MULT if has_medic else 1.0)
+                severity = random.choices(["ligeiro", "moderado", "grave"], weights=[60, 30, 10], k=1)[0]
+                base_duration = INJURY_SEVERITIES[severity]["recovery_s"]
+                duration = base_duration * (1 - bonuses["heal"]) * (MEDIC_RECOVERY_MULT if has_medic else 1.0)
                 until = (now_utc() + timedelta(seconds=duration)).isoformat()
-                await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "injured", "status_until": until}})
-                await push_history(db, victim["_id"], "Ferido em operação.")
+                injury = {"severity": severity, "source": t["name"], "started_at": now_utc().isoformat(), "recovery_until": until}
+                await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "injured", "status_until": until, "injury": injury}})
+                await push_history(db, victim["_id"], f"Ferido em operação ({severity}).")
                 suffix = " O médico da equipa estabilizou-o — recupera mais depressa." if has_medic else ""
                 await add_event(db, pid, "police", f"{victim['name']} ficou ferido durante {t['name']}!{suffix}")
         elif outcome == "police" and random.random() < 0.3:
@@ -2339,7 +2365,8 @@ async def _crew_returns(db, player, m, outcome):
             # Advogado na equipa (SSS v4): a prisão dura menos.
             lawyer_mult = LAWYER_ARREST_MULT if m.get("has_lawyer") else 1.0
             until = (now_utc() + timedelta(seconds=480 * (1 - bonuses["legal"]) * lawyer_mult)).isoformat()
-            await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "arrested", "status_until": until}})
+            sentence = {"reason": t["name"], "started_at": now_utc().isoformat(), "release_at": until, "heat_at_arrest": player.get("heat", 0)}
+            await db.employees.update_one({"_id": victim["_id"]}, {"$set": {"status": "arrested", "status_until": until, "sentence": sentence}})
             await push_history(db, victim["_id"], "Preso pela polícia.")
             suffix = " O advogado da equipa já está a tratar da libertação." if m.get("has_lawyer") else ""
             await add_event(db, pid, "police", f"{victim['name']} foi PRESO durante {t['name']}!{suffix}")
@@ -2361,15 +2388,29 @@ async def _crew_returns(db, player, m, outcome):
             if random.random() < UNEXPECTED_REPAIR_CHANCE_PER_RISK * t["risk"]:
                 wear += UNEXPECTED_REPAIR_CONDITION_HIT
                 await add_event(db, pid, "vehicle", f"{veh['name']} sofreu uma avaria inesperada durante {t['name']}.")
+            # Revisão em atraso e pneus degradados aceleram desgaste.
+            km_since_service = float(veh.get("km_total", 0) or 0) - float(veh.get("last_service_km", 0) or 0)
+            if km_since_service >= VEHICLE_LIFECYCLE["service_interval_km"]:
+                wear *= 1.15
+            tires = max(0.0, float(veh.get("tires_pct", 100) or 0) - (float(m.get("round_km") or 0) / 100.0) * VEHICLE_LIFECYCLE["tire_wear_per_100km"])
+            if tires < 30:
+                wear *= 1.12
             new_condition = max(0.0, veh["condition"] - wear)
+            notoriety = min(100.0, float(veh.get("notoriety", 0) or 0) + t["risk"] * (3.5 if outcome == "police" else 1.4))
             inc = {
                 "missions_done": 1,
                 "missions_since_repair": 1,
             }
             if outcome == "success":
                 inc["missions_success"] = 1
+            vehicle_set = {"condition": new_condition, "tires_pct": tires, "notoriety": notoriety}
+            if outcome == "police" and notoriety >= 55 and random.random() < min(0.55, notoriety / 180):
+                insured = bool(veh.get("insurance_until")) and parse_dt(veh["insurance_until"]) > now_utc()
+                hold_s = 240 if insured else 600
+                vehicle_set["seized_until"] = (now_utc() + timedelta(seconds=hold_s)).isoformat()
+                await add_event(db, pid, "vehicle", f"{veh['name']} foi apreendido temporariamente após a operação.")
             await db.vehicles.update_one({"_id": veh["_id"]}, {
-                "$set": {"condition": new_condition},
+                "$set": vehicle_set,
                 "$inc": inc,
             })
 
@@ -2598,10 +2639,11 @@ async def _process_payroll(db, player, employees, now):
         employer_ss = int(round(gross_payroll * EMPLOYER_SOCIAL_SECURITY_RATE))
 
         vehicles = await db.vehicles.find({"player_id": pid}).to_list(200)
+        fixed_mult = fixed_cost_multiplier(player)
         fleet_weekly = int(round(sum(
             VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
             for v in vehicles
-        )))
+        ) * fixed_mult))
 
         props = await db.properties.find({"player_id": pid}).to_list(200)
         property_weekly = int(round(sum(
@@ -2609,9 +2651,10 @@ async def _process_payroll(db, player, employees, now):
             * max(1, int(p.get("level", 1)))
             * PROPERTY_MAINTENANCE_PCT_PER_WEEK
             for p in props
-        )))
+        ) * fixed_mult))
+        territory_weekly = int(round(territory_weekly_cost(player) * fixed_mult))
 
-        total = gross_payroll + employer_ss + fleet_weekly + property_weekly
+        total = gross_payroll + employer_ss + fleet_weekly + property_weekly + territory_weekly
         if total <= 0:
             continue
 
@@ -2621,7 +2664,8 @@ async def _process_payroll(db, player, employees, now):
                 db, pid, "system",
                 f"Fecho semanal pago: -{total:,} € "
                 f"(salários {gross_payroll:,} € + TSU {employer_ss:,} € + "
-                f"frota {fleet_weekly:,} € + imóveis {property_weekly:,} €).",
+                f"frota {fleet_weekly:,} € + imóveis {property_weekly:,} € + "
+                f"territórios {territory_weekly:,} €).",
             )
             await record_tx(
                 db, pid, "weekly_costs", -total, "clean", player["clean_money"],
@@ -3131,7 +3175,7 @@ async def _maybe_raid(db, player, props, minutes, now):
     cooldown = player.get("raid_cooldown_until")
     if cooldown and parse_dt(cooldown) > now:
         return
-    prob = min(0.5, minutes * 0.02 * (player["heat"] - 60) / 40)
+    prob = min(0.5, minutes * 0.02 * (player["heat"] - 60) / 40) * raid_risk_multiplier(player, props)
     if random.random() >= prob:
         return
     lab = random.choice(labs)
@@ -3211,6 +3255,30 @@ async def advance(db, player):
                                       "dirty_cap": dirty_money_cap(player["level"])})
     await process_automations(db, player, employees, vehicles, props, bonuses, now)
 
+    # Territórios: rendimento passivo com pressão rival crescente e defesa que
+    # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
+    territory_rate = territory_income_per_hour(player)
+    if minutes > 0 and territory_rate > 0:
+        ft = float(player.get("frac_territory", 0.0) or 0.0) + territory_rate * (minutes / 60.0)
+        territory_gain = int(ft)
+        player["frac_territory"] = ft - territory_gain
+        player["clean_money"] += territory_gain
+        territories = dict(player.get("territories") or {})
+        for district, info in territories.items():
+            data = dict(info or {})
+            data["pressure"] = min(100.0, float(data.get("pressure", 0) or 0) + minutes * 0.025)
+            data["defense"] = max(0.0, float(data.get("defense", 100) or 0) - minutes * 0.018)
+            territories[district] = data
+        player["territories"] = territories
+
+    # Notoriedade da frota arrefece fora de operações.
+    if minutes > 0:
+        await db.vehicles.update_many(
+            {"player_id": pid, "notoriety": {"$gt": 0}},
+            {"$inc": {"notoriety": -minutes / 60.0 * VEHICLE_LIFECYCLE["notoriety_decay_per_hour"]}},
+        )
+        await db.vehicles.update_many({"player_id": pid, "notoriety": {"$lt": 0}}, {"$set": {"notoriety": 0.0}})
+
     # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
     # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
     decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
@@ -3250,6 +3318,8 @@ async def advance(db, player):
         "quest_offer_history": player.get("quest_offer_history", {}),
         "pending_chains": player.get("pending_chains", []),
         "phrase_memory": player.get("phrase_memory", []),
+        "territories": player.get("territories", {}),
+        "frac_territory": player.get("frac_territory", 0.0),
     }})
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player
