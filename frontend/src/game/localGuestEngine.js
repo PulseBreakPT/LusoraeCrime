@@ -1150,7 +1150,11 @@ const mutateGame=(save,path,payload)=>{
     const members=save.employees.filter(e=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90);
     const vehicle=save.vehicles.find(v=>v.id===team.vehicle_id);
     const chance=missionChance(save,opp,team);
-    return {chance,reward:opp.reward,reward_bonus_pct:0,age_decay_pct:0,split_penalty_pct:0,
+    const pulse=localWorldPulse();
+    const pulseActive=pulse.category===opp.category;
+    const pulseRewardMult=pulseActive?pulse.reward_mult:1;
+    return {chance,reward:Math.round(opp.reward*pulseRewardMult),reward_bonus_pct:Math.round((pulseRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
+      world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       fuel_needed:vehicle?Math.max(1,Math.round((opp.dist_km*2*vehicle.cons/100)*10)/10):0,
       eta_s:10+Math.round(opp.dist_km*2),duration_s:opp.duration_s||24,
       breakdown:[
@@ -1201,18 +1205,52 @@ const mutateGame=(save,path,payload)=>{
     const missionFuelNeeded=Math.max(1,(roadRoundKm>0?roadRoundKm:opp.dist_km*2)*vehicle.cons/100);
     if(vehicle.fuel_l<missionFuelNeeded)fail(400,"Combustível insuficiente para a viagem rodoviária");
     const departAt=new Date(start).toISOString();
+    const arriveAt=new Date(start+eta).toISOString();
+    const finishAt=new Date(start+eta+oper).toISOString();
+    const returnAt=new Date(start+eta+oper+ret).toISOString();
+    const baseChance=missionChance(save,opp,team);
+    const pulse=localWorldPulse(start);
+    const pulseActive=pulse.category===opp.category;
+    const pulseRewardMult=pulseActive?pulse.reward_mult:1;
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
-      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:opp.reward,pays:opp.pays,
-      fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:missionChance(save,opp,team),phase:"en_route",
-      depart_at:departAt,started_at:departAt,arrive_at:new Date(start+eta).toISOString(),
-      finish_at:new Date(start+eta+oper).toISOString(),return_at:new Date(start+eta+oper+ret).toISOString(),
+      member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult),pays:opp.pays,
+      fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:baseChance,success_chance:baseChance,
+      live_chance_delta:0,decision_reward_mult:1,phase:"en_route",
+      depart_at:departAt,started_at:departAt,arrive_at:arriveAt,finish_at:finishAt,return_at:returnAt,
       origin,origin_property_id:vehicle.property_id||null,target,
       road_outward:roadOutward,road_inward:roadInward,
-      opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key}};
+      live_log:[],
+      decision:localMissionDecision(opp.category,opp.risk,arriveAt,finishAt),
+      world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
+      opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
+        reward:Math.round(opp.reward*pulseRewardMult),risk:opp.risk,heat:opp.heat,pays:opp.pays}};
     team.status="on_mission";members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
     addEvent(save,"dispatch",`${team.name} saiu para ${opp.name}.`);return {ok:true,mission_id:mission.id};
+  }
+  if(path==="missions/decision"){
+    const mission=save.missions.find(m=>m.id===p.mission_id);
+    if(!mission)fail(404,"Operação não encontrada");
+    const decision=mission.decision;
+    if(!decision||decision.status!=="pending")fail(400,"Esta decisão já não está disponível");
+    const now=Date.now();
+    if(mission.phase!=="operating"||now<Date.parse(decision.opens_at))fail(400,"A janela de decisão ainda não abriu");
+    if(now>Date.parse(decision.expires_at)){decision.status="expired";fail(400,"A janela de decisão terminou — a equipa manteve o plano original");}
+    const option=(decision.options||[]).find(o=>o.id===p.option_id);
+    if(!option)fail(400,"Opção tática inválida");
+    mission.live_chance_delta=(mission.live_chance_delta||0)+Number(option.chance_delta||0);
+    mission.decision_reward_mult=Number(option.reward_mult||1);
+    decision.status="resolved";decision.choice=option.id;decision.choice_label=option.label;decision.resolved_at=nowIso();
+    save.player.heat=clamp(save.player.heat+Number(option.heat_delta||0),0,100);
+    save.employees.filter(e=>mission.member_ids.includes(e.id)).forEach(e=>{
+      e.fatigue=clamp((e.fatigue||0)+Number(option.fatigue_delta||0),0,100);
+    });
+    mission.live_log ||= [];
+    mission.live_log.push({at:nowIso(),speaker:"COMANDO",kind:Number(option.chance_delta||0)>0?"comp_good":Number(option.chance_delta||0)<0?"comp_bad":"radio",
+      text:`${option.label} — ordem executada.`,...(Number(option.chance_delta||0)?{pct:Number(option.chance_delta)}:{})});
+    addEvent(save,"intel",`${mission.team_name}: decisão tática — ${option.label}.`);
+    return {ok:true,choice:option.id,effects:{chance_delta:option.chance_delta||0,reward_mult:option.reward_mult||1,heat_delta:option.heat_delta||0,fatigue_delta:option.fatigue_delta||0}};
   }
   if(path==="missions/recall"){
     const mission=save.missions.find(m=>m.id===p.mission_id);if(!mission)fail(404,"Missão não encontrada");
