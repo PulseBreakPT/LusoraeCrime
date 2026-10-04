@@ -587,6 +587,25 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         for pr in properties
     )))
     weekly_fixed_total = gross_salary + employer_ss + fleet_weekly + property_weekly
+    caps_out = {
+        "employees": {"used": len(employees), "max": caps["employees"]},
+        "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
+        "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
+        "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
+    }
+    retention = build_retention_snapshot(
+        now=now_utc(),
+        player=p,
+        teams=teams,
+        employees=employees,
+        vehicles=vehicles,
+        properties=properties,
+        opportunities=opportunities,
+        missions=missions,
+        history=history,
+        caps=caps_out,
+        weekly_fixed_total=weekly_fixed_total,
+    )
 
     return {
         "server_time": now_iso,
@@ -602,12 +621,8 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         "history": [Mission.from_mongo(h).model_dump() for h in history],
         "events": [Event.from_mongo(e).model_dump() for e in events],
         "quests": quests_out,
-        "caps": {
-            "employees": {"used": len(employees), "max": caps["employees"]},
-            "vehicles": {"used": len(vehicles), "max": caps["vehicles"]},
-            "teams": {"used": len(teams), "max": max_teams_for(player["level"])},
-            "dirty_money": {"used": round(player["dirty_money"]), "max": dirty_money_cap(player["level"])},
-        },
+        "caps": caps_out,
+        "retention": retention,
         "bonuses": bonuses,
         "salary_total": gross_salary,
         "weekly_fixed_total": weekly_fixed_total,
