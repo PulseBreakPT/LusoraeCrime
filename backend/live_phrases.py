@@ -1,4 +1,4 @@
-"""live_phrases.py — Banco narrativo partilhado da Operação em Direto (SSS).
+"""live_phrases.py — Banco narrativo partilhado das operações.
 
 Contém as centenas de variantes NÃO específicas de um tipo de missão:
 viagem (por período do dia, calor, incidentes), aberturas/fechos da operação,
@@ -14,17 +14,17 @@ item é (speaker, texto). Nas complicações cada item é (texto, pct_min, pct_m
 """
 
 # ---------------------------------------------------------------------------
-# ABERTURA — CENTRAL anuncia a partida (variantes)
+# ABERTURA — partida da equipa (variantes)
 # ---------------------------------------------------------------------------
 DISPATCH_OPEN = [
-    "Canal cifrado aberto. {team} em rota — alvo: {opp} ({district}).",
+    "{team} em rota para {opp}, em {district}.",
     "Ligação estabelecida com {team}. Destino {district}, objetivo {opp}.",
     "{team} destacada. Relógio a contar para {opp}, em {district}.",
     "Sinal verde para {team}. A caminho de {opp} — bairro de {district}.",
-    "Rede em silêncio para {team}. Missão {opp} arranca agora, {district}.",
-    "Central para {team}: rota traçada até {opp}. Boa sorte lá em {district}.",
+    "{team} parte agora para {opp}, em {district}.",
+    "{team} segue para {opp}, em {district}.",
     "{team} no ar. Alvo bloqueado — {opp}, coração de {district}.",
-    "A operação {opp} começou. {team} rumo a {district}, canal seguro.",
+    "A operação {opp} começou. {team} segue para {district}.",
 ]
 
 # ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ RETURN_FAILURE = [
 
 RETURN_FAILURE_CAUSE = [
     ("Análise preliminar: {cause} pesou contra a operação."),
-    ("A central confirma — {cause} foi o que nos deitou o plano abaixo."),
+    ("{cause} foi o que deitou o plano abaixo."),
     ("Ponto fraco identificado: {cause}. Fica a lição para a próxima."),
     ("O relatório aponta {cause} como a razão principal da falha."),
 ]
@@ -414,7 +414,7 @@ RETURN_ARRIVAL = [
     ("Chegámos. Portões a fechar atrás de nós — estamos em casa."),
     ("Aproximação final ao esconderijo. Luzes apagadas, motor ao ralenti."),
     ("De volta ao ninho. Descarregar e descansar — mereceram."),
-    ("Unidade em casa. Encerrar canal em breve."),
+    ("Equipa de regresso à base."),
     ("A recolher à base sem sobressaltos. Portões abertos, café a fazer."),
 ]
 
@@ -423,7 +423,7 @@ RECALL_ORDER = [
     ("Ordem de regresso emitida — abortar aproximação e voltar à base."),
     ("Cancelar operação. Voltem já, sem completar o objetivo."),
     ("Mudança de planos — recolher a unidade imediatamente."),
-    ("Abortar missão. Regresso à base ordenado pela central."),
+    ("Missão abortada. Regresso à base."),
 ]
 
 RECALL_ACK = [
