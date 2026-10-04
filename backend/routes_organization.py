@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from functools import wraps
 from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from auth import get_current_user
 from db import db
@@ -51,55 +53,103 @@ async def _debit(player: dict, amount: int, *, stat: str | None = None) -> dict:
     return fresh
 
 
-class SupplyTradeInput(BaseModel):
+class MutationInput(BaseModel):
+    request_id: str | None = Field(default=None, max_length=80)
+
+
+def idempotent(action_name: str):
+    """Persist a short-lived mutation receipt so network retries cannot double-spend."""
+    def decorator(fn):
+        @wraps(fn)
+        async def wrapped(*args, **kwargs):
+            body = kwargs.get("body")
+            if body is None:
+                body = next((arg for arg in args if isinstance(arg, BaseModel)), None)
+            request_id = getattr(body, "request_id", None)
+            user = kwargs.get("user")
+            if user is None:
+                user = next((arg for arg in args if isinstance(arg, dict) and "_id" in arg), None)
+            if not request_id or not user:
+                return await fn(*args, **kwargs)
+
+            key = f"{user['_id']}:{action_name}:{request_id}"
+            now = now_utc()
+            try:
+                await db.action_receipts.insert_one({
+                    "key": key,
+                    "status": "processing",
+                    "created_at": now,
+                    "expires_at": now + timedelta(hours=24),
+                })
+            except DuplicateKeyError:
+                existing = await db.action_receipts.find_one({"key": key})
+                if existing and existing.get("status") == "done":
+                    return existing.get("result") or {"ok": True, "idempotent_replay": True}
+                raise HTTPException(status_code=409, detail="Ação já está a ser processada")
+
+            try:
+                result = await fn(*args, **kwargs)
+            except Exception:
+                await db.action_receipts.delete_one({"key": key, "status": "processing"})
+                raise
+            await db.action_receipts.update_one(
+                {"key": key},
+                {"$set": {"status": "done", "result": result}},
+            )
+            return result
+        return wrapped
+    return decorator
+
+
+class SupplyTradeInput(MutationInput):
     item_key: str
     packs: int = Field(default=1, ge=1, le=100)
 
 
-class TeamRenameInput(BaseModel):
+class TeamRenameInput(MutationInput):
     team_id: str
     name: str = Field(min_length=1, max_length=40)
 
 
-class TeamDoctrineInput(BaseModel):
+class TeamDoctrineInput(MutationInput):
     team_id: str
     doctrine: str
 
 
-class TeamPolicyInput(BaseModel):
+class TeamPolicyInput(MutationInput):
     team_id: str
     policies: dict
 
 
-class TeamLoadoutInput(BaseModel):
+class TeamLoadoutInput(MutationInput):
     team_id: str
     loadout: dict[str, int] = Field(default_factory=dict)
 
 
-class EntityIdInput(BaseModel):
+class EntityIdInput(MutationInput):
     id: str
 
 
-class WeaponUpgradeInput(BaseModel):
+class WeaponUpgradeInput(MutationInput):
     weapon_id: str
     upgrade_key: str
 
 
-class PropertyModuleInput(BaseModel):
+class PropertyModuleInput(MutationInput):
     property_id: str
     module_key: str
 
 
-class PropertyStaffInput(BaseModel):
+class PropertyStaffInput(MutationInput):
     property_id: str
     employee_ids: list[str] = Field(default_factory=list)
 
 
-class DepartmentInput(BaseModel):
+class DepartmentInput(MutationInput):
     department_key: str
 
 
-class TerritoryInput(BaseModel):
+class TerritoryInput(MutationInput):
     district: str
 
 
@@ -120,6 +170,7 @@ async def organization_catalog():
 
 
 @router.post("/inventory/buy")
+@idempotent("inventory.buy")
 async def buy_supply(body: SupplyTradeInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     cfg = SUPPLY_CATALOG.get(body.item_key)
@@ -144,6 +195,7 @@ async def buy_supply(body: SupplyTradeInput, user: dict = Depends(get_current_us
 
 
 @router.post("/inventory/sell")
+@idempotent("inventory.sell")
 async def sell_supply(body: SupplyTradeInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     cfg = SUPPLY_CATALOG.get(body.item_key)
@@ -164,6 +216,7 @@ async def sell_supply(body: SupplyTradeInput, user: dict = Depends(get_current_u
 
 
 @router.post("/teams/rename")
+@idempotent("teams.rename")
 async def rename_team(body: TeamRenameInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     team = await db.teams.find_one({"_id": _oid(body.team_id, "Equipa inválida"), "player_id": str(player["_id"])})
@@ -176,6 +229,7 @@ async def rename_team(body: TeamRenameInput, user: dict = Depends(get_current_us
 
 
 @router.post("/teams/doctrine")
+@idempotent("teams.doctrine")
 async def set_doctrine(body: TeamDoctrineInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     if body.doctrine not in TEAM_DOCTRINES:
@@ -190,6 +244,7 @@ async def set_doctrine(body: TeamDoctrineInput, user: dict = Depends(get_current
 
 
 @router.post("/teams/policies")
+@idempotent("teams.policies")
 async def set_policies(body: TeamPolicyInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     clean = default_team_policies()
@@ -210,6 +265,7 @@ async def set_policies(body: TeamPolicyInput, user: dict = Depends(get_current_u
 
 
 @router.post("/teams/loadout")
+@idempotent("teams.loadout")
 async def set_loadout(body: TeamLoadoutInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     inv = normalize_inventory(player)
@@ -232,6 +288,7 @@ async def set_loadout(body: TeamLoadoutInput, user: dict = Depends(get_current_u
 
 
 @router.post("/teams/dissolve")
+@idempotent("teams.dissolve")
 async def dissolve_team(body: EntityIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -249,6 +306,7 @@ async def dissolve_team(body: EntityIdInput, user: dict = Depends(get_current_us
 
 
 @router.post("/weapons/reload")
+@idempotent("weapons.reload")
 async def reload_weapon(body: EntityIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -279,6 +337,7 @@ async def reload_weapon(body: EntityIdInput, user: dict = Depends(get_current_us
 
 
 @router.post("/weapons/upgrade")
+@idempotent("weapons.upgrade")
 async def upgrade_weapon(body: WeaponUpgradeInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -303,6 +362,7 @@ async def upgrade_weapon(body: WeaponUpgradeInput, user: dict = Depends(get_curr
 
 
 @router.post("/vehicles/service")
+@idempotent("vehicles.service")
 async def service_vehicle(body: EntityIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -332,6 +392,7 @@ async def service_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/vehicles/tires")
+@idempotent("vehicles.tires")
 async def replace_tires(body: EntityIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -350,6 +411,7 @@ async def replace_tires(body: EntityIdInput, user: dict = Depends(get_current_us
 
 
 @router.post("/vehicles/insurance")
+@idempotent("vehicles.insurance")
 async def insure_vehicle(body: EntityIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -364,6 +426,7 @@ async def insure_vehicle(body: EntityIdInput, user: dict = Depends(get_current_u
 
 
 @router.post("/vehicles/inspection")
+@idempotent("vehicles.inspection")
 async def inspect_vehicle(body: EntityIdInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -380,6 +443,7 @@ async def inspect_vehicle(body: EntityIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/properties/module")
+@idempotent("properties.module")
 async def upgrade_property_module(body: PropertyModuleInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -401,6 +465,7 @@ async def upgrade_property_module(body: PropertyModuleInput, user: dict = Depend
 
 
 @router.post("/properties/staff")
+@idempotent("properties.staff")
 async def assign_property_staff(body: PropertyStaffInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
@@ -438,6 +503,7 @@ async def assign_property_staff(body: PropertyStaffInput, user: dict = Depends(g
 
 
 @router.post("/departments/upgrade")
+@idempotent("departments.upgrade")
 async def upgrade_department(body: DepartmentInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     cfg = DEPARTMENTS.get(body.department_key)
@@ -457,6 +523,7 @@ async def upgrade_department(body: DepartmentInput, user: dict = Depends(get_cur
 
 
 @router.post("/territories/claim")
+@idempotent("territories.claim")
 async def claim_territory(body: TerritoryInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     if int(player.get("level", 1)) < 5:
@@ -475,6 +542,7 @@ async def claim_territory(body: TerritoryInput, user: dict = Depends(get_current
 
 
 @router.post("/territories/consolidate")
+@idempotent("territories.consolidate")
 async def consolidate_territory(body: TerritoryInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     info = dict((player.get("territories") or {}).get(body.district) or {})
@@ -492,6 +560,7 @@ async def consolidate_territory(body: TerritoryInput, user: dict = Depends(get_c
 
 
 @router.post("/territories/defend")
+@idempotent("territories.defend")
 async def defend_territory(body: TerritoryInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     info = dict((player.get("territories") or {}).get(body.district) or {})
@@ -516,11 +585,12 @@ async def vehicle_lifecycle(vehicle_id: str, user: dict = Depends(get_current_us
     return vehicle_service_snapshot(vehicle)
 
 
-class PrestigeInput(BaseModel):
+class PrestigeInput(MutationInput):
     item_key: str
 
 
 @router.post("/prestige/buy")
+@idempotent("prestige.buy")
 async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     cfg = PRESTIGE_CATALOG.get(body.item_key)
@@ -538,7 +608,8 @@ async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_use
 
 
 @router.post("/governance/protection")
-async def buy_protection(user: dict = Depends(get_current_user)):
+@idempotent("governance.protection")
+async def buy_protection(body: MutationInput, user: dict = Depends(get_current_user)):
     player = await _player(user)
     pid = str(player["_id"])
     employees, properties = await asyncio.gather(
