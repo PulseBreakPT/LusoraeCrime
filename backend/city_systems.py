@@ -369,7 +369,14 @@ async def city_snapshot(db, player):
                 }
                 for row in pvp_players
             ],
-            "pvp_challenges": [_serialize(x) for x in pvp_challenges],
+            "pvp_challenges": [
+                {
+                    **_serialize(x),
+                    "is_incoming": x.get("defender_id") == pid,
+                    "is_outgoing": x.get("attacker_id") == pid,
+                }
+                for x in pvp_challenges
+            ],
         },
         "boss": {
             "health": int(player.get("boss_health", 100) or 100),
