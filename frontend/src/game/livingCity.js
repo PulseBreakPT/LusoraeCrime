@@ -197,13 +197,13 @@ export const advanceLocalCity = (save) => {
           rival.last_action_at=nowIso();
           pushEvent(save,"warning",`${rival.name} sabotou ${b.name} (-${hit}% condição).`);
         }else if(Number(rival.hostility||0)>=55&&roll<.72){
-          const heatGain=2+(seed%4),stressGain=2+((seed>>4)%5);
+          const heatGain=2+(seed%4),stressGain=2+((seed>>>4)%5);
           save.player.heat=clamp(Number(save.player.heat||0)+heatGain,0,100);
           save.city.boss.stress=clamp(Number(save.city.boss.stress||0)+stressGain,0,100);
           rival.intel=Math.min(10,Number(rival.intel||0)+1);rival.last_action_at=nowIso();
           let suffix="";
-          if(save.player.heat>=88&&((seed>>8)%100)<12&&!save.city.boss.sentence_until){
-            const minutes=15+((seed>>10)%31);
+          if(save.player.heat>=88&&((seed>>>8)%100)<12&&!save.city.boss.sentence_until){
+            const minutes=15+((seed>>>10)%31);
             save.city.boss.sentence_until=new Date(Date.now()+minutes*60000).toISOString();
             suffix=" O chefe acabou detido temporariamente.";
           }
