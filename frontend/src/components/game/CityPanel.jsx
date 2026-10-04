@@ -52,7 +52,7 @@ const ActionButton = ({ children, onClick, disabled, tone = "default" }) => (
 );
 
 export const CityPanel = ({ open, onOpenChange }) => {
-  const { refresh: refreshGame } = useGame();
+  const { state, refresh: refreshGame } = useGame();
   const [tab, setTab] = useState("pulse");
   const [city, setCity] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -103,6 +103,9 @@ export const CityPanel = ({ open, onOpenChange }) => {
   const season = city?.season;
   const businesses = city?.businesses || [];
   const catalog = city?.business_catalog || {};
+  const rivalActions = city?.rival_actions || {};
+  const playerLevel = Number(state?.player?.level || 1);
+  const cleanMoney = Number(state?.player?.clean_money || 0);
   const ownedByType = useMemo(
     () => Object.fromEntries(Object.keys(catalog).map((key) => [key, businesses.filter((b) => b.type_key === key).length])),
     [catalog, businesses]
@@ -283,11 +286,11 @@ export const CityPanel = ({ open, onOpenChange }) => {
                       <span>Intel <b className="text-zinc-300">{rival.intel}</b></span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      <ActionButton disabled={!!busy} onClick={() => act(`recon-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"recon" })}><Eye size={11} className="mr-1" /> Recon</ActionButton>
-                      <ActionButton tone="danger" disabled={!!busy} onClick={() => act(`sabotage-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"sabotage" })}><Bomb size={11} className="mr-1" /> Sabotar</ActionButton>
-                      <ActionButton disabled={!!busy} onClick={() => act(`pressure-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"pressure" })}><TrendingUp size={11} className="mr-1" /> Pressão</ActionButton>
-                      <ActionButton tone="good" disabled={!!busy} onClick={() => act(`truce-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"truce" })}><Handshake size={11} className="mr-1" /> Trégua</ActionButton>
-                      <ActionButton tone="good" disabled={!!busy} onClick={() => act(`alliance-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"alliance" })}>Acordo</ActionButton>
+                      <ActionButton disabled={!!busy || cleanMoney < Number(rivalActions.recon?.cost || 0)} onClick={() => act(`recon-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"recon" })}><Eye size={11} className="mr-1" /> Recon · {fmtMoney(rivalActions.recon?.cost || 0)}</ActionButton>
+                      <ActionButton tone="danger" disabled={!!busy || cleanMoney < Number(rivalActions.sabotage?.cost || 0)} onClick={() => act(`sabotage-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"sabotage" })}><Bomb size={11} className="mr-1" /> Sabotar · {fmtMoney(rivalActions.sabotage?.cost || 0)}</ActionButton>
+                      <ActionButton disabled={!!busy || cleanMoney < Number(rivalActions.pressure?.cost || 0)} onClick={() => act(`pressure-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"pressure" })}><TrendingUp size={11} className="mr-1" /> Pressão · {fmtMoney(rivalActions.pressure?.cost || 0)}</ActionButton>
+                      <ActionButton tone="good" disabled={!!busy || cleanMoney < Number(rivalActions.truce?.cost || 0)} onClick={() => act(`truce-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"truce" })}><Handshake size={11} className="mr-1" /> Trégua · {fmtMoney(rivalActions.truce?.cost || 0)}</ActionButton>
+                      <ActionButton tone="good" disabled={!!busy || cleanMoney < Number(rivalActions.alliance?.cost || 0)} onClick={() => act(`alliance-${rival.id}`, "rivals/action", { rival_id:rival.id, action:"alliance" })}>Acordo · {fmtMoney(rivalActions.alliance?.cost || 0)}</ActionButton>
                     </div>
                   </Card>
                 ))}
