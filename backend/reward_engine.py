@@ -291,8 +291,11 @@ def calculate_money_reward(
         repeat_penalty = REPEAT_PENALTY_MULTIPLIER ** repeat_count
         reward *= repeat_penalty
 
-    # Clamp final
-    return int(max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward)))
+    # Clamp final. Mantém 90k até ao nível 10 e abre espaço de forma
+    # gradual para operações de late-game, sem saltos bruscos na economia.
+    late_levels = max(0, min(100, int(org_level or 1)) - 10)
+    reward_cap = MONEY_REWARD_MAX + late_levels * MONEY_REWARD_MAX_LATE_PER_LEVEL
+    return int(max(MONEY_REWARD_MIN, min(reward_cap, reward)))
 
 
 def calculate_xp_reward(
