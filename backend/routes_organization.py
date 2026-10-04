@@ -12,13 +12,20 @@ from pymongo.errors import DuplicateKeyError
 from auth import get_current_user
 from db import db
 from engine import add_event, now_utc, record_tx
-from game_data import WEAPON_MODELS
+from game_data import WEAPON_MODELS, PROPERTY_TYPES
+from economy_constants import (
+    EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
+    PROPERTY_MAINTENANCE_PCT_PER_WEEK,
+)
+from organization_intelligence import (
+    build_organization_intelligence, quote_action, organization_policy,
+)
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
     department_cost, department_level, inventory_capacity, inventory_used,
     normalize_inventory, vehicle_service_snapshot, default_team_policies,
-    PRESTIGE_CATALOG, protection_cost,
+    PRESTIGE_CATALOG, protection_cost, fixed_cost_multiplier, territory_weekly_cost,
 )
 
 router = APIRouter(prefix="/api/game/org", tags=["organization"])
@@ -96,6 +103,19 @@ def idempotent(action_name: str):
                 {"key": key},
                 {"$set": {"status": "done", "result": result}},
             )
+            try:
+                payload = body.model_dump() if body is not None else {}
+                payload.pop("request_id", None)
+                await db.organization_audit.insert_one({
+                    "player_user_id": str(user["_id"]),
+                    "action": action_name,
+                    "payload": payload,
+                    "result": result,
+                    "ts": now_utc().isoformat(),
+                })
+            except Exception:
+                # Auditoria nunca deve transformar uma mutação válida em erro.
+                pass
             return result
         return wrapped
     return decorator
@@ -153,6 +173,18 @@ class TerritoryInput(MutationInput):
     district: str
 
 
+class OrganizationQuoteInput(BaseModel):
+    action: str
+    payload: dict = Field(default_factory=dict)
+
+
+class OrganizationPolicyInput(MutationInput):
+    reserve_cash: int = Field(default=25000, ge=0, le=100_000_000)
+    max_single_spend_pct: float = Field(default=0.35, ge=0.05, le=1.0)
+    stock_targets: dict[str, int] = Field(default_factory=dict)
+    automation: dict[str, bool] = Field(default_factory=dict)
+
+
 @router.get("/catalog")
 async def organization_catalog():
     return {
@@ -166,6 +198,132 @@ async def organization_catalog():
         "property_modules": PROPERTY_MODULES,
         "vehicle_lifecycle": VEHICLE_LIFECYCLE,
         "prestige": PRESTIGE_CATALOG,
+    }
+
+
+@router.get("/intelligence")
+async def organization_intelligence(user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    teams, employees, vehicles, weapons, properties, transactions = await asyncio.gather(
+        db.teams.find({"player_id": pid}).to_list(200),
+        db.employees.find({"player_id": pid}).to_list(500),
+        db.vehicles.find({"player_id": pid}).to_list(300),
+        db.weapons.find({"player_id": pid}).to_list(500),
+        db.properties.find({"player_id": pid}).to_list(300),
+        db.transactions.find({"player_id": pid}).sort("ts", -1).to_list(2000),
+    )
+    gross_salary = int(sum(int(e.get("salary", 0) or 0) for e in employees))
+    employer_ss = int(round(gross_salary * EMPLOYER_SOCIAL_SECURITY_RATE))
+    fixed_mult = fixed_cost_multiplier(player)
+    fleet_weekly = int(round(sum(
+        VEHICLE_ANNUAL_FIXED_COSTS.get(v.get("model_key"), 0) / 52
+        for v in vehicles
+    ) * fixed_mult))
+    property_weekly = int(round(sum(
+        (p.get("purchase_price") or PROPERTY_TYPES.get(p.get("type_key"), {}).get("price", 0))
+        * max(1, int(p.get("level", 1) or 1))
+        * PROPERTY_MAINTENANCE_PCT_PER_WEEK
+        for p in properties
+    ) * fixed_mult))
+    territory_weekly = int(round(territory_weekly_cost(player) * fixed_mult))
+    weekly_fixed_total = gross_salary + employer_ss + fleet_weekly + property_weekly + territory_weekly
+    return build_organization_intelligence(
+        player=player,
+        teams=teams,
+        employees=employees,
+        vehicles=vehicles,
+        weapons=weapons,
+        properties=properties,
+        transactions=transactions,
+        weekly_fixed_total=weekly_fixed_total,
+        now=now_utc(),
+    )
+
+
+@router.post("/quote")
+async def organization_quote(body: OrganizationQuoteInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    payload = dict(body.payload or {})
+    entity = None
+    if body.action.startswith("vehicle_"):
+        raw_id = payload.get("id") or payload.get("vehicle_id")
+        if raw_id:
+            entity = await db.vehicles.find_one({"_id": _oid(raw_id, "Veículo inválido"), "player_id": pid})
+            if not entity:
+                raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    elif body.action == "weapon_upgrade":
+        raw_id = payload.get("weapon_id") or payload.get("id")
+        if raw_id:
+            entity = await db.weapons.find_one({"_id": _oid(raw_id, "Arma inválida"), "player_id": pid})
+            if not entity:
+                raise HTTPException(status_code=404, detail="Arma não encontrada")
+    elif body.action == "property_module":
+        raw_id = payload.get("property_id")
+        if raw_id:
+            entity = await db.properties.find_one({"_id": _oid(raw_id, "Imóvel inválido"), "player_id": pid})
+            if not entity:
+                raise HTTPException(status_code=404, detail="Imóvel não encontrado")
+    employees = properties = []
+    if body.action == "protection":
+        employees, properties = await asyncio.gather(
+            db.employees.find({"player_id": pid}).to_list(500),
+            db.properties.find({"player_id": pid}).to_list(300),
+        )
+    return quote_action(
+        action=body.action,
+        player=player,
+        payload=payload,
+        employees=employees,
+        properties=properties,
+        entity=entity,
+    )
+
+
+@router.get("/policy")
+async def get_organization_policy(user: dict = Depends(get_current_user)):
+    return organization_policy(await _player(user))
+
+
+@router.post("/policy")
+@idempotent("policy.update")
+async def set_organization_policy(body: OrganizationPolicyInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    targets = {
+        key: max(0, min(10000, int(value or 0)))
+        for key, value in body.stock_targets.items()
+        if key in SUPPLY_CATALOG
+    }
+    allowed_auto = {"enabled", "auto_restock", "renew_insurance", "preventive_service"}
+    automation = {key: bool(value) for key, value in body.automation.items() if key in allowed_auto}
+    policy = {
+        "reserve_cash": int(body.reserve_cash),
+        "max_single_spend_pct": float(body.max_single_spend_pct),
+        "stock_targets": targets,
+        "automation": automation,
+    }
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"organization_policy": policy}})
+    return {"ok": True, "policy": organization_policy({**player, "organization_policy": policy})}
+
+
+@router.get("/audit")
+async def organization_audit(user: dict = Depends(get_current_user), limit: int = 50):
+    player = await _player(user)
+    rows = await db.organization_audit.find(
+        {"player_user_id": str(user["_id"])}
+    ).sort("ts", -1).to_list(max(1, min(200, int(limit or 50))))
+    return {
+        "items": [
+            {
+                "id": str(row["_id"]),
+                "action": row.get("action"),
+                "payload": row.get("payload") or {},
+                "result": row.get("result") or {},
+                "ts": row.get("ts"),
+            }
+            for row in rows
+        ]
     }
 
 
