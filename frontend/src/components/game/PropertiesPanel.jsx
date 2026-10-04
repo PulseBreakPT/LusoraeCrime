@@ -98,15 +98,13 @@ export const PropertiesPanel = ({ open, onOpenChange, focusTarget }) => {
           <SheetDescription className="text-zinc-500">Cada esquina comprada é uma esquina controlada — expande o território.</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-3">
         {state.player.heat >= 70 && props.some((p) => p.type_key === "laboratorio") && (
-          <Alert variant="destructive" data-testid="raid-warning" className="border-red-600/40 bg-red-600/10 py-2">
+          <Alert variant="destructive" data-testid="raid-warning" className="mt-3 border-red-600/40 bg-red-600/10 py-2">
             <AlertDescription className="flex items-center gap-1.5 font-mono text-[10px] text-red-400">
               <Siren size={12} /> Calor alto: risco de rusga policial aos laboratórios!
             </AlertDescription>
           </Alert>
         )}
-        </div>
 
         {(() => {
           const { dirtyPerH, launderPerH, heatPerH } = passiveRates(state, catalog, serverNow());
