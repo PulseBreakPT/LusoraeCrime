@@ -1910,6 +1910,28 @@ export async function localGuestRequest(method,url,payload){
   if(verb==="get"&&path==="/game/state"){persist(save);return {data:publicState(save),status:200};}
   if(verb==="get"&&path==="/game/mastermind/state"){const data=mastermindSnapshot(save);persist(save);return {data,status:200};}
   if(verb==="get"&&path==="/game/transactions") return {data:{transactions:clone(save.transactions)},status:200};
+  if(verb==="get"&&path==="/game/org/intelligence"){const data=guestOrgIntelligence(save);persist(save);return {data,status:200};}
+  if(verb==="get"&&path==="/game/org/policy"){return {data:guestOrgPolicy(save),status:200};}
+  if(verb==="get"&&path.startsWith("/game/org/audit")){
+    const match=path.match(/[?&]limit=(\d+)/),limit=Math.max(1,Math.min(200,Number(match?.[1]||50)));
+    return {data:{items:clone((save.organization_audit||[]).slice(0,limit))},status:200};
+  }
+  if(verb==="post"&&path==="/game/org/quote"){
+    const intel=guestOrgIntelligence(save),action=payload?.action,p=payload?.payload||{};
+    let cost=0,effect="",eligible=true,blocking_reasons=[];
+    if(action==="supply_buy"){const row=intel.stock.find(x=>x.key===p.item_key),packs=Math.max(1,Number(p.packs||1));cost=Number(row?.buy_price||0)*packs;effect=row?`+${Number(LOCAL_CATALOG.organization.supplies[p.item_key]?.pack||1)*packs} ${row.name}`:"";if(!row){eligible=false;blocking_reasons.push("Consumível inválido.");}}
+    else if(action?.startsWith("vehicle_")){const row=intel.fleet.find(x=>x.id===(p.id||p.vehicle_id));const key=action.replace("vehicle_","");cost=Number(row?.costs?.[key]||0);effect=key;}
+    else if(action==="property_module"){const row=intel.properties.find(x=>x.id===p.property_id);cost=Number(row?.module_costs?.[p.module_key]||0);effect=p.module_key;}
+    else if(action==="department_upgrade"){cost=Number(intel.quotes.departments?.[p.department_key]?.next_cost||0);effect=p.department_key;}
+    else if(action==="territory_claim"){cost=Number(intel.quotes.territory_claim||0);effect="Presença territorial";}
+    else if(action==="territory_defend"){const row=intel.territories.find(x=>x.district===p.district);cost=Number(row?.costs?.defend||0);effect="Defesa territorial";}
+    else if(action==="territory_consolidate"){const row=intel.territories.find(x=>x.district===p.district);cost=Number(row?.costs?.consolidate||0);effect="Consolidação territorial";}
+    else if(action==="protection"){cost=Number(intel.quotes.protection||0);effect="Proteção institucional";}
+    else {eligible=false;blocking_reasons.push("Ação não suportada.");}
+    if(Number(save.player.clean_money||0)<cost){eligible=false;blocking_reasons.push("Dinheiro limpo insuficiente.");}
+    const after=Number(save.player.clean_money||0)-cost,reserve=Number(intel.policy.reserve_cash||0);
+    return {data:{action,cost,cash_before:save.player.clean_money,cash_after:after,effect,eligible,blocking_reasons,reserve_cash:reserve,breaks_reserve:cost>0&&after<reserve,concentration_risk:cost>Number(save.player.clean_money||0)*Number(intel.policy.max_single_spend_pct||.35),warnings:[]},status:200};
+  }
   if(verb==="get"&&path==="/game/org/finance/summary"){
     ensureOrganizationSave(save);
     const cutoff=Date.now()-30*86400000;
@@ -1925,6 +1947,12 @@ export async function localGuestRequest(method,url,payload){
   if(verb==="post"&&path.startsWith("/game/")){
     const actionPath=path.slice("/game/".length);
     const data=mutateGame(save,actionPath,payload);
+    if(actionPath.startsWith("org/")){
+      const cleanPayload={...(payload||{})};delete cleanPayload.request_id;
+      save.organization_audit ||= [];
+      save.organization_audit.unshift({id:uid("oaudit"),action:actionPath.slice(4).replaceAll("/", "."),payload:cleanPayload,result:clone(data||{}),ts:nowIso()});
+      save.organization_audit=save.organization_audit.slice(0,200);
+    }
     persist(save);
     return {data,status:200};
   }
