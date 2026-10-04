@@ -131,12 +131,12 @@ export const SummaryStrip = ({ cols = 4, children, testId, className = "" }) => 
 export const SectionHeader = ({ icon: Icon, title, meta, action, tip, className = "", testId }) => (
   <div data-testid={testId} className={`mb-2.5 flex items-center gap-2 ${className}`}>
     <Tip tip={tip}>
-      <h3 className="flex min-w-0 shrink-0 items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300">
+      <h3 className="flex min-w-0 shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
         {Icon && <Icon size={12} className="shrink-0 text-red-500/90" />}
         <span className="truncate">{title}</span>
       </h3>
     </Tip>
-    <span className="h-px min-w-3 flex-1 bg-gradient-to-r from-white/[0.14] via-white/[0.06] to-transparent" aria-hidden="true" />
+    <span className="h-px min-w-3 flex-1 bg-white/[0.08]" aria-hidden="true" />
     {meta != null && <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">{meta}</span>}
     {action}
   </div>
