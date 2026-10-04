@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 from organization_systems import (
-    SUPPLY_CATALOG, TEAM_DOCTRINES, WEAPON_UPGRADES,
+    SUPPLY_CATALOG, TEAM_DOCTRINES, TEAM_PRESETS, WEAPON_UPGRADES,
     normalize_inventory, inventory_used, inventory_capacity,
     doctrine_effect, apply_weapon_upgrades, weapon_ammo_status,
     territory_weekly_cost, territory_income_per_hour,
-    prestige_effects, protection_active, property_operations_factor,
+    prestige_effects, protection_active, protection_risk_multiplier,
+    property_operations_factor, loadout_effect, rival_profile,
 )
 
 
@@ -65,6 +66,39 @@ def test_protection_expiry_is_time_aware():
 def test_property_operations_staff_and_module_stack():
     assert property_operations_factor({"operations_level": 0, "staff_employee_ids": []}) == 1.0
     assert property_operations_factor({"operations_level": 2, "staff_employee_ids": ["1", "2"]}) > 1.1
+
+
+def test_every_team_preset_references_real_systems():
+    assert len(TEAM_PRESETS) >= 5
+    for preset in TEAM_PRESETS.values():
+        assert preset["doctrine"] in TEAM_DOCTRINES
+        assert preset["loadout"]
+        assert all(key in SUPPLY_CATALOG for key in preset["loadout"])
+
+
+def test_signal_and_documents_change_real_mission_effects():
+    base = loadout_effect({}, "tecnica")
+    prepared = loadout_effect({"signal_kit": 1, "fake_docs": 1}, "tecnica")
+    assert prepared["chance"] > base["chance"]
+    assert prepared["heat"] < base["heat"]
+
+
+def test_governance_trust_and_exposure_are_real_tradeoffs():
+    now = datetime.now(timezone.utc)
+    until = (now + timedelta(days=10)).isoformat()
+    trusted = protection_risk_multiplier({"governance": {"protection_until": until, "trust": 90, "exposure": 5}}, now)
+    exposed = protection_risk_multiplier({"governance": {"protection_until": until, "trust": 10, "exposure": 90}}, now)
+    assert trusted < exposed < 1.0
+
+
+def test_rival_profile_is_stable_per_district():
+    a = rival_profile("Centro 1")
+    b = rival_profile("Centro 1")
+    c = rival_profile("Norte 2")
+    assert a == b
+    assert a["name"]
+    assert 20 <= a["strength"] <= 100
+    assert a != c
 
 
 if __name__ == "__main__":
