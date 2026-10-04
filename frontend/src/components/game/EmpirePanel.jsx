@@ -187,20 +187,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
         <div className="mt-6">
           <SectionHeader icon={Banknote} title="Lavagem de dinheiro" />
           <Card className="sub-card p-3 shadow-none">
-            <div className="flex items-baseline justify-between">
-              <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Retorno base de 78% (22% de fricção), melhorável até 90%.</p>
-              {state.caps?.dirty_money?.max > 0 && (
-                <Tip tip={`Capacidade do cofre de dinheiro sujo: ${fmtMoney(p.dirty_money)} de ${fmtMoney(state.caps.dirty_money.max)}. Produção dos laboratórios acima deste limite é desperdiçada — sobe de nível para aumentar, ou lava regularmente.`} align="end">
-                  <span
-                    data-testid="dirty-cap-indicator"
-                    className="shrink-0 font-mono text-[10px]"
-                    style={{ color: p.dirty_money >= state.caps.dirty_money.max * 0.9 ? "#EF4444" : "#71717A" }}
-                  >
-                    cofre {Math.round((p.dirty_money / state.caps.dirty_money.max) * 100)}%
-                  </span>
-                </Tip>
-              )}
-            </div>
+            <p className="text-xs text-zinc-500">Converte dinheiro sujo em limpo. Retorno base de 78% (22% de fricção), melhorável até 90%.</p>
             <div className="mt-2 flex flex-col gap-2 min-[420px]:flex-row">
               <Input
                 data-testid="launder-amount-input"
@@ -253,7 +240,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
         </div>
 
         <div className="mt-6">
-          <SectionHeader icon={Siren} title="Polícia" meta={`${Math.round(p.heat)}%`} />
+          <SectionHeader icon={Siren} title="Polícia" />
           <Card className="sub-card p-3 shadow-none">
             <div className="flex justify-between font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               <Tip tip={hs.desc}>
