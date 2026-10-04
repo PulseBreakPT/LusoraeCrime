@@ -3,14 +3,14 @@ import { fmtMoney, chanceColor, CATEGORY_COLORS } from "../../lib/game";
 import { Radio, Crosshair, Siren, X } from "lucide-react";
 
 /*
- * Operação em Direto — painel embutível com a "transmissão" das operações.
+ * Operações — painel embutível com a atividade das operações.
  * Revela o guião da missão (live_log do backend) linha a linha, seguindo o
  * relógio do servidor: rádio da equipa, marcos da operação e COMPLICAÇÕES com
  * efeito real na chance (o pct de cada complicação soma à "chance ao vivo",
  * que é exatamente o valor usado pelo servidor no desfecho).
  *
  * Este painel já não se posiciona sozinho sobre o mapa: vive dentro da
- * "Central da rede" (ActivityFeed), no separador EM DIRETO — uma só superfície
+ * "Central da rede" (ActivityFeed), no separador OPERAÇÕES — uma só superfície
  * de UI em vez de dois widgets sobrepostos.
  */
 
@@ -123,7 +123,7 @@ export function LiveOpsPanel({ state, serverNow }) {
           Sem operações no terreno
         </p>
         <p className="mt-1 font-mono text-[10px] leading-relaxed text-zinc-600">
-          Despacha uma equipa para acompanhares no mapa o percurso, os membros, as fases e a chance ao vivo.
+          Despacha uma equipa para acompanhares no mapa o percurso, os membros, as fases e a probabilidade de sucesso.
         </p>
       </div>
     );
@@ -225,7 +225,7 @@ export function LiveOpsPanel({ state, serverNow }) {
         </div>
       )}
 
-      {/* Estado + timeline de fases + chance ao vivo */}
+      {/* Estado + fases + probabilidade de sucesso */}
       <div className="flex items-center gap-3 px-3 pb-1 pt-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
