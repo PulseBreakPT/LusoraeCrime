@@ -5270,3 +5270,26 @@ html.sub-focus-mode .sub-optional-hud {
         height: 10px !important;
     }
 }
+
+
+/* ============================================================
+   RESOURCE BAR V7 — COMBINED PROGRESSION
+   Level and points are one progression metric, leaving three equal groups.
+   ============================================================ */
+.sub-resource-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.sub-resource-grid [data-testid="stat-level"] .sub-resource-value {
+    color: #d4d4d8;
+}
+
+@media (max-width: 380px) {
+    .sub-resource-grid .sub-resource-label {
+        font-size: 10px !important;
+    }
+
+    .sub-resource-grid .sub-resource-value {
+        font-size: 11px !important;
+    }
+}
