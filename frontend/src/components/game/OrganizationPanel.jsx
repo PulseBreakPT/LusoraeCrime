@@ -141,7 +141,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
           <TabsList className="grid h-auto w-full grid-cols-4 gap-1 bg-black/40">
             {TABS.map(({ key, label, icon: Icon }) => (
-              <TabsTrigger key={key} value={key} className="min-h-9 gap-1 px-1 font-mono text-[9px] uppercase data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger key={key} value={key} className="min-h-9 gap-1 px-1 font-mono text-[10px] uppercase data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Icon size={11} /> {label}
               </TabsTrigger>
             ))}
@@ -161,9 +161,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               <Card className="sub-card p-3">
                 <SectionHeader icon={Wallet} title="Centro Financeiro" meta="últimos 30 dias" />
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div><p className="font-mono text-[9px] uppercase text-zinc-500">Receitas</p><p className="font-mono text-xs font-bold text-emerald-300">{fmtMoney(finance.income)}</p></div>
-                  <div><p className="font-mono text-[9px] uppercase text-zinc-500">Despesas</p><p className="font-mono text-xs font-bold text-red-300">{fmtMoney(finance.expenses)}</p></div>
-                  <div><p className="font-mono text-[9px] uppercase text-zinc-500">Património</p><p className="font-mono text-xs font-bold text-sky-300">{fmtMoney(finance.asset_value)}</p></div>
+                  <div><p className="font-mono text-[10px] uppercase text-zinc-500">Receitas</p><p className="font-mono text-xs font-bold text-emerald-300">{fmtMoney(finance.income)}</p></div>
+                  <div><p className="font-mono text-[10px] uppercase text-zinc-500">Despesas</p><p className="font-mono text-xs font-bold text-red-300">{fmtMoney(finance.expenses)}</p></div>
+                  <div><p className="font-mono text-[10px] uppercase text-zinc-500">Património</p><p className="font-mono text-xs font-bold text-sky-300">{fmtMoney(finance.asset_value)}</p></div>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-1 text-[10px] text-zinc-500">
                   <span>Imóveis {fmtMoney(finance.property_value)}</span>
@@ -189,7 +189,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-white">{d.name}</p>
                         <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-500">{d.desc}</p>
-                        <p className="mt-1 font-mono text-[9px] uppercase text-zinc-600">{unlocked ? `Nível ${level}/${d.max_level}` : `Requer QG ${d.unlock_hq}`}</p>
+                        <p className="mt-1 font-mono text-[10px] uppercase text-zinc-600">{unlocked ? `Nível ${level}/${d.max_level}` : `Requer QG ${d.unlock_hq}`}</p>
                       </div>
                       <PurchaseButton
                         label={maxed ? "Máx." : fmtMoney(cost)}
@@ -219,7 +219,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       <Crown size={15} className={owned ? "text-amber-300" : "text-zinc-600"} />
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-white">{item.name}</p>
-                        <p className="font-mono text-[9px] text-zinc-500">nível {item.unlock_level} · investimento permanente</p>
+                        <p className="font-mono text-[10px] text-zinc-500">nível {item.unlock_level} · investimento permanente</p>
                       </div>
                       <PurchaseButton
                         label={owned ? "Adquirido" : fmtMoney(item.cost)}
@@ -239,7 +239,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                 <ShieldCheck size={16} className="text-emerald-300" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-white">Rede de proteção</p>
-                  <p className="font-mono text-[9px] text-zinc-500">
+                  <p className="font-mono text-[10px] text-zinc-500">
                     {org.governance?.protection_until && Date.parse(org.governance.protection_until) > now
                       ? `ativa por ${daysLeft(org.governance.protection_until, now)} dias`
                       : "inativa · reduz risco de rusga durante 30 dias"}
@@ -276,7 +276,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                         <span className="font-mono text-[11px] font-bold text-zinc-200">×{qty}</span>
                       </div>
                       <p className="mt-0.5 text-[10px] text-zinc-500">{item.desc}</p>
-                      <p className="mt-1 font-mono text-[9px] uppercase text-zinc-600">
+                      <p className="mt-1 font-mono text-[10px] uppercase text-zinc-600">
                         pack ×{item.pack} · {fmtMoney(item.price)} · espaço {item.space}
                       </p>
                     </div>
@@ -307,7 +307,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
                       <InlineRename value={team.name} onSave={(name) => renameTeam(team.id, name)} />
-                      <p className="font-mono text-[9px] uppercase text-zinc-600">{team.spec} · {team.status}</p>
+                      <p className="font-mono text-[10px] uppercase text-zinc-600">{team.spec} · {team.status}</p>
                     </div>
                     <ConfirmButton
                       label="Dissolver"
@@ -319,7 +319,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
 
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase text-zinc-500">Doutrina</span>
+                      <span className="font-mono text-[10px] uppercase text-zinc-500">Doutrina</span>
                       <select
                         value={team.doctrine || "balanced"}
                         disabled={team.status !== "idle"}
@@ -330,7 +330,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       </select>
                     </label>
                     <label className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase text-zinc-500">Abortar abaixo de</span>
+                      <span className="font-mono text-[10px] uppercase text-zinc-500">Abortar abaixo de</span>
                       <div className="flex gap-1">
                         <Input
                           type="number" min="0" max="60"
@@ -346,7 +346,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   </div>
 
                   <div>
-                    <p className="mb-2 font-mono text-[9px] uppercase text-zinc-500">Material consumido no despacho</p>
+                    <p className="mb-2 font-mono text-[10px] uppercase text-zinc-500">Material consumido no despacho</p>
                     <div className="grid grid-cols-2 gap-1.5">
                       {LOADOUT_KEYS.map((key) => {
                         const item = orgCatalog.supplies?.[key];
@@ -397,15 +397,15 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-xs font-semibold text-white">{v.name}</p>
-                      <p className="font-mono text-[9px] uppercase text-zinc-600">{Math.round(v.km_total || 0)} km · revisão em {Math.round(due)} km</p>
+                      <p className="font-mono text-[10px] uppercase text-zinc-600">{Math.round(v.km_total || 0)} km · revisão em {Math.round(due)} km</p>
                     </div>
-                    {seized && <span className="rounded bg-red-500/10 px-2 py-1 font-mono text-[9px] text-red-300">APREENDIDO</span>}
+                    {seized && <span className="rounded bg-red-500/10 px-2 py-1 font-mono text-[10px] text-red-300">APREENDIDO</span>}
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div><p className="font-mono text-[9px] text-zinc-500">Condição {Math.round(v.condition)}%</p><MiniBar value={v.condition} color={v.condition < 40 ? "#EF4444" : "#34D399"} /></div>
-                    <div><p className="font-mono text-[9px] text-zinc-500">Pneus {Math.round(v.tires_pct ?? 100)}%</p><MiniBar value={v.tires_pct ?? 100} color={(v.tires_pct ?? 100) < 35 ? "#EF4444" : "#F59E0B"} /></div>
-                    <div><p className="font-mono text-[9px] text-zinc-500">Notoriedade {Math.round(v.notoriety || 0)}%</p><MiniBar value={v.notoriety || 0} color="#EF4444" /></div>
-                    <div className="font-mono text-[9px] text-zinc-500">
+                    <div><p className="font-mono text-[10px] text-zinc-500">Condição {Math.round(v.condition)}%</p><MiniBar value={v.condition} color={v.condition < 40 ? "#EF4444" : "#34D399"} /></div>
+                    <div><p className="font-mono text-[10px] text-zinc-500">Pneus {Math.round(v.tires_pct ?? 100)}%</p><MiniBar value={v.tires_pct ?? 100} color={(v.tires_pct ?? 100) < 35 ? "#EF4444" : "#F59E0B"} /></div>
+                    <div><p className="font-mono text-[10px] text-zinc-500">Notoriedade {Math.round(v.notoriety || 0)}%</p><MiniBar value={v.notoriety || 0} color="#EF4444" /></div>
+                    <div className="font-mono text-[10px] text-zinc-500">
                       <p>Seguro: {insured ? `${daysLeft(v.insurance_until, now)}d` : "inativo"}</p>
                       <p>IPO: {inspected ? `${daysLeft(v.inspection_due_at, now)}d` : "pendente"}</p>
                     </div>
@@ -439,7 +439,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-semibold text-white">{w.name}</p>
-                      <p className="font-mono text-[9px] text-zinc-500">{ammoKey ? `${loaded}/${cap} munições · stock ${inventory[ammoKey] || 0}` : "sem munições"}</p>
+                      <p className="font-mono text-[10px] text-zinc-500">{ammoKey ? `${loaded}/${cap} munições · stock ${inventory[ammoKey] || 0}` : "sem munições"}</p>
                     </div>
                     <SmallAction disabled={!ammoKey || loaded >= cap} onClick={() => reloadWeapon(w.id)}>
                       <Fuel size={11} /> Recarregar
@@ -461,7 +461,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     </SmallAction>
                   </div>
                   {(w.upgrades || []).length > 0 && (
-                    <p className="mt-2 font-mono text-[9px] text-zinc-600">
+                    <p className="mt-2 font-mono text-[10px] text-zinc-600">
                       {(w.upgrades || []).map((u) => upgradeCatalog[u.key]?.name || u.key).join(" · ")}
                     </p>
                   )}
@@ -481,9 +481,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold text-white">{p.name}</p>
-                      <p className="font-mono text-[9px] uppercase text-zinc-600">{p.district} · N{p.level}</p>
+                      <p className="font-mono text-[10px] uppercase text-zinc-600">{p.district} · N{p.level}</p>
                     </div>
-                    <span className="font-mono text-[9px] text-zinc-500">{selectedStaff.size}/4 destacados</span>
+                    <span className="font-mono text-[10px] text-zinc-500">{selectedStaff.size}/4 destacados</span>
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-1.5">
                     {Object.entries(propertyModules).map(([key, mod]) => {
@@ -499,13 +499,13 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                           className="h-auto min-h-12 flex-col border-white/10 bg-white/[0.03] px-1 py-2"
                         >
                           <span className="text-[10px] text-zinc-300">{mod.name}</span>
-                          <span className="font-mono text-[9px] text-zinc-600">N{level}/{mod.max_level}</span>
+                          <span className="font-mono text-[10px] text-zinc-600">N{level}/{mod.max_level}</span>
                         </Button>
                       );
                     })}
                   </div>
                   <div className="mt-3">
-                    <p className="mb-1.5 font-mono text-[9px] uppercase text-zinc-500">Operacionais destacados</p>
+                    <p className="mb-1.5 font-mono text-[10px] uppercase text-zinc-500">Operacionais destacados</p>
                     <div className="max-h-28 space-y-1 overflow-y-auto">
                       {freePropertyStaff.map((e) => (
                         <label key={e.id} className="flex items-center gap-2 rounded border border-white/[0.06] px-2 py-1.5 text-[10px] text-zinc-400">
@@ -548,13 +548,13 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-xs font-semibold text-white">{district}</p>
-                      <p className="font-mono text-[9px] uppercase text-zinc-600">{tierCfg.name || `Nível ${tier}`} · +{Math.round((tierCfg.reward_bonus || 0) * 100)}% recompensa local</p>
+                      <p className="font-mono text-[10px] uppercase text-zinc-600">{tierCfg.name || `Nível ${tier}`} · +{Math.round((tierCfg.reward_bonus || 0) * 100)}% recompensa local</p>
                     </div>
                     <span className="font-mono text-[10px] text-emerald-300">{fmtMoney(tierCfg.income_h || 0)}/h</span>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div><p className="font-mono text-[9px] text-zinc-500">Defesa {Math.round(info.defense || 0)}%</p><MiniBar value={info.defense || 0} color="#22D3EE" /></div>
-                    <div><p className="font-mono text-[9px] text-zinc-500">Pressão {Math.round(info.pressure || 0)}%</p><MiniBar value={info.pressure || 0} color="#EF4444" /></div>
+                    <div><p className="font-mono text-[10px] text-zinc-500">Defesa {Math.round(info.defense || 0)}%</p><MiniBar value={info.defense || 0} color="#22D3EE" /></div>
+                    <div><p className="font-mono text-[10px] text-zinc-500">Pressão {Math.round(info.pressure || 0)}%</p><MiniBar value={info.pressure || 0} color="#EF4444" /></div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-1.5">
                     <SmallAction onClick={() => defendTerritory(district)}><ShieldCheck size={11} /> Reforçar</SmallAction>
@@ -574,7 +574,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <MapPinned size={14} className="text-zinc-500" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-white">{name}</p>
-                    <p className="font-mono text-[9px] text-zinc-600">Presença inicial · {fmtMoney(territoryTiers[1]?.cost || 0)}</p>
+                    <p className="font-mono text-[10px] text-zinc-600">Presença inicial · {fmtMoney(territoryTiers[1]?.cost || 0)}</p>
                   </div>
                   <PurchaseButton
                     label="Tomar posição"
