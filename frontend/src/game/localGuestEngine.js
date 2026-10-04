@@ -1025,6 +1025,15 @@ const localRetention=(save,caps)=>{
     if(ready&&opps)moves.push({id:"dispatch-next",horizon:"agora",priority:90,title:"Há trabalho pronto",
       description:`${ready} equipa(s) pronta(s) e ${opps} oportunidade(s) disponíveis.`,panel:"operations",focus_test_id:null,
       progress:{value:ready,target:ready,pct:100},tone:"cyan"});
+    else if(!save.teams.length)moves.push({id:"build-first-team",horizon:"agora",priority:88,title:"Monta uma equipa operacional",
+      description:"Sem uma equipa não consegues transformar oportunidades em progresso.",panel:"teams",focus_test_id:"team-builder",
+      progress:{value:0,target:1,pct:0},tone:"cyan"});
+    else if(!ready)moves.push({id:"restore-readiness",horizon:"agora",priority:86,title:"Põe uma equipa pronta",
+      description:"Há equipas, mas nenhuma está em condições de receber uma nova ordem.",panel:"teams",focus_test_id:null,
+      progress:{value:0,target:save.teams.length,pct:0},tone:"amber"});
+    else moves.push({id:"scan-opportunities",horizon:"agora",priority:72,title:"Lê o terreno",
+      description:"As equipas estão prontas. Verifica a próxima janela operacional no mapa.",panel:"operations",focus_test_id:null,
+      progress:{value:0,target:1,pct:0},tone:"cyan"});
   }
   const tired=[...save.employees].filter(e=>(e.fatigue||0)>=65).sort((a,b)=>b.fatigue-a.fatigue)[0];
   const damaged=[...save.vehicles].filter(v=>(v.condition??100)<45).sort((a,b)=>a.condition-b.condition)[0];
