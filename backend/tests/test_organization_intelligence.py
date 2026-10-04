@@ -72,7 +72,7 @@ def test_intelligence_surfaces_real_operational_risks():
     assert any(a["code"] == "territory:Centro" for a in snapshot["alerts"])
     vehicle = snapshot["fleet"][0]
     assert vehicle["costs"]["service"] < vehicle["costs"]["service_base"]
-    assert snapshot["stock"][4]["buy_price"] > 0
+    assert next(row for row in snapshot["stock"] if row["key"] == "medical_kit")["buy_price"] > 0
 
 
 def test_policy_is_clamped_and_backward_compatible():
