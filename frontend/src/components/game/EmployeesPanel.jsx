@@ -21,7 +21,7 @@ import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
-  Swords, ShieldAlert,
+  Swords, ShieldAlert, Loader2,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -524,10 +524,11 @@ const CandidateCard = ({ c }) => {
 };
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, refreshPool, restEmployee, favoriteEmployeeIds, optimizeEmployees } = useGame();
+  const { state, catalog, serverNow, refreshPool, restEmployee, restAllEligible, favoriteEmployeeIds, optimizeEmployees } = useGame();
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
+  const [restAllBusy, setRestAllBusy] = useState(false);
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
   useTick(open);
   if (!state || !catalog) return null;
@@ -547,7 +548,15 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
   });
 
   const restAllIds = state.employees.filter((e) => e.status === "idle" && e.fatigue >= 15).map((e) => e.id);
-  const restAll = () => restAllEligible();
+  const restAll = async () => {
+    if (restAllBusy) return;
+    setRestAllBusy(true);
+    try {
+      await restAllEligible();
+    } finally {
+      setRestAllBusy(false);
+    }
+  };
 
   // QI do efetivo — o Otimizar preenche vagas de equipas disponíveis com quem
   // está de fora, por aptidão à especialização (nunca move membros entre equipas).
@@ -733,9 +742,12 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate }) => {
                         data-testid="employees-rest-all"
                         variant="outline"
                         onClick={restAll}
+                        disabled={restAllBusy}
+                        aria-busy={restAllBusy}
+                        aria-label={`Descansar ${restAllIds.length} operacionais`}
                         className="h-auto shrink-0 gap-1 border-white/10 px-2 py-1.5 font-mono text-[10px] text-amber-300 hover:bg-white/5"
                       >
-                        <BedDouble size={11} /> {restAllIds.length}
+                        {restAllBusy ? <Loader2 size={11} className="animate-spin" /> : <BedDouble size={11} />} {restAllIds.length}
                       </Button>
                     </Tip>
                   )}

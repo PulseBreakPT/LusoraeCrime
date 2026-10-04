@@ -210,16 +210,17 @@ export default function GamePage() {
       {!focusMode && <ResourceBar />}
       {!focusMode && showFps && <FpsMeter />}
       {!focusMode && availableMissions.length > 0 && (
-        <div
-          role="status"
+        <button
+          type="button"
           data-testid="available-missions-hud"
-          className="sub-optional-hud sub-available-missions-hud pointer-events-none"
-          aria-label={`${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
-          title="Indicador de operações disponíveis — usa o dock Operações para abrir."
+          className="sub-optional-hud sub-available-missions-hud"
+          aria-label={`Abrir operações — ${availableMissions.length} operaç${availableMissions.length === 1 ? "ão disponível" : "ões disponíveis"}`}
+          title="Abrir operações disponíveis"
+          onClick={() => openFromNav("operations")}
         >
           <Target size={21} aria-hidden="true" />
           <span className="sub-available-missions-count">{availableMissions.length}</span>
-        </div>
+        </button>
       )}
       {!focusMode && wantedStars > 0 && (
         <div
