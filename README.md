@@ -103,14 +103,14 @@ O motor usa um modelo de progressão persistente e data-driven: o conteúdo vive
 | Modelos de veículos | **11** |
 | Modelos de armas | **9** |
 | Tipos de imóveis | **12** |
-| Quests/missões definidas | **102** |
-| Capítulos principais | **6** |
+| Quests/missões definidas | **120** |
+| Capítulos principais | **12** |
 | Zonas geradas à volta do QG | **até ~16** |
 | Níveis de procurado | **0–5 estrelas** |
 | Ranks de reputação de rua | **6** |
-| Alvos Mastermind | **3** |
-| Ranks Mastermind | **5** |
-| Mercadorias Mastermind | **4** |
+| Alvos Mastermind | **7** |
+| Ranks Mastermind | **10** |
+| Mercadorias Mastermind | **8** |
 
 ### Conteúdo de operações
 
@@ -369,7 +369,7 @@ O modelo de armas considera:
 - o preço regional efetivamente pago é usado também nas melhorias automáticas;
 - o QG possui sistema próprio de upgrades, prioridades e cosméticos;
 - os departamentos Financeiro, RH, Logística, Investigação e Comunicações têm três níveis e efeitos reais;
-- nível máximo atual do QG: **8**.
+- nível máximo atual do QG: **10**, com o tier final reservado à organização nível **100**.
 
 ---
 
@@ -411,6 +411,16 @@ Outros sistemas:
 - rede de proteção temporária contra rusgas.
 
 O fecho económico acontece **todas as segundas-feiras às 20:00, Europe/Lisbon**. Cobra salários brutos, TSU patronal, a fração semanal dos custos fixos da frota, manutenção imobiliária e defesa territorial. Combustível e reparações continuam a ser custos variáveis. Os valores são centralizados em `backend/economy_constants.py`.
+
+---
+
+## Progressão 1–100
+
+A organização tem agora **100 níveis**. Os níveis 1–10 preservam os thresholds históricos para manter compatibilidade com saves existentes; os níveis 11–100 usam uma curva progressiva própria.
+
+O conteúdo deixa de ficar concentrado no early game: operações, veículos, armas, imóveis, recrutamento, território, prestige, especializações, QG e Mastermind distribuem desbloqueios ao longo da carreira. Marcos estruturais incluem território no 20/45/75, contactos no 75, infraestrutura soberana no 85 e o capstone **Império SUBMUNDO** no nível 100.
+
+O frontend mostra o próximo desbloqueio relevante e revela módulos avançados progressivamente para reduzir carga visual no início.
 
 ---
 
@@ -496,9 +506,13 @@ O sistema **Mastermind** representa operações de grande escala com planeamento
 
 ### Alvos
 
-- **Leilão da Meia-Noite**;
-- **Reserva do Estuário**;
-- **Nó Soberano**.
+- **Leilão da Meia-Noite** — organização nível 10;
+- **Reserva do Estuário** — nível 25;
+- **Nó Soberano** — nível 40;
+- **Cofre do Freeport** — nível 55;
+- **Bolsa do Consórcio** — nível 70;
+- **Arquivo Soberano** — nível 85;
+- **Operação SUBMUNDO** — capstone de nível 100.
 
 ### Estrutura de um golpe
 
@@ -518,11 +532,13 @@ O sistema **Mastermind** representa operações de grande escala com planeamento
 
 - Silencioso;
 - Infiltração;
-- Choque.
+- Choque;
+- Fantasma;
+- Distribuído.
 
 ### Progressão Mastermind
 
-Cinco estatutos: Planeador, Coordenador, Arquiteto, Mastermind e Lenda.
+Dez estatutos: Planeador, Coordenador, Arquiteto, Mastermind, Estratega, Diretor, Soberano, Arquiteto Nacional, Lenda e SUBMUNDO.
 
 Também inclui:
 
@@ -534,7 +550,7 @@ Também inclui:
 - caçadores;
 - caches de sinal territoriais;
 - mercado negro;
-- quatro mercadorias: Microchips Selados, Caixas de Arte, Malas Clínicas e Chaves Cifradas;
+- oito mercadorias, desde Microchips Selados até Chaves Soberanas;
 - preços dinâmicos em janelas de **15 minutos**.
 
 ---
