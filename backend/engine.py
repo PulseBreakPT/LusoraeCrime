@@ -41,7 +41,7 @@ from game_data import (OPPORTUNITY_TYPES, LISBON_SPOTS, LEVEL_THRESHOLDS, EMP_LE
                        WEAR_PER_MISSION_SINCE_REPAIR, WEAR_MISSIONS_SINCE_REPAIR_CAP,
                        EMPLOYEE_HEAVY_USE_THRESHOLD, EMPLOYEE_HEAVY_USE_FATIGUE_MULT,
                        RAIN_CHANCE, RAIN_TRAVEL_MULT, NIGHT_STEALTH_HOURS, NIGHT_STEALTH_BONUS,
-                       PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL,
+                       PROPERTY_STACK_DIMINISH, DIRTY_MONEY_CAP_BASE, DIRTY_MONEY_CAP_PER_LEVEL, DIRTY_MONEY_CAP_LATE_PER_LEVEL,
                        REFUEL_DURATION_BASE_S, REFUEL_DURATION_PER_L_S,
                        FUEL_PRICES,
                        HQ_MAX_LEVEL, HQ_LEVEL_BENEFITS,
@@ -599,9 +599,16 @@ def property_stack_mult(rank):
 
 
 def dirty_money_cap(level):
-    """Limite de armazenamento de dinheiro sujo — acima disto, o excesso
-    produzido é desperdiçado (por isso vale a pena lavar regularmente)."""
-    return DIRTY_MONEY_CAP_BASE + DIRTY_MONEY_CAP_PER_LEVEL * max(0, level - 1)
+    """Capacidade do cofre com curva piecewise até ao nível 100.
+
+    Os níveis 1-10 preservam exatamente a economia anterior. A partir do 11,
+    o cofre cresce mais depressa para comportar golpes de endgame sem retirar
+    a pressão de lavar dinheiro regularmente.
+    """
+    level = max(1, min(100, int(level or 1)))
+    early = DIRTY_MONEY_CAP_BASE + DIRTY_MONEY_CAP_PER_LEVEL * max(0, min(level, 10) - 1)
+    late = DIRTY_MONEY_CAP_LATE_PER_LEVEL * max(0, level - 10)
+    return early + late
 
 
 async def push_history(db, emp_id, text):
