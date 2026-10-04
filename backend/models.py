@@ -76,6 +76,7 @@ class Team(BaseDocument):
     available_at: Optional[str] = None
     roster_stable_since: Optional[str] = None
     last_type_key: Optional[str] = None
+    last_type_at: Optional[str] = None
     repeat_type_count: int = 0
     # QI das equipas (SSS v4) — campos persistidos pelo motor e agora expostos
     # no /state para a UI mostrar momentum, entrosamento e familiaridade.

@@ -74,7 +74,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        SLOT_COST_VEHICLE_BASE, SLOT_COST_EMPLOYEE_BASE, SLOT_COST_SCALE_PER_UNIT,
                        VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
-from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX, REPEAT_PENALTY_MULTIPLIER
+from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX, REPEAT_PENALTY_MULTIPLIER, REPEAT_PENALTY_RESETS_AFTER_MIN
 from property_market import property_market_price
 from road_routing import road_router
 from travel_metrics import road_mission_metrics
@@ -907,7 +907,13 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
 
     team_skill = team_effectiveness(members, opp["category"], now)
     spec_match = team["spec"] == opp["category"] or opp["category"] == "especial"
-    repeat_count = int(team.get("repeat_type_count", 0) or 0) + 1 if team.get("last_type_key") == opp["type_key"] else 0
+    same_type = team.get("last_type_key") == opp["type_key"]
+    last_type_at = parse_dt(team.get("last_type_at")) if team.get("last_type_at") else None
+    repeat_window_s = max(1, REPEAT_PENALTY_RESETS_AFTER_MIN) * 60
+    repeat_is_live = bool(
+        same_type and last_type_at and 0 <= (now - last_type_at).total_seconds() <= repeat_window_s
+    )
+    repeat_count = int(team.get("repeat_type_count", 0) or 0) + 1 if repeat_is_live else 0
     operation_profile = opp.get("profile") or operation_profile_of(opp.get("type_key"), opp.get("category"))
     # Inteligência da equipa (SSS v4): papéis internos e memória, lidos uma vez
     # aqui e usados na chance, nas perseguições e nas consequências pós-missão.
@@ -1305,6 +1311,7 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         {"_id": team["_id"], "player_id": pid, "status": "idle"},
         {"$set": {
             "status": "en_route", "last_type_key": opp["type_key"],
+            "last_type_at": now.isoformat(),
             "repeat_type_count": prep.get("repeat_count", 0),
         }},
         return_document=ReturnDocument.BEFORE,
@@ -1736,7 +1743,7 @@ async def create_team(body: TeamCreateInput, user: dict = Depends(get_current_us
         "available_at": None, "roster_stable_since": created,
         # SSS v4: memória da equipa — momentum, familiaridade e entrosamento.
         "streak": 0, "category_missions": {}, "roster_missions": 0,
-        "repeat_type_count": 0,
+        "repeat_type_count": 0, "last_type_at": None,
         "doctrine": "balanced", "policies": default_team_policies(), "loadout": {},
     }
     fresh_player = await _debit_clean_atomic(player, TEAM_CREATE_COST, {"stats.teams_created": 1})

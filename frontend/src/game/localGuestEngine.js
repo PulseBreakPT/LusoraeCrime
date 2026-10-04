@@ -133,7 +133,7 @@ const makeVehicle = (modelKey, teamId = null) => {
 const makeTeam = () => ({
   id: uid("team"), name: "Crew Alfa", spec: "assalto", status: "idle", vehicle_id: null,
   missions_done: 0, streak: 0, category_missions: {}, roster_missions: 0,
-  last_type_key: null, repeat_type_count: 0,
+  last_type_key: null, last_type_at: null, repeat_type_count: 0,
   available_at: null, roster_stable_since: nowIso(), emblem_key: null,
 });
 
@@ -671,6 +671,15 @@ const rollFrom = (text) => {
   return (h >>> 0) / 4294967296;
 };
 
+const consecutiveRepeatCount = (team, opp, nowMs = Date.now()) => {
+  if (!team || team.last_type_key !== opp?.type_key || !team.last_type_at) return 0;
+  const last = Date.parse(team.last_type_at);
+  if (!Number.isFinite(last)) return 0;
+  const resetMin = Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_reset_min || 60);
+  if (nowMs - last < 0 || nowMs - last > resetMin * 60000) return 0;
+  return Number(team.repeat_type_count || 0) + 1;
+};
+
 const missionChance = (save, opp, team) => {
   const members = save.employees.filter((e)=>e.team_id===team.id && e.status==="idle" && e.fatigue < 90);
   const skill = members.length ? members.reduce((sum,e)=>{
@@ -1127,7 +1136,7 @@ const mutateGame=(save,path,payload)=>{
     const pulse=localWorldPulse();
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
-    const repeatCount=team.last_type_key===opp.type_key?Number(team.repeat_type_count||0)+1:0;
+    const repeatCount=consecutiveRepeatCount(team,opp);
     const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
     const profile=operationProfileEffect(save,opp,members,vehicle);
     return {chance,reward:Math.round(opp.reward*pulseRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
@@ -1190,7 +1199,7 @@ const mutateGame=(save,path,payload)=>{
     const pulse=localWorldPulse(start);
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
-    const repeatCount=team.last_type_key===opp.type_key?Number(team.repeat_type_count||0)+1:0;
+    const repeatCount=consecutiveRepeatCount(team,opp);
     const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
     const profile=operationProfileEffect(save,opp,members,vehicle);
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
@@ -1206,7 +1215,7 @@ const mutateGame=(save,path,payload)=>{
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
         reward:Math.round(opp.reward*pulseRewardMult*repeatMult),risk:opp.risk,heat:opp.heat,pays:opp.pays,profile:profile.profile}};
-    team.status="on_mission";team.last_type_key=opp.type_key;team.repeat_type_count=repeatCount;members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
+    team.status="on_mission";team.last_type_key=opp.type_key;team.last_type_at=new Date(start).toISOString();team.repeat_type_count=repeatCount;members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
     addEvent(save,"dispatch",`${team.name} saiu para ${opp.name}.`);return {ok:true,mission_id:mission.id};
