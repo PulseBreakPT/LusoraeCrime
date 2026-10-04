@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Search, Crosshair, Target, Building2, Users, IdCard, Car, Warehouse,
-  Swords, ShoppingBag, Landmark, BrainCircuit, Radar, Settings, RefreshCw,
+  Swords, ShoppingBag, Landmark, BrainCircuit, Settings, RefreshCw,
   ClipboardCopy, Download, BedDouble, Fuel, Wrench, Sparkles, Focus,
   Clock3, CornerDownLeft, Vault,
 } from "lucide-react";
@@ -49,7 +49,6 @@ const PANEL_COMMANDS = [
   ["properties", "Imóveis", "Propriedades, rendimento e capacidade", Warehouse, "7"],
   ["weapons", "Armamento", "Inventário, atribuição e manutenção", Swords, "8"],
   ["shop", "Loja", "Acelerações, cosméticos, VIP e slots", ShoppingBag, "9"],
-  ["street", "Cidade Viva", "Procurado, territórios, contactos e atividades de rua", Radar, null],
   ["mastermind", "Mastermind", "Grandes golpes, mercado negro, caçadores e sinais", Vault, null],
   ["hq", "Quartel-General", "Estratégia, melhorias e desempenho", Landmark, null],
   ["intel", "Relatórios", "Alertas e histórico", BrainCircuit, null],
