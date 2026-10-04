@@ -14,7 +14,7 @@ import { PanelWatermark } from "./hud";
 import {
   RadioTower, CloudRain, Newspaper, Skull, Building2, Users, Trophy, Clock3,
   ShieldAlert, Eye, Bomb, Handshake, TrendingUp, Coins, Dices, MessageCircle,
-  HeartPulse, RefreshCw, Zap, Gauge, Landmark, Send, ArrowUpCircle,
+  HeartPulse, RefreshCw, Zap, Landmark, Send, ArrowUpCircle,
 } from "lucide-react";
 
 const TABS = [
