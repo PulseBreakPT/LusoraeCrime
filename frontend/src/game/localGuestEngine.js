@@ -362,7 +362,7 @@ const createInitialSave = () => {
       providers:["guest"], has_password:false, is_guest:true, disclaimer_accepted:false,
     },
     player: {
-      id:"guest-player", org_name:"Império Convidado", clean_money:125000, dirty_money:5000,
+      id:"guest-player", org_name:"Império Convidado", clean_money:100000, dirty_money:5000,
       respect:0, level:1, heat:0, hq:null, districts:[], region:"",
       priorities:{active:"equilibrio"}, favorite_types:[], owned_cosmetics:[],
       extra_vehicle_slots:0, extra_employee_slots:0, vip_until:null, hq_skin_key:null,
