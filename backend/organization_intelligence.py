@@ -13,6 +13,8 @@ from organization_events import public_event
 from organization_systems import (
     SUPPLY_CATALOG,
     WEAPON_UPGRADES,
+    ORGANIZATION_SPECIALIZATIONS,
+    organization_specialization_effects,
     PROPERTY_MODULES,
     DEPARTMENTS,
     TERRITORY_TIERS,
@@ -521,7 +523,15 @@ def build_organization_intelligence(
             "reserve_cash": policy["reserve_cash"], "available_above_reserve": max(0, cash - policy["reserve_cash"]),
             "budgets": budgets,
         },
-        "organization": {"score": org_power, "level": org_level, "progression": progression, "dimensions": dimensions},
+        "organization": {
+            "score": org_power,
+            "level": org_level,
+            "progression": progression,
+            "dimensions": dimensions,
+            "specialization": player.get("organization_specialization"),
+            "specialization_effects": organization_specialization_effects(player),
+            "specialization_options": ORGANIZATION_SPECIALIZATIONS,
+        },
         "quotes": {
             "departments": department_quotes,
             "protection": protection_cost(player, len(employees), len(properties)),
@@ -674,6 +684,18 @@ def quote_action(
         effect = "Proteção institucional por 30 dias"
         if cost <= 0:
             reasons.append("Requer nível 5.")
+    elif action == "specialization":
+        key = payload.get("specialization_key")
+        cfg = ORGANIZATION_SPECIALIZATIONS.get(key)
+        if not cfg:
+            reasons.append("Especialização inválida.")
+        else:
+            cost = int(cfg["cost"])
+            effect = cfg["name"]
+            if player.get("organization_specialization"):
+                reasons.append("A organização já tem uma especialização.")
+            if int(player.get("level", 1) or 1) < int(cfg.get("unlock_level", 9) or 9):
+                reasons.append(f"Requer nível {cfg.get('unlock_level', 9)}.")
     elif action == "prestige":
         key = payload.get("item_key")
         cfg = PRESTIGE_CATALOG.get(key)
