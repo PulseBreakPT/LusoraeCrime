@@ -3,9 +3,9 @@ import { useGame } from "../../context/GameContextV2";
 import { useAuth } from "../../context/AuthContextV2";
 import { useSettings, NOTIFICATION_KEYS } from "../../context/SettingsContext";
 import { evaluatePassword } from "../../lib/passwordStrength";
-import { ConfirmButton, PanelKicker, PanelWatermark, SectionHeader } from "./hud";
+import { ConfirmButton, PanelWatermark, SectionHeader } from "./hud";
 import { haptics } from "../../lib/haptics";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Card } from "../ui/card";
@@ -373,11 +373,9 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Settings} />
-          <PanelKicker>Sistema · Preferências</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Settings size={18} className="text-zinc-400" /> Definições
           </SheetTitle>
-          <SheetDescription className="text-zinc-500">Preferências essenciais. As opções técnicas ficam escondidas até precisares delas.</SheetDescription>
         </SheetHeader>
 
         <Button
@@ -545,7 +543,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
               onChange={(v) => { setSoundEnabled(v); if (v) audio.sfx.notify(); }}
             />
           </Row>
-          <Row label="Música ambiente" hint="Banda sonora noir gerada em tempo real" testId="settings-row-music">
+          <Row label="Música ambiente" hint="Banda sonora do jogo" testId="settings-row-music">
             <div className="flex items-center gap-2">
               <VolumeSlider
                 testId="settings-music-volume"
@@ -581,7 +579,7 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
 
         <Section icon={Bell} title="Notificações" testId="settings-section-notifications">
           <Row
-            label="Notificações do sistema"
+            label="Notificações"
             hint={
               !desktopNotificationsSupported
                 ? "Não suportadas neste browser"
