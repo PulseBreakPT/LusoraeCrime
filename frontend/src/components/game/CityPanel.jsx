@@ -86,7 +86,8 @@ export const CityPanel = ({ open, onOpenChange }) => {
     if (busy) return;
     setBusy(key);
     try {
-      const { data } = await api.post(`/game/city/${path}`, payload);
+      const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const { data } = await api.post(`/game/city/${path}`, { ...payload, request_id: requestId });
       if (success) toast.success(typeof success === "function" ? success(data) : success);
       await Promise.all([load(true), refreshGame()]);
       return data;
@@ -361,7 +362,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                           <span className="min-w-0 flex-1 truncate text-[10px] text-zinc-300">
                             {challenge.attacker_name} → {challenge.defender_name}
                           </span>
-                          {challenge.defender_id && challenge.defender_id !== challenge.attacker_id && (
+                          {challenge.is_incoming && (
                             <>
                               <ActionButton
                                 tone="good"
