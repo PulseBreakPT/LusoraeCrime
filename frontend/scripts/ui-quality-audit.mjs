@@ -32,7 +32,43 @@ function walk(dir) {
   });
 }
 
+const HUD_EXPORTS = [
+  "Tip", "MiniBar", "Chip", "Kpi", "SummaryStrip", "SectionHeader", "PanelKicker",
+  "PanelWatermark", "EmptyState", "InlineRename", "FavoriteStar", "ConfirmButton",
+  "PurchaseButton", "useFlash", "AnimatedNumber",
+];
+
+function scanSharedHudImports(file, source) {
+  const normalized = file.replaceAll("\\", "/");
+  if (!normalized.includes("/components/game/") || normalized.endsWith("/components/game/hud.jsx")) return;
+
+  const importMatch = source.match(/import\s*\{([^}]*)\}\s*from\s*["']\.\/hud["'];?/);
+  const imported = new Set(
+    (importMatch?.[1] || "")
+      .split(",")
+      .map((name) => name.trim().split(/\s+as\s+/)[0])
+      .filter(Boolean)
+  );
+
+  for (const name of HUD_EXPORTS) {
+    const componentUse = new RegExp(`<${name}\\b`).test(source);
+    const functionUse = new RegExp(`\\b${name}\\s*\\(`).test(source);
+    if ((componentUse || functionUse) && !imported.has(name)) {
+      const index = Math.max(source.indexOf(`<${name}`), source.indexOf(`${name}(`), 0);
+      add(
+        "shared-hud-symbol-not-imported",
+        file,
+        source,
+        index,
+        `${name} is used but not imported from ./hud`
+      );
+    }
+  }
+}
+
 function scanJsx(file, source) {
+  scanSharedHudImports(file, source);
+
   for (const match of source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) {
     if (Number(match[1]) < 10) add("microtext-under-10px", file, source, match.index, match[0]);
   }
