@@ -327,3 +327,9 @@ def protection_cost(player: dict, employee_count: int, property_count: int) -> i
         + max(0, employee_count) * GOVERNMENT_CORRUPTION_PER_EMPLOYEE
         + max(0, property_count) * GOVERNMENT_CORRUPTION_PER_PROPERTY
     )
+
+
+def property_operations_factor(prop: dict) -> float:
+    module = max(0, int(prop.get("operations_level", 0) or 0))
+    staff = min(4, len(prop.get("staff_employee_ids") or []))
+    return 1.0 + module * 0.05 + staff * 0.02
