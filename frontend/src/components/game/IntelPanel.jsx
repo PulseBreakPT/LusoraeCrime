@@ -147,6 +147,7 @@ const RecommendedActions = ({ onNavigate }) => {
               data-testid={`intel-rec-${r.id}`}
               onClick={r.run}
               disabled={!r.can}
+              aria-label={`${r.action}: ${r.text}`}
               title={`${r.action}: ${r.text}`}
               className="sub-action-row flex w-full items-center justify-between gap-2 rounded-none border-0 px-3 py-2.5 text-left shadow-none transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500/45 disabled:opacity-45"
             >
