@@ -1479,7 +1479,7 @@ const mutateGame=(save,path,payload)=>{
       return {ok:true,value,quantity};
     }
 
-    const team=save.teams.find((x)=>x.id===p.id);
+    const team=save.teams.find((x)=>x.id===(p.team_id||p.id));
     if(path==="org/teams/rename"){
       if(!team)fail(404,"Equipa não encontrada"); if(team.status!=="idle")fail(400,"Equipa ocupada");
       team.name=String(p.name||team.name).trim().slice(0,40)||team.name; return {ok:true};
