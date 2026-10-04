@@ -391,6 +391,29 @@ export function weaponCombatScore(wm, category, categoryWeights) {
   );
 }
 
+
+// Aplica as modificações persistidas usando o mesmo catálogo do backend.
+export function weaponModelWithUpgrades(wm, weaponDoc, catalog) {
+  const model = { ...(wm || {}) };
+  const upgrades = catalog?.organization?.weapon_upgrades || {};
+  (weaponDoc?.upgrades || []).forEach((installed) => {
+    const cfg = upgrades[installed?.key];
+    if (!cfg) return;
+    ["reliability", "use_speed", "accuracy", "range", "discretion", "power", "durability", "weight"].forEach((stat) => {
+      if (cfg[stat] != null) model[stat] = Math.max(0, Number(model[stat] || 0) + Number(cfg[stat]));
+    });
+  });
+  return model;
+}
+
+export function weaponAmmoInfo(weaponDoc, wm, catalog) {
+  const ammoKey = catalog?.organization?.weapon_ammo?.[weaponDoc?.model_key];
+  const capacity = Math.max(0, Number(wm?.magazine_capacity || 0));
+  if (!ammoKey) return { ammoKey: null, capacity, loaded: capacity, fraction: 1 };
+  const loaded = Math.max(0, Math.min(capacity, Number(weaponDoc?.ammo_loaded || 0)));
+  return { ammoKey, capacity, loaded, fraction: loaded / Math.max(1, capacity) };
+}
+
 // Espelho de engine.weapon_condition_factor: linear até ao joelho
 // (condition_soft_knee), quadrática abaixo — a 20% a arma é quase sucata.
 export function weaponConditionFactor(condition, meta) {
@@ -446,6 +469,7 @@ export function weaponCompatFactor(emp, wm, meta) {
 // best_for × condição × fiabilidade × compatibilidade × habilidade + proficiência.
 export function weaponEffectiveScore(emp, weaponDoc, wm, category, catalog) {
   if (!wm) return 0;
+  wm = weaponModelWithUpgrades(wm, weaponDoc, catalog);
   const meta = catalog?.weapon_meta || {};
   const score = weaponCombatScore(wm, category, catalog?.weapon_category_weights);
   const bestForMult = (wm.best_for || []).includes(category) ? 1.3 : 0.7;
@@ -456,7 +480,9 @@ export function weaponEffectiveScore(emp, weaponDoc, wm, category, catalog) {
   const profMax = meta.proficiency_max ?? 100;
   const prof = (emp?.weapon_proficiency || {})[wm.category] || 0;
   const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
-  return score * bestForMult * condition * reliability * compat * skill * (meta.combat_score_scale ?? 0.15) + profBonus;
+  const ammo = weaponAmmoInfo(weaponDoc, wm, catalog);
+  const ammoFactor = ammo.ammoKey == null ? 1 : 0.2 + 0.8 * ammo.fraction;
+  return score * bestForMult * condition * reliability * compat * skill * ammoFactor * (meta.combat_score_scale ?? 0.15) + profBonus;
 }
 
 // Desgaste base de condição por missão deste modelo (antes do risco da
