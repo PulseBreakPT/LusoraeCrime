@@ -557,9 +557,19 @@ async def buy_supply(body: SupplyTradeInput, user: dict = Depends(get_current_us
     if inventory_used(projected) > capacity:
         raise HTTPException(status_code=400, detail="Armazenamento insuficiente — melhora Armazéns/Logística")
     cost = max(1, int(cfg["price"] * body.packs * supply_cost_multiplier(player)))
-    await _debit(player, cost, stat="supply_purchases")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {f"inventory.{body.item_key}": units}})
-    await record_tx(db, str(player["_id"]), "supply_buy", -cost, "clean", player["clean_money"], f"{cfg['name']} ×{units}")
+    fresh = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": cost}},
+        {"$inc": {
+            "clean_money": -cost,
+            "stats.supply_purchases": 1,
+            f"inventory.{body.item_key}": units,
+        }},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
+    player["clean_money"] = fresh["clean_money"]
+    await record_tx(db, str(player["_id"]), "supply_buy", -cost, "clean", fresh["clean_money"], f"{cfg['name']} ×{units}")
     await add_event(db, str(player["_id"]), "shop", f"Logística recebeu {cfg['name']} ×{units} por {cost:,} €.")
     return {"ok": True, "item_key": body.item_key, "units": units, "cost": cost}
 
@@ -967,9 +977,20 @@ async def upgrade_department(body: DepartmentInput, user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail="Departamento no nível máximo")
     nxt = current + 1
     cost = department_cost(body.department_key, nxt)
-    await _debit(player, cost, stat="department_upgrades")
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {f"departments.{body.department_key}": nxt}})
-    await record_tx(db, str(player["_id"]), "department_upgrade", -cost, "clean", player["clean_money"], f"{cfg['name']} N{nxt}")
+    level_path = f"departments.{body.department_key}"
+    fresh = await db.players.find_one_and_update(
+        {
+            "_id": player["_id"],
+            "clean_money": {"$gte": cost},
+            "$or": [{level_path: current}, {level_path: {"$exists": False}}] if current == 0 else [{level_path: current}],
+        },
+        {"$inc": {"clean_money": -cost, "stats.department_upgrades": 1}, "$set": {level_path: nxt}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=409, detail="O estado do departamento ou da caixa mudou; tenta novamente")
+    player["clean_money"] = fresh["clean_money"]
+    await record_tx(db, str(player["_id"]), "department_upgrade", -cost, "clean", fresh["clean_money"], f"{cfg['name']} N{nxt}")
     return {"ok": True, "level": nxt, "cost": cost}
 
 
@@ -985,15 +1006,22 @@ async def claim_territory(body: TerritoryInput, user: dict = Depends(get_current
     if body.district in (player.get("territories") or {}):
         raise HTTPException(status_code=400, detail="Já tens presença nesta zona")
     cfg = TERRITORY_TIERS[1]
-    await _debit(player, cfg["cost"], stat="territories_claimed")
     rival = rival_profile(body.district)
     info = {
         "tier": 1, "pressure": 10.0, "defense": 70.0,
         "claimed_at": now_utc().isoformat(),
         "rival": {"key": rival["key"], "name": rival["name"], "style": rival["style"], "strength": rival["strength"]},
     }
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {f"territories.{body.district}": info}})
-    await record_tx(db, str(player["_id"]), "territory_claim", -cfg["cost"], "clean", player["clean_money"], f"Presença territorial: {body.district}")
+    territory_path = f"territories.{body.district}"
+    fresh = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": cfg["cost"]}, territory_path: {"$exists": False}},
+        {"$inc": {"clean_money": -cfg["cost"], "stats.territories_claimed": 1}, "$set": {territory_path: info}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=409, detail="A caixa ou o território mudou; tenta novamente")
+    player["clean_money"] = fresh["clean_money"]
+    await record_tx(db, str(player["_id"]), "territory_claim", -cfg["cost"], "clean", fresh["clean_money"], f"Presença territorial: {body.district}")
     return {"ok": True, "territory": info}
 
 
@@ -1009,10 +1037,17 @@ async def consolidate_territory(body: TerritoryInput, user: dict = Depends(get_c
         raise HTTPException(status_code=400, detail="Território já está no máximo")
     nxt = current + 1
     cost = TERRITORY_TIERS[nxt]["cost"]
-    await _debit(player, cost, stat="territories_consolidated")
     info.update({"tier": nxt, "pressure": min(100.0, float(info.get("pressure", 0)) + 12), "defense": 100.0})
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {f"territories.{body.district}": info}})
-    await record_tx(db, str(player["_id"]), "territory_consolidate", -cost, "clean", player["clean_money"], f"Consolidação de {body.district}")
+    territory_path = f"territories.{body.district}"
+    fresh = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": cost}, f"{territory_path}.tier": current},
+        {"$inc": {"clean_money": -cost, "stats.territories_consolidated": 1}, "$set": {territory_path: info}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=409, detail="A caixa ou o território mudou; tenta novamente")
+    player["clean_money"] = fresh["clean_money"]
+    await record_tx(db, str(player["_id"]), "territory_consolidate", -cost, "clean", fresh["clean_money"], f"Consolidação de {body.district}")
     return {"ok": True, "territory": info, "cost": cost}
 
 
@@ -1025,12 +1060,19 @@ async def defend_territory(body: TerritoryInput, user: dict = Depends(get_curren
     if tier <= 0:
         raise HTTPException(status_code=400, detail="Território não controlado")
     cost = max(500, int(TERRITORY_TIERS[tier]["defense_weekly"] * 1.5))
-    await _debit(player, cost, stat="territories_defended")
     info["defense"] = 100.0
     info["pressure"] = max(0.0, float(info.get("pressure", 0)) - 22)
     info["last_defended_at"] = now_utc().isoformat()
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {f"territories.{body.district}": info}})
-    await record_tx(db, str(player["_id"]), "territory_defend", -cost, "clean", player["clean_money"], f"Defesa de {body.district}")
+    territory_path = f"territories.{body.district}"
+    fresh = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": cost}, f"{territory_path}.tier": tier},
+        {"$inc": {"clean_money": -cost, "stats.territories_defended": 1}, "$set": {territory_path: info}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=409, detail="A caixa ou o território mudou; tenta novamente")
+    player["clean_money"] = fresh["clean_money"]
+    await record_tx(db, str(player["_id"]), "territory_defend", -cost, "clean", fresh["clean_money"], f"Defesa de {body.district}")
     return {"ok": True, "cost": cost, "territory": info}
 
 
@@ -1059,9 +1101,15 @@ async def buy_prestige(body: PrestigeInput, user: dict = Depends(get_current_use
     if body.item_key in set(player.get("prestige_items") or []):
         raise HTTPException(status_code=400, detail="Investimento já adquirido")
     cost = int(cfg["cost"])
-    await _debit(player, cost, stat="prestige_purchases")
-    await db.players.update_one({"_id": player["_id"]}, {"$addToSet": {"prestige_items": body.item_key}})
-    await record_tx(db, str(player["_id"]), "prestige", -cost, "clean", player["clean_money"], cfg["name"])
+    fresh = await db.players.find_one_and_update(
+        {"_id": player["_id"], "clean_money": {"$gte": cost}, "prestige_items": {"$ne": body.item_key}},
+        {"$inc": {"clean_money": -cost, "stats.prestige_purchases": 1}, "$addToSet": {"prestige_items": body.item_key}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not fresh:
+        raise HTTPException(status_code=409, detail="A caixa ou o investimento mudou; tenta novamente")
+    player["clean_money"] = fresh["clean_money"]
+    await record_tx(db, str(player["_id"]), "prestige", -cost, "clean", fresh["clean_money"], cfg["name"])
     return {"ok": True, "cost": cost}
 
 
