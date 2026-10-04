@@ -73,6 +73,7 @@ export function GameProvider({ children }) {
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
   const pendingRefreshRef = useRef(false);  // um refresh pedido durante um fetch em curso
+  const refreshWaitersRef = useRef([]);     // ações que aguardam o refresh pendente terminar
   const refreshRef = useRef(null);          // referência estável à última `refresh`
   const hasLoadedRef = useRef(!!initialGameState);
   const consecutiveFailuresRef = useRef(0);
@@ -125,7 +126,10 @@ export function GameProvider({ children }) {
     // Corrida action↔poll: se já há um fetch em curso, NÃO descartar o pedido —
     // marca-o como pendente para correr logo a seguir (a mutação reflete-se sem
     // esperar um ciclo inteiro de poll).
-    if (fetchingRef.current) { pendingRefreshRef.current = true; return; }
+    if (fetchingRef.current) {
+      pendingRefreshRef.current = true;
+      return new Promise((resolve) => refreshWaitersRef.current.push(resolve));
+    }
 
     fetchingRef.current = true;
     try {
@@ -356,6 +360,9 @@ export function GameProvider({ children }) {
       if (pendingRefreshRef.current) {
         pendingRefreshRef.current = false;
         setTimeout(() => refreshRef.current && refreshRef.current(), 0);
+      } else if (refreshWaitersRef.current.length) {
+        const waiters = refreshWaitersRef.current.splice(0);
+        waiters.forEach((resolve) => resolve());
       }
     }
   }, [user, notifications, autoOpenReport]);
@@ -431,8 +438,9 @@ export function GameProvider({ children }) {
         }
         const sound = soundForAction(path);
         if (sound) audio.sfx[sound]();
-        // Refresh in background
-        refresh();
+        // Só termina a ação quando o /state autoritativo já refletiu a mutação.
+        // Se um poll estava em curso, refresh() aguarda também o refresh pendente seguinte.
+        await refresh();
         return { ok: true, data };
       } catch (e) {
         toast.error(formatApiErrorDetail(e.response?.data?.detail) || e.message);
