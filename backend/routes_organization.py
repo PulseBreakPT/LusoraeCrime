@@ -21,6 +21,7 @@ from organization_intelligence import (
     build_organization_intelligence, quote_action, organization_policy,
 )
 from organization_automation import run_organization_automation
+from organization_events import parse_dt as parse_org_event_dt
 from organization_systems import (
     SUPPLY_CATALOG, WEAPON_AMMO, WEAPON_UPGRADES, TEAM_DOCTRINES, TEAM_POLICIES,
     DEPARTMENTS, TERRITORY_TIERS, PROPERTY_MODULES, VEHICLE_LIFECYCLE,
@@ -209,6 +210,11 @@ class OrganizationQuoteInput(BaseModel):
     payload: dict = Field(default_factory=dict)
 
 
+class OrganizationEventResolveInput(MutationInput):
+    event_id: str
+    choice: str
+
+
 class OrganizationPolicyInput(MutationInput):
     reserve_cash: int = Field(default=25000, ge=0, le=100_000_000)
     max_single_spend_pct: float = Field(default=0.35, ge=0.05, le=1.0)
@@ -345,6 +351,149 @@ async def run_automation_now(body: MutationInput, user: dict = Depends(get_curre
     return await run_organization_automation(
         db, player, now=now_utc(), add_event=add_event, record_tx=record_tx, force=True,
     )
+
+
+@router.post("/events/resolve")
+@idempotent("events.resolve")
+async def resolve_organization_event(body: OrganizationEventResolveInput, user: dict = Depends(get_current_user)):
+    player = await _player(user)
+    pid = str(player["_id"])
+    event = dict(player.get("organization_event") or {})
+    if not event or event.get("id") != body.event_id or event.get("status", "pending") != "pending":
+        raise HTTPException(status_code=409, detail="Esta decisão já não está disponível")
+    expires = parse_org_event_dt(event.get("expires_at"))
+    if expires and expires <= now_utc():
+        await db.players.update_one(
+            {"_id": player["_id"], "organization_event.id": body.event_id},
+            {"$set": {"organization_event.status": "expired", "organization_event.resolved_at": now_utc().isoformat()}},
+        )
+        raise HTTPException(status_code=409, detail="O prazo desta decisão terminou")
+
+    claimed = await db.players.find_one_and_update(
+        {"_id": player["_id"], "organization_event.id": body.event_id, "organization_event.status": "pending"},
+        {"$set": {"organization_event.status": "resolving"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="A decisão foi tratada noutra sessão")
+
+    kind = event.get("type")
+    choice = body.choice
+    result = {"type": kind, "choice": choice}
+    cost = 0
+    try:
+        if kind == "supplier_shock":
+            if choice == "stockpile":
+                cost = 6000
+                await _debit(claimed, cost)
+                await db.players.update_one({"_id": player["_id"]}, {"$inc": {
+                    "inventory.service_fluids": 2,
+                    "inventory.safehouse_supplies": 2,
+                    "inventory.tire_set": 1,
+                }})
+                result["effect"] = "Recebeste material de manutenção e bases."
+            elif choice == "ration":
+                until = (now_utc() + timedelta(days=3)).isoformat()
+                await db.players.update_one({"_id": player["_id"]}, {"$set": {
+                    "organization_modifiers.supply_surcharge_until": until,
+                }})
+                result.update({"effect": "Abastecimento +12% durante 3 dias.", "until": until})
+            else:
+                raise HTTPException(status_code=400, detail="Escolha inválida")
+
+        elif kind == "staff_dispute":
+            count = await db.employees.count_documents({"player_id": pid})
+            if choice == "bonus":
+                cost = max(1200, count * 300)
+                await _debit(claimed, cost)
+                await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": 8, "loyalty": 5}})
+                await db.employees.update_many({"player_id": pid, "morale": {"$gt": 100}}, {"$set": {"morale": 100}})
+                await db.employees.update_many({"player_id": pid, "loyalty": {"$gt": 100}}, {"$set": {"loyalty": 100}})
+                result["effect"] = "Moral +8 e lealdade +5."
+            elif choice == "hold_line":
+                await db.employees.update_many({"player_id": pid}, {"$inc": {"morale": -3, "loyalty": -2}})
+                await db.employees.update_many({"player_id": pid, "morale": {"$lt": 0}}, {"$set": {"morale": 0}})
+                await db.employees.update_many({"player_id": pid, "loyalty": {"$lt": 0}}, {"$set": {"loyalty": 0}})
+                result["effect"] = "Moral -3 e lealdade -2."
+            else:
+                raise HTTPException(status_code=400, detail="Escolha inválida")
+
+        elif kind == "rival_ultimatum":
+            territories = dict(claimed.get("territories") or {})
+            if choice == "reinforce":
+                cost = 7500
+                await _debit(claimed, cost)
+                for district, info in territories.items():
+                    data = dict(info or {})
+                    data["pressure"] = max(0.0, float(data.get("pressure", 0) or 0) - 15)
+                    data["defense"] = min(100.0, float(data.get("defense", 0) or 0) + 15)
+                    territories[district] = data
+                result["effect"] = "Pressão -15 e defesa +15 em todas as zonas."
+            elif choice == "ignore":
+                for district, info in territories.items():
+                    data = dict(info or {})
+                    data["pressure"] = min(100.0, float(data.get("pressure", 0) or 0) + 18)
+                    data["defense"] = max(0.0, float(data.get("defense", 0) or 0) - 10)
+                    territories[district] = data
+                result["effect"] = "Pressão +18 e defesa -10."
+            else:
+                raise HTTPException(status_code=400, detail="Escolha inválida")
+            await db.players.update_one({"_id": player["_id"]}, {"$set": {"territories": territories}})
+
+        elif kind == "information_leak":
+            current_heat = float(claimed.get("heat", 0) or 0)
+            if choice == "contain":
+                cost = 12000
+                await _debit(claimed, cost)
+                new_heat = max(0.0, current_heat - 8)
+                result["effect"] = "Calor -8."
+            elif choice == "absorb":
+                new_heat = min(100.0, current_heat + 7)
+                result["effect"] = "Calor +7."
+            else:
+                raise HTTPException(status_code=400, detail="Escolha inválida")
+            await db.players.update_one({"_id": player["_id"]}, {"$set": {"heat": new_heat}})
+
+        elif kind == "maintenance_backlog":
+            props = await db.properties.find({"player_id": pid}).to_list(300)
+            if choice == "preventive":
+                cost = 5000
+                await _debit(claimed, cost)
+                delta = 8
+                result["effect"] = "Condição das bases +8."
+            elif choice == "defer":
+                delta = -5
+                result["effect"] = "Condição das bases -5."
+            else:
+                raise HTTPException(status_code=400, detail="Escolha inválida")
+            for prop in props:
+                condition = max(0.0, min(100.0, float(prop.get("condition", 100) or 0) + delta))
+                await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"condition": condition}})
+        else:
+            raise HTTPException(status_code=400, detail="Evento desconhecido")
+    except Exception:
+        await db.players.update_one(
+            {"_id": player["_id"], "organization_event.id": body.event_id, "organization_event.status": "resolving"},
+            {"$set": {"organization_event.status": "pending"}},
+        )
+        raise
+
+    result["cost"] = cost
+    resolved_at = now_utc().isoformat()
+    await db.players.update_one(
+        {"_id": player["_id"], "organization_event.id": body.event_id},
+        {"$set": {
+            "organization_event.status": "resolved",
+            "organization_event.choice": choice,
+            "organization_event.result": result,
+            "organization_event.resolved_at": resolved_at,
+        }},
+    )
+    if cost:
+        fresh = await db.players.find_one({"_id": player["_id"]})
+        await record_tx(db, pid, "organization_event", -cost, "clean", int(fresh.get("clean_money", 0) or 0), event.get("title", "Decisão da organização"))
+    await add_event(db, pid, "system", f"{event.get('title','Decisão')}: {result.get('effect','resolvido')}")
+    return {"ok": True, **result, "resolved_at": resolved_at}
 
 
 @router.get("/audit")
