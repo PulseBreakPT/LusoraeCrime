@@ -246,7 +246,7 @@ async def reset_player_progress(user_id: str, body: ResetPlayerInput, admin: dic
         respect_for_level = LEVEL_THRESHOLDS[min(level - 1, len(LEVEL_THRESHOLDS) - 1)]
 
     await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "clean_money": 125000,
+        "clean_money": 100000,
         "dirty_money": 5000,
         "respect": respect_for_level,
         "level": level,
