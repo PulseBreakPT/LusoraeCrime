@@ -10,7 +10,7 @@ import { Radio, Crosshair, Siren, X } from "lucide-react";
  * que é exatamente o valor usado pelo servidor no desfecho).
  *
  * Este painel já não se posiciona sozinho sobre o mapa: vive dentro da
- * "Central da rede" (ActivityFeed), no separador OPERAÇÕES — uma só superfície
+ * Atividade (ActivityFeed), no separador OPERAÇÕES
  * de UI em vez de dois widgets sobrepostos.
  */
 
