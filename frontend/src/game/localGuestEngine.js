@@ -515,7 +515,7 @@ const guestOrgIntelligence=(save)=>{
   const gross=(save.employees||[]).reduce((sum,e)=>sum+Number(e.salary||0),0);
   const weeklyBurn=Math.max(1,gross*1.2375,expenses/4);
   const runway=Number(save.player.clean_money||0)/weeklyBurn;
-  const financeScore=clamp(runway/8*100);
+  const financeScore=clamp(runway/8*100,0,100);
   const fleet=(save.vehicles||[]).map((v)=>{
     const condition=Number(v.condition||0),missing=Math.max(0,100-condition);
     const lc=org.vehicle_lifecycle||{};
@@ -530,7 +530,7 @@ const guestOrgIntelligence=(save)=>{
     if(condition<60)reasons.push("condição baixa");
     if(Number(v.tires_pct??100)<35)reasons.push("pneus gastos");
     if(!v.insurance_until||Date.parse(v.insurance_until)<=Date.now()){score-=16;reasons.push("sem seguro");}
-    return {id:v.id,name:v.name,score:Math.round(clamp(score)),condition,tires_pct:Number(v.tires_pct??100),reasons,costs:{service,service_base:base,tires:Number(inventory.tire_set||0)>0?0:Number(org.supplies?.tire_set?.price||520),insurance,inspection:Number(lc.inspection_base||85)}};
+    return {id:v.id,name:v.name,score:Math.round(clamp(score,0,100)),condition,tires_pct:Number(v.tires_pct??100),reasons,costs:{service,service_base:base,tires:Number(inventory.tire_set||0)>0?0:Number(org.supplies?.tire_set?.price||520),insurance,inspection:Number(lc.inspection_base||85)}};
   });
   const properties=(save.properties||[]).map((p)=>{
     const module_costs={};
@@ -538,19 +538,19 @@ const guestOrgIntelligence=(save)=>{
       const level=Number(p[`${key}_level`]||0);
       module_costs[key]=level>=Number(cfg.max_level||0)?null:Math.trunc(Number(cfg.base_cost||0)*(1+level*.75)*Number(p.market_multiplier||1));
     });
-    const staffScore=clamp(Number(p.staff_effectiveness||0)*100);
-    return {id:p.id,name:p.name,score:Math.round(clamp(Number(p.condition||100)*.6+staffScore*.4)),condition:Number(p.condition||100),staff_score:Math.round(staffScore),staff_count:(p.staff_employee_ids||[]).length,staff_roles:{...(p.staff_roles||{})},module_costs};
+    const staffScore=clamp(Number(p.staff_effectiveness||0)*100,0,100);
+    return {id:p.id,name:p.name,score:Math.round(clamp(Number(p.condition||100)*.6+staffScore*.4,0,100)),condition:Number(p.condition||100),staff_score:Math.round(staffScore),staff_count:(p.staff_employee_ids||[]).length,staff_roles:{...(p.staff_roles||{})},module_costs};
   });
   const territories=Object.entries(save.player.territories||{}).map(([district,info])=>{
     const tier=Number(info.tier||1),cfg=org.territory_tiers?.[tier]||{},next=org.territory_tiers?.[tier+1];
-    return {district,tier,defense:Number(info.defense||0),pressure:Number(info.pressure||0),score:Math.round(clamp(Number(info.defense||0)*.65+(100-Number(info.pressure||0))*.35)),costs:{defend:Math.max(500,Math.trunc(Number(cfg.defense_weekly||0)*1.5)),consolidate:next?Number(next.cost||0):null}};
+    return {district,tier,defense:Number(info.defense||0),pressure:Number(info.pressure||0),score:Math.round(clamp(Number(info.defense||0)*.65+(100-Number(info.pressure||0))*.35,0,100)),costs:{defend:Math.max(500,Math.trunc(Number(cfg.defense_weekly||0)*1.5)),consolidate:next?Number(next.cost||0):null}};
   });
   const fleetScore=fleet.length?fleet.reduce((a,v)=>a+v.score,0)/fleet.length:45;
   const propertyScore=properties.length?properties.reduce((a,p)=>a+p.score,0)/properties.length:55;
-  const logisticsScore=clamp(100-stock.filter(x=>x.status==="critical").length*8-(orgInventoryUsed(save)/Math.max(1,orgInventoryCapacity(save))>.9?20:0));
+  const logisticsScore=clamp(100-stock.filter(x=>x.status==="critical").length*8-(orgInventoryUsed(save)/Math.max(1,orgInventoryCapacity(save))>.9?20:0),0,100);
   const territoryScore=territories.length?territories.reduce((a,t)=>a+t.score,0)/territories.length:70;
-  const crewScore=save.teams.length?clamp(75+save.teams.filter(t=>t.status==="idle").length/save.teams.length*20):35;
-  const securityScore=clamp(100-Number(save.player.heat||0));
+  const crewScore=save.teams.length?clamp(75+save.teams.filter(t=>t.status==="idle").length/save.teams.length*20,0,100):35;
+  const securityScore=clamp(100-Number(save.player.heat||0),0,100);
   const overall=Math.round(financeScore*.24+crewScore*.18+fleetScore*.16+logisticsScore*.15+propertyScore*.12+territoryScore*.10+securityScore*.05);
   const alerts=[];
   if(runway<1.25)alerts.push({severity:"critical",code:"cash_runway",title:"Caixa em risco",detail:`Runway de ${runway.toFixed(1)} semanas.`,tab:"centro"});
