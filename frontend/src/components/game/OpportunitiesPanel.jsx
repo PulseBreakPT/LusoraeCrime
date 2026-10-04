@@ -4,7 +4,7 @@ import {
   fmtMoney, fmtDuration, CATEGORY_COLORS, TYPE_ICONS, SPEC_LABELS,
   matchesSearch, opportunityReachable, teamReadiness, OPP_URGENT_SECONDS,
 } from "../../lib/game";
-import { Tip, Kpi, PanelKicker, PanelWatermark } from "./hud";
+import { Tip, Kpi, PanelWatermark } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -101,7 +101,6 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
       <SheetContent side="right" className="overflow-y-auto sub-panel">
         <SheetHeader>
           <PanelWatermark icon={Target} />
-          <PanelKicker>Comando · Operações</PanelKicker>
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-primary" /> Operações disponíveis
           </SheetTitle>
