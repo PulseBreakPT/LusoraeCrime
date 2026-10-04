@@ -14,7 +14,7 @@ import {
   Network, Wallet, PackageOpen, Users, Car, Swords, Warehouse, MapPinned,
   TrendingUp, ShieldCheck, Gauge, Wrench, Fuel, Shield, ClipboardCheck,
   Crosshair, Plus, Minus, Crown,
-  Boxes, UserRoundCog, Landmark, Banknote,
+  Boxes, UserRoundCog, Landmark, Banknote, Activity, AlertTriangle, Bot, History,
 } from "lucide-react";
 
 const TABS = [
@@ -56,9 +56,15 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
     upgradePropertyModule, assignPropertyStaff, upgradeDepartment,
     claimTerritory, consolidateTerritory, defendTerritory,
     buyPrestige, buyProtection, fetchFinanceSummary,
+    fetchOrganizationIntelligence, fetchOrganizationAudit,
+    setOrganizationPolicy, runOrganizationAutomation,
   } = useGame();
   const [tab, setTab] = useState("centro");
   const [finance, setFinance] = useState(null);
+  const [intelligence, setIntelligence] = useState(null);
+  const [audit, setAudit] = useState([]);
+  const [policyDraft, setPolicyDraft] = useState(null);
+  const [policyDirty, setPolicyDirty] = useState(false);
   const [weaponUpgrade, setWeaponUpgrade] = useState({});
   const [abortThreshold, setAbortThreshold] = useState({});
   const [loadouts, setLoadouts] = useState({});
@@ -71,13 +77,31 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const now = serverNow();
 
   useEffect(() => {
-    if (!open || tab !== "centro") return;
+    if (!open) return;
     let alive = true;
-    fetchFinanceSummary().then((res) => {
-      if (alive && res.ok) setFinance(res.data);
+    Promise.all([
+      fetchFinanceSummary(),
+      fetchOrganizationIntelligence(),
+      fetchOrganizationAudit(12),
+    ]).then(([financeRes, intelligenceRes, auditRes]) => {
+      if (!alive) return;
+      if (financeRes.ok) setFinance(financeRes.data);
+      if (intelligenceRes.ok) {
+        setIntelligence(intelligenceRes.data);
+        if (!policyDirty) setPolicyDraft(intelligenceRes.data.policy);
+      }
+      if (auditRes.ok) setAudit(auditRes.data?.items || []);
     });
     return () => { alive = false; };
-  }, [open, tab, state?.player?.clean_money, fetchFinanceSummary]);
+  }, [
+    open,
+    state?.player?.clean_money,
+    state?.weekly_fixed_total,
+    fetchFinanceSummary,
+    fetchOrganizationIntelligence,
+    fetchOrganizationAudit,
+    policyDirty,
+  ]);
 
   useEffect(() => {
     if (!open) {
@@ -112,7 +136,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const prestige = orgCatalog.prestige || {};
   const lifecycle = orgCatalog.vehicle_lifecycle || {};
   const tireSetPrice = Number(orgCatalog.supplies?.tire_set?.price || 0);
-  const protectionCost = Number(org.protection_cost || org.governance?.last_cost || 0);
+  const protectionCost = Number(intelligence?.quotes?.protection ?? org.protection_cost ?? org.governance?.last_cost ?? 0);
+  const fleetIntel = Object.fromEntries((intelligence?.fleet || []).map((row) => [row.id, row]));
+  const propertyIntel = Object.fromEntries((intelligence?.properties || []).map((row) => [row.id, row]));
+  const territoryIntel = Object.fromEntries((intelligence?.territories || []).map((row) => [row.district, row]));
+  const stockIntel = Object.fromEntries((intelligence?.stock || []).map((row) => [row.key, row]));
 
   const vehicleValue = (vehicle) =>
     Number(vehicle?.price || catalog.vehicle_models?.[vehicle?.model_key]?.price || 0);
@@ -156,6 +184,37 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
     });
   };
 
+  const patchPolicy = (patch) => {
+    setPolicyDirty(true);
+    setPolicyDraft((prev) => ({ ...(prev || intelligence?.policy || {}), ...patch }));
+  };
+  const patchAutomation = (key, value) => {
+    setPolicyDirty(true);
+    setPolicyDraft((prev) => ({
+      ...(prev || intelligence?.policy || {}),
+      automation: { ...(prev?.automation || intelligence?.policy?.automation || {}), [key]: value },
+    }));
+  };
+  const patchStockTarget = (key, value) => {
+    setPolicyDirty(true);
+    setPolicyDraft((prev) => ({
+      ...(prev || intelligence?.policy || {}),
+      stock_targets: { ...(prev?.stock_targets || intelligence?.policy?.stock_targets || {}), [key]: Math.max(0, Number(value || 0)) },
+    }));
+  };
+  const savePolicy = async () => {
+    if (!policyDraft) return;
+    const result = await setOrganizationPolicy(policyDraft);
+    if (result?.ok) setPolicyDirty(false);
+  };
+  const runAutomation = async () => {
+    const result = await runOrganizationAutomation();
+    if (result?.ok) {
+      const fresh = await fetchOrganizationIntelligence();
+      if (fresh.ok) setIntelligence(fresh.data);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sub-panel" data-testid="organization-panel">
@@ -181,6 +240,117 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
 
         {tab === "centro" && (
           <div className="mt-3 space-y-4">
+            <SummaryStrip cols={3}>
+              <Kpi icon={Activity} label="Saúde" value={intelligence ? `${intelligence.health.score} · ${intelligence.health.grade}` : "—"} color={(intelligence?.health?.score || 0) >= 78 ? "#34D399" : "#F59E0B"} />
+              <Kpi icon={Wallet} label="Runway" value={intelligence ? `${intelligence.finance.runway_weeks} sem.` : "—"} color={(intelligence?.finance?.runway_weeks || 0) >= 3 ? "#34D399" : "#EF4444"} />
+              <Kpi icon={AlertTriangle} label="Urgentes" value={intelligence?.alert_counts?.critical || 0} color={(intelligence?.alert_counts?.critical || 0) ? "#EF4444" : "#34D399"} />
+            </SummaryStrip>
+
+            {intelligence && (
+              <Card className="sub-card p-3">
+                <SectionHeader icon={Activity} title="Inteligência operacional" meta={`${intelligence.organization.score} poder organizacional`} />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {[
+                    ["Finanças", intelligence.health.finance],
+                    ["Crew", intelligence.health.crew],
+                    ["Frota", intelligence.health.fleet],
+                    ["Logística", intelligence.health.logistics],
+                    ["Imóveis", intelligence.health.properties],
+                    ["Território", intelligence.health.territory],
+                    ["Segurança", intelligence.health.security],
+                    ["Gestão", intelligence.organization.dimensions.management],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-zinc-500">
+                        <span>{label}</span><span>{Math.round(value)}%</span>
+                      </div>
+                      <MiniBar value={value} color={value >= 75 ? "#34D399" : value >= 55 ? "#F59E0B" : "#EF4444"} />
+                    </div>
+                  ))}
+                </div>
+                {(intelligence.recommendations || []).length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {(intelligence.recommendations || []).slice(0, 5).map((rec, index) => (
+                      <button
+                        type="button"
+                        key={`${rec.title}-${index}`}
+                        onClick={() => setTab(rec.tab || "centro")}
+                        className="w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-2.5 py-2 text-left"
+                      >
+                        <p className="text-[11px] font-semibold text-zinc-200">{rec.title}</p>
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-500">{rec.reason}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {(intelligence?.alerts || []).filter((item) => item.severity === "critical").slice(0, 3).map((alert) => (
+              <button
+                type="button"
+                key={alert.code}
+                onClick={() => setTab(alert.tab || "centro")}
+                className="w-full rounded-lg border border-red-500/20 bg-red-500/[0.06] p-3 text-left"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-red-300" />
+                  <div>
+                    <p className="text-xs font-semibold text-red-100">{alert.title}</p>
+                    <p className="mt-0.5 text-[10px] text-red-200/60">{alert.detail}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            <Card className="sub-card p-3">
+              <SectionHeader icon={Bot} title="Política e automação" meta="guard rails financeiros" />
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1">
+                  <span className="font-mono text-[10px] uppercase text-zinc-500">Reserva mínima</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={policyDraft?.reserve_cash ?? 0}
+                    onChange={(e) => patchPolicy({ reserve_cash: Number(e.target.value || 0) })}
+                    className="h-9 bg-black/50 text-xs"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="font-mono text-[10px] uppercase text-zinc-500">Máx. compra única</span>
+                  <Input
+                    type="number"
+                    min="5"
+                    max="100"
+                    value={Math.round(Number(policyDraft?.max_single_spend_pct ?? 0.35) * 100)}
+                    onChange={(e) => patchPolicy({ max_single_spend_pct: Math.max(0.05, Math.min(1, Number(e.target.value || 35) / 100)) })}
+                    className="h-9 bg-black/50 text-xs"
+                  />
+                </label>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                {[
+                  ["enabled", "Automação ativa"],
+                  ["auto_restock", "Auto-stock"],
+                  ["renew_insurance", "Renovar seguros"],
+                  ["preventive_service", "Manutenção preventiva"],
+                ].map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 rounded border border-white/[0.08] px-2 py-2 text-[10px] text-zinc-400">
+                    <input
+                      type="checkbox"
+                      checked={!!policyDraft?.automation?.[key]}
+                      onChange={(e) => patchAutomation(key, e.target.checked)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <SmallAction disabled={!policyDirty} onClick={savePolicy}>Guardar política</SmallAction>
+                <SmallAction onClick={runAutomation}><Bot size={11} /> Executar agora</SmallAction>
+              </div>
+            </Card>
+
             <SummaryStrip cols={3}>
               <Kpi icon={Wallet} label="Caixa" value={fmtMoney(state.player.clean_money)} color="#34D399" />
               <Kpi icon={TrendingUp} label="Resultado 30d" value={finance ? fmtMoney(finance.net) : "—"} color={(finance?.net || 0) >= 0 ? "#34D399" : "#EF4444"} />
@@ -237,6 +407,23 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                 })}
               </div>
             </div>
+
+            {audit.length > 0 && (
+              <Card className="sub-card p-3">
+                <SectionHeader icon={History} title="Auditoria recente" meta={`${audit.length} eventos`} />
+                <div className="space-y-1.5">
+                  {audit.slice(0, 6).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 border-b border-white/[0.05] py-1.5 last:border-0">
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-[10px] text-zinc-300">{String(item.action || "").replaceAll(".", " / ")}</p>
+                        <p className="text-[10px] text-zinc-600">{item.ts ? new Date(item.ts).toLocaleString("pt-PT") : ""}</p>
+                      </div>
+                      {item.result?.cost != null && <span className="font-mono text-[10px] text-amber-300">{fmtMoney(item.result.cost)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             <div>
               <SectionHeader icon={Crown} title="Prestígio e late game" />
