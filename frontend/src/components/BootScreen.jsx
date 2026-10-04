@@ -14,12 +14,12 @@ import {
 
 const PHASES = [
   ["VALIDATING", "Verificar credenciais", "A verificar credenciais…"],
-  ["LOADING_PROFILE", "Carregar dossiê", "A carregar dossiê…"],
+  ["LOADING_PROFILE", "Carregar perfil", "A carregar perfil…"],
   ["LOADING_ORG", "Carregar organização", "A carregar organização…"],
   ["LOADING_RESOURCES", "Carregar património", "A carregar património…"],
   ["LOADING_TEAMS", "Carregar equipas", "A carregar equipas e frota…"],
   ["LOADING_MISSIONS", "Carregar operações", "A carregar operações…"],
-  ["PREPARING_UI", "Preparar posto de comando", "A preparar posto de comando…"],
+  ["PREPARING_UI", "Preparar interface", "A preparar interface…"],
 ];
 
 export function BootScreen() {
@@ -31,14 +31,14 @@ export function BootScreen() {
   if (isBootError) {
     return (
       <LoadingBackdrop>
-        <TacticalFrame header="Falha de uplink" status="Interrompido" tone="error">
+        <TacticalFrame header="Erro de ligação" status="Interrompido" tone="error">
           <div className="space-y-5">
             <div className="flex items-center gap-4">
               <span className="sub-alert-icon">
                 <AlertTriangle className="h-9 w-9 flex-shrink-0 text-destructive" />
               </span>
               <div>
-                <p className="font-display text-lg font-bold uppercase tracking-wide text-white">Falha na ligação à organização</p>
+                <p className="font-display text-lg font-bold uppercase tracking-wide text-white">Não foi possível carregar o jogo</p>
                 <p className="mt-1 font-mono text-xs text-zinc-400">
                   {error?.phase ? `Falha em: ${error.phase.replace(/_/g, " ").toLowerCase()}` : "Erro desconhecido"}
                 </p>
@@ -103,10 +103,10 @@ export function BootScreen() {
           <BootWordmark statusText={activePhase ? activePhase[2] : "A inicializar…"} />
           <UplinkProgress
             progress={progress}
-            label="Ligação segura"
+            label="A carregar"
             meta={`${String(doneCount).padStart(2, "0")}/${String(rows.length).padStart(2, "0")} fases`}
           />
-          <TerminalLog title="Sequência de arranque" rows={rows} />
+          <TerminalLog title="Progresso" rows={rows} />
           <FlavorRotator />
 
           <p className="text-center font-mono text-[10px] uppercase tracking-widest text-zinc-700">
@@ -120,7 +120,7 @@ export function BootScreen() {
               className="w-full text-xs"
               size="sm"
             >
-              Ligação lenta — recarregar
+              Está a demorar — recarregar
             </Button>
           )}
         </div>
