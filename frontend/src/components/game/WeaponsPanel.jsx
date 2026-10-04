@@ -278,7 +278,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                     <p className="min-w-0 truncate text-sm font-bold text-white">{w.name}</p>
                     <TierChip tier={tier} />
                   </div>
-                  <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                     {catalog?.weapon_categories?.[model.category]?.name || model.category}
                     {model.loud && (
                       <Tip tip={`Arma ruidosa — multiplica o calor da operação por ×${meta.loud_heat_mult ?? 1.3} e denuncia abordagens discretas.`}>
@@ -440,7 +440,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate }) => {
                         <p className="min-w-0 truncate text-sm font-semibold text-white">{m.name}</p>
                         <TierChip tier={tier} />
                       </div>
-                      <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                         {catalog?.weapon_categories?.[m.category]?.name || m.category}
                         {locked && (
                           <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400">

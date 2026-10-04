@@ -257,7 +257,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                       </div>
                       <TierChip tier={tier} />
                     </div>
-                    <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       {renamed && (
                         <Tip tip="Modelo original deste veículo, antes de o renomeares.">
                           <span data-testid={`vehicle-model-tag-${v.id}`} className="mr-1.5 rounded bg-black/40 px-1 py-px text-zinc-400">{modelName}</span>
@@ -507,7 +507,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate }) => {
                           <p className="truncate text-sm font-semibold text-white">{m.name}</p>
                           <TierChip tier={tier} />
                         </div>
-                        <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                        <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                           {locked && (
                             <span className="mr-1.5 inline-flex items-center gap-0.5 text-amber-400">
                               <Lock size={9} /> nível {m.min_level}

@@ -425,7 +425,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate }) => {
                       </div>
                       <TierChip tier={tier} missions={t.missions_done} />
                     </div>
-                    <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       <Tip tip={`Especialização ${SPEC_LABELS[t.spec]} — bónus de sucesso em operações desta categoria.`}>
                         <span>{SPEC_LABELS[t.spec]}</span>
                       </Tip>

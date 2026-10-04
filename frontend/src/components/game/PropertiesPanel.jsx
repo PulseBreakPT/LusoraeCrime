@@ -198,7 +198,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                       />
                       <TierChip tier={tier} />
                     </div>
-                    <p className="flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                    <p className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       <MapPin size={9} className="shrink-0" /> {p.district}
                       {renamed && (
                         <Tip tip="Tipo original desta propriedade, antes de a renomeares.">
@@ -332,7 +332,7 @@ export const PropertiesPanel = ({ open, onOpenChange }) => {
                           <p className="truncate text-sm font-semibold text-white">{pt.name}</p>
                           <TierChip tier={tier} />
                         </div>
-                        <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-500">
+                        <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                           {locked && (
                             <span className="mr-1.5 inline-flex items-center gap-0.5 text-amber-400">
                               <Lock size={9} /> nível {pt.min_level}
