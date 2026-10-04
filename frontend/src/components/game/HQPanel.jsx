@@ -212,9 +212,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
             <p className="font-mono text-[10px] text-emerald-400">{hqBenefitDesc(currentTier)}</p>
 
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                <Lightbulb size={12} className="text-amber-400" /> Recomendações do consultor
-              </h3>
+              <SectionHeader icon={Lightbulb} title="Recomendações do consultor" />
               {tips.length === 0 ? (
                 <Alert className="border-emerald-500/20 bg-emerald-500/5 py-2">
                   <AlertDescription className="font-mono text-[11px] text-emerald-400">
@@ -227,10 +225,10 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                     const color = SEVERITY_COLOR[t.severity] || "#71717A";
                     const Icon = SEVERITY_ICON[t.severity] || Lightbulb;
                     return (
-                      <Card key={t.id} data-testid={`hq-tip-${t.id}`} className="flex items-center justify-between gap-2 sub-card px-3 py-2 shadow-none">
+                      <Card key={t.id} data-testid={`hq-tip-${t.id}`} className="flex flex-col items-stretch gap-2 sub-card px-3 py-2 shadow-none sm:flex-row sm:items-center sm:justify-between">
                         <p className="flex min-w-0 items-center gap-1.5 text-[11px] leading-snug text-zinc-300">
                           <Icon size={11} className="shrink-0" style={{ color }} />
-                          <span className="min-w-0 truncate">{t.label}</span>
+                          <span className="min-w-0 break-words">{t.label}</span>
                         </p>
                         {t.navigate && (
                           <Button
@@ -303,9 +301,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
             </Card>
 
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                <History size={12} /> Histórico de melhorias
-              </h3>
+              <SectionHeader icon={History} title="Histórico de melhorias" />
               {(!hq.upgrade_history || hq.upgrade_history.length === 0) ? (
                 <p className="rounded-lg border border-dashed border-white/10 p-3 text-center font-mono text-[10px] text-zinc-600">
                   Ainda sem melhorias concluídas.
@@ -365,10 +361,8 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
         {tab === "prioridades" && (
           <div className="mt-3 space-y-3" data-testid="hq-tab-prioridades-content">
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">
-                <SlidersHorizontal size={12} /> Prioridade da organização
-              </h3>
-              <div className="grid grid-cols-2 gap-1.5" data-testid="hq-priority-options">
+              <SectionHeader icon={SlidersHorizontal} title="Prioridade da organização" />
+              <div className="grid grid-cols-1 gap-1.5 min-[390px]:grid-cols-2" data-testid="hq-priority-options">
                 {Object.entries(catalog.hq_priorities || {}).map(([key, label]) => (
                   <Button
                     key={key}
@@ -389,7 +383,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
             </div>
 
             <div>
-              <h3 className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-zinc-400">Departamentos</h3>
+              <SectionHeader icon={UserCog} title="Departamentos" />
               <div className="space-y-2" data-testid="hq-departments">
                 {Object.entries(catalog.hq_departments || {}).map(([key, dept]) => {
                   const unlockTier = (catalog.hq_level_benefits || []).find((t) => (t.unlocks || []).includes(key));
