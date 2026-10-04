@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney } from "../../lib/game";
 import {
@@ -63,6 +63,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const [abortThreshold, setAbortThreshold] = useState({});
   const [loadouts, setLoadouts] = useState({});
   const [propertyStaff, setPropertyStaff] = useState({});
+  const draftsInitializedRef = useRef(false);
 
   const orgCatalog = catalog?.organization || {};
   const org = state?.organization || {};
@@ -79,7 +80,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   }, [open, tab, state?.player?.clean_money, fetchFinanceSummary]);
 
   useEffect(() => {
-    if (!state) return;
+    if (!open) {
+      draftsInitializedRef.current = false;
+      return;
+    }
+    if (!state || draftsInitializedRef.current) return;
     setAbortThreshold(Object.fromEntries(
       (state.teams || []).map((t) => [t.id, t.policies?.abort_below_pct ?? 0])
     ));
@@ -89,7 +94,8 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
     setPropertyStaff(Object.fromEntries(
       (state.properties || []).map((p) => [p.id, new Set(p.staff_employee_ids || [])])
     ));
-  }, [state]);
+    draftsInitializedRef.current = true;
+  }, [open, state]);
 
   const inventory = org.inventory || {};
   const storageUsed = Number(org.inventory_used || 0);
@@ -104,10 +110,30 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const territoryTiers = orgCatalog.territory_tiers || {};
   const propertyModules = orgCatalog.property_modules || {};
   const prestige = orgCatalog.prestige || {};
+  const lifecycle = orgCatalog.vehicle_lifecycle || {};
+  const tireSetPrice = Number(orgCatalog.supplies?.tire_set?.price || 0);
+  const protectionCost = Number(org.protection_cost || org.governance?.last_cost || 0);
 
-  const freePropertyStaff = useMemo(
-    () => (state?.employees || []).filter((e) => e.status === "idle" && !e.team_id),
-    [state?.employees]
+  const vehicleValue = (vehicle) =>
+    Number(vehicle?.price || catalog.vehicle_models?.[vehicle?.model_key]?.price || 0);
+  const serviceCostOf = (vehicle) => Math.max(
+    120,
+    Math.trunc(
+      vehicleValue(vehicle) * Number(lifecycle.service_base_pct || 0.018)
+      + Math.max(0, 100 - Number(vehicle?.condition || 0)) * 8
+    )
+  );
+  const insuranceCostOf = (vehicle) => Math.max(
+    80,
+    Math.trunc(vehicleValue(vehicle) * Number(lifecycle.insurance_week_pct || 0.0012) * 4)
+  );
+  const moduleCostOf = (property, mod, level) => Math.trunc(
+    Number(mod?.base_cost || 0)
+    * (1 + Number(level || 0) * 0.75)
+    * Number(property?.market_multiplier || 1)
+  );
+  const weaponUpgradeCostOf = (upgrade, rank) => Math.trunc(
+    Number(upgrade?.cost || 0) * (1 + Number(rank || 0) * 0.65)
   );
 
   if (!state || !catalog) return null;
@@ -144,9 +170,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 bg-black/40">
+          <TabsList className="flex h-auto w-full gap-1 overflow-x-auto bg-black/40 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map(({ key, label, icon: Icon }) => (
-              <TabsTrigger key={key} value={key} className="min-h-9 gap-1 px-1 font-mono text-[10px] uppercase data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger key={key} value={key} className="min-h-8 min-w-[78px] flex-1 gap-1 whitespace-nowrap px-2 font-mono text-[9px] uppercase data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Icon size={11} /> {label}
               </TabsTrigger>
             ))}
@@ -250,9 +276,13 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   </p>
                 </div>
                 <PurchaseButton
-                  label={org.governance?.last_cost ? fmtMoney(org.governance.last_cost) : "Ativar"}
-                  can={state.player.level >= 5}
-                  blockedReasons={state.player.level < 5 ? ["Requer nível 5."] : []}
+                  label={`${org.governance?.protection_until && Date.parse(org.governance.protection_until) > now ? "Renovar" : "Ativar"} · ${fmtMoney(protectionCost)}`}
+                  can={state.player.level >= 5 && protectionCost > 0 && money >= protectionCost}
+                  blockedReasons={[
+                    state.player.level < 5 ? "Requer nível 5." : null,
+                    protectionCost <= 0 ? "Preço indisponível." : null,
+                    money < protectionCost ? `Faltam ${fmtMoney(protectionCost - money)}.` : null,
+                  ].filter(Boolean)}
                   onConfirm={buyProtection}
                 />
               </Card>
@@ -271,6 +301,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               {supplyEntries.map(([key, item]) => {
                 const qty = Number(inventory[key] || 0);
                 const unlocked = state.player.level >= item.min_level;
+                const buySpace = Number(item.space || 0) * Number(item.pack || 0);
+                const hasRoom = storageCap <= 0 || storageUsed + buySpace <= storageCap;
+                const resale = Math.trunc(Number(item.price || 0) * 0.45);
                 return (
                   <Card key={key} className="sub-card flex items-center gap-2.5 p-3">
                     <div className="min-w-0 flex-1">
@@ -284,11 +317,19 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
-                      <SmallAction disabled={!unlocked || money < item.price} onClick={() => buySupply(key, 1)}>
-                        <Plus size={11} /> Comprar
+                      <SmallAction
+                        disabled={!unlocked || money < item.price || !hasRoom}
+                        title={!unlocked ? `Desbloqueia no nível ${item.min_level}` : !hasRoom ? "Armazenamento insuficiente" : money < item.price ? "Dinheiro insuficiente" : `Comprar pack ×${item.pack}`}
+                        onClick={() => buySupply(key, 1)}
+                      >
+                        <Plus size={11} /> {fmtMoney(item.price)}
                       </SmallAction>
-                      <SmallAction disabled={qty < item.pack} onClick={() => sellSupply(key, 1)}>
-                        <Minus size={11} /> Vender
+                      <SmallAction
+                        disabled={qty < item.pack}
+                        title={qty < item.pack ? `Precisas de ${item.pack} unidades` : `Recebes ${fmtMoney(resale)}`}
+                        onClick={() => sellSupply(key, 1)}
+                      >
+                        <Minus size={11} /> +{fmtMoney(resale)}
                       </SmallAction>
                     </div>
                   </Card>
@@ -331,6 +372,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       >
                         {Object.entries(doctrines).map(([key, d]) => <option key={key} value={key}>{d.name}</option>)}
                       </select>
+                      <span className="block text-[10px] leading-relaxed text-zinc-600">
+                        {doctrines[team.doctrine || "balanced"]?.desc}
+                      </span>
                     </label>
                     <label className="space-y-1">
                       <span className="font-mono text-[10px] uppercase text-zinc-500">Abortar abaixo de</span>
@@ -346,6 +390,25 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                         </SmallAction>
                       </div>
                     </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                    {["protect_injured", "auto_use_medical", "auto_use_armor"].map((policyKey) => {
+                      const cfg = orgCatalog.team_policies?.[policyKey];
+                      if (!cfg) return null;
+                      const enabled = team.policies?.[policyKey] ?? cfg.default ?? false;
+                      return (
+                        <label key={policyKey} className="flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-2 text-[10px] text-zinc-400">
+                          <input
+                            type="checkbox"
+                            checked={!!enabled}
+                            disabled={team.status !== "idle"}
+                            onChange={(e) => setTeamPolicies(team.id, { ...(team.policies || {}), [policyKey]: e.target.checked })}
+                          />
+                          <span>{cfg.name}</span>
+                        </label>
+                      );
+                    })}
                   </div>
 
                   <div>
@@ -395,6 +458,13 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               const seized = v.seized_until && Date.parse(v.seized_until) > now;
               const insured = v.insurance_until && Date.parse(v.insurance_until) > now;
               const inspected = v.inspection_due_at && Date.parse(v.inspection_due_at) > now;
+              const assignedTeam = v.team_id ? state.teams.find((team) => team.id === v.team_id) : null;
+              const occupied = assignedTeam && assignedTeam.status !== "idle";
+              const serviceCost = serviceCostOf(v);
+              const tiresCost = Number(inventory.tire_set || 0) > 0 ? 0 : tireSetPrice;
+              const insuranceCost = insuranceCostOf(v);
+              const inspectionCost = Number(lifecycle.inspection_base || 85);
+              const inspectionReady = Number(v.condition || 0) >= 55 && Number(v.tires_pct ?? 100) >= 35;
               return (
                 <Card key={v.id} className="sub-card p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -414,10 +484,41 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                    <SmallAction dense disabled={seized} onClick={() => serviceVehicle(v.id)}><Wrench size={10} /> Revisão</SmallAction>
-                    <SmallAction dense disabled={seized} onClick={() => replaceVehicleTires(v.id)}><Gauge size={10} /> Pneus</SmallAction>
-                    <SmallAction dense onClick={() => insureVehicle(v.id)}><Shield size={10} /> Seguro</SmallAction>
-                    <SmallAction dense disabled={seized} onClick={() => inspectVehicle(v.id)}><ClipboardCheck size={10} /> IPO</SmallAction>
+                    <PurchaseButton
+                      density="dense" icon={Wrench} label={`Revisão · ${fmtMoney(serviceCost)}`}
+                      can={!seized && !occupied && money >= serviceCost}
+                      blockedReasons={[
+                        seized ? "Veículo apreendido." : null,
+                        occupied ? "Veículo em operação." : null,
+                        money < serviceCost ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      onConfirm={() => serviceVehicle(v.id)}
+                    />
+                    <PurchaseButton
+                      density="dense" icon={Gauge} label={tiresCost ? `Pneus · ${fmtMoney(tiresCost)}` : "Pneus · stock"}
+                      can={!seized && (tiresCost === 0 || money >= tiresCost)}
+                      blockedReasons={[
+                        seized ? "Veículo apreendido." : null,
+                        tiresCost > 0 && money < tiresCost ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      onConfirm={() => replaceVehicleTires(v.id)}
+                    />
+                    <PurchaseButton
+                      density="dense" icon={Shield} label={`Seguro · ${fmtMoney(insuranceCost)}`}
+                      can={money >= insuranceCost}
+                      blockedReasons={money < insuranceCost ? ["Dinheiro insuficiente."] : []}
+                      onConfirm={() => insureVehicle(v.id)}
+                    />
+                    <PurchaseButton
+                      density="dense" icon={ClipboardCheck} label={`IPO · ${fmtMoney(inspectionCost)}`}
+                      can={!seized && inspectionReady && money >= inspectionCost}
+                      blockedReasons={[
+                        seized ? "Veículo apreendido." : null,
+                        !inspectionReady ? "Requer condição ≥55% e pneus ≥35%." : null,
+                        money < inspectionCost ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      onConfirm={() => inspectVehicle(v.id)}
+                    />
                   </div>
                 </Card>
               );
@@ -437,6 +538,12 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               const loaded = ammoKey ? Number(w.ammo_loaded || 0) : cap;
               const upgradeCounts = (w.upgrades || []).reduce((acc, u) => ({ ...acc, [u.key]: (acc[u.key] || 0) + 1 }), {});
               const selected = weaponUpgrade[w.id] || Object.keys(upgradeCatalog)[0] || "";
+              const selectedUpgrade = upgradeCatalog[selected] || null;
+              const selectedRank = Number(upgradeCounts[selected] || 0);
+              const upgradeCost = weaponUpgradeCostOf(selectedUpgrade, selectedRank);
+              const upgradeUnlocked = !!selectedUpgrade && state.player.level >= Number(selectedUpgrade.min_level || 1);
+              const upgradeMaxed = !!selectedUpgrade && selectedRank >= Number(selectedUpgrade.max_rank || 0);
+              const ammoAvailable = ammoKey ? Number(inventory[ammoKey] || 0) : 0;
               return (
                 <Card key={w.id} className="sub-card p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -444,7 +551,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       <p className="text-xs font-semibold text-white">{w.name}</p>
                       <p className="font-mono text-[10px] text-zinc-500">{ammoKey ? `${loaded}/${cap} munições · stock ${inventory[ammoKey] || 0}` : "sem munições"}</p>
                     </div>
-                    <SmallAction disabled={!ammoKey || loaded >= cap} onClick={() => reloadWeapon(w.id)}>
+                    <SmallAction
+                      disabled={!ammoKey || loaded >= cap || ammoAvailable <= 0}
+                      title={!ammoKey ? "Esta arma não usa munições." : loaded >= cap ? "Carregador cheio." : ammoAvailable <= 0 ? "Sem munições no stock." : `Usa até ${Math.max(0, cap - loaded)} unidades do stock.`}
+                      onClick={() => reloadWeapon(w.id)}
+                    >
                       <Fuel size={11} /> Recarregar
                     </SmallAction>
                   </div>
@@ -455,13 +566,23 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       onChange={(e) => setWeaponUpgrade((p) => ({ ...p, [w.id]: e.target.value }))}
                       className="h-8 min-w-0 flex-1 rounded-md border border-white/10 bg-black/60 px-2 text-[10px] text-zinc-200"
                     >
-                      {Object.entries(upgradeCatalog).map(([key, up]) => (
-                        <option key={key} value={key}>{up.name} · N{upgradeCounts[key] || 0}/{up.max_rank}</option>
-                      ))}
+                      {Object.entries(upgradeCatalog).map(([key, up]) => {
+                        const rank = Number(upgradeCounts[key] || 0);
+                        const price = weaponUpgradeCostOf(up, rank);
+                        return <option key={key} value={key}>{up.name} · N{rank}/{up.max_rank} · {fmtMoney(price)}</option>;
+                      })}
                     </select>
-                    <SmallAction disabled={!selected} onClick={() => upgradeWeaponMod(w.id, selected)}>
-                      <Plus size={11} /> Instalar
-                    </SmallAction>
+                    <PurchaseButton
+                      density="dense" icon={Plus} label={upgradeMaxed ? "Máximo" : `Instalar · ${fmtMoney(upgradeCost)}`}
+                      can={!!selected && upgradeUnlocked && !upgradeMaxed && money >= upgradeCost}
+                      blockedReasons={[
+                        !selected ? "Escolhe um upgrade." : null,
+                        selectedUpgrade && !upgradeUnlocked ? `Requer nível ${selectedUpgrade.min_level}.` : null,
+                        upgradeMaxed ? "Upgrade no nível máximo." : null,
+                        upgradeCost > money ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      onConfirm={() => upgradeWeaponMod(w.id, selected)}
+                    />
                   </div>
                   {(w.upgrades || []).length > 0 && (
                     <p className="mt-2 font-mono text-[10px] text-zinc-600">
@@ -477,8 +598,15 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
         {tab === "imoveis" && (
           <div className="mt-3 space-y-2">
             <SectionHeader icon={Warehouse} title="Infraestrutura e pessoal" meta={`${state.properties.length} bases`} />
-            {state.properties.map((p) => {
+            {state.properties.length === 0 ? (
+              <EmptyState icon={Warehouse} title="Sem imóveis" sub="Adquire uma base para gerir módulos e pessoal." />
+            ) : state.properties.map((p) => {
               const selectedStaff = propertyStaff[p.id] || new Set();
+              const eligiblePropertyStaff = (state.employees || []).filter((e) =>
+                e.status === "idle"
+                && !e.team_id
+                && (!e.stationed_property_id || e.stationed_property_id === p.id)
+              );
               return (
                 <Card key={p.id} className="sub-card p-3">
                   <div className="flex items-center justify-between">
@@ -493,24 +621,27 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       const field = `${key}_level`;
                       const level = Number(p[field] || 0);
                       const maxed = level >= mod.max_level;
+                      const cost = moduleCostOf(p, mod, level);
                       return (
-                        <Button
+                        <PurchaseButton
                           key={key}
-                          variant="outline"
-                          disabled={maxed}
-                          onClick={() => upgradePropertyModule(p.id, key)}
-                          className="h-auto min-h-10 flex-col border-white/10 bg-white/[0.03] px-1 py-1.5"
-                        >
-                          <span className="text-[10px] text-zinc-300">{mod.name}</span>
-                          <span className="font-mono text-[10px] text-zinc-600">N{level}/{mod.max_level}</span>
-                        </Button>
+                          density="dense"
+                          label={maxed ? `${mod.name} · Máx.` : `${mod.name} · ${fmtMoney(cost)}`}
+                          can={!maxed && money >= cost}
+                          blockedReasons={[
+                            maxed ? "Módulo no nível máximo." : null,
+                            money < cost ? "Dinheiro insuficiente." : null,
+                          ].filter(Boolean)}
+                          availableTip={`${mod.desc} Nível ${level}/${mod.max_level}.`}
+                          onConfirm={() => upgradePropertyModule(p.id, key)}
+                        />
                       );
                     })}
                   </div>
                   <div className="mt-3">
                     <p className="mb-1.5 font-mono text-[10px] uppercase text-zinc-500">Operacionais destacados</p>
                     <div className="max-h-28 space-y-1 overflow-y-auto">
-                      {freePropertyStaff.map((e) => (
+                      {eligiblePropertyStaff.map((e) => (
                         <label key={e.id} className="flex items-center gap-2 rounded border border-white/[0.06] px-2 py-1.5 text-[10px] text-zinc-400">
                           <input
                             type="checkbox"
@@ -523,6 +654,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                         </label>
                       ))}
                     </div>
+                    {eligiblePropertyStaff.length === 0 && selectedStaff.size === 0 && (
+                      <p className="rounded border border-dashed border-white/10 px-2 py-2 text-[10px] text-zinc-600">
+                        Sem operacionais livres para destacar.
+                      </p>
+                    )}
                     <SmallAction className="mt-2 w-full" onClick={() => assignPropertyStaff(p.id, [...selectedStaff])}>
                       <UserRoundCog size={11} /> Guardar destacamento
                     </SmallAction>
@@ -546,6 +682,8 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
               const tier = Number(info.tier || 1);
               const tierCfg = territoryTiers[tier] || {};
               const next = territoryTiers[tier + 1];
+              const defendCost = Math.max(500, Math.trunc(Number(tierCfg.defense_weekly || 0) * 1.5));
+              const consolidateCost = Number(next?.cost || 0);
               return (
                 <Card key={district} className="sub-card p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -560,8 +698,21 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     <div><p className="font-mono text-[10px] text-zinc-500">Pressão {Math.round(info.pressure || 0)}%</p><MiniBar value={info.pressure || 0} color="#EF4444" /></div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-1.5">
-                    <SmallAction onClick={() => defendTerritory(district)}><ShieldCheck size={11} /> Reforçar</SmallAction>
-                    <SmallAction disabled={!next} onClick={() => consolidateTerritory(district)}><TrendingUp size={11} /> {next ? "Consolidar" : "Máximo"}</SmallAction>
+                    <PurchaseButton
+                      density="dense" icon={ShieldCheck} label={`Reforçar · ${fmtMoney(defendCost)}`}
+                      can={money >= defendCost}
+                      blockedReasons={money < defendCost ? ["Dinheiro insuficiente."] : []}
+                      onConfirm={() => defendTerritory(district)}
+                    />
+                    <PurchaseButton
+                      density="dense" icon={TrendingUp} label={next ? `Consolidar · ${fmtMoney(consolidateCost)}` : "Máximo"}
+                      can={!!next && money >= consolidateCost}
+                      blockedReasons={[
+                        !next ? "Território no nível máximo." : null,
+                        next && money < consolidateCost ? "Dinheiro insuficiente." : null,
+                      ].filter(Boolean)}
+                      onConfirm={() => consolidateTerritory(district)}
+                    />
                   </div>
                 </Card>
               );
