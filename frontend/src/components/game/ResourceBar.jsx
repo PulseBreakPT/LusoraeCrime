@@ -38,7 +38,7 @@ export const ResourceBar = () => {
       data-testid="resource-bar"
       className="pointer-events-auto absolute left-2 right-2 top-2 z-20 animate-slide-down"
     >
-      <div className="sub-topbar mx-auto grid w-full max-w-[34rem] grid-cols-4 overflow-hidden rounded-xl sm:w-auto">
+      <div className="sub-topbar sub-resource-grid mx-auto grid w-full max-w-[34rem] overflow-hidden rounded-xl sm:w-auto">
         <Stat
           testId="stat-level"
           icon={Shield}
@@ -86,14 +86,14 @@ export const ResourceBar = () => {
 const Stat = ({ icon: Icon, color, label, value, tip, testId, className = "" }) => (
   <Tip tip={tip} side="bottom" className="min-w-0">
     <div data-testid={testId} className={`sub-minimal-stat flex min-w-0 items-center gap-2 px-2.5 py-2 ${className}`}>
-      <span className="sub-resource-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+      <span className="sub-resource-icon flex h-6 w-6 shrink-0 items-center justify-center">
         <Icon size={14} style={{ color }} />
       </span>
       <span className="min-w-0">
         <span className="sub-resource-label block truncate text-[8px] font-semibold uppercase leading-none tracking-[0.11em] text-zinc-600">
           {label}
         </span>
-        <span className="mt-1 block truncate font-mono text-[12px] font-bold leading-none tabular-nums text-zinc-100 sm:text-[13px]">
+        <span className="mt-1 block whitespace-nowrap font-mono text-[11px] font-bold leading-none tabular-nums text-zinc-100 sm:text-[13px]">
           {value}
         </span>
       </span>
