@@ -172,7 +172,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               onChange={(ev) => setQuery(ev.target.value)}
               aria-label="Pesquisar frota"
               placeholder="Pesquisar veículo..."
-              className="h-auto w-full border-white/10 bg-black/60 py-1.5 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+              className="h-8 min-h-0 w-full border-white/10 bg-black/60 py-1 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
             />
           </div>
           <Tip tip={canOptimize
@@ -183,7 +183,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               onClick={() => canOptimize && optimizeVehicles()}
               disabled={!canOptimize}
               className={cn(
-                "flex shrink-0 items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                "flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border px-2 font-mono text-[10px] font-bold uppercase transition-colors",
                 canOptimize
                   ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
                   : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
@@ -202,6 +202,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               availableTip={`Repara todos os veículos disponíveis abaixo de 100% de condição (${repairableIds.length}) por ${fmtMoney(repairAllCost)} no total.`}
               onConfirm={repairAll}
               className="w-full shrink-0 sm:w-auto"
+              density="compact"
             />
           )}
         </div>
@@ -422,7 +423,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                   {refueling ? (
                     <span
                       data-testid={`refuel-vehicle-${v.id}`}
-                      className="flex flex-1 items-center justify-center gap-1 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 font-mono text-[10px] text-amber-400"
+                      className="flex min-h-7 flex-1 items-center justify-center gap-0.5 rounded border border-amber-500/20 bg-amber-500/5 px-1.5 py-1 font-mono text-[10px] text-amber-400"
                     >
                       <Clock size={11} /> A abastecer · {fmtDuration(refuelRemaining)}
                     </span>
@@ -440,6 +441,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                       availableTip={`Atestar o depósito (${(v.tank_l - v.fuel_l).toFixed(0)}L a ${(state.fuel_prices?.[v.fuel_type] || 0).toFixed(2)} €/L) — demora alguns segundos.`}
                       onConfirm={() => refuelVehicle(v.id)}
                       className="flex-1"
+                      density="dense"
                     />
                   )}
                   <PurchaseButton
@@ -455,6 +457,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                     availableTip={`Reparar até 100% de condição — recupera velocidade máxima${state.bonuses?.repair_discount ? " (desconto de oficina aplicado)" : ""}.`}
                     onConfirm={() => repairVehicle(v.id)}
                     className="flex-1"
+                    density="dense"
                   />
                   <ConfirmButton
                     testId={`sell-vehicle-${v.id}`}
@@ -465,6 +468,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                     onConfirm={() => sellVehicle(v.id)}
                     disabled={locked}
                     className="flex-1"
+                    density="dense"
                     tip={
                       transferring
                         ? "Não podes vender um veículo em trânsito para outra base."

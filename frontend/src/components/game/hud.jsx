@@ -265,9 +265,30 @@ export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
 // abater) — sem modais: o primeiro clique arma um curto período de confirmação,
 // o segundo clique dentro desse período executa a ação. Fica sobre bg-destructive
 // quando armado, para deixar claro que o clique seguinte é definitivo.
+const ACTION_DENSITY_CLASS = {
+  comfortable: "min-h-9 gap-1.5 px-2.5 py-1.5 text-[10px]",
+  compact: "min-h-8 gap-1 px-2 py-1 text-[10px]",
+  dense: "min-h-7 gap-0.5 px-1.5 py-1 text-[10px]",
+};
+
+export const actionDensityForCount = (count) =>
+  count >= 3 ? "dense" : count === 2 ? "compact" : "comfortable";
+
+export const ActionGrid = ({ count = 1, children, className = "" }) => {
+  const layout =
+    count >= 4
+      ? "grid-cols-2 min-[430px]:grid-cols-4"
+      : count === 3
+      ? "grid-cols-3"
+      : count === 2
+      ? "grid-cols-2"
+      : "grid-cols-1";
+  return <div className={cn("grid gap-1.5", layout, className)}>{children}</div>;
+};
+
 export const ConfirmButton = ({
   testId, icon: Icon, label, confirmLabel = "Confirmar?", color = "text-red-400",
-  onConfirm, disabled, className = "", armMs = 3000, tip,
+  onConfirm, disabled, className = "", armMs = 3000, tip, density = "comfortable",
 }) => {
   const [armed, setArmed] = useState(false);
   const skipArm = getDisplayPrefs().confirmIrreversible === false;
@@ -283,7 +304,8 @@ export const ConfirmButton = ({
         onClick={() => { if (skipArm) { onConfirm(); return; } if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
         disabled={disabled}
         className={cn(
-          "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] transition-colors disabled:opacity-40",
+          "flex w-full items-center justify-center rounded-md border font-mono transition-colors disabled:opacity-40",
+          ACTION_DENSITY_CLASS[density] || ACTION_DENSITY_CLASS.comfortable,
           armed
             ? "border-destructive/60 bg-destructive/20 text-destructive"
             : disabled
@@ -304,7 +326,7 @@ export const ConfirmButton = ({
 // grandes, sem precisar de um componente/estilo à parte.
 export const PurchaseButton = ({
   testId, label, icon: Icon, can, blockedReasons = [], availableTip, confirmLabel = "Confirmar?",
-  requireConfirm = false, onConfirm, className = "", layout = "row", children,
+  requireConfirm = false, onConfirm, className = "", layout = "row", children, density = "comfortable",
 }) => {
   const [armed, setArmed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -345,7 +367,10 @@ export const PurchaseButton = ({
         className={cn(
           layout === "card"
             ? "flex h-full w-full flex-col items-start gap-1 rounded-md border px-3 py-2 text-left font-mono text-[10px] font-bold uppercase md:flex-row md:items-center md:text-[10px]"
-            : "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase",
+            : cn(
+                "flex w-full items-center justify-center rounded-md border font-mono font-bold uppercase",
+                ACTION_DENSITY_CLASS[density] || ACTION_DENSITY_CLASS.comfortable
+              ),
           "transition-colors disabled:cursor-not-allowed",
           pending
             ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
