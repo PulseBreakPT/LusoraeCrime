@@ -2330,6 +2330,7 @@ async def sell_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_us
 
 
 @router.post("/vehicles/refuel")
+@idempotent("vehicles.refuel")
 async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2351,14 +2352,23 @@ async def refuel_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     if vip_active:
         duration_s *= VIP_REFUEL_SPEED_MULT
     until = (now_utc() + timedelta(seconds=duration_s)).isoformat()
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_refueled": 1}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {"refueling_until": until}, "$inc": {"fuel_spent_total": cost}})
+    fresh_player = await _debit_clean_atomic(player, cost, {"stats.vehicles_refueled": 1})
+    changed = await db.vehicles.update_one(
+        {"_id": vehicle["_id"], "player_id": pid, "fuel_l": vehicle["fuel_l"], "$or": [
+            {"refueling_until": None}, {"refueling_until": {"$exists": False}}, {"refueling_until": {"$lte": now_utc().isoformat()}},
+        ]},
+        {"$set": {"refueling_until": until}, "$inc": {"fuel_spent_total": cost}},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost, "stats.vehicles_refueled": -1}})
+        raise HTTPException(status_code=409, detail="O estado do veículo mudou antes do abastecimento")
     await add_event(db, pid, "vehicle", f"{vehicle['name']} a abastecer ({vehicle['fuel_type']}) por {cost:,} € — pronto em {round(duration_s)}s.")
-    await record_tx(db, pid, "refuel", -cost, "clean", player["clean_money"] - cost, f"Combustível para {vehicle['name']}")
+    await record_tx(db, pid, "refuel", -cost, "clean", fresh_player["clean_money"], f"Combustível para {vehicle['name']}")
     return {"cost": cost, "refueling_until": until}
 
 
 @router.post("/vehicles/repair")
+@idempotent("vehicles.repair")
 async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2382,13 +2392,19 @@ async def repair_vehicle(body: VehicleIdInput, user: dict = Depends(get_current_
     cost = max(50, int(missing * vehicle["price"] * VEHICLE_REPAIR_BASE_MULTIPLIER * (1 - discount)))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.vehicles_repaired": 1}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {
-        "$set": {"condition": 100.0, "missions_since_repair": 0},
-        "$inc": {"repair_spent_total": cost},
-    })
+    fresh_player = await _debit_clean_atomic(player, cost, {"stats.vehicles_repaired": 1})
+    changed = await db.vehicles.update_one(
+        {"_id": vehicle["_id"], "player_id": pid, "condition": vehicle["condition"]},
+        {
+            "$set": {"condition": 100.0, "missions_since_repair": 0},
+            "$inc": {"repair_spent_total": cost},
+        },
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost, "stats.vehicles_repaired": -1}})
+        raise HTTPException(status_code=409, detail="A condição do veículo mudou antes da reparação")
     await add_event(db, pid, "vehicle", f"{vehicle['name']} reparado por {cost:,} €.")
-    await record_tx(db, pid, "repair", -cost, "clean", player["clean_money"] - cost, f"Reparação de {vehicle['name']}")
+    await record_tx(db, pid, "repair", -cost, "clean", fresh_player["clean_money"], f"Reparação de {vehicle['name']}")
     return {"cost": cost}
 
 
@@ -2417,6 +2433,7 @@ async def assign_vehicle(body: VehicleAssignInput, user: dict = Depends(get_curr
 
 
 @router.post("/vehicles/transfer")
+@idempotent("vehicles.transfer")
 async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2446,16 +2463,26 @@ async def transfer_vehicle(body: VehicleTransferInput, user: dict = Depends(get_
     now = now_utc()
     until = (now + timedelta(seconds=duration_s)).isoformat()
     dest_name = to_prop["name"] if to_prop else player["hq"]["name"]
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.vehicles.update_one({"_id": vehicle["_id"]}, {"$set": {
-        "transfer": {
-            "to_property_id": body.to_property_id, "started_at": now.isoformat(), "ends_at": until,
-            "from": {"lat": origin["lat"], "lng": origin["lng"]},
-            "to": {"lat": to_lat, "lng": to_lng},
+    fresh_player = await _debit_clean_atomic(player, cost)
+    changed = await db.vehicles.update_one(
+        {
+            "_id": vehicle["_id"], "player_id": pid,
+            "property_id": vehicle.get("property_id"),
+            "$or": [{"transfer": None}, {"transfer": {"$exists": False}}],
         },
-    }})
+        {"$set": {
+            "transfer": {
+                "to_property_id": body.to_property_id, "started_at": now.isoformat(), "ends_at": until,
+                "from": {"lat": origin["lat"], "lng": origin["lng"]},
+                "to": {"lat": to_lat, "lng": to_lng},
+            },
+        }},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost}})
+        raise HTTPException(status_code=409, detail="O veículo mudou de base/estado antes da transferência")
     await add_event(db, pid, "vehicle", f"{vehicle['name']} a caminho de {dest_name} — chega em {round(duration_s)}s.")
-    await record_tx(db, pid, "vehicle_transfer", -cost, "clean", player["clean_money"] - cost, f"Transferência de {vehicle['name']} para {dest_name}")
+    await record_tx(db, pid, "vehicle_transfer", -cost, "clean", fresh_player["clean_money"], f"Transferência de {vehicle['name']} para {dest_name}")
     return {"cost": cost, "transfer_until": until}
 
 
@@ -2662,6 +2689,7 @@ async def sell_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user
 
 
 @router.post("/weapons/repair")
+@idempotent("weapons.repair")
 async def repair_weapon(body: WeaponIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2677,10 +2705,16 @@ async def repair_weapon(body: WeaponIdInput, user: dict = Depends(get_current_us
     cost = max(20, int(missing * model.get("maintenance_cost", 100) * WEAPON_REPAIR_COST_MULTIPLIER / 100))
     if player["clean_money"] < cost:
         raise HTTPException(status_code=400, detail="Dinheiro limpo insuficiente")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost}})
-    await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"condition": 100.0, "missions_since_repair": 0}})
+    fresh_player = await _debit_clean_atomic(player, cost)
+    changed = await db.weapons.update_one(
+        {"_id": weapon["_id"], "player_id": pid, "condition": weapon.get("condition", 100)},
+        {"$set": {"condition": 100.0, "missions_since_repair": 0}},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost}})
+        raise HTTPException(status_code=409, detail="A condição da arma mudou antes da reparação")
     await add_event(db, pid, "weapon", f"{weapon['name']} reparada por {cost:,} €.")
-    await record_tx(db, pid, "weapon_repair", -cost, "clean", player["clean_money"] - cost, f"Reparação de {weapon['name']}")
+    await record_tx(db, pid, "weapon_repair", -cost, "clean", fresh_player["clean_money"], f"Reparação de {weapon['name']}")
     return {"cost": cost}
 
 
@@ -2966,6 +3000,7 @@ async def sell_property(body: PropertyIdInput, user: dict = Depends(get_current_
 
 
 @router.post("/properties/upgrade")
+@idempotent("properties.upgrade")
 async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
@@ -2985,10 +3020,19 @@ async def upgrade_property(body: PropertyIdInput, user: dict = Depends(get_curre
     target_level = prop["level"] + 1
     duration_s = PROPERTY_UPGRADE_BASE_S + PROPERTY_UPGRADE_PER_LEVEL_S * target_level
     until = (now + timedelta(seconds=duration_s)).isoformat()
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": -cost, "stats.properties_upgraded": 1}})
-    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"upgrading_until": until}})
+    fresh_player = await _debit_clean_atomic(player, cost, {"stats.properties_upgraded": 1})
+    changed = await db.properties.update_one(
+        {
+            "_id": prop["_id"], "player_id": pid, "level": prop["level"],
+            "$or": [{"upgrading_until": None}, {"upgrading_until": {"$exists": False}}, {"upgrading_until": {"$lte": now.isoformat()}}],
+        },
+        {"$set": {"upgrading_until": until}},
+    )
+    if changed.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {"clean_money": cost, "stats.properties_upgraded": -1}})
+        raise HTTPException(status_code=409, detail="O imóvel mudou de estado antes da melhoria")
     await add_event(db, pid, "property", f"{prop['name']} começou a ser melhorado para nível {target_level} por {cost:,} € — pronto em {round(duration_s / 60, 1)} min.")
-    await record_tx(db, pid, "property_upgrade", -cost, "clean", player["clean_money"] - cost, f"Melhoria de {prop['name']}")
+    await record_tx(db, pid, "property_upgrade", -cost, "clean", fresh_player["clean_money"], f"Melhoria de {prop['name']}")
     return {"ok": True, "upgrading_until": until}
 
 
