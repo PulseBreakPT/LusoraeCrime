@@ -5,6 +5,7 @@ from organization_intelligence import (
     organization_policy,
     quote_action,
 )
+from organization_events import maybe_spawn_organization_event, public_event
 
 
 def sample_player():
@@ -114,6 +115,19 @@ def test_supply_quote_includes_logistics_discount():
     )
     assert 0 < quote["cost"] < 280
     assert quote["eligible"] is True
+
+
+def test_management_events_are_scheduled_then_become_decisions():
+    now = datetime.now(timezone.utc)
+    player = {}
+    assert maybe_spawn_organization_event(player, now=now, employee_count=3, property_count=1, territory_count=1) is None
+    assert player.get("next_organization_event_at")
+    player["next_organization_event_at"] = (now - timedelta(seconds=1)).isoformat()
+    event = maybe_spawn_organization_event(player, now=now, employee_count=3, property_count=1, territory_count=1)
+    assert event is not None
+    assert event["status"] == "pending"
+    assert len(event["options"]) == 2
+    assert public_event(event)["id"] == event["id"]
 
 
 def test_weekly_budgets_create_actionable_alerts_and_progression():
