@@ -13,7 +13,7 @@ from organization_intelligence import organization_policy
 from organization_systems import (
     SUPPLY_CATALOG, VEHICLE_LIFECYCLE,
     inventory_capacity, inventory_used, normalize_inventory,
-    logistics_cost_multiplier,
+    logistics_cost_multiplier, supply_cost_multiplier,
 )
 
 
@@ -90,7 +90,7 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
                 projected[key] = current + packs * pack
             if packs <= 0:
                 continue
-            cost = max(1, int(cfg["price"] * packs * logistics_cost_multiplier(player)))
+            cost = max(1, int(cfg["price"] * packs * supply_cost_multiplier(player, now)))
             units = packs * pack
             if not await spend(cost, {f"inventory.{key}": units}):
                 continue
