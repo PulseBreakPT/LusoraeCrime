@@ -58,6 +58,9 @@ class Player(BaseDocument):
     vip_until: Optional[str] = None
     owned_cosmetics: List[str] = []
     hq_skin_key: Optional[str] = None
+    inventory: dict = {}
+    departments: dict = {}
+    territories: dict = {}
 
 
 class Team(BaseDocument):
@@ -77,6 +80,9 @@ class Team(BaseDocument):
     roster_missions: int = 0
     category_missions: dict = {}
     emblem_key: Optional[str] = None
+    doctrine: str = "balanced"
+    policies: dict = {}
+    loadout: dict = {}
 
 
 class Employee(BaseDocument):
@@ -105,6 +111,11 @@ class Employee(BaseDocument):
     missions_done: int = 0
     weapon_id: Optional[str] = None
     weapon_proficiency: dict = {}
+    stress: float = 10.0
+    traits: List[str] = []
+    injury: Optional[dict] = None
+    sentence: Optional[dict] = None
+    relations: dict = {}
 
 
 class Candidate(BaseDocument):
@@ -147,6 +158,12 @@ class Vehicle(BaseDocument):
     property_id: Optional[str] = None
     transfer: Optional[dict] = None
     paint_key: Optional[str] = None
+    last_service_km: float = 0.0
+    tires_pct: float = 100.0
+    insurance_until: Optional[str] = None
+    inspection_due_at: Optional[str] = None
+    notoriety: float = 0.0
+    seized_until: Optional[str] = None
 
 
 class Weapon(BaseDocument):
@@ -158,6 +175,7 @@ class Weapon(BaseDocument):
     missions_since_repair: int = 0
     missions_done: int = 0
     upgrades: List[dict] = []
+    ammo_loaded: int = 0
     bought_at: str
 
 
@@ -187,6 +205,10 @@ class Property(BaseDocument):
     bought_at: str
     condition: float = 100.0
     upgrading_until: Optional[str] = None
+    security_level: int = 0
+    storage_level: int = 0
+    operations_level: int = 0
+    staff_employee_ids: List[str] = []
 
 
 class Opportunity(BaseDocument):
@@ -265,6 +287,10 @@ class Mission(BaseDocument):
     decision: Optional[dict] = None
     decision_reward_mult: float = 1.0
     world_pulse: Optional[dict] = None
+    doctrine: str = "balanced"
+    doctrine_heat_mult: float = 1.0
+    doctrine_fatigue_mult: float = 1.0
+    loadout: dict = {}
 
 
 class Event(BaseDocument):
