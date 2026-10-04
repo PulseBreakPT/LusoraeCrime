@@ -21,7 +21,7 @@ const TABS = [
   ["caches", "Sinais", RadioTower],
 ];
 
-const selectClass = "mt-1 h-9 w-full rounded-md border border-white/10 bg-black/50 px-2 font-mono text-[10px] text-zinc-200 outline-none focus:border-red-500/50";
+const selectClass = "mt-1 h-11 w-full rounded-md border border-white/10 bg-black/50 px-2 font-mono text-base sm:h-9 sm:text-[10px] text-zinc-200 outline-none focus:border-red-500/50";
 
 const statusLabel = {
   available: "Disponível",
@@ -80,7 +80,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
         <SheetHeader>
           <PanelWatermark icon={Vault} />
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Vault size={18} className="text-violet-300" /> Sala de Planeamento
+            <Vault size={18} className="text-sky-300" /> Sala de Planeamento
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
             Golpes por fases, mercado negro, caçadores rivais e sinais escondidos.
@@ -89,7 +89,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
 
         {!mastermind ? (
           <Card className="mt-5 sub-card p-5 text-center">
-            <RadioTower className="mx-auto animate-pulse text-violet-300" size={22} />
+            <RadioTower className="mx-auto animate-pulse text-sky-300" size={22} />
             <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               A carregar…
             </p>
@@ -104,7 +104,7 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
                   onClick={() => setTab(key)}
                   data-testid={`mastermind-tab-${key}`}
                   className={`flex items-center justify-center gap-1 rounded-lg px-1 py-2 font-mono text-[9px] font-bold uppercase tracking-wider transition-colors ${
-                    tab === key ? "bg-violet-500/20 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                    tab === key ? "bg-sky-500/20 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
                   }`}
                 >
                   <Icon size={11} /> {label}
@@ -178,7 +178,7 @@ const RankCard = ({ rank }) => (
         <p className="mt-1 text-sm font-bold text-white">{rank.name}</p>
         <p className="font-mono text-[9px] text-zinc-600">Nível {rank.level} · {rank.xp} XP</p>
       </div>
-      <Badge className="border-violet-500/25 bg-violet-500/10 font-mono text-violet-300">
+      <Badge className="border-sky-500/25 bg-sky-500/10 font-mono text-sky-300">
         {rank.next_name || "Lenda máxima"}
       </Badge>
     </div>
@@ -258,7 +258,7 @@ const BoardTab = ({
               </Field>
             </div>
             <label className="mt-3 block font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-              Parte da equipa · <span className="text-violet-300">{draft.crew_cut_pct}%</span>
+              Parte da equipa · <span className="text-sky-300">{draft.crew_cut_pct}%</span>
               <input
                 type="range"
                 min="10"
@@ -266,7 +266,7 @@ const BoardTab = ({
                 step="1"
                 value={draft.crew_cut_pct}
                 onChange={(event) => setDraft((current) => ({ ...current, crew_cut_pct: Number(event.target.value) }))}
-                className="mt-2 w-full accent-violet-500"
+                className="mt-2 w-full accent-sky-500"
               />
             </label>
             <p className="mt-1 text-[10px] text-zinc-600">
@@ -317,8 +317,8 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
       <Info label="Preps" value={target.preps.length} />
     </div>
     {target.intel ? (
-      <div className="mt-3 rounded-lg border border-violet-500/20 bg-violet-500/5 p-2">
-        <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-violet-300">
+      <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-2">
+        <p className="flex items-center gap-1 font-mono text-[9px] font-bold uppercase text-sky-300">
           <ScanLine size={11} /> Dossiê ativo · {target.intel.recommended_name}
         </p>
         <p className="mt-1 text-[10px] text-zinc-500">
@@ -368,7 +368,7 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
                 {active.team_name} · {active.vehicle_name}
               </p>
             </div>
-            <Badge className={ready ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}>
+            <Badge className={ready ? "bg-emerald-500/15 text-emerald-300" : "bg-sky-500/15 text-sky-300"}>
               {ready ? "Resultado pronto" : fmtDuration(finale.remaining_s)}
             </Badge>
           </div>
@@ -585,7 +585,7 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
       <p className="mt-1 text-[10px] text-zinc-500">
         Envia uma equipa disponível para identificar e quebrar a rede que te está a seguir.
       </p>
-      <select className={selectClass} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
+      <select aria-label="Selecionar equipa para contraemboscada" className={selectClass} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
         {teams.map((team) => (
           <option key={team.id} value={team.id}>{team.name} · {team.status}</option>
         ))}
@@ -619,7 +619,7 @@ const CachesTab = ({ caches, onScan }) => (
             {caches.completion_claimed ? "Todos os sinais encontrados" : "Localiza as caches de cada zona"}
           </p>
         </div>
-        <RadioTower size={20} className={caches.completion_claimed ? "text-emerald-300" : "text-violet-300"} />
+        <RadioTower size={20} className={caches.completion_claimed ? "text-emerald-300" : "text-sky-300"} />
       </div>
       <MiniBar value={(caches.collected / Math.max(1, caches.total)) * 100} color="#A78BFA" className="mt-3" height="h-1.5" />
       <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
@@ -633,7 +633,7 @@ const CachesTab = ({ caches, onScan }) => (
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
             district.collected ? "border-emerald-500/25 bg-emerald-500/5" : "border-white/10 bg-black/40"
           }`}>
-            {district.collected ? <Check size={16} className="text-emerald-300" /> : <ScanLine size={16} className="text-violet-300" />}
+            {district.collected ? <Check size={16} className="text-emerald-300" /> : <ScanLine size={16} className="text-sky-300" />}
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-white">{district.name}</p>
@@ -671,7 +671,7 @@ const Field = ({ label, children }) => (
 
 const Info = ({ label, value }) => (
   <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
-    <p className="font-mono text-[8px] uppercase tracking-wider text-zinc-600">{label}</p>
+    <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">{label}</p>
     <p className="mt-0.5 truncate font-mono text-[10px] font-bold text-zinc-300">{value}</p>
   </div>
 );
