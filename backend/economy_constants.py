@@ -30,6 +30,16 @@ PAYROLL_MORALE_REGEN = 0.4  # morale/loyalty recovered per employee on time paym
 EMPLOYER_SOCIAL_SECURITY_RATE = 0.2375  # TSU patronal normal em Portugal
 POOL_REFRESH_MIN = 5  # minutes between recruitment pool refreshes
 
+# Offline catch-up policy. Passive income, fatigue/recovery, territorial pressure
+# and fixed weekly settlements must always cover the same bounded time window.
+# Older time is intentionally forgiven instead of letting income and costs drift
+# apart after very long absences.
+OFFLINE_SIMULATION_MAX_DAYS = 28
+OFFLINE_SIMULATION_MAX_MINUTES = OFFLINE_SIMULATION_MAX_DAYS * 24 * 60
+# A 28-day closed interval can cross five Monday 20:00 boundaries depending on
+# the exact endpoints, so allow five settlements inside the same catch-up window.
+OFFLINE_PAYROLL_MAX_CYCLES = 5
+
 # ============================================================================
 # TEAM MANAGEMENT
 # ============================================================================
