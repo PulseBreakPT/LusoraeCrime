@@ -412,13 +412,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                   </SelectContent>
                 </Select>
                 {v.team_id && teamMembers(v.team_id) === 0 && (
-                  <button type="button"
+                  <Button variant="bare" size="bare" type="button"
                     data-testid={`vehicle-team-empty-${v.id}`}
                     onClick={() => onNavigate && onNavigate("employees")}
                     className="relative z-[1] mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
                   >
                     <UserRound size={10} /> Equipa sem membros — atribuir em Operacionais
-                  </button>
+                  </Button>
                 )}
 
                 <div className="relative z-[1] mt-2 flex gap-1.5">
@@ -479,14 +479,14 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                   />
                 </div>
 
-                <button type="button"
+                <Button variant="bare" size="bare" type="button"
                   data-testid={`vehicle-stats-toggle-${v.id}`}
                   onClick={() => setStatsOpen(statsOpen === v.id ? null : v.id)}
                   className="relative z-[1] mt-2 flex w-full items-center justify-center gap-1 font-mono text-[10px] uppercase text-zinc-500 transition-colors hover:text-white"
                 >
                   <BarChart3 size={11} /> Estatísticas
                   <ChevronDown size={11} className={`transition-transform ${statsOpen === v.id ? "rotate-180" : ""}`} />
-                </button>
+                </Button>
                 {statsOpen === v.id && (
                   <div data-testid={`vehicle-stats-${v.id}`} className="relative z-[1] mt-1.5 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-2">
                     <VStat label="Missões" value={`${v.missions_success || 0}✓/${v.missions_done || 0}`} />
@@ -584,13 +584,13 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
             return (
               <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none">
                 <p className="font-mono text-[10px] text-amber-400">Garagem cheia</p>
-                <button type="button"
+                <Button variant="bare" size="bare" type="button"
                   data-testid="fleet-nav-properties"
                   onClick={() => onNavigate && onNavigate("properties")}
                   className="font-mono text-[10px] text-amber-300 underline-offset-2 hover:underline"
                 >
                   {canBuy ? `Abrir Imóveis · garagem desde ${fmtMoney(garagem.price)}` : "Ver Imóveis"}
-                </button>
+                </Button>
               </Card>
             );
           })()}
