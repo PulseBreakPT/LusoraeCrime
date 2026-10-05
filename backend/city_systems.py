@@ -8,7 +8,7 @@ from city_data import (
     WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES, RIVAL_ACTIONS,
     SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO, SEASON_REWARDS,
 )
-from economy_director import guard_reward, city_business_cap
+from economy_director import guard_reward, city_business_cap, passive_portfolio_scale
 
 LISBON = ZoneInfo("Europe/Lisbon")
 
@@ -346,6 +346,22 @@ def business_projection(doc, now=None):
     }
 
 
+def guarded_business_projections(player, projections):
+    """Apply the shared passive-income envelope while preserving clean/dirty mix."""
+    projections = [dict(row) for row in (projections or [])]
+    if not projections:
+        return projections
+    hours = max(float(row.get("hours", 0) or 0) for row in projections)
+    clean = sum(int(row.get("clean", 0) or 0) for row in projections)
+    dirty = sum(int(row.get("dirty", 0) or 0) for row in projections)
+    scale = passive_portfolio_scale(player.get("level", 1), hours, clean, dirty)
+    for row in projections:
+        row["clean"] = int(round(int(row.get("clean", 0) or 0) * scale))
+        row["dirty"] = int(round(int(row.get("dirty", 0) or 0) * scale))
+        row["economy_scale"] = round(scale, 4)
+    return projections
+
+
 def business_network_effect(businesses, category):
     total = 0.0
     for doc in businesses or []:
@@ -538,7 +554,10 @@ async def city_snapshot(db, player):
     rivals = await ensure_rivals(db, player)
     businesses = await db.city_businesses.find({"player_id": pid}).sort("bought_at", 1).to_list(50)
     await advance_rival_world(db, player, rivals, businesses, now)
-    projections = [business_projection(b, now) for b in businesses]
+    projections = guarded_business_projections(
+        player,
+        [business_projection(b, now) for b in businesses],
+    )
     season = season_info(now)
     score = await _season_checkpoint(db, player, season)
     board = await _leaderboard(db, season["id"], player)
