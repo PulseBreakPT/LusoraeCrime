@@ -108,6 +108,7 @@ from economy_constants import (
     EMPLOYER_SOCIAL_SECURITY_RATE, VEHICLE_ANNUAL_FIXED_COSTS,
     LAUNDER_PASSIVE_RATE, PROPERTY_MAINTENANCE_PCT_PER_WEEK,
     PROPERTY_CONDITION_RECOVERY_PER_WEEK, PROPERTY_CONDITION_DECAY_MISSED_WEEK,
+    OFFLINE_SIMULATION_MAX_MINUTES, OFFLINE_PAYROLL_MAX_CYCLES,
 )
 from economy_calendar import next_weekly_settlement, is_weekly_settlement
 from game_data import operation_profile_of
@@ -2685,7 +2686,7 @@ async def _process_payroll(db, player, employees, now):
         return
 
     cycles = 0
-    while parse_dt(player["next_payroll_at"]) <= now and cycles < 4:
+    while parse_dt(player["next_payroll_at"]) <= now and cycles < OFFLINE_PAYROLL_MAX_CYCLES:
         cycles += 1
         current_due = parse_dt(player["next_payroll_at"])
         player["next_payroll_at"] = next_weekly_settlement(
@@ -3268,6 +3269,33 @@ async def _maybe_raid(db, player, props, minutes, now):
 async def advance(db, player):
     now = now_utc()
     pid = str(player["_id"])
+
+    # One authoritative tick per player. GET /game/state can be polled from
+    # several tabs/devices at the same time; without a lease those readers can
+    # duplicate passive income, payroll, raids and automation for the same
+    # last_tick interval. The lease is short and self-healing after a crash.
+    lease_token = f"{pid}:{now.timestamp():.6f}"
+    lease_until = (now + timedelta(seconds=90)).isoformat()
+    lease = await db.players.update_one(
+        {
+            "_id": player["_id"],
+            "$or": [
+                {"simulation_lease_until": {"$exists": False}},
+                {"simulation_lease_until": None},
+                {"simulation_lease_until": {"$lte": now.isoformat()}},
+            ],
+        },
+        {"$set": {
+            "simulation_lease_token": lease_token,
+            "simulation_lease_until": lease_until,
+        }},
+    )
+    if lease.modified_count != 1:
+        # Another request owns this interval. Return the freshest persisted
+        # snapshot and let that owner finish the simulation exactly once.
+        return await db.players.find_one({"_id": player["_id"]}) or player
+    player = await db.players.find_one({"_id": player["_id"]}) or player
+
     ensure_stats(player)
     await reconcile_mission_stats(db, player)
 
@@ -3291,7 +3319,23 @@ async def advance(db, player):
     await _process_statuses(db, pid, now)
 
     last = parse_dt(player["last_tick"])
-    minutes = max(0.0, (now - last).total_seconds() / 60)
+    raw_minutes = max(0.0, (now - last).total_seconds() / 60)
+    minutes = min(raw_minutes, float(OFFLINE_SIMULATION_MAX_MINUTES))
+
+    # When an account returns after a very long absence, simulate one bounded
+    # window consistently. Old passive income and old fixed costs are both
+    # forgiven, instead of paying months of one side and only weeks of the other.
+    if raw_minutes > OFFLINE_SIMULATION_MAX_MINUTES:
+        window_start = now - timedelta(minutes=OFFLINE_SIMULATION_MAX_MINUTES)
+        scheduled = player.get("next_payroll_at")
+        try:
+            scheduled_dt = parse_dt(scheduled) if scheduled else None
+        except (TypeError, ValueError):
+            scheduled_dt = None
+        if scheduled_dt and scheduled_dt < window_start:
+            player["next_payroll_at"] = next_weekly_settlement(
+                window_start - timedelta(seconds=1)
+            ).isoformat()
 
     if minutes > 0:
         rec = minutes * 0.6
@@ -3480,7 +3524,9 @@ async def advance(db, player):
     player["level"] = level_for(player["respect"])
     player["last_tick"] = now.isoformat()
 
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {
+    await db.players.update_one(
+        {"_id": player["_id"], "simulation_lease_token": lease_token},
+        {"$set": {
         "heat": player["heat"], "level": player["level"], "last_tick": player["last_tick"],
         "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
         "respect": player["respect"], "stats": player["stats"],
@@ -3507,6 +3553,10 @@ async def advance(db, player):
         "organization_event": player.get("organization_event"),
         "next_organization_event_at": player.get("next_organization_event_at"),
         "governance": player.get("governance", {}),
-    }})
+        }, "$unset": {
+            "simulation_lease_token": "",
+            "simulation_lease_until": "",
+        }},
+    )
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
     return player
