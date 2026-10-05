@@ -8,7 +8,7 @@ from economy_constants import (
 )
 from game_data import (
     VEHICLE_MODELS, WEAPON_MODELS, PROPERTY_TYPES, OPPORTUNITY_TYPES,
-    RECRUIT_SOURCES, ORG_LEVEL_UNLOCKS,
+    RECRUIT_SOURCES, ORG_LEVEL_UNLOCKS, PROGRESSION_UNLOCK_VERSION, PROGRESSION_UNLOCK_LEVELS,
 )
 from organization_systems import TERRITORY_TIERS, ORGANIZATION_SPECIALIZATIONS
 from mastermind_data import MASTERMIND_RANKS, HEIST_TARGETS
@@ -35,6 +35,12 @@ def assert_content_distribution():
     assert WEAPON_MODELS["pistola"]["min_level"] == 1
     assert PROPERTY_TYPES["esconderijo"]["min_level"] == 1
     assert RECRUIT_SOURCES["contactos"]["min_level"] == 75
+    assert PROGRESSION_UNLOCK_VERSION == 1
+    assert VEHICLE_MODELS["supercarro"]["min_level"] == PROGRESSION_UNLOCK_LEVELS["vehicles"]["supercarro"] == 100
+    assert WEAPON_MODELS["rifle_assalto"]["min_level"] == PROGRESSION_UNLOCK_LEVELS["weapons"]["rifle_assalto"] == 84
+    assert PROPERTY_TYPES["centro_logistico"]["min_level"] == PROGRESSION_UNLOCK_LEVELS["properties"]["centro_logistico"] == 100
+    assert OPPORTUNITY_TYPES["golpe_banco_central"]["min_level"] == PROGRESSION_UNLOCK_LEVELS["opportunities"]["golpe_banco_central"] == 100
+    assert OPPORTUNITY_TYPES["assalto_blindado"]["min_level"] >= VEHICLE_MODELS["suv_blindado"]["min_level"]
 
     # A carreira não pode voltar a concentrar-se toda no early game.
     all_unlocks = [
