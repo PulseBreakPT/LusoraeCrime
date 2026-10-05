@@ -1,0 +1,399 @@
+/* ==========================================================================
+   SUBMUNDO — SHADCN UI SYSTEM
+   Final component layer loaded after lighting.css.
+   Applies one red/black visual language to the shadcn/Radix primitives used
+   across public routes, admin and gameplay.
+   ========================================================================== */
+
+:root {
+  --sub-shad-surface: rgba(10, 8, 11, 0.94);
+  --sub-shad-surface-raised: rgba(17, 11, 14, 0.96);
+  --sub-shad-border: rgba(255, 255, 255, 0.085);
+  --sub-shad-border-hot: rgba(248, 113, 113, 0.24);
+  --sub-shad-red: #ef4444;
+  --sub-shad-red-hot: #f87171;
+  --sub-shad-shadow:
+    0 12px 34px rgba(0,0,0,.42),
+    0 3px 12px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.025);
+  --sub-shad-shadow-raised:
+    0 22px 58px rgba(0,0,0,.62),
+    0 7px 20px rgba(0,0,0,.32),
+    0 0 0 1px rgba(239,68,68,.045),
+    0 0 24px rgba(239,68,68,.045),
+    inset 0 1px 0 rgba(255,255,255,.045);
+}
+
+@keyframes sub-shad-progress-energy {
+  from { transform: translateX(-150%); opacity: .15; }
+  48% { opacity: .72; }
+  to { transform: translateX(520%); opacity: .15; }
+}
+
+/* Buttons */
+.sub-btn {
+  border-radius: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sub-btn-primary {
+  box-shadow:
+    0 8px 20px rgba(0,0,0,.36),
+    0 0 0 1px rgba(248,113,113,.08),
+    0 0 15px rgba(239,68,68,.085) !important;
+}
+
+.sub-btn-primary:hover:not(:disabled) {
+  box-shadow:
+    0 11px 25px rgba(0,0,0,.42),
+    0 0 0 1px rgba(248,113,113,.15),
+    0 0 22px rgba(239,68,68,.13) !important;
+}
+
+.sub-btn-glass,
+.sub-btn-soft,
+.sub-btn-filter {
+  border-color: var(--sub-shad-border) !important;
+  background:
+    radial-gradient(80% 150% at 12% 0%, rgba(239,68,68,.035), transparent 62%),
+    rgba(13,12,15,.92) !important;
+  box-shadow: var(--sub-shad-shadow) !important;
+}
+
+.sub-btn-glass:hover:not(:disabled),
+.sub-btn-soft:hover:not(:disabled),
+.sub-btn-filter:hover:not(:disabled) {
+  border-color: rgba(248,113,113,.18) !important;
+  background:
+    radial-gradient(90% 170% at 12% 0%, rgba(239,68,68,.07), transparent 64%),
+    rgba(18,14,17,.96) !important;
+}
+
+/* Cards */
+.sub-shad-card {
+  border-color: var(--sub-shad-border) !important;
+  background:
+    radial-gradient(110% 80% at 10% 0%, rgba(239,68,68,.045), transparent 55%),
+    rgba(10,9,12,.90) !important;
+  box-shadow: var(--sub-shad-shadow) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sub-shad-card:hover {
+    border-color: rgba(248,113,113,.15) !important;
+    box-shadow:
+      0 14px 36px rgba(0,0,0,.48),
+      0 4px 15px rgba(0,0,0,.28),
+      0 0 0 1px rgba(239,68,68,.045),
+      0 0 20px rgba(239,68,68,.045),
+      inset 0 1px 0 rgba(255,255,255,.04) !important;
+  }
+}
+
+/* Badges */
+.sub-shad-badge {
+  min-height: 22px;
+  backdrop-filter: blur(6px) saturate(115%);
+  -webkit-backdrop-filter: blur(6px) saturate(115%);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+/* Inputs / textarea / selects */
+.sub-shad-input,
+.sub-shad-textarea,
+.sub-shad-select-trigger {
+  border-color: var(--sub-shad-border) !important;
+  background:
+    radial-gradient(85% 180% at 10% 0%, rgba(239,68,68,.025), transparent 58%),
+    rgba(10,9,12,.92) !important;
+  color: #f4f4f5;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.02),
+    0 3px 11px rgba(0,0,0,.22) !important;
+}
+
+.sub-shad-input:hover:not(:disabled),
+.sub-shad-textarea:hover:not(:disabled),
+.sub-shad-select-trigger:hover:not(:disabled) {
+  border-color: rgba(248,113,113,.16) !important;
+}
+
+.sub-shad-input:focus-visible,
+.sub-shad-textarea:focus-visible,
+.sub-shad-select-trigger:focus {
+  border-color: rgba(248,113,113,.42) !important;
+  box-shadow:
+    0 0 0 1px rgba(239,68,68,.20),
+    0 0 0 4px rgba(239,68,68,.06),
+    0 8px 22px rgba(0,0,0,.36) !important;
+}
+
+.sub-shad-select-content,
+.sub-shad-popover,
+.sub-shad-dropdown,
+.sub-shad-command {
+  border-color: rgba(248,113,113,.13) !important;
+  background:
+    radial-gradient(100% 90% at 9% 0%, rgba(239,68,68,.075), transparent 55%),
+    rgba(8,7,10,.97) !important;
+  box-shadow: var(--sub-shad-shadow-raised) !important;
+  backdrop-filter: blur(16px) saturate(122%);
+  -webkit-backdrop-filter: blur(16px) saturate(122%);
+}
+
+.sub-shad-select-item,
+.sub-shad-dropdown-item,
+.sub-shad-command-item {
+  min-height: 36px;
+  border: 1px solid transparent;
+}
+
+.sub-shad-select-item:focus,
+.sub-shad-dropdown-item:focus,
+.sub-shad-command-item[data-selected="true"] {
+  border-color: rgba(239,68,68,.09);
+  background: rgba(239,68,68,.075) !important;
+  color: #fff !important;
+}
+
+/* Checkbox / switch / slider */
+.sub-shad-checkbox {
+  border-color: rgba(248,113,113,.32) !important;
+  background: rgba(7,7,10,.92);
+  box-shadow:
+    0 2px 7px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+.sub-shad-checkbox[data-state="checked"] {
+  border-color: rgba(248,113,113,.68) !important;
+  background: #dc2626 !important;
+  box-shadow:
+    0 0 0 1px rgba(239,68,68,.14),
+    0 0 12px rgba(239,68,68,.19);
+}
+
+.sub-shad-switch {
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,.34),
+    0 3px 8px rgba(0,0,0,.22);
+}
+
+.sub-shad-switch[data-state="checked"] {
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.10),
+    0 0 0 1px rgba(239,68,68,.12),
+    0 0 13px rgba(239,68,68,.14);
+}
+
+.sub-shad-switch-thumb {
+  box-shadow:
+    0 2px 6px rgba(0,0,0,.48),
+    inset 0 1px 0 rgba(255,255,255,.75) !important;
+}
+
+.sub-shad-slider-track {
+  background: rgba(255,255,255,.085) !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.42);
+}
+
+.sub-shad-slider-range {
+  background: linear-gradient(90deg, #991b1b, #dc2626 60%, #f87171) !important;
+  box-shadow: 0 0 9px rgba(239,68,68,.22);
+}
+
+.sub-shad-slider-thumb {
+  border-color: rgba(248,113,113,.65) !important;
+  background: #f4f4f5 !important;
+  box-shadow:
+    0 3px 9px rgba(0,0,0,.58),
+    0 0 0 3px rgba(239,68,68,.065),
+    0 0 11px rgba(239,68,68,.15) !important;
+}
+
+/* Tabs */
+.sub-tabs-list {
+  border-color: var(--sub-shad-border) !important;
+  background:
+    radial-gradient(100% 180% at 12% 0%, rgba(239,68,68,.04), transparent 58%),
+    rgba(9,8,11,.92) !important;
+  box-shadow:
+    0 7px 18px rgba(0,0,0,.28),
+    inset 0 1px 0 rgba(255,255,255,.02);
+}
+
+.sub-tabs-trigger[data-state="active"] {
+  background: rgba(239,68,68,.085) !important;
+  color: #fff !important;
+  box-shadow:
+    inset 0 -2px 0 rgba(248,113,113,.90),
+    0 0 13px rgba(239,68,68,.055) !important;
+}
+
+/* Accordion */
+.sub-shad-accordion-item {
+  border-color: rgba(255,255,255,.07) !important;
+}
+
+.sub-shad-accordion-trigger {
+  min-height: 44px;
+}
+
+.sub-shad-accordion-trigger[data-state="open"] {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(239,68,68,.12);
+}
+
+/* Alerts */
+.sub-shad-alert {
+  border-color: rgba(255,255,255,.09);
+  background:
+    radial-gradient(95% 140% at 8% 0%, rgba(239,68,68,.045), transparent 60%),
+    rgba(10,9,12,.90);
+  box-shadow:
+    0 8px 22px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+/* Tooltip */
+.sub-shad-tooltip {
+  border: 1px solid rgba(248,113,113,.12);
+  background:
+    radial-gradient(100% 180% at 12% 0%, rgba(239,68,68,.08), transparent 60%),
+    rgba(8,7,10,.97) !important;
+  color: #e4e4e7 !important;
+  box-shadow:
+    0 10px 28px rgba(0,0,0,.55),
+    0 0 0 1px rgba(239,68,68,.04),
+    0 0 14px rgba(239,68,68,.045);
+}
+
+/* Progress */
+.sub-shad-progress {
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,.48),
+    0 0 0 1px rgba(255,255,255,.02);
+}
+
+.sub-shad-progress-indicator {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #7f1d1d, #dc2626 60%, #f87171) !important;
+  box-shadow: 0 0 10px rgba(239,68,68,.16);
+}
+
+.sub-shad-progress-indicator::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 18%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent);
+  animation: sub-shad-progress-energy 2.8s ease-in-out infinite;
+}
+
+/* Table */
+.sub-shad-table-wrap {
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  background: rgba(8,7,10,.72);
+  box-shadow: var(--sub-shad-shadow);
+}
+
+.sub-shad-table-head {
+  color: #71717a;
+  background: rgba(255,255,255,.018);
+}
+
+.sub-shad-table-row {
+  border-color: rgba(255,255,255,.055) !important;
+}
+
+.sub-shad-table-row:hover {
+  background: rgba(239,68,68,.035) !important;
+}
+
+/* Avatar */
+.sub-shad-avatar {
+  border: 1px solid rgba(248,113,113,.16);
+  box-shadow:
+    0 4px 12px rgba(0,0,0,.42),
+    0 0 12px rgba(239,68,68,.06);
+}
+
+.sub-shad-avatar-fallback {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(239,68,68,.14), transparent 58%),
+    #111114 !important;
+}
+
+/* ScrollArea */
+.sub-shad-scroll-thumb {
+  background: linear-gradient(180deg, rgba(248,113,113,.56), rgba(127,29,29,.66)) !important;
+  box-shadow: 0 0 7px rgba(239,68,68,.10);
+}
+
+/* Dialog / drawer */
+.sub-shad-dialog,
+.sub-shad-drawer {
+  border-color: rgba(248,113,113,.16) !important;
+}
+
+.sub-shad-dialog-close {
+  border-color: rgba(239,68,68,.07) !important;
+}
+
+.sub-shad-dialog-close:hover {
+  border-color: rgba(248,113,113,.28) !important;
+  background: rgba(239,68,68,.085) !important;
+  box-shadow: 0 0 16px rgba(239,68,68,.08);
+}
+
+/* Public routes */
+.sub-page-bg .sub-shad-card,
+.sub-page-bg .sub-shad-alert,
+.sub-page-bg .sub-shad-table-wrap {
+  backdrop-filter: blur(12px) saturate(116%);
+  -webkit-backdrop-filter: blur(12px) saturate(116%);
+}
+
+/* Focus unification */
+.sub-btn:focus-visible,
+.sub-shad-input:focus-visible,
+.sub-shad-textarea:focus-visible,
+.sub-shad-select-trigger:focus-visible,
+.sub-shad-checkbox:focus-visible,
+.sub-shad-switch:focus-visible,
+.sub-shad-slider-thumb:focus-visible,
+.sub-tabs-trigger:focus-visible,
+.sub-shad-accordion-trigger:focus-visible {
+  outline: none !important;
+  box-shadow:
+    0 0 0 1px rgba(248,113,113,.42),
+    0 0 0 4px rgba(239,68,68,.075),
+    0 0 18px rgba(239,68,68,.07) !important;
+}
+
+/* Accessibility */
+html.sub-reduced-motion .sub-shad-progress-indicator::after {
+  animation: none !important;
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-shad-progress-indicator::after {
+    animation: none !important;
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .sub-shad-select-content,
+  .sub-shad-popover,
+  .sub-shad-dropdown,
+  .sub-shad-command {
+    backdrop-filter: blur(10px) saturate(114%);
+    -webkit-backdrop-filter: blur(10px) saturate(114%);
+  }
+}
