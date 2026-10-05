@@ -161,7 +161,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Pesquisar operações"
               placeholder="Procurar por nome, zona ou tipo…"
-              className="h-8 border-white/10 bg-black/60 pl-7 font-mono text-xs text-white"
+              size="compact" className="pl-7 font-mono text-white"
             />
           </div>
           <div className="grid grid-cols-1 gap-1.5 min-[430px]:grid-cols-3">
