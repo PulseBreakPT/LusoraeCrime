@@ -233,7 +233,7 @@ const FilterChips = ({ counts, filter, onFilter }) => (
         aria-pressed={filter === c.key}
         data-testid={`feed-filter-${c.key}`}
         onClick={() => onFilter(c.key)}
-        className="sub-feed-chip"
+        className="gap-1 font-mono text-[10px] uppercase tracking-[0.04em]"
       >
         {c.label}
         <span className="sub-feed-chip-n">{counts[c.key] || 0}</span>
