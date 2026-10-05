@@ -108,13 +108,13 @@ export const ShopPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-2 gap-1 bg-black/40 sm:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t.key}
                 data-testid={`shop-tab-${t.key}`}
                 value={t.key}
-                className="gap-1 px-1 font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="gap-1 px-1 font-mono text-[10px] font-bold uppercase tracking-wider"
               >
                 <t.icon size={12} /> {t.label}
               </TabsTrigger>
