@@ -1,16 +1,15 @@
 import asyncio
 import math
 import random
-from functools import wraps
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
-from pymongo.errors import DuplicateKeyError
 from typing import Optional
 from datetime import timedelta
 
 from db import db
+from mutation_guard import MutationInput, idempotent
 from auth import get_current_user
 from geo import (is_valid_hq_location, is_in_portugal, in_water_body,
                  distance_to_boundary_m)
@@ -154,51 +153,6 @@ async def get_player(user: dict, allow_pending: bool = False) -> dict:
     player["hq"].setdefault("upgrade_history", [])
     player.setdefault("priorities", {"active": "equilibrio"})
     return player
-
-
-class MutationInput(BaseModel):
-    request_id: Optional[str] = Field(default=None, max_length=80)
-
-
-def idempotent(action_name: str):
-    """Impede retries/reenvios de rede de executar a mesma mutação duas vezes."""
-    def decorator(fn):
-        @wraps(fn)
-        async def wrapped(*args, **kwargs):
-            body = kwargs.get("body")
-            if body is None:
-                body = next((arg for arg in args if isinstance(arg, BaseModel)), None)
-            request_id = getattr(body, "request_id", None)
-            user = kwargs.get("user")
-            if user is None:
-                user = next((arg for arg in args if isinstance(arg, dict) and "_id" in arg), None)
-            if not request_id or not user:
-                return await fn(*args, **kwargs)
-
-            key = f"{user['_id']}:{action_name}:{request_id}"
-            now = now_utc()
-            try:
-                await db.action_receipts.insert_one({
-                    "key": key, "status": "processing", "created_at": now,
-                    "expires_at": now + timedelta(hours=24),
-                })
-            except DuplicateKeyError:
-                existing = await db.action_receipts.find_one({"key": key})
-                if existing and existing.get("status") == "done":
-                    return existing.get("result") or {"ok": True, "idempotent_replay": True}
-                raise HTTPException(status_code=409, detail="Ação já está a ser processada")
-
-            try:
-                result = await fn(*args, **kwargs)
-            except Exception:
-                await db.action_receipts.delete_one({"key": key, "status": "processing"})
-                raise
-            await db.action_receipts.update_one(
-                {"key": key}, {"$set": {"status": "done", "result": result}}
-            )
-            return result
-        return wrapped
-    return decorator
 
 
 async def _debit_clean_atomic(player: dict, amount: int, extra_inc: Optional[dict] = None):
