@@ -5639,8 +5639,11 @@ html.sub-focus-mode .sub-optional-hud {
     background: #121217 !important;
 }
 
-.sub-filter-chip.is-active {
-    border-color: rgba(255, 255, 255, 0.13) !important;
+.sub-filter-chip.is-active,
+.sub-filter-chip[aria-pressed="true"] {
+    border-color: rgba(239, 68, 68, 0.28) !important;
+    background: rgba(220, 38, 38, 0.11) !important;
+    color: #fecaca !important;
 }
 
 .sub-operations-list {
