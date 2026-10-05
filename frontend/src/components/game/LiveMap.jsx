@@ -337,9 +337,12 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
     let cancelled = false;
 
     const loadRoadPlans = async () => {
-      // Mesmo princípio do 112i: ida e regresso são percursos OSRM
-      // independentes. Nunca invertemos a ida por ruas de sentido único.
-      const outward = await fetchRoute(mission.origin, mission.target);
+      // A geometria resolvida no despacho é a fonte canónica da missão.
+      // Só pedimos OSRM para saves legados/rotas ausentes; nunca substituímos
+      // uma road_outward persistida a meio da viagem (isso causava saltos).
+      const outward = validRoadPlan(mission.road_outward)
+        ? mission.road_outward
+        : await fetchRoute(mission.origin, mission.target);
       if (cancelled) return;
 
       if (outward.unavailable || !outward.latlngs?.length) {
