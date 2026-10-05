@@ -772,7 +772,8 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     </div>
                     <Button
                       variant="outline"
-                      className="mt-2 h-8 w-full border-white/10 bg-white/[0.03] font-mono text-[10px]"
+                      size="compact"
+                      className="mt-2 w-full font-mono"
                       disabled={team.status !== "idle"}
                       onClick={() => setTeamLoadout(team.id, draftLoadout)}
                     >
