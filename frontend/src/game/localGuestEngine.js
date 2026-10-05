@@ -5,6 +5,8 @@ import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWor
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
 const SESSION_KEY = "submundo_guest_session_v2";
+const OFFLINE_SIMULATION_MAX_S = 28 * 24 * 3600;
+const OFFLINE_PAYROLL_MAX_CYCLES = 5;
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const nowIso = () => new Date().toISOString();
@@ -987,7 +989,8 @@ const tick = (save) => {
   advanceLocalCity(save);
   const now=Date.now();
   const previous=Number(save.last_tick||now);
-  const elapsed=Math.max(0,Math.min(24*3600,(now-previous)/1000));
+  const rawElapsed=Math.max(0,(now-previous)/1000);
+  const elapsed=Math.min(OFFLINE_SIMULATION_MAX_S,rawElapsed);
 
   save.employees.forEach((e)=>{
     if(e.status_until && Date.parse(e.status_until)<=now){
@@ -1061,8 +1064,15 @@ const tick = (save) => {
     save.player.next_payroll_at=nextWeeklySettlementIso(now);
     payrollAt=Date.parse(save.player.next_payroll_at);
   }
+  if(rawElapsed>OFFLINE_SIMULATION_MAX_S){
+    const windowStart=now-OFFLINE_SIMULATION_MAX_S*1000;
+    if(payrollAt && payrollAt<windowStart){
+      save.player.next_payroll_at=nextWeeklySettlementIso(windowStart-1000);
+      payrollAt=Date.parse(save.player.next_payroll_at);
+    }
+  }
   let settlements=0;
-  while(payrollAt && now>=payrollAt && settlements<4){
+  while(payrollAt && now>=payrollAt && settlements<OFFLINE_PAYROLL_MAX_CYCLES){
     settlements+=1;
     const economy=LOCAL_CATALOG.economy_meta||{};
     const propMeta=LOCAL_CATALOG.property_meta||{};
