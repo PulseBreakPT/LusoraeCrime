@@ -415,6 +415,15 @@ export const AnimatedNumber = ({ value, format = (v) => Math.round(v).toString()
   useEffect(() => {
     const from = displayRef.current;
     const to = value;
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      ((typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) ||
+        document.documentElement.classList.contains("sub-reduced-motion"));
+    if (reducedMotion) {
+      setDisplay(to);
+      displayRef.current = to;
+      return undefined;
+    }
     if (Math.abs(to - from) < 0.01) {
       setDisplay(to);
       displayRef.current = to;
