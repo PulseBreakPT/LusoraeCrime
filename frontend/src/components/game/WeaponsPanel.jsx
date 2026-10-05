@@ -11,6 +11,7 @@ import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelWa
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import {
   Swords, Wrench, Trash2, Lock, Volume2, Search, ShieldAlert, UserRound, Wand2, CheckCircle2,
@@ -207,25 +208,26 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
               onChange={(ev) => setQuery(ev.target.value)}
               aria-label="Pesquisar armamento"
               placeholder="Pesquisar arma..."
-              className="h-8 min-h-0 w-full border-white/10 bg-black/60 py-1 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+              size="compact" className="pl-7 font-mono text-white placeholder:text-zinc-600"
             />
           </div>
           <Tip tip={canOptimize
             ? `Distribui o arsenal pelos ${idleCount} operacionais disponíveis, procurando a melhor combinação para cada um.`
             : weapons.length === 0 ? "Sem armas no arsenal." : "Nenhum operacional disponível para equipar."}>
-            <button type="button"
+            <Button
+              type="button"
               data-testid="weapons-optimize"
+              variant="outline"
+              size="compact"
               onClick={() => canOptimize && optimizeWeapons()}
               disabled={!canOptimize}
               className={cn(
-                "flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border px-2 font-mono text-[10px] font-bold uppercase transition-colors",
-                canOptimize
-                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
-                  : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+                "shrink-0 gap-1 font-mono font-bold uppercase",
+                canOptimize ? "text-cyan-300" : "text-zinc-600"
               )}
             >
               <Sparkles size={11} /> Otimizar
-            </button>
+            </Button>
           </Tip>
           {repairableIds.length > 0 && (
             <PurchaseButton
