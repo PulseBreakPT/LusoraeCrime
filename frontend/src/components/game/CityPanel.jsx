@@ -101,8 +101,8 @@ export const CityPanel = ({ open, onOpenChange }) => {
 
   const world = city?.world;
   const season = city?.season;
-  const businesses = city?.businesses || [];
-  const catalog = city?.business_catalog || {};
+  const businesses = useMemo(() => city?.businesses || [], [city?.businesses]);
+  const catalog = useMemo(() => city?.business_catalog || {}, [city?.business_catalog]);
   const rivalActions = city?.rival_actions || {};
   const playerLevel = Number(state?.player?.level || 1);
   const cleanMoney = Number(state?.player?.clean_money || 0);
