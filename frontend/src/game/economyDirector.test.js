@@ -4,6 +4,7 @@ import {
   rewardCeiling,
   guardReward,
   cityBusinessCap,
+  passivePortfolioScale,
 } from "./economyDirector";
 
 describe("economy director parity", () => {
@@ -18,6 +19,11 @@ describe("economy director parity", () => {
     expect(rewardCeiling(100, "operation")).toBe(400000);
     expect(guardReward(9999999, 100, "mastermind")).toBe(1600000);
     expect(rewardCeiling(100, "operation")).toBeGreaterThan(rewardCeiling(1, "operation"));
+  });
+
+  test("scales aggregate passive income to the career ceiling", () => {
+    expect(passivePortfolioScale(1, 1, 18000, 18000)).toBe(0.5);
+    expect(passivePortfolioScale(100, 2, 80000, 80000)).toBe(1);
   });
 
   test("bounds city business portfolio growth", () => {
