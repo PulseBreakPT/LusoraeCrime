@@ -234,7 +234,7 @@ export default function AdminPanel() {
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 gap-1 border border-white/10 bg-zinc-900/50 sm:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3 gap-1 sm:grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <TrendingUp size={16} />
               <span className="hidden sm:inline">Dashboard</span>
