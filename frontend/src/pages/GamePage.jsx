@@ -232,7 +232,8 @@ export default function GamePage() {
       ref={gameShellRef}
       data-testid="game-page"
       data-heat-tier={heatTier}
-      className={`sub-game-shell fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"} ${selectedOpp ? "sub-has-selection" : ""} ${hudPinned ? "sub-ui-open" : ""}`}
+      data-live-ops={takenOpportunities.length}
+      className={`sub-game-shell fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"} ${selectedOpp ? "sub-has-selection" : ""} ${hudPinned ? "sub-ui-open" : ""} ${takenOpportunities.length ? "sub-operations-live" : ""}`}
     >
       <LiveMap
         state={mapState}
