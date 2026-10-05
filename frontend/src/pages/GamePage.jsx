@@ -204,6 +204,7 @@ export default function GamePage() {
   const alerts = shellAlerts;
   const p = state.player;
   const wantedStars = Math.max(0, Math.min(5, Math.floor(Number(p.heat || 0) / 20)));
+  const heatTier = Number(p.heat || 0) >= 80 ? 4 : Number(p.heat || 0) >= 60 ? 3 : Number(p.heat || 0) >= 40 ? 2 : Number(p.heat || 0) >= 20 ? 1 : 0;
   const empireAlert = p.heat >= 70 || p.dirty_money >= 15000;
 
   const weaponsDamaged = (state.weapons || []).filter((w) => w.condition < 30).length;
@@ -230,6 +231,7 @@ export default function GamePage() {
     <div
       ref={gameShellRef}
       data-testid="game-page"
+      data-heat-tier={heatTier}
       className={`sub-game-shell fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"} ${selectedOpp ? "sub-has-selection" : ""} ${hudPinned ? "sub-ui-open" : ""}`}
     >
       <LiveMap
