@@ -5441,7 +5441,7 @@ html.sub-focus-mode .sub-optional-hud {
 
 [data-testid="resource-bar"] .sub-resource-label {
     color: rgba(212, 212, 216, 0.68) !important;
-    font-size: 9.5px !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
     letter-spacing: 0.075em !important;
 }
@@ -5692,10 +5692,10 @@ html.sub-focus-mode .sub-optional-hud {
 .opp-pin-type {
     left: -3px !important;
     bottom: -3px !important;
-    width: 12px !important;
-    height: 12px !important;
+    width: 14px !important;
+    height: 14px !important;
     border-width: 1px !important;
-    font-size: 8px !important;
+    font-size: 10px !important;
 }
 
 .hq-pin {
@@ -5769,7 +5769,7 @@ html.sub-focus-mode .sub-optional-hud {
 .sub-available-missions-count {
     top: -2px !important;
     right: -1px !important;
-    font-size: 9px !important;
+    font-size: 10px !important;
 }
 
 .sub-modal-overlay {
@@ -5823,7 +5823,7 @@ html.sub-focus-mode .sub-optional-hud {
     }
 
     [data-testid="resource-bar"] .sub-resource-label {
-        font-size: 9px !important;
+        font-size: 10px !important;
     }
 
     [data-testid="resource-bar"] .sub-resource-value {
@@ -5841,7 +5841,7 @@ html.sub-focus-mode .sub-optional-hud {
     }
 
     .sub-world-pulse-effect {
-        font-size: 9px !important;
+        font-size: 10px !important;
     }
 
     .sub-operations-panel .sub-operations-summary .sub-kpi {
