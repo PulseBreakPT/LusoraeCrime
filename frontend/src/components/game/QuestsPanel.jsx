@@ -213,7 +213,7 @@ const TABS = [
 ];
 
 export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTarget, onFocusTabConsumed }) => {
-  const { state, serverNow, claimAllQuests } = useGame();
+  const { state, catalog, serverNow, claimAllQuests } = useGame();
   const { rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("questsTab", "historia", rememberSort);
   useTick(open);
