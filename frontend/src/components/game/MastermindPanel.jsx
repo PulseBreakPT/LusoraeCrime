@@ -10,6 +10,7 @@ import { fmtDuration, fmtMoney } from "../../lib/game";
 import { MiniBar, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../ui/sheet";
 import { Button } from "../ui/button";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
@@ -95,21 +96,20 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
           </Card>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 sm:grid-cols-4">
-              {TABS.map(([key, label, Icon]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setTab(key)}
-                  data-testid={`mastermind-tab-${key}`}
-                  className={`flex items-center justify-center gap-1 rounded-lg px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                    tab === key ? "bg-sky-500/20 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-                  }`}
-                >
-                  <Icon size={11} /> {label}
-                </button>
-              ))}
-            </div>
+            <Tabs value={tab} onValueChange={setTab} className="mt-4">
+              <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
+                {TABS.map(([key, label, Icon]) => (
+                  <TabsTrigger
+                    key={key}
+                    value={key}
+                    data-testid={`mastermind-tab-${key}`}
+                    className="gap-1 px-1 font-mono text-[10px] font-bold uppercase tracking-wider"
+                  >
+                    <Icon size={11} /> {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
             {tab === "board" && (
               <BoardTab
