@@ -641,6 +641,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             (nowSec >= ch.doorsOpenAt && nowSec < ch.doorsCloseExitAt) ||
             (nowSec >= ch.boardDoorsOpenAt && nowSec < ch.doorsFinalCloseAt);
           car.classList.toggle("unit-doors-open", doorsOpen);
+          car.classList.toggle("unit-car-moving", Boolean(p.moving));
+          car.classList.toggle("unit-car-returning", p.phase === "returning");
         }
       } else if (commLineRef.current) {
         commLineRef.current.setLatLngs([]);
@@ -765,13 +767,19 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             <Polyline
               positions={positions}
               smoothFactor={1}
-              pathOptions={{ color: "#071016", weight: 4.6, opacity: dim ? 0.1 : 0.56, lineCap: "round", lineJoin: "round" }}
+              pathOptions={{ color: "#071016", weight: 4.6, opacity: dim ? 0.1 : 0.56, lineCap: "round", lineJoin: "round", className: "sub-route-shadow" }}
               interactive={false}
             />
             <Polyline
               positions={positions}
               smoothFactor={1}
-              pathOptions={{ color: "#F4F4F5", weight: 2.05, opacity: dim ? 0.22 : 0.86, dashArray: returning ? "5 6" : null, lineCap: "round", lineJoin: "round" }}
+              pathOptions={{ color: returning ? "#F59E0B" : "#F4F4F5", weight: 2.05, opacity: dim ? 0.22 : 0.86, dashArray: returning ? "5 6" : null, lineCap: "round", lineJoin: "round", className: `sub-route-line ${returning ? "sub-route-line-returning" : "sub-route-line-outbound"}` }}
+              interactive={false}
+            />
+            <Polyline
+              positions={positions}
+              smoothFactor={1}
+              pathOptions={{ color: returning ? "#FDE68A" : "#FFFFFF", weight: 1.05, opacity: dim ? 0.04 : 0.2, dashArray: "1 14", lineCap: "round", className: "sub-route-flow" }}
               interactive={false}
             />
           </>
@@ -951,13 +959,13 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
           <Polyline
             positions={route.latlngs}
             smoothFactor={1}
-            pathOptions={{ color: "#071016", weight: 4.2, opacity: dim ? 0.08 : 0.48, lineCap: "round", lineJoin: "round" }}
+            pathOptions={{ color: "#071016", weight: 4.2, opacity: dim ? 0.08 : 0.48, lineCap: "round", lineJoin: "round", className: "sub-route-shadow" }}
             interactive={false}
           />
           <Polyline
             positions={route.latlngs}
             smoothFactor={1}
-            pathOptions={{ color: TRANSFER_COLOR, weight: 1.8, opacity: dim ? 0.18 : 0.82, dashArray: "4 6", lineCap: "round", lineJoin: "round" }}
+            pathOptions={{ color: TRANSFER_COLOR, weight: 1.8, opacity: dim ? 0.18 : 0.82, dashArray: "4 6", lineCap: "round", lineJoin: "round", className: "sub-transfer-route" }}
             interactive={false}
           />
         </>
