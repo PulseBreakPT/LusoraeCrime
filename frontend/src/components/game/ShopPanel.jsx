@@ -197,7 +197,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, vehicleId] = selection.split(":");
                                 equipPaint(vehicleId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-36 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger size="compact" className="w-full shrink-0 text-white sm:w-36">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -220,7 +220,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, teamId] = selection.split(":");
                                 equipEmblem(teamId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-36 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger size="compact" className="w-full shrink-0 text-white sm:w-36">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
