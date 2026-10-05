@@ -11,6 +11,7 @@ from db import db
 from engine import add_event, dirty_money_cap, now_utc, parse_dt, record_tx
 from game_data import VEHICLE_MODELS
 from routes_game import MutationInput, idempotent
+from economy_director import guard_reward
 from mastermind_data import (
     COMPLICATIONS,
     FENCES,
@@ -811,6 +812,7 @@ async def launch_heist(body: HeistIdInput, user: dict = Depends(get_current_user
         * (1 + optional_done * 0.05)
         * variation
     )
+    gross_reward = guard_reward(gross_reward, int(player.get("level", 1) or 1), "mastermind")
     net_reward = int(gross_reward * (1 - crew_cut / 100))
     heat_gain = max(1, int(
         target["heat"] * approach["heat_mult"] * fence["heat_mult"] * complication["heat_mult"]
