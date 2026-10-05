@@ -105,7 +105,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   // probabilidade de sucesso que cumpra mesmo os requisitos — o utilizador pode
   // sempre escolher outra equipa manualmente clicando numa linha diferente.
   // Toque de abertura ao selecionar uma operação no mapa — os marcadores do
-  // Leaflet não são <button type="button">, por isso o som global de interface não os cobre.
+  // Leaflet não são <Button variant="bare" size="bare" type="button">, por isso o som global de interface não os cobre.
   useEffect(() => {
     audio.sfx.notify();
   }, [opp.id]);
@@ -662,14 +662,14 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 </p>
 
                 {modifiers.length > 0 && (
-                  <button type="button"
+                  <Button variant="bare" size="bare" type="button"
                     data-testid="dispatch-preview-toggle-details"
                     onClick={() => setShowDetails((v) => !v)}
                     className="mt-1.5 flex w-full items-center justify-center gap-1 border-t border-white/5 pt-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500 transition-colors hover:text-white"
                   >
                     {showDetails ? "Ocultar detalhes" : "Ver detalhes"}
                     <ChevronDown size={11} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
-                  </button>
+                  </Button>
                 )}
 
                 {showDetails && (
