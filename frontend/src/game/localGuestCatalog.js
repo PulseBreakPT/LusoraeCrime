@@ -350,19 +350,23 @@ Object.assign(LOCAL_CATALOG.recruit_sources, {
   contactos: { ...LOCAL_CATALOG.recruit_sources.contactos, min_level: 75 },
 });
 
-const spreadLocalUnlocks = (table, valueKey, fixed = {}, curve = 1.35) => {
-  const entries = Object.entries(table).sort((a, b) =>
-    Number(a[1]?.[valueKey] || 0) - Number(b[1]?.[valueKey] || 0)
-  );
-  entries.forEach(([key, cfg], index) => {
-    const ratio = entries.length <= 1 ? 0 : index / (entries.length - 1);
-    cfg.min_level = fixed[key] ?? Math.max(1, Math.min(100, 1 + Math.round(99 * (ratio ** curve))));
-  });
+// Versioned unlock contract mirrored from backend/game_data.py. Economy
+// rebalance (prices) must never move content between levels implicitly.
+LOCAL_CATALOG.progression_unlock_version = 1;
+const LOCAL_PROGRESSION_UNLOCKS = {
+  vehicles:{moto:1,usado:1,buggy_todo_terreno:12,carrinha_entrega:20,van:5,carro_furtivo:40,desportivo:51,berlina_blindada:62,limousine:74,suv_blindado:87,supercarro:100},
+  weapons:{faca_taser:1,espingarda:7,pistola:1,cacadeira_serrada:27,pistola_silenciada:40,rifle_precisao:53,submetralhadora:68,rifle_assalto:84,metralhadora_ligeira:100},
+  properties:{garagem:1,esconderijo:1,posto_vigilancia:11,arsenal:18,empresa_legal:5,oficina:35,armazem:45,escritorio_advocacia:55,laboratorio:65,casa_cambio:77,porto_clandestino:88,centro_logistico:100},
 };
-
-spreadLocalUnlocks(LOCAL_CATALOG.vehicle_models, "price", { usado:1, moto:1, van:5 });
-spreadLocalUnlocks(LOCAL_CATALOG.weapon_models, "price", { faca_taser:1, pistola:1 });
-spreadLocalUnlocks(LOCAL_CATALOG.property_types, "price", { esconderijo:1, garagem:1, empresa_legal:5 });
+for (const [key, level] of Object.entries(LOCAL_PROGRESSION_UNLOCKS.vehicles)) {
+  if (LOCAL_CATALOG.vehicle_models[key]) LOCAL_CATALOG.vehicle_models[key].min_level = level;
+}
+for (const [key, level] of Object.entries(LOCAL_PROGRESSION_UNLOCKS.weapons)) {
+  if (LOCAL_CATALOG.weapon_models[key]) LOCAL_CATALOG.weapon_models[key].min_level = level;
+}
+for (const [key, level] of Object.entries(LOCAL_PROGRESSION_UNLOCKS.properties)) {
+  if (LOCAL_CATALOG.property_types[key]) LOCAL_CATALOG.property_types[key].min_level = level;
+}
 
 const localOpportunityLevels = [1, 1, 15, 25, 35, 50, 70, 85];
 Object.entries(LOCAL_CATALOG.opportunity_types).forEach(([key, cfg], index) => {
