@@ -22,6 +22,9 @@ from economy_constants import (
     LAUNDER_BASE_RATE,
     LAUNDER_MAX_RATE,
     LAUNDER_PASSIVE_RATE,
+    OFFLINE_SIMULATION_MAX_DAYS,
+    OFFLINE_SIMULATION_MAX_MINUTES,
+    OFFLINE_PAYROLL_MAX_CYCLES,
 )
 from reward_config import (
     MONEY_REWARD_MIN,
@@ -51,6 +54,9 @@ def run():
     assert VEHICLE_ANNUAL_FIXED_COSTS["usado"] == 1250
     assert VEHICLE_ANNUAL_FIXED_COSTS["supercarro"] == 6000
     assert (LAUNDER_BASE_RATE, LAUNDER_PASSIVE_RATE, LAUNDER_MAX_RATE) == (0.78, 0.82, 0.90)
+    assert OFFLINE_SIMULATION_MAX_DAYS == 28
+    assert OFFLINE_SIMULATION_MAX_MINUTES == 28 * 24 * 60
+    assert OFFLINE_PAYROLL_MAX_CYCLES == 5
 
     rewards = []
     for risk in range(1, 6):
