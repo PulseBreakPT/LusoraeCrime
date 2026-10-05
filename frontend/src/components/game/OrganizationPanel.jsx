@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import {
   Network, Wallet, PackageOpen, Users, Car, Swords, Warehouse, MapPinned,
   TrendingUp, ShieldCheck, Gauge, Wrench, Fuel, Shield, ClipboardCheck,
@@ -698,14 +699,16 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label className="space-y-1">
                       <span className="font-mono text-[10px] uppercase text-zinc-500">Doutrina</span>
-                      <select
+                      <Select
                         value={team.doctrine || "balanced"}
                         disabled={team.status !== "idle"}
-                        onChange={(e) => setTeamDoctrine(team.id, e.target.value)}
-                        className="h-9 w-full rounded-md border border-white/10 bg-black/60 px-2 text-xs text-white"
+                        onValueChange={(value) => setTeamDoctrine(team.id, value)}
                       >
-                        {Object.entries(doctrines).map(([key, d]) => <option key={key} value={key}>{d.name}</option>)}
-                      </select>
+                        <SelectTrigger size="compact"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(doctrines).map(([key, d]) => <SelectItem key={key} value={key}>{d.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                       <span className="block text-[10px] leading-relaxed text-zinc-600">
                         {doctrines[team.doctrine || "balanced"]?.desc}
                       </span>
@@ -896,17 +899,19 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   </div>
                   <MiniBar value={cap ? loaded / cap * 100 : 100} color={loaded < cap * 0.3 ? "#EF4444" : "#34D399"} className="mt-2" />
                   <div className="mt-3 flex gap-1.5">
-                    <select
+                    <Select
                       value={selected}
-                      onChange={(e) => setWeaponUpgrade((p) => ({ ...p, [w.id]: e.target.value }))}
-                      className="h-8 min-w-0 flex-1 rounded-md border border-white/10 bg-black/60 px-2 text-[10px] text-zinc-200"
+                      onValueChange={(value) => setWeaponUpgrade((p) => ({ ...p, [w.id]: value }))}
                     >
-                      {Object.entries(upgradeCatalog).map(([key, up]) => {
-                        const rank = Number(upgradeCounts[key] || 0);
-                        const price = weaponUpgradeCostOf(up, rank);
-                        return <option key={key} value={key}>{up.name} · N{rank}/{up.max_rank} · {fmtMoney(price)}</option>;
-                      })}
-                    </select>
+                      <SelectTrigger size="compact" className="min-w-0 flex-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(upgradeCatalog).map(([key, up]) => {
+                          const rank = Number(upgradeCounts[key] || 0);
+                          const price = weaponUpgradeCostOf(up, rank);
+                          return <SelectItem key={key} value={key}>{up.name} · N{rank}/{up.max_rank} · {fmtMoney(price)}</SelectItem>;
+                        })}
+                      </SelectContent>
+                    </Select>
                     <PurchaseButton
                       density="dense" icon={Plus} label={upgradeMaxed ? "Máximo" : `Instalar · ${fmtMoney(upgradeCost)}`}
                       can={!!selected && upgradeUnlocked && !upgradeMaxed && money >= upgradeCost}
