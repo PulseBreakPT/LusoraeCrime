@@ -264,7 +264,7 @@ export default function GamePage() {
       {!focusMode && <ResourceBar />}
       {!focusMode && showFps && <FpsMeter />}
       {!focusMode && availableMissions.length > 0 && (
-        <button
+        <Button variant="bare" size="bare"
           type="button"
           data-testid="available-missions-hud"
           className="sub-optional-hud sub-available-missions-hud"
@@ -274,7 +274,7 @@ export default function GamePage() {
         >
           <Target size={21} aria-hidden="true" />
           <span className="sub-available-missions-count">{availableMissions.length}</span>
-        </button>
+        </Button>
       )}
       {!focusMode && wantedStars > 0 && (
         <div
@@ -305,9 +305,9 @@ export default function GamePage() {
         >
           {online ? <RefreshCw size={12} /> : <WifiOff size={12} />}
           <span>{online ? "Dados desatualizados" : "Sem ligação à internet"}</span>
-          <button type="button" onClick={refresh} className="font-bold text-white underline underline-offset-2">
+          <Button variant="bare" size="bare" type="button" onClick={refresh} className="font-bold text-white underline underline-offset-2">
             Sincronizar
-          </button>
+          </Button>
         </div>
       )}
       {/* Modo de colocação = modo focado: só o mapa e os controlos de colocação
@@ -524,7 +524,7 @@ const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick 
 );
 
 const NavAction = ({ testId, icon: Icon, label, color, alert, active, onClick }) => (
-  <button
+  <Button variant="bare" size="bare"
     type="button"
     data-testid={testId}
     onClick={onClick}
@@ -542,5 +542,5 @@ const NavAction = ({ testId, icon: Icon, label, color, alert, active, onClick })
         style={{ background: NOTIFY_COLOR }}
       />
     )}
-  </button>
+  </Button>
 );
