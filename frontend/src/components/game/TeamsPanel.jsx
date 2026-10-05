@@ -963,7 +963,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                         else assignVehicle(vid, t.id);
                       }}
                     >
-                      <SelectTrigger data-testid={`team-vehicle-select-${t.id}`} className="h-7 flex-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+                      <SelectTrigger data-testid={`team-vehicle-select-${t.id}`} size="compact" className="flex-1 text-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
