@@ -110,11 +110,11 @@ const oppIcon = (opp, selected, favorite, urgent) => {
   const taken = opp.status === "taken";
   const html = `
     <div class="opp-pin ${selected ? "opp-pin-selected" : ""} ${taken ? "opp-pin-taken" : ""} ${urgent && !taken ? "opp-pin-urgent" : ""}" style="--mk:${color}">
-      ${renderToStaticMarkup(<Icon size={15} strokeWidth={2.5} />)}
+      ${renderToStaticMarkup(<Icon size={14} strokeWidth={2.4} />)}
       <span class="opp-pin-type" style="background:${color}">${initial}</span>
       ${favorite ? `<span style="position:absolute;top:-4px;right:-4px;color:#FBBF24;filter:drop-shadow(0 0 2px rgba(0,0,0,0.8))">${renderToStaticMarkup(<Star size={11} fill="#FBBF24" />)}</span>` : ""}
     </div>`;
-  return makeDivIcon(html, 34);
+  return makeDivIcon(html, 32);
 };
 
 // Cache de ícones por assinatura visual — evita recriar divIcons (e o churn de
@@ -136,9 +136,9 @@ const hqIcon = (skinColor) => {
   const style = skinColor ? ` style="--skin:${skinColor}"` : "";
   const html = `
     <div class="hq-pin"${style}>
-      ${renderToStaticMarkup(<Home size={16} strokeWidth={2.5} />)}
+      ${renderToStaticMarkup(<Home size={14} strokeWidth={2.5} />)}
     </div>`;
-  return makeDivIcon(html, 36);
+  return makeDivIcon(html, 30);
 };
 
 // Veículo top-down — o corpo (<span data-car>) é rodado pelo loop rAF para o
@@ -159,7 +159,7 @@ const unitIcon = (phase, chased) => {
       </span>
       ${parked ? '<span class="unit-parked-badge">P</span>' : ""}
     </div>`;
-  return makeDivIcon(html, 30);
+  return makeDivIcon(html, 26);
 };
 
 // ---------- Execução visual das missões: operacionais + halo do alvo ----------
@@ -200,7 +200,7 @@ const missionTargetIconCached = (hot) => {
         <span class="mission-target-cross"></span>
         <span class="mission-target-dot"></span>
       </div>`;
-    icon = L.divIcon({ html, className: "sub-marker", iconSize: [30, 30], iconAnchor: [15, 15] });
+    icon = L.divIcon({ html, className: "sub-marker", iconSize: [26, 26], iconAnchor: [13, 13] });
     missionTargetIconCache.set(key, icon);
   }
   return icon;
@@ -765,13 +765,13 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
             <Polyline
               positions={positions}
               smoothFactor={1}
-              pathOptions={{ color: "#071016", weight: 6, opacity: dim ? 0.12 : 0.68, lineCap: "round", lineJoin: "round" }}
+              pathOptions={{ color: "#071016", weight: 4.6, opacity: dim ? 0.1 : 0.56, lineCap: "round", lineJoin: "round" }}
               interactive={false}
             />
             <Polyline
               positions={positions}
               smoothFactor={1}
-              pathOptions={{ color: "#FFFFFF", weight: 2.6, opacity: dim ? 0.25 : 0.92, dashArray: returning ? "6 6" : null, lineCap: "round", lineJoin: "round" }}
+              pathOptions={{ color: "#F4F4F5", weight: 2.05, opacity: dim ? 0.22 : 0.86, dashArray: returning ? "5 6" : null, lineCap: "round", lineJoin: "round" }}
               interactive={false}
             />
           </>
@@ -951,13 +951,13 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
           <Polyline
             positions={route.latlngs}
             smoothFactor={1}
-            pathOptions={{ color: "#071016", weight: 5, opacity: dim ? 0.1 : 0.58, lineCap: "round", lineJoin: "round" }}
+            pathOptions={{ color: "#071016", weight: 4.2, opacity: dim ? 0.08 : 0.48, lineCap: "round", lineJoin: "round" }}
             interactive={false}
           />
           <Polyline
             positions={route.latlngs}
             smoothFactor={1}
-            pathOptions={{ color: TRANSFER_COLOR, weight: 2.2, opacity: dim ? 0.2 : 0.9, dashArray: "5 6", lineCap: "round", lineJoin: "round" }}
+            pathOptions={{ color: TRANSFER_COLOR, weight: 1.8, opacity: dim ? 0.18 : 0.82, dashArray: "4 6", lineCap: "round", lineJoin: "round" }}
             interactive={false}
           />
         </>
