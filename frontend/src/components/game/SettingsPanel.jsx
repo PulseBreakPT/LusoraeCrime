@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Card } from "../ui/card";
 import { Switch } from "../ui/switch";
+import { Slider } from "../ui/slider";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/collapsible";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import {
@@ -72,16 +73,16 @@ const Row = ({ label, hint, children, testId, hidden = false }) => {
 // Slider de volume compacto (0–100%), coerente com o resto do painel.
 const VolumeSlider = ({ value, onChange, disabled, testId, ariaLabel }) => (
   <div className="flex items-center gap-1.5">
-    <input
+    <Slider
       data-testid={testId}
       aria-label={ariaLabel}
-      type="range"
-      min="0"
-      max="100"
-      value={Math.round(value * 100)}
+      min={0}
+      max={100}
+      step={1}
+      value={[Math.round(value * 100)]}
       disabled={disabled}
-      onChange={(e) => onChange(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) / 100)}
-      className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/10 accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+      onValueChange={([next]) => onChange(Math.max(0, Math.min(100, next || 0)) / 100)}
+      className="w-20"
     />
     <span className="w-8 text-right font-mono text-[10px] text-zinc-500">{Math.round(value * 100)}%</span>
   </div>
