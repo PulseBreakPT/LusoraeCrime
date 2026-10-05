@@ -746,16 +746,20 @@ html.sub-reduced-motion .unit-car-moving .unit-car-body::before {
   animation: sub-fx-car-tail 1.4s ease-in-out infinite;
 }
 
-/* Panels and mission cards visibly breathe while open. */
-.sub-sheet-panel,
-.sub-menu-modal,
-.sub-nav-tray,
-.sub-opp-card {
+/* Navigation trays breathe while open. Modal entry animations remain untouched. */
+.sub-nav-tray {
   animation: sub-fx-panel-breathe 4.6s ease-in-out infinite;
 }
 
+.sub-sheet-panel .sub-sheet-title svg,
+.sub-sheet-panel .sub-watermark svg,
+.sub-sheet-panel .sub-section-header svg,
+.sub-opp-card > div:first-child svg {
+  animation: sub-fx-icon-pulse 3.8s ease-in-out infinite;
+}
+
 /* Inner cards receive a slow travelling reflection. */
-.sub-game-shell .sub-card {
+.sub-game-shell .sub-card:not(.sub-flash):not(.sub-flash-amber):not(.sub-flash-blue) {
   background-image:
     linear-gradient(
       112deg,
@@ -770,6 +774,15 @@ html.sub-reduced-motion .unit-car-moving .unit-car-body::before {
     linear-gradient(165deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.014) 55%, rgba(220,38,38,.022) 100%);
   background-size: 260% 100%, 100% 100%;
   animation: sub-fx-card-sheen 8.6s linear infinite;
+}
+
+/* Open mission cards keep their own entrance, then retain a stronger static glow. */
+.sub-opp-card {
+  box-shadow:
+    0 24px 62px rgba(0,0,0,.68),
+    0 0 0 1px color-mix(in srgb, var(--mk, #ef4444) 22%, rgba(255,255,255,.04)),
+    0 0 26px color-mix(in srgb, var(--mk, #ef4444) 9%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.07) !important;
 }
 
 /* Progress bars always show energy moving through the filled segment. */
