@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Badge } from "../ui/badge";
 import { PanelWatermark } from "./hud";
@@ -584,9 +585,16 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   <p className="mt-1 text-[10px] text-zinc-500">Apostas entre 100 € e 5 000 € usando apenas dinheiro do jogo.</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Input type="number" min={100} max={5000} value={bet} onChange={(e) => setBet(e.target.value)} className="h-8 w-28 bg-black/30 text-xs" />
-                    <select value={rouletteChoice} onChange={(e) => setRouletteChoice(e.target.value)} className="h-8 rounded-md border border-white/10 bg-black/40 px-2 font-mono text-[10px] text-zinc-300">
-                      <option value="red">Vermelho</option><option value="black">Preto</option><option value="green">Zero</option>
-                    </select>
+                    <Select value={rouletteChoice} onValueChange={setRouletteChoice}>
+                      <SelectTrigger size="compact" className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="red">Vermelho</SelectItem>
+                        <SelectItem value="black">Preto</SelectItem>
+                        <SelectItem value="green">Zero</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <ActionButton disabled={!!busy} onClick={() => playCasino("roulette")}>Roleta</ActionButton>
                     <ActionButton disabled={!!busy} onClick={() => playCasino("blackjack")}>Blackjack</ActionButton>
                   </div>
