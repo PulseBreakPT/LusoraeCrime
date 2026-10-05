@@ -291,7 +291,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
 
 
         <div className="mt-6 pb-2">
-          <button type="button"
+          <Button variant="bare" size="bare" type="button"
             data-testid="ledger-toggle"
             onClick={() => setShowLedger(!showLedger)}
             className="flex w-full items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:text-white"
@@ -299,7 +299,7 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
             <span className="flex items-center gap-1.5"><History size={12} className="text-red-500/90" /> Extrato</span>
             <span className="h-px min-w-3 flex-1 bg-gradient-to-r from-white/[0.14] via-white/[0.06] to-transparent" aria-hidden="true" />
             <ChevronDown size={13} className={`transition-transform ${showLedger ? "rotate-180" : ""}`} />
-          </button>
+          </Button>
           {showLedger && (
             <div className="mt-2" data-testid="ledger-list">
               {transactions.length === 0 ? (
