@@ -18,7 +18,7 @@ export const SOURCE_BURST_HOURS = {
   quest: 3,
   mastermind: 20,
   city_cache: 2,
-  season: 3,
+  season: 30,
 };
 
 const levelOf = (value) => Math.max(1, Math.min(100, Math.trunc(Number(value) || 1)));
