@@ -812,25 +812,133 @@ NIGHT_STEALTH_BONUS = 0.04               # bónus de chance em operações discr
 # ============================================================================
 MAX_ORG_LEVEL = len(LEVEL_THRESHOLDS)
 
-def _progression_level(index: int, total: int, curve: float = 1.35) -> int:
-    if total <= 1:
-        return 1
-    ratio = max(0.0, min(1.0, index / (total - 1)))
-    return max(1, min(MAX_ORG_LEVEL, 1 + round((MAX_ORG_LEVEL - 1) * (ratio ** curve))))
+# Unlocks are an explicit versioned contract. Prices/rewards can now be
+# rebalanced without silently moving content to another organization level.
+# These values freeze the v1 level-100 distribution that was previously
+# generated dynamically from price/base_reward ordering.
+PROGRESSION_UNLOCK_VERSION = 1
+PROGRESSION_UNLOCK_LEVELS = {
+    "vehicles": {
+        "moto": 1,
+        "usado": 1,
+        "buggy_todo_terreno": 12,
+        "carrinha_entrega": 20,
+        "van": 5,
+        "carro_furtivo": 40,
+        "desportivo": 51,
+        "berlina_blindada": 62,
+        "limousine": 74,
+        "suv_blindado": 87,
+        "supercarro": 100,
+},
+    "weapons": {
+        "faca_taser": 1,
+        "espingarda": 7,
+        "pistola": 1,
+        "cacadeira_serrada": 27,
+        "pistola_silenciada": 40,
+        "rifle_precisao": 53,
+        "submetralhadora": 68,
+        "rifle_assalto": 84,
+        "metralhadora_ligeira": 100,
+},
+    "properties": {
+        "garagem": 1,
+        "esconderijo": 1,
+        "posto_vigilancia": 11,
+        "arsenal": 18,
+        "empresa_legal": 5,
+        "oficina": 35,
+        "armazem": 45,
+        "escritorio_advocacia": 55,
+        "laboratorio": 65,
+        "casa_cambio": 77,
+        "porto_clandestino": 88,
+        "centro_logistico": 100,
+},
+    "opportunities": {
+        "entrega_local": 1,
+        "protecao_comercio": 1,
+        "cobranca": 1,
+        "phishing_bancario": 3,
+        "boato_rua": 3,
+        "entrega_expressa": 4,
+        "vigilancia_digital": 5,
+        "assalto_licorista": 6,
+        "clonagem_cartoes": 7,
+        "roubo": 1,
+        "recolha_mercadoria": 9,
+        "roubo_joalharia": 10,
+        "transporte": 1,
+        "assalto": 1,
+        "lavagem": 13,
+        "suborno_funcionario": 14,
+        "hack_semaforos": 16,
+        "rota_costeira": 17,
+        "roubo_carga": 18,
+        "transporte_armas": 19,
+        "hack": 21,
+        "chantagem_politico": 22,
+        "contrabando": 23,
+        "fraude_criptomoedas": 25,
+        "assalto_penhores": 26,
+        "roubo_obra_arte": 28,
+        "assalto_armado": 29,
+        "lavagem_casino": 31,
+        "contrabando_tabaco": 32,
+        "suborno_oficial": 34,
+        "invasao_servidor": 35,
+        "emboscada_rival": 37,
+        "infiltracao": 38,
+        "infiltracao_sindicato": 40,
+        "frota_fantasma": 41,
+        "ciberespionagem": 43,
+        "assalto_blindado": 87,
+        "operacao_encoberta": 46,
+        "resgate_refem": 48,
+        "ataque_territorio": 50,
+        "ataque_ddos": 51,
+        "acordo_autarca": 53,
+        "rota_alfandega": 55,
+        "rota_internacional": 57,
+        "assalto_casino": 58,
+        "leilao_clandestino": 60,
+        "roubo_dados": 62,
+        "campanha_difamacao": 64,
+        "carga_diplomatica": 65,
+        "venda_armamento": 67,
+        "sequestro_relampago": 69,
+        "operacao_vip": 71,
+        "fuga_prisao": 73,
+        "rede_distribuicao": 75,
+        "controlo_imprensa": 77,
+        "sabotagem_industrial": 78,
+        "assalto_museu": 80,
+        "ciberataque_bancario": 82,
+        "assassinato_contrato": 84,
+        "porto_franco": 86,
+        "guerra_cibernetica": 88,
+        "missao_especial": 90,
+        "golpe_estado_local": 92,
+        "guerra_territorio": 94,
+        "operacao_fantasma": 96,
+        "trafico_influencia_internacional": 98,
+        "golpe_banco_central": 100,
+},
+}
 
-def _spread_unlocks(table: dict, value_key: str, fixed: dict | None = None) -> None:
-    fixed = fixed or {}
-    ordered = sorted(table.items(), key=lambda item: (float(item[1].get(value_key, 0) or 0), item[0]))
-    for index, (key, cfg) in enumerate(ordered):
-        cfg["min_level"] = int(fixed.get(key, _progression_level(index, len(ordered))))
-    for key, level in fixed.items():
-        if key in table:
-            table[key]["min_level"] = min(MAX_ORG_LEVEL, max(1, int(level)))
-
-_spread_unlocks(VEHICLE_MODELS, "price", {"usado": 1, "moto": 1, "van": 5})
-_spread_unlocks(WEAPON_MODELS, "price", {"faca_taser": 1, "pistola": 1})
-_spread_unlocks(PROPERTY_TYPES, "price", {"esconderijo": 1, "garagem": 1, "empresa_legal": 5})
-_spread_unlocks(OPPORTUNITY_TYPES, "base_reward", {"assalto": 1, "roubo": 1, "cobranca": 1, "transporte": 1})
+for _key, _level in PROGRESSION_UNLOCK_LEVELS["vehicles"].items():
+    if _key in VEHICLE_MODELS:
+        VEHICLE_MODELS[_key]["min_level"] = _level
+for _key, _level in PROGRESSION_UNLOCK_LEVELS["weapons"].items():
+    if _key in WEAPON_MODELS:
+        WEAPON_MODELS[_key]["min_level"] = _level
+for _key, _level in PROGRESSION_UNLOCK_LEVELS["properties"].items():
+    if _key in PROPERTY_TYPES:
+        PROPERTY_TYPES[_key]["min_level"] = _level
+for _key, _level in PROGRESSION_UNLOCK_LEVELS["opportunities"].items():
+    if _key in OPPORTUNITY_TYPES:
+        OPPORTUNITY_TYPES[_key]["min_level"] = _level
 
 RECRUIT_SOURCE_LEVELS = {
     "rua": 1, "bares": 1, "empresas": 10, "prisoes": 25,
@@ -842,8 +950,8 @@ for _key, _level in RECRUIT_SOURCE_LEVELS.items():
 
 for _cfg in OPPORTUNITY_TYPES.values():
     _required = [VEHICLE_MODELS[k]["min_level"] for k in (_cfg.get("required_models") or []) if k in VEHICLE_MODELS]
-    if _required:
-        _cfg["min_level"] = max(int(_cfg.get("min_level", 1)), min(_required))
+    if _required and int(_cfg.get("min_level", 1)) < min(_required):
+        raise ValueError("Progression contract invalid: operation unlocks before every required vehicle")
     _cfg["respect"] = max(
         int(_cfg.get("respect", 0) or 0),
         30 + int(_cfg.get("min_level", 1)) * 5 + int(_cfg.get("risk", 1)) * 12,
