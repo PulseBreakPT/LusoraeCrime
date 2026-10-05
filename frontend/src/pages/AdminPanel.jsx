@@ -512,7 +512,7 @@ export default function AdminPanel() {
                     ) : (
                       <>
                         <p className="text-zinc-400 text-sm">Utilizador é jogador normal</p>
-                        <Button onClick={handleGrantAdmin} variant="success" className="w-full">
+                        <Button onClick={() => handleSetRole("admin")} variant="success" className="w-full">
                           <Unlock size={16} className="mr-2" />
                           Tornar Admin
                         </Button>
