@@ -265,7 +265,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
         </div>
       )}
 
-      <button
+      <Button variant="bare" size="bare"
         type="button"
         data-testid={`emp-manage-toggle-${e.id}`}
         onClick={() => setManage(!manage)}
@@ -273,7 +273,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
       >
         {manage ? "Fechar gestão" : "Gerir operacional"}
         <ChevronDown size={11} className={`transition-transform ${manage ? "rotate-180" : ""}`} />
-      </button>
+      </Button>
 
       {manage && (
         <div className="mt-3 space-y-4 border-t border-white/10 pt-3">
@@ -353,7 +353,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
                   <p className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
                     {weaponModel.name} · <span style={{ color: conditionBand(weapon.condition).color }}>{Math.round(weapon.condition)}%</span>
                   </p>
-                  <button
+                  <Button variant="bare" size="bare"
                     type="button"
                     data-testid={`emp-unassign-weapon-${e.id}`}
                     onClick={() => unassignWeapon(e.id)}
@@ -361,7 +361,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
                     className="shrink-0 font-mono text-[10px] text-red-400 disabled:opacity-40"
                   >
                     Desatribuir
-                  </button>
+                  </Button>
                 </div>
                 {weaponProficiency > 0 && <p className="mt-1 font-mono text-[10px] text-zinc-500">Proficiência {Math.round(weaponProficiency)}%</p>}
                 {weaponCompat && !weaponCompat.compatible && (
@@ -371,14 +371,14 @@ const EmployeeCard = ({ e, onNavigate }) => {
                 )}
               </div>
             ) : (
-              <button
+              <Button variant="bare" size="bare"
                 type="button"
                 data-testid={`emp-nav-weapons-${e.id}`}
                 onClick={() => onNavigate && onNavigate("weapons")}
                 className="min-h-10 w-full rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-2 text-left font-mono text-[10px] text-amber-300"
               >
                 Sem arma equipada · abrir Armamento
-              </button>
+              </Button>
             )}
           </div>
 
@@ -472,7 +472,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
           {(e.history || []).length > 0 && (
             <div>
-              <button
+              <Button variant="bare" size="bare"
                 type="button"
                 data-testid={`emp-history-toggle-${e.id}`}
                 onClick={() => setShowHistory(!showHistory)}
@@ -480,7 +480,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
               >
                 <History size={10} /> Histórico ({e.history.length})
                 <ChevronDown size={10} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
-              </button>
+              </Button>
               {showHistory && (
                 <div className="space-y-1 rounded-md border border-white/[0.06] bg-black/20 p-2">
                   {[...e.history].reverse().map((item, index) => (
@@ -782,13 +782,13 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
         {capFull && (
           <Card className="mt-2 flex items-center justify-between gap-2 border-amber-500/30 bg-amber-500/5 px-2.5 py-2 shadow-none" data-testid="hr-cap-full">
             <p className="font-mono text-[10px] text-amber-400">Esconderijos cheios</p>
-            <button type="button"
+            <Button variant="bare" size="bare" type="button"
               data-testid="hr-nav-properties"
               onClick={() => onNavigate && onNavigate("properties")}
               className="font-mono text-[10px] text-amber-300 underline-offset-2 hover:underline"
             >
               {canBuyHideout ? `Abrir Imóveis · esconderijo desde ${fmtMoney(hideout.price)}` : "Ver Imóveis"}
-            </button>
+            </Button>
           </Card>
         )}
 
@@ -897,13 +897,13 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                   {sortedEmployees.length === 0 && (
                     <Card className="border-white/[0.06] bg-white/[0.02] p-3 shadow-none">
                       <p className="font-mono text-[11px] text-zinc-500">Nenhum operacional corresponde à pesquisa e aos filtros atuais.</p>
-                      <button
+                      <Button variant="bare" size="bare"
                         type="button"
                         onClick={() => { setQuery(""); setHideUnavailable(false); }}
                         className="mt-2 font-mono text-[10px] text-cyan-300"
                       >
                         Limpar filtros
-                      </button>
+                      </Button>
                     </Card>
                   )}
                   {sortedEmployees.map((employee) => (
