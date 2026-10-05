@@ -24,15 +24,15 @@ O mapa é o centro da experiência. O mundo nasce à volta do Quartel-General es
 | URL | https://pulsebreakpt.github.io/LusoraeCrime/ |
 | Build | React/CRACO via GitHub Actions |
 | Rotas SPA | Preparadas para o subdiretório `/LusoraeCrime` |
-| Login e registo no Pages | **Ocultos por feature flag**, não removidos |
-| Sistema de autenticação | Continua implementado no código |
+| Entrada no Pages | Google quando configurado + modo convidado local |
+| Sistema de autenticação | Implementado; sessão persistente no backend e save local no modo convidado |
 | Backend completo | FastAPI + MongoDB, destinado à stack Docker/VPS |
 | Deploy de produção | Docker Compose + Caddy + HTTPS automático |
 | Modo atual | Single-player local + backend persistente com camada social/multiplayer opt-in |
 
 **Compatibilidade de deployment:** o caminho `LusoraeCrime` que ainda aparece no URL do GitHub Pages é apenas o identificador legado do repositório/deploy atual; a marca do produto é exclusivamente **SUBMUNDO**.
 
-A build pública do GitHub Pages usa `REACT_APP_AUTH_UI_ENABLED=false`. Isto esconde o ecrã de login/registo sem apagar a implementação. Para uma build privada ou de produção, a interface pode voltar a ser exposta alterando a flag.
+O ecrã público de entrada é parte da experiência atual: permite jogar como convidado no próprio dispositivo e apresenta Google Sign-In quando o respetivo client ID está configurado.
 
 ---
 
