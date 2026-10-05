@@ -208,6 +208,24 @@ describe("offline guest engine", () => {
     expect(state.properties.length).toBe(1);
   });
 
+  test("credits territory income in guest mode using the shared passive economy", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", { lat: 38.7223, lng: -9.1393 });
+
+    const key = "submundo_guest_save_v2";
+    const save = JSON.parse(localStorage.getItem(key));
+    const before = Number(save.player.clean_money || 0);
+    save.player.territories = {
+      Centro: { tier: 1, pressure: 0, defense: 100 },
+    };
+    save.last_tick = Date.now() - 60 * 60 * 1000;
+    localStorage.setItem(key, JSON.stringify(save));
+
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    expect(state.player.clean_money).toBeGreaterThan(before);
+    expect(state.organization.territory_income_h).toBeGreaterThan(0);
+  });
+
   test("keeps the organization panel functional and authoritative in guest mode", async () => {
     enableLocalGuestMode();
     await localGuestRequest("post", "/game/hq/place", {
