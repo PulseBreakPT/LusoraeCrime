@@ -11,6 +11,7 @@ import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseB
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 import { Alert, AlertDescription } from "../ui/alert";
 import {
   Warehouse, ArrowUpCircle, Trash2, Lock, Siren, TrendingUp, Droplets, Flame, Banknote,
@@ -135,25 +136,26 @@ export const PropertiesPanel = ({ open, onOpenChange, focusTarget }) => {
               onChange={(ev) => setQuery(ev.target.value)}
               aria-label="Pesquisar imóveis"
               placeholder="Pesquisar imóvel..."
-              className="h-8 min-h-0 w-full border-white/10 bg-black/60 py-1 pl-6 pr-2 font-mono text-[11px] text-white placeholder:text-zinc-600"
+              size="compact" className="pl-7 font-mono text-white placeholder:text-zinc-600"
             />
           </div>
           <Tip tip={canOptimize
             ? `Lança as melhorias com melhor retorno real e preserva ${fmtMoney(reserve)} para o próximo fecho semanal (salários + TSU + frota + imóveis).`
             : props.length === 0 ? "Sem imóveis no património." : "Nenhum imóvel elegível — tudo no nível máximo ou já em obras."}>
-            <button type="button"
+            <Button
+              type="button"
               data-testid="properties-optimize"
+              variant="outline"
+              size="compact"
               onClick={() => canOptimize && optimizeProperties()}
               disabled={!canOptimize}
               className={cn(
-                "flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border px-2 font-mono text-[10px] font-bold uppercase transition-colors",
-                canOptimize
-                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
-                  : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
+                "shrink-0 gap-1 font-mono font-bold uppercase",
+                canOptimize ? "text-cyan-300" : "text-zinc-600"
               )}
             >
               <Sparkles size={11} /> Otimizar
-            </button>
+            </Button>
           </Tip>
         </div>
 
