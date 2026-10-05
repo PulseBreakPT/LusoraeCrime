@@ -114,6 +114,7 @@ from economy_calendar import next_weekly_settlement, is_weekly_settlement
 from game_data import operation_profile_of
 from time_rules import portugal_hour_allowed
 from economy_director import passive_portfolio_scale
+from state_lease import acquire_player_state_lease
 
 from organization_automation import run_organization_automation
 from organization_events import maybe_spawn_organization_event
@@ -3291,31 +3292,21 @@ async def advance(db, player):
     now = now_utc()
     pid = str(player["_id"])
 
-    # One authoritative tick per player. GET /game/state can be polled from
-    # several tabs/devices at the same time; without a lease those readers can
-    # duplicate passive income, payroll, raids and automation for the same
-    # last_tick interval. The lease is short and self-healing after a crash.
-    lease_token = f"{pid}:{now.timestamp():.6f}"
-    lease_until = (now + timedelta(seconds=90)).isoformat()
-    lease = await db.players.update_one(
-        {
-            "_id": player["_id"],
-            "$or": [
-                {"simulation_lease_until": {"$exists": False}},
-                {"simulation_lease_until": None},
-                {"simulation_lease_until": {"$lte": now.isoformat()}},
-            ],
-        },
-        {"$set": {
-            "simulation_lease_token": lease_token,
-            "simulation_lease_until": lease_until,
-        }},
+    # One authoritative writer per player. The same lease is shared with API
+    # mutations, so a purchase cannot race the tick's final state persistence.
+    lease_token = f"tick:{pid}:{now.timestamp():.6f}"
+    locked_player = await acquire_player_state_lease(
+        db,
+        player["_id"],
+        lease_token,
+        ttl_s=120,
+        wait_s=0,
     )
-    if lease.modified_count != 1:
-        # Another request owns this interval. Return the freshest persisted
-        # snapshot and let that owner finish the simulation exactly once.
+    if not locked_player:
+        # Another tick/mutation owns the player. Return the freshest persisted
+        # snapshot and never queue a duplicate simulation of the same interval.
         return await db.players.find_one({"_id": player["_id"]}) or player
-    player = await db.players.find_one({"_id": player["_id"]}) or player
+    player = locked_player
 
     ensure_stats(player)
     await reconcile_mission_stats(db, player)
@@ -3551,7 +3542,7 @@ async def advance(db, player):
     player["last_tick"] = now.isoformat()
 
     await db.players.update_one(
-        {"_id": player["_id"], "simulation_lease_token": lease_token},
+        {"_id": player["_id"], "state_lease_owner": lease_token},
         {"$set": {
         "heat": player["heat"], "level": player["level"], "last_tick": player["last_tick"],
         "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
@@ -3580,8 +3571,8 @@ async def advance(db, player):
         "next_organization_event_at": player.get("next_organization_event_at"),
         "governance": player.get("governance", {}),
         }, "$unset": {
-            "simulation_lease_token": "",
-            "simulation_lease_until": "",
+            "state_lease_owner": "",
+            "state_lease_until": "",
         }},
     )
     await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
