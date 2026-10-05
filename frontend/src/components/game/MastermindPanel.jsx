@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 
 
 const TABS = [
@@ -20,8 +21,6 @@ const TABS = [
   ["bounty", "Caçada", ShieldAlert],
   ["caches", "Sinais", RadioTower],
 ];
-
-const selectClass = "mt-1 h-11 w-full rounded-md border border-white/10 bg-black/50 px-2 font-mono text-base sm:h-9 sm:text-[10px] text-zinc-200 outline-none focus:border-red-500/50";
 
 const statusLabel = {
   available: "Disponível",
@@ -203,56 +202,64 @@ const BoardTab = ({
           <Card className="sub-card p-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label="Equipa">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.team_id}
-                  onChange={(event) => setDraft((current) => ({ ...current, team_id: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, team_id: value }))}
                 >
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name} · {team.status === "idle" ? "pronta" : team.status}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue placeholder="Escolher equipa" /></SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} · {team.status === "idle" ? "pronta" : team.status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Veículo de fuga">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.vehicle_id}
-                  onChange={(event) => setDraft((current) => ({ ...current, vehicle_id: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, vehicle_id: value }))}
                 >
-                  {vehicles.filter((vehicle) => !vehicle.team_id || vehicle.team_id === draft.team_id).map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.name} · {Math.round(vehicle.condition)}%
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue placeholder="Escolher veículo" /></SelectTrigger>
+                  <SelectContent>
+                    {vehicles.filter((vehicle) => !vehicle.team_id || vehicle.team_id === draft.team_id).map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.name} · {Math.round(vehicle.condition)}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Abordagem">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.approach_key}
-                  onChange={(event) => setDraft((current) => ({ ...current, approach_key: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, approach_key: value }))}
                 >
-                  {mastermind.approaches.map((approach) => (
-                    <option key={approach.key} value={approach.key} disabled={!approach.unlocked}>
-                      {approach.name}{!approach.unlocked ? ` · nível ${approach.unlock_rank}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {mastermind.approaches.map((approach) => (
+                      <SelectItem key={approach.key} value={approach.key} disabled={!approach.unlocked}>
+                        {approach.name}{!approach.unlocked ? ` · nível ${approach.unlock_rank}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Recetor da carga">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.fence_key}
-                  onChange={(event) => setDraft((current) => ({ ...current, fence_key: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, fence_key: value }))}
                 >
-                  {mastermind.fences.map((fence) => (
-                    <option key={fence.key} value={fence.key} disabled={!fence.unlocked}>
-                      {fence.name}{!fence.unlocked ? ` · nível ${fence.unlock_rank}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {mastermind.fences.map((fence) => (
+                      <SelectItem key={fence.key} value={fence.key} disabled={!fence.unlocked}>
+                        {fence.name}{!fence.unlocked ? ` · nível ${fence.unlock_rank}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
             </div>
             <label className="mt-3 block font-mono text-[10px] uppercase tracking-wider text-zinc-500">
@@ -585,11 +592,16 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
       <p className="mt-1 text-[10px] text-zinc-500">
         Envia uma equipa disponível para identificar e quebrar a rede que te está a seguir.
       </p>
-      <select aria-label="Selecionar equipa para contraemboscada" className={selectClass} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
-        {teams.map((team) => (
-          <option key={team.id} value={team.id}>{team.name} · {team.status}</option>
-        ))}
-      </select>
+      <Select value={teamId} onValueChange={setTeamId}>
+        <SelectTrigger size="compact" className="mt-2" aria-label="Selecionar equipa para contraemboscada">
+          <SelectValue placeholder="Escolher equipa" />
+        </SelectTrigger>
+        <SelectContent>
+          {teams.map((team) => (
+            <SelectItem key={team.id} value={team.id}>{team.name} · {team.status}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Button size="sm" variant="outline" className="h-9 text-[10px]" disabled={!bounty.value} onClick={onPay}>
           <Coins size={11} /> Pagar silêncio
