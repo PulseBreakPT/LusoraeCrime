@@ -289,9 +289,9 @@ const FollowChip = ({ name, onStop }) => {
     <div ref={ref} className="sub-follow-chip" data-testid="map-follow-chip">
       <span className="sub-follow-dot" aria-hidden="true" />
       A seguir {name}
-      <button type="button" data-testid="map-follow-stop" title="Parar de seguir" aria-label="Parar de seguir" onClick={onStop}>
+      <Button variant="bare" size="bare" type="button" data-testid="map-follow-stop" title="Parar de seguir" aria-label="Parar de seguir" onClick={onStop}>
         <X size={12} strokeWidth={2.5} />
-      </button>
+      </Button>
     </div>
   );
 };
