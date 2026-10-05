@@ -1,3 +1,4 @@
+import { Button } from "../ui/button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtMoney, chanceColor, CATEGORY_COLORS } from "../../lib/game";
 import { Radio, Crosshair, Siren, X } from "lucide-react";
@@ -153,7 +154,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
             </p>
           </div>
         </div>
-        <button
+        <Button variant="bare" size="bare"
           type="button"
           data-testid="liveops-finished-close"
           onClick={() => setFinished(null)}
@@ -161,7 +162,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
           aria-label="Fechar"
         >
           <X size={12} />
-        </button>
+        </Button>
       </div>
     );
   }
@@ -210,7 +211,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button
+          <Button variant="bare" size="bare"
             type="button"
             data-testid="liveops-follow"
             title="Seguir esta unidade no mapa"
@@ -218,7 +219,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
             className="rounded-full border border-white/10 p-1 text-zinc-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
           >
             <Crosshair size={11} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -229,7 +230,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
             const isSel = m.id === sel.id;
             const alert = m.chase_active || m.outcome === "police";
             return (
-              <button
+              <Button variant="bare" size="bare"
                 key={m.id}
                 type="button"
                 data-testid={`liveops-tab-${i}`}
@@ -240,7 +241,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
               >
                 {m.team_name}
                 {alert && <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -335,7 +336,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
                   ].filter(Boolean);
                   const neutral = effects.length === 0;
                   return (
-                    <button
+                    <Button variant="bare" size="bare"
                       key={option.id}
                       type="button"
                       data-testid={`liveops-decision-${option.id}`}
@@ -360,7 +361,7 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
                       <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">
                         {option.description}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
