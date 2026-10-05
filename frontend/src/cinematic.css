@@ -597,29 +597,6 @@ html.sub-reduced-motion .unit-car-moving .unit-car-body::before {
   animation: sub-fx-world-scan 7.8s linear infinite;
 }
 
-/* Fine moving scanlines remain visible without obscuring roads or labels. */
-.sub-vignette::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.22;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(255,255,255,.018) 0 1px,
-      transparent 1px 5px
-    ),
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      rgba(255,255,255,.028) 49%,
-      transparent 51%
-    );
-  background-size: 100% 5px, 100% 140px;
-  animation: sub-fx-scanline-fall 6.5s linear infinite;
-}
-
 /* Constant map breathing makes the world feel rendered, not static. */
 .sub-dark-map .leaflet-tile-pane {
   animation: sub-fx-map-breathe 7.2s ease-in-out infinite;
@@ -863,7 +840,6 @@ html.sub-reduced-motion .unit-car-moving .unit-car-body::before {
 
 /* Reduced motion leaves the visual treatment present but freezes the movement. */
 html.sub-reduced-motion .sub-vignette::before,
-html.sub-reduced-motion .sub-vignette::after,
 html.sub-reduced-motion .sub-dark-map .leaflet-tile-pane,
 html.sub-reduced-motion .sub-game-shell::after,
 html.sub-reduced-motion [data-testid="resource-bar"],
@@ -886,7 +862,6 @@ html.sub-reduced-motion .sub-toast {
 
 @media (prefers-reduced-motion: reduce) {
   .sub-vignette::before,
-  .sub-vignette::after,
   .sub-dark-map .leaflet-tile-pane,
   .sub-game-shell::after,
   [data-testid="resource-bar"],
