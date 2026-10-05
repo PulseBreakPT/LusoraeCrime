@@ -1,112 +1,172 @@
 /* ==========================================================================
-   SUBMUNDO — UNIFIED LIGHTING SYSTEM
-   Final visual layer: light leaks, blue/cyan ambience, semantic danger light,
-   controlled blur and a shared shadow hierarchy. No scanlines.
+   SUBMUNDO — UNIFIED RED LIGHTING SYSTEM V2
+   Red/black cinematic lighting across HUD, map, cards and modals.
+   Blue is reserved for police/emergency semantics. No scanlines.
    ========================================================================== */
 
 :root {
-  --sub-light-blue: #38bdf8;
-  --sub-light-cyan: #22d3ee;
   --sub-light-red: #ef4444;
+  --sub-light-red-hot: #f87171;
+  --sub-light-red-deep: #991b1b;
   --sub-light-amber: #f59e0b;
   --sub-light-green: #34d399;
+  --sub-police-blue: #3b82f6;
 
-  --sub-glow-blue-soft: rgba(56, 189, 248, 0.10);
-  --sub-glow-blue-mid: rgba(34, 211, 238, 0.20);
+  --sub-glow-red-faint: rgba(239, 68, 68, 0.045);
   --sub-glow-red-soft: rgba(239, 68, 68, 0.10);
-  --sub-glow-red-mid: rgba(239, 68, 68, 0.24);
-  --sub-glow-amber-soft: rgba(245, 158, 11, 0.10);
+  --sub-glow-red-mid: rgba(239, 68, 68, 0.20);
+  --sub-glow-red-strong: rgba(248, 113, 113, 0.34);
 
   --sub-shadow-float:
-    0 18px 52px rgba(0, 0, 0, 0.58),
-    0 4px 14px rgba(0, 0, 0, 0.32);
+    0 18px 52px rgba(0, 0, 0, 0.60),
+    0 4px 14px rgba(0, 0, 0, 0.34);
   --sub-shadow-panel:
-    0 30px 84px rgba(0, 0, 0, 0.72),
-    0 8px 28px rgba(0, 0, 0, 0.42);
-  --sub-shadow-blue:
-    0 0 0 1px rgba(56, 189, 248, 0.08),
-    0 0 24px rgba(34, 211, 238, 0.07);
+    0 32px 88px rgba(0, 0, 0, 0.76),
+    0 10px 30px rgba(0, 0, 0, 0.46);
   --sub-shadow-red:
     0 0 0 1px rgba(239, 68, 68, 0.12),
-    0 0 26px rgba(239, 68, 68, 0.08);
+    0 0 28px rgba(239, 68, 68, 0.085);
 
   --sub-blur-hud: 10px;
   --sub-blur-panel: 18px;
 }
 
+/* --------------------------------------------------------------------------
+   CORE MOTION
+   -------------------------------------------------------------------------- */
+
 @keyframes sub-light-leak-drift {
   0% {
-    transform: translate3d(-8%, -2%, 0) scale(1);
-    opacity: 0.58;
+    transform: translate3d(-9%, -3%, 0) scale(1);
+    opacity: .50;
   }
-  35% {
-    transform: translate3d(5%, 4%, 0) scale(1.08);
-    opacity: 0.82;
+  34% {
+    transform: translate3d(6%, 5%, 0) scale(1.08);
+    opacity: .82;
   }
-  70% {
-    transform: translate3d(12%, -4%, 0) scale(0.96);
-    opacity: 0.64;
+  68% {
+    transform: translate3d(13%, -4%, 0) scale(.97);
+    opacity: .62;
   }
   100% {
-    transform: translate3d(-8%, -2%, 0) scale(1);
-    opacity: 0.58;
+    transform: translate3d(-9%, -3%, 0) scale(1);
+    opacity: .50;
   }
 }
 
-@keyframes sub-blue-bloom {
+@keyframes sub-red-bloom {
   0%, 100% {
     box-shadow:
       var(--sub-shadow-float),
-      0 0 0 1px rgba(56, 189, 248, 0.06),
-      0 0 18px rgba(34, 211, 238, 0.04);
+      0 0 0 1px rgba(239,68,68,.065),
+      0 0 20px rgba(239,68,68,.05);
   }
   50% {
     box-shadow:
       var(--sub-shadow-float),
-      0 0 0 1px rgba(56, 189, 248, 0.14),
-      0 0 34px rgba(34, 211, 238, 0.12);
+      0 0 0 1px rgba(248,113,113,.16),
+      0 0 38px rgba(239,68,68,.14);
   }
 }
 
 @keyframes sub-light-rim {
-  0%, 100% { opacity: 0.32; filter: brightness(1); }
-  50% { opacity: 0.86; filter: brightness(1.35); }
+  0%, 100% { opacity: .30; filter: brightness(1); }
+  50% { opacity: .92; filter: brightness(1.35); }
 }
 
 @keyframes sub-glass-reflection {
-  from { background-position: 170% 0; }
-  to { background-position: -80% 0; }
-}
-
-@keyframes sub-map-blue-pulse {
-  0%, 100% {
-    filter:
-      drop-shadow(0 3px 6px rgba(0, 0, 0, 0.78))
-      drop-shadow(0 0 3px rgba(34, 211, 238, 0.10));
-  }
-  50% {
-    filter:
-      drop-shadow(0 4px 8px rgba(0, 0, 0, 0.84))
-      drop-shadow(0 0 9px rgba(34, 211, 238, 0.34));
-  }
+  from { background-position: 175% 0; }
+  to { background-position: -85% 0; }
 }
 
 @keyframes sub-control-light {
   0%, 100% {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.025),
-      0 3px 10px rgba(0, 0, 0, 0.28);
+      inset 0 1px 0 rgba(255,255,255,.025),
+      0 3px 10px rgba(0,0,0,.30);
   }
   50% {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.055),
-      0 4px 13px rgba(0, 0, 0, 0.34),
-      0 0 10px rgba(56, 189, 248, 0.035);
+      inset 0 1px 0 rgba(255,255,255,.055),
+      0 4px 14px rgba(0,0,0,.36),
+      0 0 11px rgba(239,68,68,.055);
   }
 }
 
+@keyframes sub-red-map-pulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 3px 6px rgba(0,0,0,.80))
+      drop-shadow(0 0 3px rgba(239,68,68,.11));
+  }
+  50% {
+    filter:
+      drop-shadow(0 4px 8px rgba(0,0,0,.86))
+      drop-shadow(0 0 10px rgba(239,68,68,.35));
+  }
+}
+
+@keyframes sub-modal-rim-run {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
+@keyframes sub-modal-inner-breathe {
+  0%, 100% { opacity: .30; transform: scale(.985); }
+  50% { opacity: .78; transform: scale(1.01); }
+}
+
+@keyframes sub-modal-title-glow {
+  0%, 100% {
+    text-shadow:
+      0 2px 8px rgba(0,0,0,.80),
+      0 0 0 rgba(239,68,68,0);
+  }
+  50% {
+    text-shadow:
+      0 2px 8px rgba(0,0,0,.86),
+      0 0 12px rgba(239,68,68,.22);
+  }
+}
+
+@keyframes sub-modal-icon-glow {
+  0%, 100% {
+    filter:
+      drop-shadow(0 2px 4px rgba(0,0,0,.74))
+      drop-shadow(0 0 3px rgba(239,68,68,.12));
+  }
+  50% {
+    filter:
+      drop-shadow(0 2px 5px rgba(0,0,0,.84))
+      drop-shadow(0 0 9px rgba(248,113,113,.46));
+  }
+}
+
+@keyframes sub-close-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.02),
+      0 0 0 rgba(239,68,68,0);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.05),
+      0 0 13px rgba(239,68,68,.08);
+  }
+}
+
+@keyframes sub-overlay-aura {
+  0%, 100% { opacity: .72; }
+  50% { opacity: 1; }
+}
+
+@keyframes sub-modal-corner-pulse {
+  0%, 100% { opacity: .25; filter: brightness(1); }
+  50% { opacity: .88; filter: brightness(1.45); }
+}
+
 /* --------------------------------------------------------------------------
-   WORLD LIGHTING — moving light leaks, never scanlines
+   WORLD LIGHTING — RED LIGHT LEAKS
    -------------------------------------------------------------------------- */
 
 .sub-vignette::after {
@@ -114,66 +174,70 @@
   position: absolute;
   inset: -18%;
   pointer-events: none;
-  opacity: 0.72;
+  opacity: .75;
   background:
     radial-gradient(
-      42rem 30rem at 12% 18%,
-      rgba(56, 189, 248, 0.105),
-      rgba(34, 211, 238, 0.035) 34%,
+      44rem 31rem at 11% 17%,
+      rgba(239,68,68,.14),
+      rgba(153,27,27,.055) 34%,
       transparent 72%
     ),
     radial-gradient(
-      36rem 26rem at 88% 74%,
-      rgba(14, 116, 144, 0.085),
+      39rem 28rem at 90% 74%,
+      rgba(185,28,28,.115),
       transparent 70%
     ),
     radial-gradient(
-      30rem 22rem at 82% 8%,
-      rgba(245, 158, 11, 0.045),
+      28rem 20rem at 82% 7%,
+      rgba(248,113,113,.07),
       transparent 72%
     );
-  filter: blur(24px) saturate(118%);
+  filter: blur(25px) saturate(124%);
   mix-blend-mode: screen;
-  animation: sub-light-leak-drift 12s ease-in-out infinite;
+  animation: sub-light-leak-drift 11.5s ease-in-out infinite;
   will-change: transform, opacity;
 }
 
-/* Danger gradually replaces the cool blue leak with red at the screen edges. */
 .sub-game-shell[data-heat-tier="2"] .sub-vignette::after {
+  opacity: .82;
   background:
-    radial-gradient(42rem 30rem at 12% 18%, rgba(56,189,248,.09), transparent 72%),
-    radial-gradient(38rem 28rem at 92% 72%, rgba(239,68,68,.075), transparent 70%);
+    radial-gradient(44rem 31rem at 10% 18%, rgba(239,68,68,.16), transparent 72%),
+    radial-gradient(42rem 29rem at 92% 72%, rgba(220,38,38,.15), transparent 69%);
 }
 
 .sub-game-shell[data-heat-tier="3"] .sub-vignette::after {
+  opacity: .90;
   background:
-    radial-gradient(38rem 28rem at 10% 20%, rgba(56,189,248,.07), transparent 72%),
-    radial-gradient(42rem 30rem at 94% 70%, rgba(239,68,68,.12), transparent 68%);
+    radial-gradient(46rem 33rem at 8% 18%, rgba(239,68,68,.18), transparent 70%),
+    radial-gradient(46rem 32rem at 94% 68%, rgba(220,38,38,.19), transparent 67%);
+  animation-duration: 8.5s;
 }
 
 .sub-game-shell[data-heat-tier="4"] .sub-vignette::after {
+  opacity: 1;
   background:
-    radial-gradient(34rem 26rem at 8% 20%, rgba(56,189,248,.055), transparent 72%),
-    radial-gradient(48rem 34rem at 94% 66%, rgba(239,68,68,.18), transparent 66%);
-  animation-duration: 7s;
+    radial-gradient(48rem 34rem at 6% 18%, rgba(248,113,113,.21), transparent 68%),
+    radial-gradient(52rem 36rem at 96% 64%, rgba(220,38,38,.25), transparent 65%);
+  animation-duration: 6.5s;
 }
 
 /* --------------------------------------------------------------------------
-   HUD — one coherent shadow / blur language
+   HUD — RED/BLACK CINEMATIC GLASS
    -------------------------------------------------------------------------- */
 
 .sub-topbar {
-  border-color: rgba(125, 211, 252, 0.105) !important;
+  border-color: rgba(248,113,113,.13) !important;
   background:
-    linear-gradient(180deg, rgba(16, 20, 27, 0.91), rgba(7, 8, 12, 0.94)) !important;
+    radial-gradient(95% 130% at 9% 0%, rgba(239,68,68,.085), transparent 56%),
+    linear-gradient(180deg, rgba(19,12,14,.92), rgba(7,7,10,.95)) !important;
   box-shadow:
     var(--sub-shadow-float),
-    0 0 0 1px rgba(56, 189, 248, 0.055),
-    0 0 26px rgba(34, 211, 238, 0.075),
-    inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
-  backdrop-filter: blur(var(--sub-blur-hud)) saturate(122%) !important;
-  -webkit-backdrop-filter: blur(var(--sub-blur-hud)) saturate(122%) !important;
-  animation: sub-blue-bloom 5.2s ease-in-out infinite;
+    0 0 0 1px rgba(239,68,68,.07),
+    0 0 28px rgba(239,68,68,.09),
+    inset 0 1px 0 rgba(255,255,255,.055) !important;
+  backdrop-filter: blur(var(--sub-blur-hud)) saturate(124%) !important;
+  -webkit-backdrop-filter: blur(var(--sub-blur-hud)) saturate(124%) !important;
+  animation: sub-red-bloom 5s ease-in-out infinite;
 }
 
 .sub-topbar::before {
@@ -188,12 +252,12 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(56,189,248,.15) 18%,
-    rgba(125,211,252,.72) 50%,
-    rgba(56,189,248,.15) 82%,
+    rgba(239,68,68,.16) 18%,
+    rgba(248,113,113,.82) 50%,
+    rgba(239,68,68,.16) 82%,
     transparent
   ) !important;
-  animation: sub-light-rim 3.8s ease-in-out infinite;
+  animation: sub-light-rim 3.6s ease-in-out infinite;
 }
 
 .sub-topbar::after {
@@ -202,42 +266,35 @@
 
 .sub-resource-icon svg {
   filter:
-    drop-shadow(0 2px 3px rgba(0,0,0,.76))
+    drop-shadow(0 2px 3px rgba(0,0,0,.78))
     drop-shadow(0 0 5px currentColor);
 }
 
 .sub-dock {
   filter:
-    drop-shadow(0 12px 20px rgba(0,0,0,.52))
-    drop-shadow(0 0 13px rgba(34,211,238,.07));
+    drop-shadow(0 12px 21px rgba(0,0,0,.54))
+    drop-shadow(0 0 14px rgba(239,68,68,.10));
 }
 
 .sub-dock .sub-hud-btn {
-  text-shadow: 0 2px 8px rgba(0,0,0,.78);
+  text-shadow: 0 2px 8px rgba(0,0,0,.80);
 }
 
 .sub-dock .sub-hud-btn svg {
   filter:
-    drop-shadow(0 2px 4px rgba(0,0,0,.80))
-    drop-shadow(0 0 5px rgba(56,189,248,.16));
+    drop-shadow(0 2px 4px rgba(0,0,0,.82))
+    drop-shadow(0 0 5px rgba(239,68,68,.20));
 }
 
 .sub-dock .sub-hud-btn-active svg {
   filter:
-    drop-shadow(0 2px 4px rgba(0,0,0,.85))
-    drop-shadow(0 0 8px rgba(125,211,252,.50))
-    drop-shadow(0 0 14px rgba(34,211,238,.18));
-}
-
-.sub-game-shell[data-heat-tier="3"] .sub-dock,
-.sub-game-shell[data-heat-tier="4"] .sub-dock {
-  filter:
-    drop-shadow(0 12px 20px rgba(0,0,0,.56))
-    drop-shadow(0 0 12px rgba(239,68,68,.12));
+    drop-shadow(0 2px 4px rgba(0,0,0,.86))
+    drop-shadow(0 0 9px rgba(248,113,113,.60))
+    drop-shadow(0 0 16px rgba(239,68,68,.24));
 }
 
 /* --------------------------------------------------------------------------
-   PANELS / CARDS — smoky glass + edge lights + deep shadows
+   SHARED SURFACES — ALL RED-DOMINANT
    -------------------------------------------------------------------------- */
 
 .sub-sheet-panel,
@@ -245,49 +302,40 @@
 .sub-nav-tray,
 .sub-opp-card,
 .sub-map-tip {
-  border-color: rgba(125, 211, 252, 0.105) !important;
-  background-color: rgba(7, 9, 13, 0.89) !important;
+  border-color: rgba(248,113,113,.12) !important;
+  background-color: rgba(9,7,9,.90) !important;
   box-shadow:
     var(--sub-shadow-panel),
-    0 0 0 1px rgba(56,189,248,.045),
-    0 0 34px rgba(34,211,238,.055),
+    0 0 0 1px rgba(239,68,68,.055),
+    0 0 36px rgba(239,68,68,.075),
     inset 0 1px 0 rgba(255,255,255,.055) !important;
-  backdrop-filter: blur(var(--sub-blur-panel)) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(var(--sub-blur-panel)) saturate(125%) !important;
+  backdrop-filter: blur(var(--sub-blur-panel)) saturate(126%) !important;
+  -webkit-backdrop-filter: blur(var(--sub-blur-panel)) saturate(126%) !important;
 }
 
 .sub-nav-tray {
   background:
-    radial-gradient(120% 90% at 12% 0%, rgba(56,189,248,.075), transparent 48%),
-    linear-gradient(180deg, rgba(13,16,22,.96), rgba(7,8,11,.94)) !important;
-}
-
-.sub-sheet-panel,
-.sub-menu-modal {
-  background:
-    radial-gradient(90% 46% at 12% 0%, rgba(56,189,248,.055), transparent 58%),
-    radial-gradient(75% 42% at 92% 100%, rgba(239,68,68,.035), transparent 62%),
-    rgba(7,8,11,.91) !important;
+    radial-gradient(120% 90% at 12% 0%, rgba(239,68,68,.095), transparent 49%),
+    linear-gradient(180deg, rgba(18,11,14,.96), rgba(7,7,10,.95)) !important;
 }
 
 .sub-opp-card {
   background:
-    radial-gradient(95% 46% at 10% 0%, color-mix(in srgb, var(--mk, #ef4444) 9%, transparent), transparent 58%),
-    radial-gradient(70% 38% at 96% 100%, rgba(56,189,248,.055), transparent 65%),
-    rgba(7,8,11,.92) !important;
+    radial-gradient(95% 46% at 10% 0%, color-mix(in srgb, var(--mk, #ef4444) 12%, transparent), transparent 58%),
+    radial-gradient(70% 38% at 96% 100%, rgba(239,68,68,.065), transparent 65%),
+    rgba(8,7,10,.93) !important;
 }
 
 .sub-map-tip {
   background:
-    radial-gradient(100% 90% at 12% 0%, rgba(56,189,248,.065), transparent 55%),
-    rgba(5,7,10,.92) !important;
+    radial-gradient(100% 90% at 12% 0%, rgba(239,68,68,.085), transparent 55%),
+    rgba(6,6,9,.94) !important;
   box-shadow:
-    0 16px 42px rgba(0,0,0,.68),
-    0 0 0 1px rgba(125,211,252,.09),
-    0 0 18px rgba(34,211,238,.055) !important;
+    0 16px 42px rgba(0,0,0,.70),
+    0 0 0 1px rgba(248,113,113,.11),
+    0 0 20px rgba(239,68,68,.07) !important;
 }
 
-/* Slow glass reflection shared by reusable surfaces. */
 .sub-nav-tray::after,
 .sub-opp-card::after {
   content: "";
@@ -301,14 +349,14 @@
       115deg,
       transparent 0%,
       transparent 42%,
-      rgba(255,255,255,.035) 47%,
-      rgba(125,211,252,.07) 50%,
-      rgba(255,255,255,.025) 54%,
+      rgba(255,255,255,.025) 47%,
+      rgba(248,113,113,.09) 50%,
+      rgba(255,255,255,.02) 54%,
       transparent 60%,
       transparent 100%
     );
   background-size: 270% 100%;
-  animation: sub-glass-reflection 9s linear infinite;
+  animation: sub-glass-reflection 8.5s linear infinite;
 }
 
 .sub-nav-tray > *,
@@ -317,35 +365,242 @@
   z-index: 1;
 }
 
-/* Reusable cards receive consistent lift and cyan under-light. */
-.sub-game-shell .sub-card,
-.sub-operation-row,
-.sub-settings-row,
-.sub-kpi,
-.sub-kpi-cell {
+/* --------------------------------------------------------------------------
+   MODALS — EXTRA SSS VISUAL LAYER
+   Overrides the neutralised pseudo-elements from App.css.
+   -------------------------------------------------------------------------- */
+
+.sub-modal-overlay {
+  background:
+    radial-gradient(
+      70% 54% at 50% 50%,
+      rgba(127,29,29,.16),
+      rgba(0,0,0,.72) 58%,
+      rgba(0,0,0,.84) 100%
+    ) !important;
+  backdrop-filter: blur(5px) saturate(108%) !important;
+  -webkit-backdrop-filter: blur(5px) saturate(108%) !important;
+}
+
+.sub-modal-overlay[data-state="open"] {
+  animation:
+    sub-overlay-enter var(--sub-motion-base) var(--sub-ease-out) both,
+    sub-overlay-aura 4.2s ease-in-out .25s infinite !important;
+}
+
+.sub-sheet-panel,
+.sub-menu-modal {
+  border-color: rgba(248,113,113,.18) !important;
+  background:
+    radial-gradient(100% 54% at 12% 0%, rgba(239,68,68,.115), transparent 58%),
+    radial-gradient(80% 46% at 96% 100%, rgba(153,27,27,.075), transparent 62%),
+    linear-gradient(180deg, rgba(17,10,13,.955), rgba(7,7,10,.96)) !important;
   box-shadow:
-    0 8px 24px rgba(0,0,0,.30),
-    0 2px 8px rgba(0,0,0,.20),
+    0 38px 110px rgba(0,0,0,.82),
+    0 14px 42px rgba(0,0,0,.52),
+    0 0 0 1px rgba(239,68,68,.095),
+    0 0 42px rgba(239,68,68,.11),
+    0 0 90px rgba(127,29,29,.07),
+    inset 0 1px 0 rgba(255,255,255,.065),
+    inset 0 -1px 0 rgba(239,68,68,.055) !important;
+}
+
+/* Moving reflection inside modal. */
+.sub-sheet-panel::before,
+.sub-menu-modal::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  border-radius: inherit !important;
+  pointer-events: none !important;
+  background:
+    linear-gradient(
+      118deg,
+      transparent 0%,
+      transparent 39%,
+      rgba(255,255,255,.018) 44%,
+      rgba(248,113,113,.075) 49%,
+      rgba(255,255,255,.026) 52%,
+      transparent 59%,
+      transparent 100%
+    ) !important;
+  background-size: 285% 100% !important;
+  animation: sub-glass-reflection 10s linear infinite !important;
+}
+
+/* Internal red bloom + vignette. */
+.sub-sheet-panel::after,
+.sub-menu-modal::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 7px !important;
+  z-index: 0 !important;
+  border-radius: calc(var(--sub-modal-radius) - 7px) !important;
+  pointer-events: none !important;
+  border: 1px solid rgba(239,68,68,.065) !important;
+  background:
+    radial-gradient(60% 24% at 50% 0%, rgba(248,113,113,.075), transparent 72%),
+    radial-gradient(45% 30% at 100% 100%, rgba(153,27,27,.06), transparent 75%) !important;
+  box-shadow:
+    inset 0 0 30px rgba(239,68,68,.025),
+    0 0 24px rgba(239,68,68,.035) !important;
+  animation: sub-modal-inner-breathe 4.8s ease-in-out infinite !important;
+}
+
+.sub-sheet-panel > *,
+.sub-menu-modal > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header gets a darker plate, hot red upper rim and depth separation. */
+.sub-modal-header,
+.sub-menu-modal-header,
+.sub-sheet-panel .sub-sheet-scroll > [class*="sticky"][class*="top-0"] {
+  background:
+    radial-gradient(100% 180% at 10% 0%, rgba(239,68,68,.105), transparent 52%),
+    rgba(10,8,11,.94) !important;
+  border-bottom-color: rgba(239,68,68,.10) !important;
+  box-shadow:
+    0 10px 28px rgba(0,0,0,.30),
+    inset 0 -1px 0 rgba(239,68,68,.07),
+    inset 0 1px 0 rgba(255,255,255,.035) !important;
+  backdrop-filter: blur(12px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(118%) !important;
+}
+
+.sub-modal-title,
+.sub-sheet-panel .sub-sheet-title {
+  color: #fafafa !important;
+  animation: sub-modal-title-glow 4s ease-in-out infinite;
+}
+
+.sub-modal-title svg,
+.sub-sheet-panel .sub-sheet-title svg,
+.sub-modal-header svg,
+.sub-menu-modal-header svg {
+  color: #f87171 !important;
+  animation: sub-modal-icon-glow 3.2s ease-in-out infinite;
+}
+
+/* Strong top energy rim on every modal. */
+.sub-sheet-panel .sub-sheet-scroll::before,
+.sub-menu-modal > div:first-of-type::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 7%;
+  right: 7%;
+  height: 1px;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(239,68,68,.20) 20%,
+      rgba(248,113,113,.92) 48%,
+      rgba(255,220,220,.98) 50%,
+      rgba(248,113,113,.92) 52%,
+      rgba(239,68,68,.20) 80%,
+      transparent
+    );
+  background-size: 260% 100%;
+  animation: sub-modal-rim-run 4.4s linear infinite;
+}
+
+/* Modal corners: small cinematic energy brackets. */
+.sub-sheet-panel .sub-sheet-scroll {
+  position: relative !important;
+}
+
+.sub-sheet-panel .sub-sheet-scroll::after {
+  content: "";
+  position: sticky;
+  display: block;
+  left: calc(100% - 18px);
+  bottom: 8px;
+  width: 12px;
+  height: 12px;
+  z-index: 4;
+  pointer-events: none;
+  border-right: 1px solid rgba(248,113,113,.60);
+  border-bottom: 1px solid rgba(248,113,113,.60);
+  filter: drop-shadow(0 0 5px rgba(239,68,68,.32));
+  animation: sub-modal-corner-pulse 3.2s ease-in-out infinite;
+}
+
+/* Close button is no longer visually dead. */
+.sub-sheet-panel .sub-sheet-close,
+.sub-menu-modal > button {
+  border-color: rgba(239,68,68,.08) !important;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(239,68,68,.07), transparent 66%),
+    rgba(255,255,255,.012) !important;
+  color: rgba(244,244,245,.72) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 4px 12px rgba(0,0,0,.24) !important;
+  animation: sub-close-pulse 4.2s ease-in-out infinite;
+}
+
+.sub-sheet-panel .sub-sheet-close:hover,
+.sub-sheet-panel .sub-sheet-close:focus-visible,
+.sub-menu-modal > button:hover,
+.sub-menu-modal > button:focus-visible {
+  border-color: rgba(248,113,113,.34) !important;
+  background: rgba(239,68,68,.095) !important;
+  color: #fff !important;
+  box-shadow:
+    0 7px 18px rgba(0,0,0,.34),
+    0 0 0 1px rgba(239,68,68,.12),
+    0 0 18px rgba(239,68,68,.13),
+    inset 0 1px 0 rgba(255,255,255,.055) !important;
+}
+
+/* Scroll track gets a subtle red light channel inside modals. */
+.sub-sheet-panel .sub-sheet-scroll::-webkit-scrollbar-thumb,
+.sub-menu-modal ::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(180deg, rgba(248,113,113,.54), rgba(127,29,29,.60)) !important;
+  box-shadow: 0 0 8px rgba(239,68,68,.16);
+}
+
+/* Content cards inside modals inherit deeper red under-light. */
+.sub-sheet-panel .sub-card,
+.sub-menu-modal .sub-card,
+.sub-sheet-panel .sub-kpi,
+.sub-sheet-panel .sub-kpi-cell,
+.sub-sheet-panel .sub-operation-row {
+  border-color: rgba(239,68,68,.075) !important;
+  box-shadow:
+    0 9px 25px rgba(0,0,0,.34),
+    0 2px 9px rgba(0,0,0,.22),
+    0 0 0 1px rgba(239,68,68,.025),
     inset 0 1px 0 rgba(255,255,255,.025) !important;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .sub-game-shell .sub-card:hover,
-  .sub-operation-row:hover,
-  .sub-settings-row:hover,
-  .sub-kpi:hover,
-  .sub-kpi-cell:hover {
+  .sub-sheet-panel .sub-card:hover,
+  .sub-menu-modal .sub-card:hover,
+  .sub-sheet-panel .sub-kpi:hover,
+  .sub-sheet-panel .sub-kpi-cell:hover,
+  .sub-sheet-panel .sub-operation-row:hover {
+    border-color: rgba(248,113,113,.18) !important;
     box-shadow:
-      0 13px 32px rgba(0,0,0,.42),
-      0 4px 12px rgba(0,0,0,.25),
-      0 0 0 1px rgba(56,189,248,.075),
-      0 0 18px rgba(34,211,238,.055),
-      inset 0 1px 0 rgba(255,255,255,.05) !important;
+      0 14px 36px rgba(0,0,0,.44),
+      0 5px 14px rgba(0,0,0,.28),
+      0 0 0 1px rgba(239,68,68,.07),
+      0 0 20px rgba(239,68,68,.065),
+      inset 0 1px 0 rgba(255,255,255,.045) !important;
   }
 }
 
 /* --------------------------------------------------------------------------
-   CONTROLS — subtle blue tech light, semantic focus
+   CONTROLS — RED TECH LIGHT
    -------------------------------------------------------------------------- */
 
 .sub-game-shell .sub-btn:not(:disabled),
@@ -354,154 +609,135 @@
 .sub-game-shell [role="combobox"] {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.025),
-    0 3px 10px rgba(0,0,0,.28) !important;
+    0 3px 10px rgba(0,0,0,.30) !important;
 }
 
 .sub-game-shell .sub-btn:not(:disabled) {
-  animation: sub-control-light 4.6s ease-in-out infinite;
+  animation: sub-control-light 4.5s ease-in-out infinite;
 }
 
 .sub-game-shell .sub-btn:not(:disabled):hover,
 .sub-game-shell [role="combobox"]:hover {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.06),
-    0 7px 18px rgba(0,0,0,.36),
-    0 0 0 1px rgba(56,189,248,.10),
-    0 0 14px rgba(34,211,238,.06) !important;
+    0 7px 18px rgba(0,0,0,.38),
+    0 0 0 1px rgba(239,68,68,.12),
+    0 0 15px rgba(239,68,68,.08) !important;
 }
 
 .sub-game-shell input:focus,
 .sub-game-shell textarea:focus,
 .sub-game-shell [role="combobox"]:focus-visible {
-  border-color: rgba(56,189,248,.38) !important;
+  border-color: rgba(248,113,113,.42) !important;
   box-shadow:
-    0 0 0 1px rgba(56,189,248,.22),
-    0 0 0 4px rgba(34,211,238,.065),
-    0 8px 22px rgba(0,0,0,.40) !important;
+    0 0 0 1px rgba(239,68,68,.24),
+    0 0 0 4px rgba(239,68,68,.07),
+    0 8px 22px rgba(0,0,0,.42) !important;
 }
 
 /* --------------------------------------------------------------------------
-   MAP LIGHTING — blue navigation light, red danger, amber return
+   MAP — RED LIGHTING, BLUE ONLY FOR POLICE
    -------------------------------------------------------------------------- */
 
 .hq-pin {
   filter:
-    drop-shadow(0 3px 5px rgba(0,0,0,.84))
-    drop-shadow(0 0 6px rgba(125,211,252,.48))
-    drop-shadow(0 0 14px rgba(34,211,238,.18)) !important;
+    drop-shadow(0 3px 5px rgba(0,0,0,.86))
+    drop-shadow(0 0 7px rgba(248,113,113,.50))
+    drop-shadow(0 0 15px rgba(239,68,68,.22)) !important;
 }
 
 .prop-pin {
   filter:
-    drop-shadow(0 3px 5px rgba(0,0,0,.74))
-    drop-shadow(0 0 5px rgba(56,189,248,.22));
+    drop-shadow(0 3px 5px rgba(0,0,0,.76))
+    drop-shadow(0 0 6px rgba(239,68,68,.26));
 }
 
 .opp-pin {
   animation:
     sub-fx-marker-pulse 3.6s ease-in-out infinite,
-    sub-map-blue-pulse 4.8s ease-in-out infinite;
+    sub-red-map-pulse 4.6s ease-in-out infinite;
 }
 
 .opp-pin-selected {
   box-shadow:
-    0 7px 18px rgba(0,0,0,.74),
-    0 0 0 1px color-mix(in srgb, var(--mk, #fff) 62%, transparent),
-    0 0 18px color-mix(in srgb, var(--mk, #fff) 46%, transparent),
-    0 0 30px rgba(34,211,238,.09) !important;
+    0 7px 18px rgba(0,0,0,.76),
+    0 0 0 1px color-mix(in srgb, var(--mk, #ef4444) 65%, transparent),
+    0 0 18px color-mix(in srgb, var(--mk, #ef4444) 48%, transparent),
+    0 0 32px rgba(239,68,68,.12) !important;
 }
 
 .unit-car-body {
   box-shadow:
-    0 3px 7px rgba(0,0,0,.78),
-    0 0 7px color-mix(in srgb, var(--mk, #22d3ee) 44%, transparent),
-    0 0 14px color-mix(in srgb, var(--mk, #22d3ee) 18%, transparent) !important;
+    0 3px 7px rgba(0,0,0,.80),
+    0 0 8px rgba(239,68,68,.34),
+    0 0 16px rgba(239,68,68,.13) !important;
 }
 
 .unit-car-returning .unit-car-body {
   box-shadow:
-    0 3px 7px rgba(0,0,0,.78),
-    0 0 8px rgba(245,158,11,.42),
-    0 0 16px rgba(245,158,11,.16) !important;
+    0 3px 7px rgba(0,0,0,.80),
+    0 0 8px rgba(245,158,11,.44),
+    0 0 16px rgba(245,158,11,.17) !important;
 }
 
 .unit-car-chased .unit-car-body {
   box-shadow:
-    0 3px 7px rgba(0,0,0,.82),
-    0 0 10px rgba(239,68,68,.68),
-    0 0 22px rgba(239,68,68,.28) !important;
+    0 3px 7px rgba(0,0,0,.84),
+    0 0 11px rgba(239,68,68,.72),
+    0 0 24px rgba(239,68,68,.32) !important;
 }
 
 .op-pin {
   box-shadow:
-    0 3px 7px rgba(0,0,0,.76),
-    0 0 7px rgba(125,211,252,.30),
-    0 0 13px rgba(34,211,238,.10) !important;
+    0 3px 7px rgba(0,0,0,.78),
+    0 0 7px rgba(248,113,113,.34),
+    0 0 14px rgba(239,68,68,.13) !important;
 }
 
 .op-leader {
   box-shadow:
-    0 3px 7px rgba(0,0,0,.78),
-    0 0 8px rgba(245,158,11,.62),
-    0 0 16px rgba(245,158,11,.20) !important;
+    0 3px 7px rgba(0,0,0,.80),
+    0 0 8px rgba(245,158,11,.64),
+    0 0 16px rgba(245,158,11,.22) !important;
 }
 
+/* Police remains blue/red because that color carries gameplay meaning. */
 .police-lights .police-car-body,
 .police-pursuit .police-car-body {
   box-shadow:
-    0 3px 8px rgba(0,0,0,.82),
-    -6px 0 12px rgba(59,130,246,.65),
-    6px 0 12px rgba(239,68,68,.52),
-    0 0 24px rgba(59,130,246,.22) !important;
+    0 3px 8px rgba(0,0,0,.84),
+    -6px 0 12px rgba(59,130,246,.68),
+    6px 0 12px rgba(239,68,68,.56),
+    0 0 24px rgba(59,130,246,.23) !important;
 }
 
-.leaflet-overlay-pane path.sub-route-line-outbound {
+.leaflet-overlay-pane path.sub-route-line:not(.sub-route-line-returning) {
   filter:
-    drop-shadow(0 0 2px rgba(255,255,255,.34))
-    drop-shadow(0 0 5px rgba(56,189,248,.42))
-    drop-shadow(0 0 10px rgba(34,211,238,.14));
+    drop-shadow(0 0 2px rgba(255,255,255,.30))
+    drop-shadow(0 0 6px rgba(248,113,113,.45))
+    drop-shadow(0 0 11px rgba(239,68,68,.17));
 }
 
 .leaflet-overlay-pane path.sub-route-line-returning {
   filter:
     drop-shadow(0 0 2px rgba(255,255,255,.28))
-    drop-shadow(0 0 6px rgba(245,158,11,.46))
-    drop-shadow(0 0 11px rgba(245,158,11,.15));
+    drop-shadow(0 0 6px rgba(245,158,11,.48))
+    drop-shadow(0 0 11px rgba(245,158,11,.16));
 }
 
 /* --------------------------------------------------------------------------
-   SEMANTIC LIGHT — danger becomes red, normal UI remains cool blue
+   TOASTS / NOTIFICATIONS
    -------------------------------------------------------------------------- */
 
-.sub-game-shell[data-heat-tier="3"] .sub-topbar,
-.sub-game-shell[data-heat-tier="4"] .sub-topbar {
-  border-color: rgba(239,68,68,.15) !important;
-  box-shadow:
-    var(--sub-shadow-float),
-    0 0 0 1px rgba(239,68,68,.08),
-    0 0 28px rgba(239,68,68,.09),
-    inset 0 1px 0 rgba(255,255,255,.05) !important;
-}
-
-.sub-game-shell[data-heat-tier="4"] .sub-sheet-panel,
-.sub-game-shell[data-heat-tier="4"] .sub-menu-modal {
-  box-shadow:
-    var(--sub-shadow-panel),
-    0 0 0 1px rgba(239,68,68,.08),
-    0 0 36px rgba(239,68,68,.065),
-    inset 0 1px 0 rgba(255,255,255,.05) !important;
-}
-
-/* Toasts inherit the same glass/shadow hierarchy. */
 .sub-toast {
-  border-color: rgba(125,211,252,.11) !important;
+  border-color: rgba(248,113,113,.13) !important;
   background:
-    radial-gradient(100% 100% at 10% 0%, rgba(56,189,248,.06), transparent 55%),
-    rgba(8,9,12,.94) !important;
+    radial-gradient(100% 100% at 10% 0%, rgba(239,68,68,.085), transparent 55%),
+    rgba(9,7,10,.95) !important;
   box-shadow:
-    0 16px 44px rgba(0,0,0,.62),
-    0 0 0 1px rgba(56,189,248,.055),
-    0 0 18px rgba(34,211,238,.045),
+    0 16px 44px rgba(0,0,0,.64),
+    0 0 0 1px rgba(239,68,68,.065),
+    0 0 20px rgba(239,68,68,.06),
     inset 0 1px 0 rgba(255,255,255,.045) !important;
   backdrop-filter: blur(14px) saturate(120%) !important;
   -webkit-backdrop-filter: blur(14px) saturate(120%) !important;
@@ -518,9 +754,9 @@
   }
 
   .sub-vignette::after {
-    filter: blur(18px) saturate(112%);
-    opacity: .58;
-    animation-duration: 15s;
+    filter: blur(18px) saturate(116%);
+    opacity: .62;
+    animation-duration: 14s;
   }
 
   .sub-sheet-panel,
@@ -529,10 +765,15 @@
   .sub-opp-card,
   .sub-map-tip {
     box-shadow:
-      0 22px 56px rgba(0,0,0,.66),
-      0 0 0 1px rgba(56,189,248,.045),
-      0 0 20px rgba(34,211,238,.04),
+      0 24px 60px rgba(0,0,0,.69),
+      0 0 0 1px rgba(239,68,68,.06),
+      0 0 22px rgba(239,68,68,.055),
       inset 0 1px 0 rgba(255,255,255,.04) !important;
+  }
+
+  .sub-sheet-panel::after,
+  .sub-menu-modal::after {
+    inset: 5px !important;
   }
 }
 
@@ -541,6 +782,16 @@ html.sub-reduced-motion .sub-topbar,
 html.sub-reduced-motion .sub-topbar::before,
 html.sub-reduced-motion .sub-nav-tray::after,
 html.sub-reduced-motion .sub-opp-card::after,
+html.sub-reduced-motion .sub-sheet-panel::before,
+html.sub-reduced-motion .sub-sheet-panel::after,
+html.sub-reduced-motion .sub-menu-modal::before,
+html.sub-reduced-motion .sub-menu-modal::after,
+html.sub-reduced-motion .sub-modal-title,
+html.sub-reduced-motion .sub-sheet-panel .sub-sheet-title,
+html.sub-reduced-motion .sub-modal-title svg,
+html.sub-reduced-motion .sub-sheet-panel .sub-sheet-title svg,
+html.sub-reduced-motion .sub-sheet-panel .sub-sheet-close,
+html.sub-reduced-motion .sub-menu-modal > button,
 html.sub-reduced-motion .sub-game-shell .sub-btn:not(:disabled),
 html.sub-reduced-motion .opp-pin {
   animation: none !important;
@@ -552,8 +803,22 @@ html.sub-reduced-motion .opp-pin {
   .sub-topbar::before,
   .sub-nav-tray::after,
   .sub-opp-card::after,
+  .sub-sheet-panel::before,
+  .sub-sheet-panel::after,
+  .sub-menu-modal::before,
+  .sub-menu-modal::after,
+  .sub-modal-title,
+  .sub-sheet-panel .sub-sheet-title,
+  .sub-modal-title svg,
+  .sub-sheet-panel .sub-sheet-title svg,
+  .sub-sheet-panel .sub-sheet-close,
+  .sub-menu-modal > button,
   .sub-game-shell .sub-btn:not(:disabled),
   .opp-pin {
+    animation: none !important;
+  }
+
+  .sub-modal-overlay[data-state="open"] {
     animation: none !important;
   }
 }
