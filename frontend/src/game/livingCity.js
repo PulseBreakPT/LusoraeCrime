@@ -1,4 +1,4 @@
-import { cityBusinessCap, guardReward } from "./economyDirector";
+import { cityBusinessCap, guardReward, passivePortfolioScale } from "./economyDirector";
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const nowIso = () => new Date().toISOString();
@@ -244,6 +244,15 @@ const businessProjection=(b)=>{
   const hours=clamp((Date.now()-last)/3600000,0,168),level=Math.max(1,Number(b.level||1)),eff=clamp(Number(b.condition??100)/100,.35,1.35);
   return {hours:Number(hours.toFixed(3)),clean:Math.floor((cfg.clean_h||0)*level*hours*eff),dirty:Math.floor((cfg.dirty_h||0)*level*hours*eff),heat:Number(((cfg.heat_h||0)*level*hours).toFixed(2))};
 };
+const guardedBusinessProjections=(save,businesses)=>{
+  const projections=(businesses||[]).map((b)=>businessProjection(b));
+  if(!projections.length)return projections;
+  const hours=Math.max(...projections.map((p)=>Number(p.hours||0)));
+  const clean=projections.reduce((sum,p)=>sum+Number(p.clean||0),0);
+  const dirty=projections.reduce((sum,p)=>sum+Number(p.dirty||0),0);
+  const scale=passivePortfolioScale(save.player.level,hours,clean,dirty);
+  return projections.map((p)=>({...p,clean:Math.round(p.clean*scale),dirty:Math.round(p.dirty*scale),economy_scale:Number(scale.toFixed(4))}));
+};
 export const localBossLeadership = (save) => {
   ensureLocalCity(save);
   const now=Date.now(),boss=save.city.boss;
@@ -281,7 +290,8 @@ const npcLeaderboard=(save,season)=>{
 export const localCitySnapshot = (save) => {
   advanceLocalCity(save);
   const world=localCityWorld(save),season=seasonInfo();
-  const businesses=save.city.businesses.map((b)=>({...clone(b),projection:businessProjection(b),config:LOCAL_BUSINESS_TYPES[b.type_key]}));
+  const projections=guardedBusinessProjections(save,save.city.businesses);
+  const businesses=save.city.businesses.map((b,index)=>({...clone(b),projection:projections[index],config:LOCAL_BUSINESS_TYPES[b.type_key]}));
   const totals=businesses.reduce((a,b)=>({unclaimed_clean:a.unclaimed_clean+b.projection.clean,unclaimed_dirty:a.unclaimed_dirty+b.projection.dirty,pending_heat:Number((a.pending_heat+b.projection.heat).toFixed(2))}),{unclaimed_clean:0,unclaimed_dirty:0,pending_heat:0});
   const news=[
     {id:`world:${world.event.key}`,kind:"world",headline:world.event.name,body:world.event.description,severity:world.event.severity,ts:world.generated_at},
@@ -366,7 +376,7 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
   }
   if(verb==="post"&&path==="/game/city/businesses/collect"){
     if(!save.city.businesses.length)fail(400,"Ainda não tens negócios urbanos");
-    let clean=0,dirty=0,heat=0;save.city.businesses.forEach((b)=>{const p=businessProjection(b);clean+=p.clean;dirty+=p.dirty;heat+=p.heat;b.last_collect_at=nowIso();b.total_clean=(b.total_clean||0)+p.clean;b.total_dirty=(b.total_dirty||0)+p.dirty;});
+    let clean=0,dirty=0,heat=0;const projections=guardedBusinessProjections(save,save.city.businesses);save.city.businesses.forEach((b,index)=>{const p=projections[index];clean+=p.clean;dirty+=p.dirty;heat+=p.heat;b.last_collect_at=nowIso();b.total_clean=(b.total_clean||0)+p.clean;b.total_dirty=(b.total_dirty||0)+p.dirty;});
     save.player.clean_money+=clean;save.player.dirty_money+=dirty;save.player.heat=clamp(Number(save.player.heat||0)+heat,0,100);
     if(clean)pushTx(save,"city_business_income",clean,"clean","Receitas da rede empresarial");if(dirty)pushTx(save,"city_business_income",dirty,"dirty","Receitas clandestinas da rede empresarial");
     pushEvent(save,"system",`Rede empresarial fechou caixa: +${clean.toLocaleString("pt-PT")} € limpos, +${dirty.toLocaleString("pt-PT")} € sujos.`);
