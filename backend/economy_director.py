@@ -74,6 +74,21 @@ def passive_hourly_ceiling(level: int) -> int:
     return career_economy_band(level)["ceiling_per_hour"]
 
 
+def passive_portfolio_scale(level: int, hours: float, clean: int | float, dirty: int | float) -> float:
+    """Scale an aggregate passive payout into the career envelope.
+
+    Accumulated offline income may cover several hours, so the ceiling grows
+    with the longest collection window instead of treating the whole claim as
+    one instantaneous hour.
+    """
+    window_h = max(0.0, float(hours or 0.0))
+    total = max(0.0, float(clean or 0.0)) + max(0.0, float(dirty or 0.0))
+    if total <= 0 or window_h <= 0:
+        return 1.0
+    ceiling = passive_hourly_ceiling(level) * window_h
+    return max(0.0, min(1.0, ceiling / total))
+
+
 def city_business_cap(level: int) -> int:
     """Portfolio size grows with the career instead of allowing infinite copies."""
     level = _level(level)
