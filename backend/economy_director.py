@@ -25,7 +25,7 @@ SOURCE_BURST_HOURS = {
     "quest": 3.0,
     "mastermind": 20.0,
     "city_cache": 2.0,
-    "season": 3.0,
+    "season": 30.0,
 }
 
 
