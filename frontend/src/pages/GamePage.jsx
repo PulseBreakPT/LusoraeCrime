@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "../context/GameContextV2";
 import { useSettings } from "../context/SettingsContext";
 import LiveMap, { MapLegend, PlacementControls } from "../components/game/LiveMap";
@@ -42,6 +42,8 @@ export default function GamePage() {
   const [mapLegendOpen, setMapLegendOpen] = useState(false);
   const [focusTarget, setFocusTarget] = useState(null);
   const [hudAwake, setHudAwake] = useState(true);
+  const gameShellRef = useRef(null);
+  const gameReady = Boolean(state);
   const playerLevel = Number(state?.player?.level || 1);
   const unlocks = {
     city: playerLevel >= 5,
@@ -77,6 +79,39 @@ export default function GamePage() {
       events.forEach((name) => window.removeEventListener(name, wake));
     };
   }, []);
+
+  // Parallax ambiental extremamente subtil. Nunca move o mapa nem interfere
+  // com Leaflet; apenas desloca a luz atmosférica da camada global.
+  useEffect(() => {
+    const shell = gameShellRef.current;
+    if (!gameReady || !shell || settings.reducedMotion) return undefined;
+    if (typeof window.matchMedia !== "function" || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return undefined;
+
+    let raf = null;
+    const write = (x, y) => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        shell.style.setProperty("--sub-parallax-x", `${x.toFixed(2)}px`);
+        shell.style.setProperty("--sub-parallax-y", `${y.toFixed(2)}px`);
+      });
+    };
+    const onMove = (event) => {
+      const x = (event.clientX / Math.max(1, window.innerWidth) - 0.5) * 10;
+      const y = (event.clientY / Math.max(1, window.innerHeight) - 0.5) * 7;
+      write(x, y);
+    };
+    const reset = () => write(0, 0);
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("blur", reset);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("blur", reset);
+      shell.style.removeProperty("--sub-parallax-x");
+      shell.style.removeProperty("--sub-parallax-y");
+    };
+  }, [gameReady, settings.reducedMotion]);
 
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
   const [baseFilter, setBaseFilter] = useState("all");
@@ -193,8 +228,9 @@ export default function GamePage() {
 
   return (
     <div
+      ref={gameShellRef}
       data-testid="game-page"
-      className={`fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"}`}
+      className={`sub-game-shell fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"} ${selectedOpp ? "sub-has-selection" : ""} ${hudPinned ? "sub-ui-open" : ""}`}
     >
       <LiveMap
         state={mapState}
@@ -239,9 +275,11 @@ export default function GamePage() {
       )}
       {!focusMode && wantedStars > 0 && (
         <div
+          key={`wanted-${wantedStars}`}
           role="status"
           data-testid="wanted-stars-hud"
-          className="sub-optional-hud pointer-events-none absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
+          data-level={wantedStars}
+          className="sub-wanted-hud sub-optional-hud pointer-events-none absolute left-2 top-14 z-20 rounded-full px-1.5 py-1"
           aria-label={`Nível de procurado: ${wantedStars} de 5 estrelas`}
           title="Indicador de procurado."
         >
