@@ -86,7 +86,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
     if (busy) return;
     setBusy(key);
     try {
-      const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const requestId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const { data } = await api.post(`/game/city/${path}`, { ...payload, request_id: requestId });
       if (success) toast.success(typeof success === "function" ? success(data) : success);
       await Promise.all([load(true), refreshGame()]);

@@ -259,7 +259,7 @@ export default function GamePage() {
         <div
           role="status"
           data-testid="connection-banner"
-          className="pointer-events-auto absolute left-1/2 top-2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-500/30 bg-black/90 px-3 py-1.5 font-mono text-[10px] text-amber-300 shadow-xl backdrop-blur"
+          className="pointer-events-auto absolute left-1/2 top-2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-500/25 bg-[#0b0b0e] px-3 py-1.5 font-mono text-[10px] text-amber-300 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_12px_28px_rgba(0,0,0,0.48)]"
         >
           {online ? <RefreshCw size={12} /> : <WifiOff size={12} />}
           <span>{online ? "Dados desatualizados" : "Sem ligação à internet"}</span>

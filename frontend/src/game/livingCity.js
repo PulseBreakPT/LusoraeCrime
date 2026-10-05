@@ -2,7 +2,7 @@ import { cityBusinessCap, guardReward, passivePortfolioScale } from "./economyDi
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const nowIso = () => new Date().toISOString();
-const uid = (prefix) => `${prefix}_${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+const uid = (prefix) => `${prefix}_${window.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
 
 const WEATHER = {
   ceu_limpo:{name:"Céu limpo",weight:30,chance:{},travel_mult:1,heat_mult:1,reward_mult:1,description:"Visibilidade normal e circulação previsível."},

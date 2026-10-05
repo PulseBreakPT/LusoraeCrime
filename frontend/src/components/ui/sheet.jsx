@@ -26,14 +26,14 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 // a shell modal central definida em DESIGN.md. As restantes variantes ficam
 // disponíveis para superfícies auxiliares que precisem de um sheet real.
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-4 pt-0 shadow-lg transition ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-180 data-[state=closed]:duration-150 sm:p-6 sm:pt-0",
+  "fixed z-50 gap-4 bg-background p-4 pt-0 shadow-lg transition ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-200 data-[state=closed]:duration-150 sm:p-6 sm:pt-0",
   {
     variants: {
       side: {
         top: "inset-x-0 top-0 border-b data-[state=open]:slide-in-from-top data-[state=closed]:slide-out-to-top",
         bottom: "inset-x-0 bottom-0 border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
         left: "inset-y-0 left-0 h-full w-full border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
-        right: "left-1/2 top-1/2 rounded-2xl border data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+        right: "left-1/2 top-1/2 rounded-2xl border",
       },
     },
     defaultVariants: {

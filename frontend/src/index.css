@@ -56,6 +56,15 @@ body::after {
         --sub-text-muted: #71717a;
         --sub-border: rgba(255, 255, 255, 0.08);
 
+        /* Shared interaction rhythm — one restrained motion language. */
+        --sub-motion-fast: 120ms;
+        --sub-motion-base: 160ms;
+        --sub-motion-slow: 200ms;
+        --sub-ease-out: cubic-bezier(0.2, 0, 0, 1);
+        --sub-shadow-elevated:
+            0 0 0 1px rgba(255, 255, 255, 0.075),
+            0 16px 40px rgba(0, 0, 0, 0.44);
+
         --background: 240 9% 2%;
         --foreground: 240 6% 96%;
         --card: 240 11% 7%;

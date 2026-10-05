@@ -62,7 +62,7 @@ export const Tip = ({ tip, side = "top", align = "center", block = false, classN
         align={align}
         sideOffset={SIDE_ALIGN_OFFSET[side] ?? 6}
         onOpenAutoFocus={(e) => e.preventDefault()}
-        className="w-auto max-w-[16rem] border-white/10 bg-black/95 p-2 font-mono text-[11px] leading-snug text-zinc-200 shadow-2xl backdrop-blur-xl"
+        className="w-auto max-w-[16rem] border-transparent bg-[#0b0b0e] p-2 font-mono text-[11px] leading-snug text-zinc-200 shadow-[0_0_0_1px_rgba(255,255,255,0.10),0_12px_28px_rgba(0,0,0,0.48)]"
       >
         {tip}
       </PopoverContent>
@@ -146,7 +146,7 @@ export const SectionHeader = ({ icon: Icon, title, meta, action, tip, className 
 // traço laser vermelho, no estilo dos kickers de HUD militar.
 export const PanelKicker = ({ children, className = "" }) => (
   <p className={`flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-red-500/90 ${className}`}>
-    <span className="inline-block h-px w-4 bg-red-500 shadow-[0_0_6px_rgba(220,38,38,0.8)]" aria-hidden="true" />
+    <span className="inline-block h-px w-4 bg-red-500/90" aria-hidden="true" />
     {children}
   </p>
 );
@@ -208,7 +208,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           data-testid={testId && `${testId}-save`}
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={save}
-          className="shrink-0 text-success transition-colors hover:brightness-125"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-success transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] hover:brightness-125 active:scale-[0.96] sm:h-10 sm:w-10"
         >
           <Check size={14} />
         </button>
@@ -218,7 +218,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           data-testid={testId && `${testId}-cancel`}
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={() => setEditing(false)}
-          className="shrink-0 text-zinc-500 transition-colors hover:text-white"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] hover:text-white active:scale-[0.96] sm:h-10 sm:w-10"
         >
           <X size={14} />
         </button>
@@ -235,7 +235,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           aria-label="Renomear"
           data-testid={testId && `${testId}-edit`}
           onClick={() => { setDraft(value); setEditing(true); }}
-          className="shrink-0 text-zinc-600 transition-colors hover:text-white"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-600 transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] hover:text-white active:scale-[0.96] sm:h-10 sm:w-10"
         >
           <Pencil size={11} />
         </button>
@@ -254,7 +254,7 @@ export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
       aria-pressed={active}
       data-testid={testId}
       onClick={(ev) => { ev.stopPropagation(); onToggle(); }}
-      className={`shrink-0 rounded p-0.5 transition-colors ${active ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-white"}`}
+      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg p-0 transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] active:scale-[0.96] sm:h-10 sm:w-10 ${active ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-white"}`}
     >
       <Star size={size} fill={active ? "currentColor" : "none"} />
     </button>

@@ -12,7 +12,7 @@ const OFFLINE_PAYROLL_MAX_CYCLES = 5;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const nowIso = () => new Date().toISOString();
 const uid = (prefix = "id") =>
-  `${prefix}_${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+  `${prefix}_${window.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const money = (n) => Math.max(0, Math.round(Number(n) || 0));

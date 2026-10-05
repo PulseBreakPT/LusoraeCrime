@@ -10,15 +10,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "sub-btn-primary border border-red-500/45 bg-red-700 text-white shadow-[0_3px_10px_rgba(0,0,0,0.28)] hover:border-red-400/60 hover:bg-red-600 active:translate-y-px",
+          "sub-btn-primary border border-red-500/45 bg-red-700 text-white shadow-[0_3px_10px_rgba(0,0,0,0.28)] hover:border-red-400/60 hover:bg-red-600 active:scale-[0.96]",
         destructive:
-          "sub-btn-danger border border-red-500/35 bg-red-950/90 text-red-100 hover:border-red-400/50 hover:bg-red-900 active:translate-y-px",
+          "sub-btn-danger border border-red-500/35 bg-red-950/90 text-red-100 hover:border-red-400/50 hover:bg-red-900 active:scale-[0.96]",
         outline:
-          "sub-btn-glass border border-white/10 bg-[#111114] text-zinc-200 hover:border-white/20 hover:bg-[#16161b] hover:text-white active:translate-y-px",
+          "sub-btn-glass border border-white/10 bg-[#111114] text-zinc-200 hover:border-white/20 hover:bg-[#16161b] hover:text-white active:scale-[0.96]",
         secondary:
-          "sub-btn-soft border border-white/10 bg-zinc-900/90 text-zinc-300 hover:border-white/20 hover:bg-zinc-800/90 hover:text-white active:translate-y-px",
+          "sub-btn-soft border border-white/10 bg-zinc-900/90 text-zinc-300 hover:border-white/20 hover:bg-zinc-800/90 hover:text-white active:scale-[0.96]",
         success:
-          "sub-btn-success border border-emerald-500/40 bg-emerald-700 text-white shadow-[0_3px_10px_rgba(0,0,0,0.25)] hover:border-emerald-400/55 hover:bg-emerald-600 active:translate-y-px",
+          "sub-btn-success border border-emerald-500/40 bg-emerald-700 text-white shadow-[0_3px_10px_rgba(0,0,0,0.25)] hover:border-emerald-400/55 hover:bg-emerald-600 active:scale-[0.96]",
         ghost: "sub-btn-ghost border border-transparent text-zinc-300 hover:bg-white/[0.06] hover:text-white",
         link: "sub-btn-link text-red-400 underline-offset-4 hover:text-red-300 hover:underline",
       },
