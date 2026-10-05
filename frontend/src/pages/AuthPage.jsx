@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContextV2";
 import { Button } from "../components/ui/button";
 import {
   Loader2,
-
+  ShieldCheck,
   Gamepad2,
   LogIn,
   MapPinned,
