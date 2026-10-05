@@ -143,9 +143,9 @@ export const CityPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid h-auto w-full grid-cols-5 gap-1 bg-black/40 p-1">
+          <TabsList className="grid h-auto w-full grid-cols-5 gap-1">
             {TABS.map(([key, label, Icon]) => (
-              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] uppercase data-[state=active]:bg-red-600 data-[state=active]:text-white">
+              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider">
                 <Icon size={11} /><span className="hidden min-[430px]:inline">{label}</span>
               </TabsTrigger>
             ))}
