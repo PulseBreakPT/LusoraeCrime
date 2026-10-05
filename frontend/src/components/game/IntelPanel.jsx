@@ -1,3 +1,4 @@
+import { Button } from "../ui/button";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, SPEC_LABELS, chanceColor, sellValueOf } from "../../lib/game";
 import { Tip, PanelWatermark, EmptyState, SectionHeader } from "./hud";
@@ -35,7 +36,7 @@ const RetentionRoadmap = ({ onNavigate }) => {
         {moves.map((move) => {
           const pct = Math.max(0, Math.min(100, Number(move.progress?.pct || 0)));
           return (
-            <button
+            <Button variant="bare" size="bare"
               key={move.id}
               type="button"
               data-testid={`retention-move-${move.id}`}
@@ -58,7 +59,7 @@ const RetentionRoadmap = ({ onNavigate }) => {
                   style={{ width: `${pct}%` }}
                 />
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -218,7 +219,7 @@ const RecommendedActions = ({ onNavigate }) => {
       ) : (
         <div className="sub-action-list overflow-hidden rounded-xl border border-white/[0.065]">
           {recs.map((r) => (
-            <button
+            <Button variant="bare" size="bare"
               key={r.id}
               type="button"
               data-testid={`intel-rec-${r.id}`}
@@ -235,7 +236,7 @@ const RecommendedActions = ({ onNavigate }) => {
               >
                 {r.action} <ArrowRight size={10} />
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -381,7 +382,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
               const outcome = m.chase_outcome === "caught" ? "police" : m.outcome;
               const paidReward = Number(m.pending_reward || 0);
               return (
-                <button
+                <Button variant="bare" size="bare"
                   key={m.id}
                   type="button"
                   data-testid={`intel-history-row-${m.id}`}
@@ -413,7 +414,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
                       <ArrowRight size={12} className="shrink-0 text-zinc-600" />
                     </div>
                   </Card>
-                </button>
+                </Button>
               );
             })}
           </div>
