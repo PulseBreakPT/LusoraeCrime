@@ -101,9 +101,7 @@ async def _refund_debit(player: dict, amount: int, *, stat: str | None = None, r
     player["clean_money"] = int(player.get("clean_money", 0) or 0) + max(0, int(amount))
 
 
-class MutationInput(BaseModel):
-    request_id: str | None = Field(default=None, max_length=80)
-
+from mutation_guard import MutationInput
 
 def idempotent(action_name: str):
     """Persist a short-lived mutation receipt so network retries cannot double-spend."""
