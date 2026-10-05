@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
+import { Checkbox } from "../components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, RotateCcw, Zap, ArrowLeft, Eye, Shield, Crown, User as UserIcon, Flag } from "lucide-react";
 import { toast } from "sonner";
@@ -476,12 +477,10 @@ export default function AdminPanel() {
                   <h3 className="text-lg font-bold text-white mb-4">🔄 Resetar Progresso</h3>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         id="keepLevel"
                         checked={resetForm.keep_level}
-                        onChange={(e) => setResetForm({ ...resetForm, keep_level: e.target.checked })}
-                        className="rounded border-white/20"
+                        onCheckedChange={(checked) => setResetForm({ ...resetForm, keep_level: checked === true })}
                       />
                       <label htmlFor="keepLevel" className="text-zinc-400 text-sm">
                         Manter nível actual
