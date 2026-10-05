@@ -26,6 +26,7 @@ import { DisclaimerModal } from "../components/game/DisclaimerModal";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../components/ui/select";
 import { orgAlerts, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, Network, RadioTower } from "lucide-react";
@@ -337,21 +338,24 @@ export default function GamePage() {
                   {(state.properties || []).length > 0 && (
                     <label className="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
                       <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Base no mapa</span>
-                      <select
-                        data-testid="map-base-filter"
+                      <Select
                         value={baseFilter}
-                        onChange={(event) => {
-                          setBaseFilter(event.target.value);
+                        onValueChange={(value) => {
+                          setBaseFilter(value);
                           setNavGroup(null);
                         }}
-                        className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/60 px-2 py-2 font-mono text-base text-zinc-200 outline-none sm:text-[10px]"
                       >
-                        <option value="all">Todas</option>
-                        <option value="hq">Quartel-General</option>
-                        {(state.properties || []).map((property) => (
-                          <option key={property.id} value={property.id}>{property.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger data-testid="map-base-filter" size="compact" className="min-w-0 flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas</SelectItem>
+                          <SelectItem value="hq">Quartel-General</SelectItem>
+                          {(state.properties || []).map((property) => (
+                            <SelectItem key={property.id} value={property.id}>{property.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </label>
                   )}
                 </>
