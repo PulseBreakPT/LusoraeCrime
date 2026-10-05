@@ -10,7 +10,7 @@ from auth import get_current_user
 from db import db
 from engine import add_event, dirty_money_cap, now_utc, parse_dt, record_tx
 from game_data import VEHICLE_MODELS
-from routes_game import MutationInput, idempotent
+from mutation_guard import MutationInput, idempotent
 from economy_director import guard_reward
 from mastermind_data import (
     COMPLICATIONS,
