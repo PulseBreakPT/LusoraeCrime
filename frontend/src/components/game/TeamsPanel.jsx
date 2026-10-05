@@ -303,13 +303,13 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
               <p className="mt-0.5 text-[10px] text-zinc-600">Define que tipo de operações esta equipa deve dominar.</p>
             </div>
             {spec && (
-              <button
+              <Button variant="bare" size="bare"
                 type="button"
                 onClick={() => applyRecommendation(spec)}
                 className="flex min-h-9 shrink-0 items-center gap-1 rounded-md border border-cyan-500/20 bg-cyan-500/[0.06] px-2 font-mono text-[10px] text-cyan-300"
               >
                 <Brain size={11} /> Recomendar
-              </button>
+              </Button>
             )}
           </div>
 
@@ -317,7 +317,7 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
             {Object.entries(catalog.team_specs || {}).map(([key, cfg]) => {
               const selected = spec === key;
               return (
-                <button
+                <Button variant="bare" size="bare"
                   key={key}
                   type="button"
                   data-testid={`team-builder-spec-${key}`}
@@ -334,7 +334,7 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
                     {SPEC_LABELS[key] || cfg.name}
                   </span>
                   <span className="mt-1 block text-[10px] leading-relaxed text-zinc-500">{cfg.desc}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -354,13 +354,13 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
           ) : freeEmployees.length === 0 ? (
             <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-2.5">
               <p className="font-mono text-[10px] text-amber-300">Não tens operacionais livres para formar uma nova equipa.</p>
-              <button
+              <Button variant="bare" size="bare"
                 type="button"
                 onClick={() => onNavigate && onNavigate("employees")}
                 className="mt-1 font-mono text-[10px] text-cyan-300"
               >
                 Abrir Operacionais
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -371,7 +371,7 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
                   const score = employeeFit(employee);
                   const specialization = catalog.specializations?.[employee.role_key]?.name || employee.role_key;
                   return (
-                    <button
+                    <Button variant="bare" size="bare"
                       key={employee.id}
                       type="button"
                       data-testid={`team-builder-member-${employee.id}`}
@@ -403,7 +403,7 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
                       )}>
                         {score}%
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
             </div>
@@ -438,13 +438,13 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
           ) : freeVehicles.length === 0 ? (
             <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-2.5">
               <p className="font-mono text-[10px] text-amber-300">Não tens veículos livres.</p>
-              <button
+              <Button variant="bare" size="bare"
                 type="button"
                 onClick={() => onNavigate && onNavigate("fleet")}
                 className="mt-1 font-mono text-[10px] text-cyan-300"
               >
                 Abrir Frota
-              </button>
+              </Button>
             </div>
           ) : (
             <Select value={vehicleId} onValueChange={setVehicleId}>
@@ -711,7 +711,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
             block
             tip="Despacho automático: envia cada equipa livre para a melhor oportunidade que o servidor recomendar — só missões cujos requisitos (membros, veículo, combustível, nível) a equipa cumpre mesmo."
           >
-            <button type="button"
+            <Button variant="bare" size="bare" type="button"
               data-testid="teams-auto-dispatch"
               onClick={() => !autoBusy && readyIds.length > 0 && autoDispatchAll()}
               disabled={autoBusy || readyIds.length === 0}
@@ -724,7 +724,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
             >
               <Zap size={11} />
               {autoBusy ? "A despachar…" : `Despacho automático${readyIds.length > 0 ? ` (${readyIds.length})` : ""}`}
-            </button>
+            </Button>
           </Tip>
         </div>
 
@@ -904,27 +904,27 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                       </span>
                     </Tip>
                     {members.length === 0 && freeEmployees.length === 0 ? (
-                      <button type="button"
+                      <Button variant="bare" size="bare" type="button"
                         data-testid={`team-nav-rh-${t.id}`}
                         onClick={() => nav("employees")}
                         className="flex items-center gap-1 font-mono text-[10px] text-red-400 underline-offset-2 hover:underline"
                       >
                         <IdCard size={10} /> Sem membros — recrutar em Operacionais
-                      </button>
+                      </Button>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1">
                         {members.map((m) => (
                           <span key={m.id} className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
                             {m.name.split(" ")[0]} <span style={{ color: fatigueColor(m.fatigue) }}>{Math.round(m.fatigue)}%</span>
                             {m.status === "idle" && (
-                              <button type="button"
+                              <Button variant="bare" size="bare" type="button"
                                 data-testid={`team-member-remove-${m.id}`}
                                 title="Remover da equipa"
                                 onClick={() => assignEmployee(m.id, null)}
                                 className="text-zinc-500 hover:text-red-400"
                               >
                                 <X size={10} />
-                              </button>
+                              </Button>
                             )}
                           </span>
                         ))}
@@ -993,13 +993,13 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                     </Tip>
                   )}
                   {!vehicle && freeVehicles.length === 0 && (
-                    <button type="button"
+                    <Button variant="bare" size="bare" type="button"
                       data-testid={`team-nav-fleet-${t.id}`}
                       onClick={() => nav("fleet")}
                       className="shrink-0 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
                     >
                       Comprar na Frota
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {vehicle && (
