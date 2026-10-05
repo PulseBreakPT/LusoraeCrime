@@ -2,7 +2,8 @@ import "@/App.css";
 import "@/cinematic.css";
 import "@/lighting.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "./components/ui/sonner";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { AuthProvider, useAuth } from "./context/AuthContextV2";
 import { GameProvider } from "./context/GameContextV2";
 import { BootProvider, useBoot } from "./context/BootContext";
@@ -97,6 +98,7 @@ function App() {
     <BootProvider>
       <AuthProvider>
         <LoadingProvider>
+          <TooltipProvider delayDuration={220}>
           <BrowserRouter basename={process.env.PUBLIC_URL}>
             <BootScreen />
             <Routes>
@@ -147,6 +149,7 @@ function App() {
               toastOptions={{ className: "sub-toast", duration: 3200 }}
             />
           </BrowserRouter>
+          </TooltipProvider>
         </LoadingProvider>
       </AuthProvider>
     </BootProvider>
