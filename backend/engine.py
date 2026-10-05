@@ -3300,11 +3300,11 @@ async def advance(db, player):
         player["_id"],
         lease_token,
         ttl_s=120,
-        wait_s=0,
+        wait_s=5,
     )
     if not locked_player:
-        # Another tick/mutation owns the player. Return the freshest persisted
-        # snapshot and never queue a duplicate simulation of the same interval.
+        # An unusually long writer still owns the player. Returning persisted
+        # state is safer than running a concurrent tick and overwriting it.
         return await db.players.find_one({"_id": player["_id"]}) or player
     player = locked_player
 
