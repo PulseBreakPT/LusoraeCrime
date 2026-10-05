@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
+import { Input } from "../ui/input";
 
 
 const TABS = [
@@ -507,13 +508,14 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
       <MiniBar value={(market.used / Math.max(1, market.capacity)) * 100} color="#F59E0B" className="mt-3" height="h-1.5" />
       <label className="mt-3 block font-mono text-[10px] uppercase text-zinc-500">
         Quantidade por ordem
-        <input
+        <Input
           type="number"
           min="1"
           max="20"
+          size="compact"
           value={quantity}
           onChange={(event) => setQuantity(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
-          className={selectClass}
+          className="mt-1"
         />
       </label>
     </Card>
