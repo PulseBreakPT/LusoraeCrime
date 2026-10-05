@@ -310,13 +310,13 @@ export const QuestsPanel = ({ open, onOpenChange, onNavigate, focusTab, focusTar
         )}
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-2 gap-1 bg-black/40 sm:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t.key}
                 data-testid={`quest-tab-${t.key}`}
                 value={t.key}
-                className="relative px-1 font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="relative px-1 font-mono text-[10px] font-bold uppercase tracking-wider"
               >
                 {t.label}
                 {tabCounts[t.key] > 0 && (
