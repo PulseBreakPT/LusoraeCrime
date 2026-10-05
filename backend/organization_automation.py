@@ -39,6 +39,24 @@ async def run_organization_automation(db, player, *, now=None, add_event=None, r
         return {"ok": True, "skipped": "cooldown", "actions": []}
 
     pid = str(player["_id"])
+    if not force:
+        # Claim the 15-minute automation slot before reading balances/inventory.
+        # This closes the race where two simultaneous game ticks both passed the
+        # cooldown check and bought the same stock/service twice.
+        slot = int(now.timestamp() // (15 * 60))
+        lock = await db.players.update_one(
+            {
+                "_id": player["_id"],
+                "$or": [
+                    {"organization_automation_slot": {"$exists": False}},
+                    {"organization_automation_slot": {"$lt": slot}},
+                ],
+            },
+            {"$set": {"organization_automation_slot": slot}},
+        )
+        if lock.modified_count != 1:
+            return {"ok": True, "skipped": "concurrent", "actions": []}
+        player["organization_automation_slot"] = slot
     teams = await db.teams.find({"player_id": pid}).to_list(200)
     properties = await db.properties.find({"player_id": pid}).to_list(300)
     vehicles = await db.vehicles.find({"player_id": pid}).to_list(300)
