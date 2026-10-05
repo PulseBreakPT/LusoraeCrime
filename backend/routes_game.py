@@ -74,6 +74,7 @@ from game_data import (TEAM_SPECS, TEAM_NAMES, TEAM_CREATE_COST, SPECIALIZATIONS
                        SLOT_COST_VEHICLE_BASE, SLOT_COST_EMPLOYEE_BASE, SLOT_COST_SCALE_PER_UNIT,
                        VIP_PLANS, VIP_REFUEL_SPEED_MULT, VEHICLE_PAINTS, TEAM_EMBLEMS, HQ_SKINS)
 from reward_engine import calculate_full_reward
+from economy_director import guard_reward
 from reward_config import MONEY_REWARD_MIN, MONEY_REWARD_MAX, REPEAT_PENALTY_MULTIPLIER, REPEAT_PENALTY_RESETS_AFTER_MIN
 from property_market import property_market_price
 from road_routing import road_router
@@ -1046,7 +1047,10 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
         reward_data["money"] * mult * pulse_reward_mult * float(city_fx["reward_mult"]) * age_mult * split_mult
         * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward)
     )
-    reward = max(MONEY_REWARD_MIN, min(MONEY_REWARD_MAX, reward))
+    reward = max(
+        MONEY_REWARD_MIN,
+        guard_reward(reward, player.get("level", 1), "operation"),
+    )
 
     mission_pulse = {
         **pulse,
