@@ -1,0 +1,313 @@
+/* ==========================================================================
+   SUBMUNDO — GAMEPLAY FX V4
+   Stable bottom navigation + richer map lighting and tactical feedback.
+   Red dominant. No scanlines.
+   ========================================================================== */
+
+@keyframes sub-map-ambient-drift {
+  0%, 100% { opacity: .34; transform: translate3d(-1.5%, 0, 0) scale(1); }
+  50% { opacity: .62; transform: translate3d(1.5%, -1%, 0) scale(1.035); }
+}
+
+@keyframes sub-map-target-radar {
+  0% { transform: scale(.58); opacity: .78; }
+  72% { transform: scale(1.55); opacity: .08; }
+  100% { transform: scale(1.72); opacity: 0; }
+}
+
+@keyframes sub-map-selected-core {
+  0%, 100% {
+    filter:
+      drop-shadow(0 3px 5px rgba(0,0,0,.82))
+      drop-shadow(0 0 5px color-mix(in srgb, var(--mk, #ef4444) 46%, transparent));
+  }
+  50% {
+    filter:
+      drop-shadow(0 4px 7px rgba(0,0,0,.88))
+      drop-shadow(0 0 12px color-mix(in srgb, var(--mk, #ef4444) 72%, transparent))
+      drop-shadow(0 0 22px rgba(239,68,68,.18));
+  }
+}
+
+@keyframes sub-map-route-energy {
+  from { stroke-dashoffset: 0; opacity: .28; }
+  45% { opacity: .92; }
+  to { stroke-dashoffset: -54; opacity: .28; }
+}
+
+@keyframes sub-map-hq-aura {
+  0%, 100% { opacity: .28; transform: scale(.72); }
+  55% { opacity: .88; transform: scale(1.25); }
+}
+
+@keyframes sub-map-property-aura {
+  0%, 100% { opacity: .18; transform: scale(.78); }
+  50% { opacity: .58; transform: scale(1.16); }
+}
+
+@keyframes sub-map-car-glow {
+  0%, 100% {
+    filter:
+      drop-shadow(0 2px 4px rgba(0,0,0,.82))
+      drop-shadow(0 0 3px rgba(239,68,68,.18));
+  }
+  50% {
+    filter:
+      drop-shadow(0 3px 6px rgba(0,0,0,.88))
+      drop-shadow(0 0 9px rgba(239,68,68,.42));
+  }
+}
+
+@keyframes sub-map-police-flash {
+  0%, 100% {
+    filter:
+      drop-shadow(-4px 0 6px rgba(59,130,246,.42))
+      drop-shadow(4px 0 6px rgba(239,68,68,.34));
+  }
+  50% {
+    filter:
+      drop-shadow(-7px 0 11px rgba(59,130,246,.70))
+      drop-shadow(7px 0 11px rgba(239,68,68,.62));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Bottom navigation — fixed geometry regardless of open submenu.
+   -------------------------------------------------------------------------- */
+
+.sub-bottom-nav-shell {
+  width: 252px;
+  max-width: calc(100vw - 16px);
+  transform: translate3d(-50%, 0, 0) !important;
+  transform-origin: 50% 100%;
+  contain: layout;
+  isolation: isolate;
+}
+
+.sub-bottom-nav-shell > .sub-dock {
+  width: 100%;
+  justify-content: center;
+  margin-inline: auto;
+}
+
+.sub-bottom-nav-shell .sub-nav-tray {
+  left: 50% !important;
+  right: auto !important;
+  margin-inline: 0 !important;
+}
+
+/* Keep the dock itself static while only icons/pseudos animate. */
+.sub-bottom-nav-shell .sub-dock {
+  transform: none !important;
+  animation: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Map atmosphere — red light volume over tiles, under gameplay markers.
+   -------------------------------------------------------------------------- */
+
+.sub-dark-map.leaflet-container::before {
+  content: "";
+  position: absolute;
+  inset: -9%;
+  z-index: 350;
+  pointer-events: none;
+  background:
+    radial-gradient(36rem 28rem at 18% 22%, rgba(239,68,68,.095), transparent 72%),
+    radial-gradient(32rem 24rem at 82% 70%, rgba(127,29,29,.085), transparent 72%),
+    radial-gradient(24rem 20rem at 72% 18%, rgba(248,113,113,.045), transparent 74%);
+  mix-blend-mode: screen;
+  filter: blur(17px) saturate(116%);
+  animation: sub-map-ambient-drift 10.5s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.sub-game-shell[data-heat-tier="3"] .sub-dark-map.leaflet-container::before {
+  opacity: .78;
+  background:
+    radial-gradient(40rem 30rem at 16% 22%, rgba(239,68,68,.14), transparent 70%),
+    radial-gradient(38rem 28rem at 86% 68%, rgba(185,28,28,.14), transparent 68%);
+  animation-duration: 7.5s;
+}
+
+.sub-game-shell[data-heat-tier="4"] .sub-dark-map.leaflet-container::before {
+  opacity: .94;
+  background:
+    radial-gradient(44rem 32rem at 12% 22%, rgba(248,113,113,.17), transparent 68%),
+    radial-gradient(42rem 30rem at 90% 66%, rgba(220,38,38,.19), transparent 66%);
+  animation-duration: 5.8s;
+}
+
+/* Mission markers: persistent tactical halo plus stronger selected state. */
+.opp-pin {
+  isolation: isolate;
+}
+
+.opp-pin::before {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--mk, #ef4444) 32%, transparent),
+    0 0 14px color-mix(in srgb, var(--mk, #ef4444) 15%, transparent);
+}
+
+.opp-pin-selected {
+  animation:
+    sub-fx-marker-pulse 2.35s ease-in-out infinite,
+    sub-map-selected-core 2.15s ease-in-out infinite !important;
+}
+
+.opp-pin-selected::after {
+  border-color: color-mix(in srgb, var(--mk, #ef4444) 72%, transparent) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--mk, #ef4444) 24%, transparent);
+  animation-duration: 1.75s !important;
+}
+
+.opp-pin-urgent:not(.opp-pin-taken) {
+  box-shadow:
+    0 5px 14px rgba(0,0,0,.66),
+    0 0 0 1px rgba(248,113,113,.28),
+    0 0 15px rgba(239,68,68,.16) !important;
+}
+
+/* Physical mission target: add a second expanding radar wave. */
+.mission-target {
+  overflow: visible;
+}
+
+.mission-target::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(248,113,113,.48);
+  box-shadow: 0 0 11px rgba(239,68,68,.19);
+  pointer-events: none;
+  animation: sub-map-target-radar 2.25s ease-out infinite;
+}
+
+.mission-target-hot::before {
+  border-color: rgba(248,113,113,.86);
+  box-shadow:
+    0 0 12px rgba(239,68,68,.36),
+    0 0 24px rgba(239,68,68,.13);
+  animation-duration: 1.45s;
+}
+
+/* HQ and properties behave like a connected criminal network. */
+.hq-pin::before {
+  box-shadow:
+    0 0 0 1px rgba(248,113,113,.44),
+    0 0 14px rgba(239,68,68,.23) !important;
+  animation: sub-map-hq-aura 2.7s ease-out infinite !important;
+}
+
+.hq-pin::after {
+  border-color: rgba(239,68,68,.36) !important;
+  box-shadow: 0 0 18px rgba(239,68,68,.10);
+}
+
+.prop-pin {
+  position: relative;
+  overflow: visible;
+}
+
+.prop-pin:not(.placement-pin)::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: 999px;
+  border: 1px solid rgba(239,68,68,.24);
+  box-shadow: 0 0 9px rgba(239,68,68,.10);
+  pointer-events: none;
+  animation: sub-map-property-aura 4.1s ease-in-out infinite;
+}
+
+/* Vehicles get a visible red operational light. Return remains amber. */
+.unit-car:not(.unit-car-returning) {
+  animation: sub-map-car-glow 2.7s ease-in-out infinite;
+}
+
+.unit-car-returning {
+  filter:
+    drop-shadow(0 2px 4px rgba(0,0,0,.84))
+    drop-shadow(0 0 7px rgba(245,158,11,.38));
+}
+
+.unit-car-chased {
+  animation: sub-map-car-glow 1.15s ease-in-out infinite;
+}
+
+.police-lights,
+.police-pursuit {
+  animation: sub-map-police-flash .95s ease-in-out infinite !important;
+}
+
+/* Route line gets a clearer travelling energy segment without widening roads. */
+.leaflet-overlay-pane path.sub-route-line {
+  stroke-dasharray: 11 8 3 8;
+  animation: sub-map-route-energy 2.35s linear infinite !important;
+}
+
+.leaflet-overlay-pane path.sub-route-line-returning {
+  animation-duration: 1.95s !important;
+}
+
+.leaflet-overlay-pane path.sub-route-flow {
+  filter:
+    drop-shadow(0 0 3px rgba(248,113,113,.42))
+    drop-shadow(0 0 7px rgba(239,68,68,.15));
+}
+
+/* Operators remain readable over bright streets but receive a red comms halo. */
+.op-pin {
+  box-shadow:
+    0 3px 7px rgba(0,0,0,.78),
+    0 0 7px rgba(248,113,113,.30),
+    0 0 15px rgba(239,68,68,.11) !important;
+}
+
+.op-radio::after {
+  border-color: rgba(248,113,113,.44) !important;
+  box-shadow: 0 0 8px rgba(239,68,68,.14);
+}
+
+/* Mobile: preserve identity while reducing full-screen GPU work. */
+@media (pointer: coarse) {
+  .sub-dark-map.leaflet-container::before {
+    inset: -6%;
+    filter: blur(12px) saturate(110%);
+    opacity: .46;
+    animation-duration: 13s;
+  }
+
+  .opp-pin-selected {
+    animation-duration: 2.7s, 2.7s !important;
+  }
+}
+
+/* Reduced motion keeps the lighting but freezes all new motion. */
+html.sub-reduced-motion .sub-dark-map.leaflet-container::before,
+html.sub-reduced-motion .opp-pin-selected,
+html.sub-reduced-motion .mission-target::before,
+html.sub-reduced-motion .hq-pin::before,
+html.sub-reduced-motion .prop-pin::after,
+html.sub-reduced-motion .unit-car,
+html.sub-reduced-motion .police-lights,
+html.sub-reduced-motion .police-pursuit,
+html.sub-reduced-motion .leaflet-overlay-pane path.sub-route-line {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-dark-map.leaflet-container::before,
+  .opp-pin-selected,
+  .mission-target::before,
+  .hq-pin::before,
+  .prop-pin::after,
+  .unit-car,
+  .police-lights,
+  .police-pursuit,
+  .leaflet-overlay-pane path.sub-route-line {
+    animation: none !important;
+  }
+}
