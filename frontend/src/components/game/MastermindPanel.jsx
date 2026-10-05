@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Slider } from "../ui/slider";
 import {
   AlertTriangle, BriefcaseBusiness, Check, Clock3, Coins,
   Crosshair, Gauge, ListChecks, LockKeyhole, Package, Play,
@@ -265,14 +266,13 @@ const BoardTab = ({
             </div>
             <label className="mt-3 block font-mono text-[10px] uppercase tracking-wider text-zinc-500">
               Parte da equipa · <span className="text-sky-300">{draft.crew_cut_pct}%</span>
-              <input
-                type="range"
-                min="10"
-                max="35"
-                step="1"
-                value={draft.crew_cut_pct}
-                onChange={(event) => setDraft((current) => ({ ...current, crew_cut_pct: Number(event.target.value) }))}
-                className="mt-2 w-full accent-sky-500"
+              <Slider
+                min={10}
+                max={35}
+                step={1}
+                value={[draft.crew_cut_pct]}
+                onValueChange={([next]) => setDraft((current) => ({ ...current, crew_cut_pct: Number(next) }))}
+                className="mt-2 w-full"
               />
             </label>
             <p className="mt-1 text-[10px] text-zinc-600">
