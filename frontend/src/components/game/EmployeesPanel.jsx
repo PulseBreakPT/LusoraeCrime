@@ -793,8 +793,8 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
         )}
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-2 bg-black/40">
-            <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsList className="grid w-full grid-cols-2 gap-1">
+            <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider">
               Efetivo ({state.employees.length})
             </TabsTrigger>
             <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -828,7 +828,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
 
                 <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                   <Select value={rosterSort} onValueChange={setRosterSort}>
-                    <SelectTrigger data-testid="employees-sort" className="h-8 min-h-0 w-full border-white/10 bg-black/50 px-2 font-mono text-[10px] text-zinc-300">
+                    <SelectTrigger data-testid="employees-sort" size="compact">
                       <ArrowUpDown size={11} className="mr-1 shrink-0 text-zinc-500" />
                       <SelectValue />
                     </SelectTrigger>
@@ -844,27 +844,29 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                   <Tip tip={canOptimize
                     ? `Distribui ${freeIdleCount} operacional(is) sem equipa pelas equipas livres com vagas, respeitando especializações.`
                     : freeIdleCount === 0 ? "Não tens operacionais livres sem equipa." : "Não existem equipas livres com vagas."}>
-                    <button
+                    <Button
                       type="button"
+                      size="compact"
+                      variant="outline"
                       data-testid="employees-optimize"
                       onClick={() => canOptimize && optimizeEmployees()}
                       disabled={!canOptimize}
                       className={cn(
-                        "flex h-8 w-full items-center justify-center gap-1 rounded-md border px-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
-                        canOptimize
-                          ? "border-cyan-500/30 bg-cyan-500/[0.08] text-cyan-300 hover:bg-cyan-500/[0.14]"
-                          : "cursor-not-allowed border-white/[0.06] bg-white/[0.02] text-zinc-600"
+                        "w-full gap-1 font-mono font-bold uppercase",
+                        canOptimize ? "text-cyan-300" : "text-zinc-600"
                       )}
                     >
                       <Sparkles size={11} /> Otimizar
-                    </button>
+                    </Button>
                   </Tip>
 
                   <Button
                     data-testid="employees-toggle-unavailable"
-                    variant="outline"
+                    variant="filter"
+                    size="compact"
+                    aria-pressed={hideUnavailable}
                     onClick={() => setHideUnavailable(!hideUnavailable)}
-                    className="h-8 min-h-0 w-full gap-1 border-white/10 px-1.5 font-mono text-[10px] text-zinc-400 hover:bg-white/5"
+                    className="w-full gap-1 font-mono"
                   >
                     {hideUnavailable ? <EyeOff size={11} /> : <Eye size={11} />}
                     {hideUnavailable ? `Disponíveis${hiddenCount > 0 ? ` +${hiddenCount}` : ""}` : "Todos"}
@@ -873,10 +875,11 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                   <Button
                     data-testid="employees-rest-all"
                     variant="outline"
+                    size="compact"
                     onClick={restAll}
                     disabled={restAllBusy || restAllIds.length === 0}
                     aria-busy={restAllBusy}
-                    className="h-8 min-h-0 w-full gap-1 border-white/10 px-1.5 font-mono text-[10px] text-amber-300 hover:bg-white/5 disabled:text-zinc-600"
+                    className="w-full gap-1 font-mono text-amber-300 disabled:text-zinc-600"
                   >
                     {restAllBusy ? <Loader2 size={11} className="animate-spin" /> : <BedDouble size={11} />}
                     Descansar {restAllIds.length}
