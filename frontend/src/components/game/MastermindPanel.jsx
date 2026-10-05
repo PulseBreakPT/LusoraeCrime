@@ -335,17 +335,17 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
     ) : null}
     <div className="mt-3 flex gap-2">
       <Button
-        size="sm"
+        size="compact"
         variant="outline"
-        className="h-8 flex-1 text-[10px]"
+        className="flex-1"
         disabled={!target.unlocked || target.intel_active}
         onClick={onScout}
       >
         <ScanLine size={11} /> {target.intel_active ? "Dossiê ativo" : `Dossiê · ${fmtMoney(target.intel_cost)}`}
       </Button>
       <Button
-        size="sm"
-        className="h-8 flex-1 text-[10px]"
+        size="compact"
+        className="flex-1"
         disabled={!target.unlocked || !canCreate || target.cooldown_remaining_s > 0}
         onClick={onCreate}
       >
@@ -451,9 +451,9 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
               </div>
             )}
             <Button
-              size="sm"
+              size="compact"
               variant={canClaim ? "default" : "outline"}
-              className="mt-3 h-8 w-full text-[10px]"
+              className="mt-3 w-full"
               disabled={prep.status === "complete" || Boolean(active.current_prep && !canClaim)}
               onClick={() => canClaim ? onClaimPrep(prep.key) : onStartPrep(prep.key)}
             >
@@ -543,17 +543,15 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button
-              size="sm"
+              size="compact"
               variant="outline"
-              className="h-8 text-[10px]"
               disabled={!good.unlocked || market.used + totalSpace > market.capacity}
               onClick={() => onTrade(good.key, "buy")}
             >
               Comprar · {fmtMoney(good.price * quantity)}
             </Button>
             <Button
-              size="sm"
-              className="h-8 text-[10px]"
+              size="compact"
               disabled={!good.unlocked || good.owned < quantity}
               onClick={() => onTrade(good.key, "sell")}
             >
@@ -603,12 +601,11 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
         </SelectContent>
       </Select>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button size="sm" variant="outline" className="h-9 text-[10px]" disabled={!bounty.value} onClick={onPay}>
+        <Button size="compact" variant="outline" disabled={!bounty.value} onClick={onPay}>
           <Coins size={11} /> Pagar silêncio
         </Button>
         <Button
-          size="sm"
-          className="h-9 text-[10px]"
+          size="compact"
           disabled={!bounty.value || !teamId || bounty.hunter_remaining_s > 0}
           onClick={onAmbush}
         >
@@ -656,9 +653,9 @@ const CachesTab = ({ caches, onScan }) => (
           </Badge>
         </div>
         <Button
-          size="sm"
+          size="compact"
           variant="outline"
-          className="mt-3 h-8 w-full text-[10px]"
+          className="mt-3 w-full"
           disabled={district.collected || district.remaining_s > 0}
           onClick={() => onScan(district.key)}
         >
