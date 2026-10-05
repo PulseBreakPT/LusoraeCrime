@@ -5,6 +5,7 @@ from economy_director import (
     reward_ceiling,
     guard_reward,
     city_business_cap,
+    passive_portfolio_scale,
 )
 
 
@@ -28,6 +29,12 @@ def test_interpolation_and_caps_scale_to_endgame():
     assert reward_ceiling(100, "mastermind") == 1_600_000
     assert reward_ceiling(100, "operation") == 400_000
     assert guard_reward(9_999_999, 100, "mastermind") == 1_600_000
+
+
+def test_passive_portfolio_is_scaled_to_the_same_career_envelope():
+    # Level 1 ceiling is 18k/h: a 36k one-hour portfolio is halved.
+    assert passive_portfolio_scale(1, 1, 18_000, 18_000) == 0.5
+    assert passive_portfolio_scale(100, 2, 80_000, 80_000) == 1.0
 
 
 def test_city_business_capacity_is_bounded_and_progressive():
