@@ -11,6 +11,7 @@ from db import db
 from engine import add_event, dirty_money_cap, now_utc, parse_dt, record_tx
 from game_data import VEHICLE_MODELS
 from mutation_guard import MutationInput, idempotent
+from state_lease import acquire_player_state_lease, release_player_state_lease
 from economy_director import guard_reward
 from mastermind_data import (
     COMPLICATIONS,
@@ -449,7 +450,17 @@ async def mastermind_state(user: dict = Depends(get_current_user)):
     player = await _player(user, require_hq=False)
     if not player.get("hq"):
         return {"hq_pending": True, "server_time": now_utc().isoformat()}
-    return await _snapshot(player, now_utc())
+    now = now_utc()
+    owner = f"mastermind-state:{user['_id']}:{now.timestamp():.6f}"
+    locked = await acquire_player_state_lease(
+        db, player["_id"], owner, ttl_s=120, wait_s=5,
+    )
+    if not locked:
+        raise HTTPException(status_code=409, detail="A organização está a atualizar o estado")
+    try:
+        return await _snapshot(locked, now)
+    finally:
+        await release_player_state_lease(db, player["_id"], owner)
 
 
 @router.post("/heists/intel")
