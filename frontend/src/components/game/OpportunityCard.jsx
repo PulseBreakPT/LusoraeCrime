@@ -463,8 +463,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               data-testid="dispatch-advanced-toggle"
               type="button"
               variant="ghost"
+              size="compact"
               onClick={() => setShowAdvancedSetup((value) => !value)}
-              className="mt-2 h-7 w-full justify-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
+              className="mt-2 w-full justify-center gap-1 font-mono font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
             >
               {showAdvancedSetup ? "Ocultar configuração" : "Configuração avançada"}
               <ChevronDown size={11} className={`transition-transform ${showAdvancedSetup ? "rotate-180" : ""}`} />
