@@ -387,13 +387,13 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
                         <p className="text-[10px] text-zinc-600">{dept.desc}</p>
                       </div>
                       {unlocked ? (
-                        <button
+                        <Button variant="bare" size="bare"
                           type="button"
                           onClick={() => onNavigate && onNavigate("organization")}
                           className="shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[0.06] px-2 py-1 font-mono text-[10px] uppercase text-emerald-400"
                         >
                           N{deptLevel}/{maxLevel}
-                        </button>
+                        </Button>
                       ) : (
                         <span className="shrink-0 font-mono text-[10px] uppercase text-zinc-600">Nível {unlockLevel}</span>
                       )}
