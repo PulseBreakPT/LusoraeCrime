@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../lib/api";
 import { LegalShell, LegalSkeleton, LegalError } from "../components/legal/LegalShell";
+import { Card } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
 import { GitBranch, Sparkles, Wrench, Bug, Scale, Coins, LayoutDashboard } from "lucide-react";
 
 const CATEGORY_ORDER = ["novidades", "melhorias", "correcoes", "equilibrio", "economia", "interface"];
@@ -70,13 +72,13 @@ export default function ChangelogPage() {
                   <span className={`h-1.5 w-1.5 rounded-full ${v.tag === "atual" ? "bg-red-500" : "bg-zinc-600"}`} />
                 </span>
 
-                <div className={`sub-version-card rounded-lg p-5 sm:p-6 ${v.tag === "atual" ? "sub-version-current" : ""}`}>
+                <Card className={`sub-version-card rounded-lg p-5 sm:p-6 ${v.tag === "atual" ? "sub-version-current" : ""}`}>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <span className="font-display text-2xl font-bold tracking-tight text-white">v{v.version}</span>
                     {v.tag === "atual" && (
-                      <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
+                      <Badge className="rounded-full border-red-500/40 bg-red-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
                         Atual
-                      </span>
+                      </Badge>
                     )}
                     <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-600">{formatDate(v.date)}</span>
                   </div>
@@ -88,9 +90,9 @@ export default function ChangelogPage() {
                       const Icon = style.icon;
                       return (
                         <div key={cat}>
-                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ${style.badge}`}>
+                          <Badge variant="outline" className={`gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ${style.badge}`}>
                             <Icon size={11} aria-hidden="true" /> {data.categories?.[cat] || cat}
-                          </span>
+                          </Badge>
                           <ul className="mt-2.5 space-y-1.5">
                             {v.sections[cat].map((item, i) => (
                               <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-400">
@@ -103,7 +105,7 @@ export default function ChangelogPage() {
                       );
                     })}
                   </div>
-                </div>
+                </Card>
               </section>
             ))}
           </div>
