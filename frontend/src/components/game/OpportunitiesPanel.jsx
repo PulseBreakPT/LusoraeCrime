@@ -102,8 +102,8 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sub-panel">
-        <SheetHeader>
+      <SheetContent side="right" className="sub-panel sub-operations-panel">
+        <SheetHeader className="sub-operations-head">
           <PanelWatermark icon={Target} />
           <SheetTitle className="flex items-center gap-2 text-white">
             <Target size={18} className="text-primary" /> Operações disponíveis
@@ -116,7 +116,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
         {pulse && (
           <Card
             data-testid="world-pulse-card"
-            className="mt-3 border-cyan-500/15 bg-cyan-500/[0.035] p-3 shadow-none"
+            className="sub-world-pulse mt-3 border-cyan-500/15 bg-cyan-500/[0.035] p-3 shadow-none"
           >
             <div className="flex items-start gap-2.5">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-300">
@@ -134,8 +134,8 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{pulse.description}</p>
-                <p className="mt-1.5 font-mono text-[10px] text-cyan-300">
+                <p className="sub-world-pulse-description mt-1 text-[10px] leading-relaxed text-zinc-500">{pulse.description}</p>
+                <p className="sub-world-pulse-effect mt-1.5 font-mono text-[10px] text-cyan-300">
                   +{pulse.reward_bonus_pct}% recompensa
                   {pulse.heat_delta_pct !== 0 && (
                     <> · {pulse.heat_delta_pct > 0 ? "+" : ""}{pulse.heat_delta_pct}% geração de calor</>
@@ -147,13 +147,13 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           </Card>
         )}
 
-        <SummaryStrip cols={2} className="mt-3" testId="opportunities-summary">
+        <SummaryStrip cols={2} className="sub-operations-summary mt-3" testId="opportunities-summary">
           <Kpi icon={Target} label="No mapa" value={`${opps.length}`} color="#38BDF8" />
           <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
         </SummaryStrip>
 
         {/* Procura + ordenação */}
-        <div className="mt-3 space-y-2">
+        <div className="sub-operations-filters mt-3 space-y-2">
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <Input
@@ -161,10 +161,10 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Pesquisar operações"
               placeholder="Procurar por nome, zona ou tipo…"
-              className="h-8 border-white/10 bg-black/60 pl-7 font-mono text-xs text-white"
+              className="sub-operations-search h-9 border-white/10 bg-black/60 pl-8 font-mono text-xs text-white"
             />
           </div>
-          <div className="grid grid-cols-1 gap-1.5 min-[430px]:grid-cols-3">
+          <div className="sub-operations-selects grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             <Select value={sortKey} onValueChange={setSortKey}>
               <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
                 <SelectValue />
@@ -187,7 +187,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
             <Select value={forceFilter} onValueChange={setForceFilter}>
-              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger className="col-span-2 h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white sm:col-span-1">
                 <SelectValue placeholder="Força" />
               </SelectTrigger>
               <SelectContent>
@@ -201,14 +201,14 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
             <Button
               variant="outline" size="sm"
               onClick={() => setReachableOnly((v) => !v)}
-              className={`min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${reachableOnly ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-400"}`}
+              className={`sub-filter-chip min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${reachableOnly ? "is-active bg-emerald-500/15 text-emerald-300" : "text-zinc-400"}`}
             >
               <CheckCircle2 size={11} /> Só alcançáveis
             </Button>
             <Button
               variant="outline" size="sm"
               onClick={() => setFavOnly((v) => !v)}
-              className={`min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${favOnly ? "bg-amber-500/15 text-amber-300" : "text-zinc-400"}`}
+              className={`sub-filter-chip min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${favOnly ? "is-active bg-amber-500/15 text-amber-300" : "text-zinc-400"}`}
             >
               <Star size={11} /> Favoritas
             </Button>
@@ -216,7 +216,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
         </div>
 
         {/* Lista */}
-        <div className="mt-3 space-y-1.5 pb-4">
+        <div className="sub-operations-list mt-3 space-y-1.5 pb-4">
           {rows.length === 0 && (
             <p className="py-8 text-center font-mono text-xs text-zinc-500">
               Nenhuma operação corresponde aos filtros.
@@ -233,7 +233,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
                 key={opp.id}
                 data-testid={`opp-row-${opp.id}`}
                 onClick={() => onSelectOpp(opp)}
-                className="sub-card flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none transition-colors hover:bg-white/[0.07]"
+                className="sub-card sub-operation-row flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 shadow-none transition-colors hover:bg-white/[0.07]"
               >
                 <span
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
