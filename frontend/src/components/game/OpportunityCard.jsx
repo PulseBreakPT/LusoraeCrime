@@ -299,7 +299,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
             </Button>
           </Tip>
-          <Button data-testid="opportunity-card-close" variant="ghost" size="icon" onClick={onClose} className="h-7 w-7 text-zinc-500 hover:text-white">
+          <Button data-testid="opportunity-card-close" variant="ghost" size="iconCompact" onClick={onClose} className="text-zinc-500 hover:text-white">
             <X size={16} />
           </Button>
         </div>
