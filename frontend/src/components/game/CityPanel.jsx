@@ -538,7 +538,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                           </p>
                           {!own && m.player_id && (
                             <div className="flex shrink-0 gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
-                              <button
+                              <Button variant="bare" size="bare"
                                 type="button"
                                 title="Denunciar mensagem"
                                 aria-label="Denunciar mensagem"
@@ -550,8 +550,8 @@ export const CityPanel = ({ open, onOpenChange }) => {
                                 className="rounded p-1 text-zinc-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
                               >
                                 <Flag size={10} />
-                              </button>
-                              <button
+                              </Button>
+                              <Button variant="bare" size="bare"
                                 type="button"
                                 title="Bloquear organização"
                                 aria-label="Bloquear organização"
@@ -563,7 +563,7 @@ export const CityPanel = ({ open, onOpenChange }) => {
                                 className="rounded p-1 text-zinc-600 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-30"
                               >
                                 <UserX size={10} />
-                              </button>
+                              </Button>
                             </div>
                           )}
                         </div>
