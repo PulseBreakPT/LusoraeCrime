@@ -323,7 +323,7 @@ export default function GamePage() {
 
       {!placement && !focusMode && (
         <div
-          className="pointer-events-auto absolute left-1/2 z-40 -translate-x-1/2"
+          className="sub-bottom-nav-shell pointer-events-auto absolute left-1/2 z-40"
           style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
         >
           {navGroup && (
