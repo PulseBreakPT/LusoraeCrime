@@ -120,13 +120,12 @@ jobs:
       - name: Run frontend regression tests
         env:
           CI: "true"
-        run: yarn test --watchAll=false --runInBand --runTestsByPath src/game/localGuestEngine.test.js src/game/livingCity.test.js src/game/economyDirector.test.js src/lib/mapTiles.test.js src/lib/game.activity.test.js src/lib/routing.test.js src/lib/uiActionOwnership.test.js
+        run: yarn test --watchAll=false --runInBand
 
       - name: Build production bundle
         env:
-          CI: "false"
+          CI: "true"
           GENERATE_SOURCEMAP: "false"
           REACT_APP_BACKEND_URL: ${{ vars.PUBLIC_BACKEND_URL || 'https://lusora-patrols.preview.emergentagent.com' }}
-          REACT_APP_AUTH_UI_ENABLED: "true"
           REACT_APP_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: yarn build
