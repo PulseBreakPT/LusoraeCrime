@@ -38,15 +38,11 @@ const timeLeft = (seconds) => {
 const ActionButton = ({ children, onClick, disabled, tone = "default" }) => (
   <Button
     type="button"
-    size="sm"
-    variant="outline"
+    size="compact"
+    variant={tone === "danger" ? "destructive" : tone === "good" ? "success" : "outline"}
     disabled={disabled}
     onClick={onClick}
-    className={`h-8 font-mono text-[10px] uppercase tracking-[0.08em] ${
-      tone === "danger" ? "border-red-500/25 text-red-300 hover:bg-red-500/10" :
-      tone === "good" ? "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10" :
-      "border-white/10 bg-black/20 text-zinc-300"
-    }`}
+    className="font-mono uppercase tracking-[0.08em]"
   >
     {children}
   </Button>
