@@ -11,7 +11,7 @@ from pymongo import ReturnDocument
 from auth import get_current_user
 from db import db
 from engine import add_event, now_utc, record_tx
-from routes_game import get_player
+from player_access import get_player
 from mutation_guard import MutationInput, idempotent
 from city_data import (
     BUSINESS_TYPES, RIVAL_ACTIONS, CASINO_MIN_BET, CASINO_MAX_BET,
