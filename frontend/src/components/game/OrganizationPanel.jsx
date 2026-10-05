@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import {
@@ -440,10 +441,9 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                   ["preventive_service", "Manutenção preventiva"],
                 ].map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 rounded border border-white/[0.08] px-2 py-2 text-[10px] text-zinc-400">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={!!policyDraft?.automation?.[key]}
-                      onChange={(e) => patchAutomation(key, e.target.checked)}
+                      onCheckedChange={(checked) => patchAutomation(key, checked === true)}
                     />
                     <span>{label}</span>
                   </label>
@@ -736,11 +736,10 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       const enabled = team.policies?.[policyKey] ?? cfg.default ?? false;
                       return (
                         <label key={policyKey} className="flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-2 text-[10px] text-zinc-400">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={!!enabled}
                             disabled={team.status !== "idle"}
-                            onChange={(e) => setTeamPolicies(team.id, { ...(team.policies || {}), [policyKey]: e.target.checked })}
+                            onCheckedChange={(checked) => setTeamPolicies(team.id, { ...(team.policies || {}), [policyKey]: checked === true })}
                           />
                           <span>{cfg.name}</span>
                         </label>
@@ -758,11 +757,10 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                         const available = Number(inventory[key] || 0);
                         return (
                           <label key={key} className={`flex items-center gap-2 rounded-md border px-2 py-2 text-[10px] ${checked ? "border-emerald-500/30 bg-emerald-500/10 text-zinc-200" : "border-white/10 bg-white/[0.02] text-zinc-500"}`}>
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={checked}
                               disabled={available <= 0}
-                              onChange={(e) => setLoadoutQty(team.id, key, e.target.checked)}
+                              onCheckedChange={(next) => setLoadoutQty(team.id, key, next === true)}
                             />
                             <span className="min-w-0 flex-1 truncate">{item.name}</span>
                             <span className="font-mono">×{available}</span>
@@ -987,11 +985,10 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     <div className="max-h-28 space-y-1 overflow-y-auto">
                       {eligiblePropertyStaff.map((e) => (
                         <label key={e.id} className="flex items-center gap-2 rounded border border-white/[0.06] px-2 py-1.5 text-[10px] text-zinc-400">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selectedStaff.has(e.id)}
                             disabled={!selectedStaff.has(e.id) && selectedStaff.size >= 4}
-                            onChange={() => togglePropertyStaff(p.id, e.id)}
+                            onCheckedChange={() => togglePropertyStaff(p.id, e.id)}
                           />
                           <span className="min-w-0 flex-1 truncate">{e.name}</span>
                           <span className="font-mono text-zinc-600">{e.role_key}</span>
