@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 
 from quests_data import (QUEST_DEFS, QUEST_ORDER, DAILY_POOL, WEEKLY_POOL,
                          DYNAMIC_KEYS, EVENT_KEYS, DECISION_KEYS, DIFFICULTY_MULT)
+from economy_director import guard_reward
 
 
 # ---------------- Fórmulas (SSS v3) ----------------
@@ -188,6 +189,10 @@ def effective_quest_rewards(player, q, d, now):
     money_m, resp_m, labels = compute_quest_mult(player, q, d, now, streak_count)
     _register_claim(player, q, d, now)
     rewards = scale_rewards(d.get("rewards", {}), money_m, resp_m)
+    level = int(player.get("level", 1) or 1)
+    for currency in ("clean", "dirty"):
+        if rewards.get(currency):
+            rewards[currency] = guard_reward(rewards[currency], level, "quest")
     note = None
     if labels and any(rewards.get(k) for k in ("dirty", "clean", "respect")):
         note = f"recompensa ×{money_m:.2f} ({', '.join(labels)})"
