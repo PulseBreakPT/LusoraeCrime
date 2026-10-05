@@ -332,17 +332,24 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
   const bearingRef = useRef(null);
   const posRef = useRef(null);
   const commLineRef = useRef(null);
+  const missionRouteRef = useRef(mission);
+  const serverNowRef = useRef(serverNow);
+  missionRouteRef.current = mission;
+  serverNowRef.current = serverNow;
 
   useEffect(() => {
     let cancelled = false;
 
     const loadRoadPlans = async () => {
+      const activeMission = missionRouteRef.current;
+      const clock = serverNowRef.current;
+
       // A geometria resolvida no despacho é a fonte canónica da missão.
       // Só pedimos OSRM para saves legados/rotas ausentes; nunca substituímos
       // uma road_outward persistida a meio da viagem (isso causava saltos).
-      const outward = validRoadPlan(mission.road_outward)
-        ? mission.road_outward
-        : await fetchRoute(mission.origin, mission.target);
+      const outward = validRoadPlan(activeMission.road_outward)
+        ? activeMission.road_outward
+        : await fetchRoute(activeMission.origin, activeMission.target);
       if (cancelled) return;
 
       if (outward.unavailable || !outward.latlngs?.length) {
@@ -350,9 +357,8 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         return;
       }
 
-      const parking = buildParking(mission, outward);
+      const parking = buildParking(activeMission, outward);
       const parkTime = timeAtDistanceFraction(outward, parking.cum, parking.parkFrac);
-      const outwardReadyAt = route?.outward ? null : serverNow();
 
       setRoute((current) => ({
         outward,
@@ -360,21 +366,24 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         parking,
         parkTime,
         unavailable: false,
-        outwardReadyAt,
+        outwardReadyAt: current?.outward ? null : clock(),
         inwardReadyAt: current?.inwardReadyAt ?? null,
       }));
 
       // O regresso replica o 112i: plano separado, alvo -> base. Nunca se
       // inverte a ida e nunca se inicia de um ponto lateral artificial.
-      let inward = validRoadPlan(mission.road_inward)
-        ? mission.road_inward
-        : await fetchRoute(mission.target, mission.origin);
+      const inward = validRoadPlan(activeMission.road_inward)
+        ? activeMission.road_inward
+        : await fetchRoute(activeMission.target, activeMission.origin);
       if (cancelled) return;
 
-      const inwardReadyAt = route?.inward ? null : serverNow();
       setRoute((current) => {
         if (!current || current.outward !== outward) return current;
-        return { ...current, inward, inwardReadyAt };
+        return {
+          ...current,
+          inward,
+          inwardReadyAt: current.inward ? null : clock(),
+        };
       });
     };
 
@@ -858,6 +867,10 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
   const tr = vehicle.transfer;
   const origin = tr.from;
   const target = tr.to;
+  const originRouteRef = useRef(origin);
+  const targetRouteRef = useRef(target);
+  originRouteRef.current = origin;
+  targetRouteRef.current = target;
   const [route, setRoute] = useState(() => peekRoute(origin, target));
   const markerRef = useRef(null);
   const routeReadyAtRef = useRef(null);
@@ -868,14 +881,16 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
 
   useEffect(() => {
     let cancelled = false;
-    const cached = peekRoute(origin, target);
+    const routeOrigin = originRouteRef.current;
+    const routeTarget = targetRouteRef.current;
+    const cached = peekRoute(routeOrigin, routeTarget);
     if (cached && !cached.unavailable) {
       routeReadyAtRef.current = null;
       setRoute(cached);
       return () => { cancelled = true; };
     }
 
-    fetchRoute(origin, target).then((info) => {
+    fetchRoute(routeOrigin, routeTarget).then((info) => {
       if (cancelled) return;
       routeReadyAtRef.current = info?.unavailable ? null : serverNow();
       setRoute(info);
@@ -1187,7 +1202,7 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   return (
     <div
