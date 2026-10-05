@@ -1,4 +1,5 @@
 import "@/App.css";
+import "@/cinematic.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster, toast } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContextV2";
