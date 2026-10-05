@@ -1,3 +1,4 @@
+import { cityBusinessCap, guardReward } from "./economyDirector";
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const nowIso = () => new Date().toISOString();
@@ -167,7 +168,8 @@ export const advanceLocalCity = (save) => {
     if(s.id && !save.city.claimed_seasons.includes(s.id)){
       const oldBoard=npcLeaderboard(save,{id:s.id});
       const rank=oldBoard.find((x)=>x.is_you)?.rank||oldBoard.length;
-      const reward=LOCAL_SEASON_REWARDS[rank]||{clean:0,respect:0};
+      const baseReward=LOCAL_SEASON_REWARDS[rank]||{clean:0,respect:0};
+      const reward={...baseReward,clean:guardReward(baseReward.clean,save.player.level,"season")};
       if(reward.clean){
         save.player.clean_money=Number(save.player.clean_money||0)+reward.clean;
         pushTx(save,"city_season_reward",reward.clean,"clean",`Prémio ${s.id} · #${rank}`);
@@ -236,8 +238,6 @@ export const advanceLocalCity = (save) => {
   save.city.boss.stress=clamp(Number(save.city.boss.stress||0),0,100);
   return save;
 };
-
-const cityBusinessCap=(level)=>Math.min(12,2+Math.floor(clamp(Number(level||1),1,100)/10));
 
 const businessProjection=(b)=>{
   const cfg=LOCAL_BUSINESS_TYPES[b.type_key]||{},last=Date.parse(b.last_collect_at||b.bought_at||nowIso());
