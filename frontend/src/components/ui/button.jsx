@@ -22,7 +22,7 @@ const buttonVariants = cva(
         warning:
           "sub-btn-warning border border-amber-500/35 bg-amber-950/80 text-amber-100 hover:border-amber-400/50 hover:bg-amber-900/85 active:scale-[0.96]",
         filter:
-          "sub-btn-filter border border-white/10 bg-[#0d0d10] text-zinc-400 hover:border-white/20 hover:bg-[#111115] hover:text-white active:scale-[0.96] aria-[pressed=true]:border-red-500/30 aria-[pressed=true]:bg-red-500/12 aria-[pressed=true]:text-red-200",
+          "sub-btn-filter border border-white/10 bg-[#0d0d10] text-zinc-400 hover:border-white/20 hover:bg-[#111115] hover:text-white active:scale-[0.96] aria-[pressed=true]:border-red-500/30 aria-[pressed=true]:bg-red-500/[0.12] aria-[pressed=true]:text-red-200",
         ghost: "sub-btn-ghost border border-transparent text-zinc-300 hover:bg-white/[0.06] hover:text-white",
         link: "sub-btn-link text-red-400 underline-offset-4 hover:text-red-300 hover:underline",
       },
