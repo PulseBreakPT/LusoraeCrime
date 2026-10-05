@@ -9,6 +9,10 @@ def text(name):
     return (ROOT / name).read_text(encoding="utf-8")
 
 
+def repo_text(name):
+    return (ROOT.parent / name).read_text(encoding="utf-8")
+
+
 def require_idempotent(source, route, action=None):
     pattern = rf'@router\.post\("{re.escape(route)}"\)\s*@idempotent\("([^"]+)"\)'
     match = re.search(pattern, source)
@@ -23,6 +27,12 @@ def run():
     mastermind = text("routes_mastermind.py")
     auth = text("auth.py")
     admin = text("routes_admin.py")
+    engine = text("engine.py")
+    automation = text("organization_automation.py")
+    game_data = text("game_data.py")
+    live_map = repo_text("frontend/src/components/game/LiveMap.jsx")
+    guest_engine = repo_text("frontend/src/game/localGuestEngine.js")
+    guest_catalog = repo_text("frontend/src/game/localGuestCatalog.js")
 
     # Money/state mutations most likely to be retried by browsers/mobile networks.
     for route in (
@@ -68,6 +78,30 @@ def run():
     # Admin reset and stats must understand the level-100 world.
     assert ".to_list(100)" in admin
     assert "city_chat_reports" in admin
+
+    # State polling must never simulate the same elapsed interval twice.
+    assert "simulation_lease_token" in engine
+    assert "simulation_lease_until" in engine
+    assert "OFFLINE_SIMULATION_MAX_MINUTES" in engine
+    assert "OFFLINE_PAYROLL_MAX_CYCLES" in engine
+
+    # Automatic organization spending claims an atomic 15-minute slot.
+    assert "organization_automation_slot" in automation
+    assert '"skipped": "concurrent"' in automation
+
+    # Dispatch geometry is immutable after the backend/local engine persisted it.
+    assert "validRoadPlan(mission.road_outward)" in live_map
+    assert "const outward = await fetchRoute(mission.origin, mission.target);" not in live_map
+
+    # Level-100 unlocks are a versioned contract, not a side-effect of prices.
+    assert "PROGRESSION_UNLOCK_VERSION = 1" in game_data
+    assert "_spread_unlocks(" not in game_data
+    assert "progression_unlock_version = 1" in guest_catalog
+    assert "spreadLocalUnlocks" not in guest_catalog
+
+    # Backend and guest use the same bounded offline catch-up policy.
+    assert "OFFLINE_SIMULATION_MAX_S = 28 * 24 * 3600" in guest_engine
+    assert "OFFLINE_PAYROLL_MAX_CYCLES = 5" in guest_engine
 
     print("launch contracts: OK")
 
