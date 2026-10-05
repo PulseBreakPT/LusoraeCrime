@@ -1,7 +1,7 @@
 import { LOCAL_CATALOG, LOCAL_GUEST_SAVE_VERSION } from "./localGuestCatalog";
 import { propertyMarketPrice } from "../lib/propertyMarket";
 import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance, localBossLeadership } from "./livingCity";
-import { guardReward } from "./economyDirector";
+import { guardReward, passivePortfolioScale } from "./economyDirector";
 
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
@@ -1049,12 +1049,15 @@ const tick = (save) => {
 
   const passiveHours=elapsed/3600;
   if(passiveHours>0.01){
-    let clean=0,dirty=0;
+    let cleanRate=orgTerritoryIncome(save),dirtyRate=0;
     save.properties.forEach((p)=>{
       const cfg=LOCAL_CATALOG.property_types[p.type_key]||{};
-      clean += (cfg.passive_clean||0)*p.level*passiveHours;
-      dirty += (cfg.passive_dirty||0)*p.level*passiveHours;
+      cleanRate += (cfg.passive_clean||0)*p.level;
+      dirtyRate += (cfg.passive_dirty||0)*p.level;
     });
+    const passiveScale=passivePortfolioScale(save.player.level,1,cleanRate,dirtyRate);
+    const clean=cleanRate*passiveHours*passiveScale;
+    const dirty=dirtyRate*passiveHours*passiveScale;
     if(clean){save.player.clean_money += clean;}
     if(dirty){save.player.dirty_money += dirty;}
     save.player.heat=clamp(save.player.heat-elapsed/900,0,100);
