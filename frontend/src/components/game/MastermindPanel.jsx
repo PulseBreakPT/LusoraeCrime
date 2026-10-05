@@ -10,8 +10,10 @@ import { fmtDuration, fmtMoney } from "../../lib/game";
 import { MiniBar, PanelWatermark, SectionHeader } from "./hud";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../ui/sheet";
 import { Button } from "../ui/button";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 
 
 const TABS = [
@@ -20,8 +22,6 @@ const TABS = [
   ["bounty", "Caçada", ShieldAlert],
   ["caches", "Sinais", RadioTower],
 ];
-
-const selectClass = "mt-1 h-11 w-full rounded-md border border-white/10 bg-black/50 px-2 font-mono text-base sm:h-9 sm:text-[10px] text-zinc-200 outline-none focus:border-red-500/50";
 
 const statusLabel = {
   available: "Disponível",
@@ -96,21 +96,20 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
           </Card>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 sm:grid-cols-4">
-              {TABS.map(([key, label, Icon]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setTab(key)}
-                  data-testid={`mastermind-tab-${key}`}
-                  className={`flex items-center justify-center gap-1 rounded-lg px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                    tab === key ? "bg-sky-500/20 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-                  }`}
-                >
-                  <Icon size={11} /> {label}
-                </button>
-              ))}
-            </div>
+            <Tabs value={tab} onValueChange={setTab} className="mt-4">
+              <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
+                {TABS.map(([key, label, Icon]) => (
+                  <TabsTrigger
+                    key={key}
+                    value={key}
+                    data-testid={`mastermind-tab-${key}`}
+                    className="gap-1 px-1 font-mono text-[10px] font-bold uppercase tracking-wider"
+                  >
+                    <Icon size={11} /> {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
             {tab === "board" && (
               <BoardTab
@@ -203,56 +202,64 @@ const BoardTab = ({
           <Card className="sub-card p-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label="Equipa">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.team_id}
-                  onChange={(event) => setDraft((current) => ({ ...current, team_id: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, team_id: value }))}
                 >
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name} · {team.status === "idle" ? "pronta" : team.status}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue placeholder="Escolher equipa" /></SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} · {team.status === "idle" ? "pronta" : team.status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Veículo de fuga">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.vehicle_id}
-                  onChange={(event) => setDraft((current) => ({ ...current, vehicle_id: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, vehicle_id: value }))}
                 >
-                  {vehicles.filter((vehicle) => !vehicle.team_id || vehicle.team_id === draft.team_id).map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.name} · {Math.round(vehicle.condition)}%
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue placeholder="Escolher veículo" /></SelectTrigger>
+                  <SelectContent>
+                    {vehicles.filter((vehicle) => !vehicle.team_id || vehicle.team_id === draft.team_id).map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.name} · {Math.round(vehicle.condition)}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Abordagem">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.approach_key}
-                  onChange={(event) => setDraft((current) => ({ ...current, approach_key: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, approach_key: value }))}
                 >
-                  {mastermind.approaches.map((approach) => (
-                    <option key={approach.key} value={approach.key} disabled={!approach.unlocked}>
-                      {approach.name}{!approach.unlocked ? ` · nível ${approach.unlock_rank}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {mastermind.approaches.map((approach) => (
+                      <SelectItem key={approach.key} value={approach.key} disabled={!approach.unlocked}>
+                        {approach.name}{!approach.unlocked ? ` · nível ${approach.unlock_rank}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Recetor da carga">
-                <select
-                  className={selectClass}
+                <Select
                   value={draft.fence_key}
-                  onChange={(event) => setDraft((current) => ({ ...current, fence_key: event.target.value }))}
+                  onValueChange={(value) => setDraft((current) => ({ ...current, fence_key: value }))}
                 >
-                  {mastermind.fences.map((fence) => (
-                    <option key={fence.key} value={fence.key} disabled={!fence.unlocked}>
-                      {fence.name}{!fence.unlocked ? ` · nível ${fence.unlock_rank}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger size="compact" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {mastermind.fences.map((fence) => (
+                      <SelectItem key={fence.key} value={fence.key} disabled={!fence.unlocked}>
+                        {fence.name}{!fence.unlocked ? ` · nível ${fence.unlock_rank}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
             </div>
             <label className="mt-3 block font-mono text-[10px] uppercase tracking-wider text-zinc-500">
@@ -328,17 +335,17 @@ const TargetCard = ({ target, canCreate, onScout, onCreate }) => (
     ) : null}
     <div className="mt-3 flex gap-2">
       <Button
-        size="sm"
+        size="compact"
         variant="outline"
-        className="h-8 flex-1 text-[10px]"
+        className="flex-1"
         disabled={!target.unlocked || target.intel_active}
         onClick={onScout}
       >
         <ScanLine size={11} /> {target.intel_active ? "Dossiê ativo" : `Dossiê · ${fmtMoney(target.intel_cost)}`}
       </Button>
       <Button
-        size="sm"
-        className="h-8 flex-1 text-[10px]"
+        size="compact"
+        className="flex-1"
         disabled={!target.unlocked || !canCreate || target.cooldown_remaining_s > 0}
         onClick={onCreate}
       >
@@ -444,9 +451,9 @@ const ActivePlan = ({ active, onStartPrep, onClaimPrep, onLaunch, onClaim, onAbo
               </div>
             )}
             <Button
-              size="sm"
+              size="compact"
               variant={canClaim ? "default" : "outline"}
-              className="mt-3 h-8 w-full text-[10px]"
+              className="mt-3 w-full"
               disabled={prep.status === "complete" || Boolean(active.current_prep && !canClaim)}
               onClick={() => canClaim ? onClaimPrep(prep.key) : onStartPrep(prep.key)}
             >
@@ -536,17 +543,15 @@ const MarketTab = ({ market, quantity, setQuantity, onTrade }) => (
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button
-              size="sm"
+              size="compact"
               variant="outline"
-              className="h-8 text-[10px]"
               disabled={!good.unlocked || market.used + totalSpace > market.capacity}
               onClick={() => onTrade(good.key, "buy")}
             >
               Comprar · {fmtMoney(good.price * quantity)}
             </Button>
             <Button
-              size="sm"
-              className="h-8 text-[10px]"
+              size="compact"
               disabled={!good.unlocked || good.owned < quantity}
               onClick={() => onTrade(good.key, "sell")}
             >
@@ -585,18 +590,22 @@ const BountyTab = ({ bounty, teams, teamId, setTeamId, onPay, onAmbush }) => (
       <p className="mt-1 text-[10px] text-zinc-500">
         Envia uma equipa disponível para identificar e quebrar a rede que te está a seguir.
       </p>
-      <select aria-label="Selecionar equipa para contraemboscada" className={selectClass} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
-        {teams.map((team) => (
-          <option key={team.id} value={team.id}>{team.name} · {team.status}</option>
-        ))}
-      </select>
+      <Select value={teamId} onValueChange={setTeamId}>
+        <SelectTrigger size="compact" className="mt-2" aria-label="Selecionar equipa para contraemboscada">
+          <SelectValue placeholder="Escolher equipa" />
+        </SelectTrigger>
+        <SelectContent>
+          {teams.map((team) => (
+            <SelectItem key={team.id} value={team.id}>{team.name} · {team.status}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button size="sm" variant="outline" className="h-9 text-[10px]" disabled={!bounty.value} onClick={onPay}>
+        <Button size="compact" variant="outline" disabled={!bounty.value} onClick={onPay}>
           <Coins size={11} /> Pagar silêncio
         </Button>
         <Button
-          size="sm"
-          className="h-9 text-[10px]"
+          size="compact"
           disabled={!bounty.value || !teamId || bounty.hunter_remaining_s > 0}
           onClick={onAmbush}
         >
@@ -644,9 +653,9 @@ const CachesTab = ({ caches, onScan }) => (
           </Badge>
         </div>
         <Button
-          size="sm"
+          size="compact"
           variant="outline"
-          className="mt-3 h-8 w-full text-[10px]"
+          className="mt-3 w-full"
           disabled={district.collected || district.remaining_s > 0}
           onClick={() => onScan(district.key)}
         >
