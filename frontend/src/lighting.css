@@ -1,0 +1,559 @@
+/* ==========================================================================
+   SUBMUNDO — UNIFIED LIGHTING SYSTEM
+   Final visual layer: light leaks, blue/cyan ambience, semantic danger light,
+   controlled blur and a shared shadow hierarchy. No scanlines.
+   ========================================================================== */
+
+:root {
+  --sub-light-blue: #38bdf8;
+  --sub-light-cyan: #22d3ee;
+  --sub-light-red: #ef4444;
+  --sub-light-amber: #f59e0b;
+  --sub-light-green: #34d399;
+
+  --sub-glow-blue-soft: rgba(56, 189, 248, 0.10);
+  --sub-glow-blue-mid: rgba(34, 211, 238, 0.20);
+  --sub-glow-red-soft: rgba(239, 68, 68, 0.10);
+  --sub-glow-red-mid: rgba(239, 68, 68, 0.24);
+  --sub-glow-amber-soft: rgba(245, 158, 11, 0.10);
+
+  --sub-shadow-float:
+    0 18px 52px rgba(0, 0, 0, 0.58),
+    0 4px 14px rgba(0, 0, 0, 0.32);
+  --sub-shadow-panel:
+    0 30px 84px rgba(0, 0, 0, 0.72),
+    0 8px 28px rgba(0, 0, 0, 0.42);
+  --sub-shadow-blue:
+    0 0 0 1px rgba(56, 189, 248, 0.08),
+    0 0 24px rgba(34, 211, 238, 0.07);
+  --sub-shadow-red:
+    0 0 0 1px rgba(239, 68, 68, 0.12),
+    0 0 26px rgba(239, 68, 68, 0.08);
+
+  --sub-blur-hud: 10px;
+  --sub-blur-panel: 18px;
+}
+
+@keyframes sub-light-leak-drift {
+  0% {
+    transform: translate3d(-8%, -2%, 0) scale(1);
+    opacity: 0.58;
+  }
+  35% {
+    transform: translate3d(5%, 4%, 0) scale(1.08);
+    opacity: 0.82;
+  }
+  70% {
+    transform: translate3d(12%, -4%, 0) scale(0.96);
+    opacity: 0.64;
+  }
+  100% {
+    transform: translate3d(-8%, -2%, 0) scale(1);
+    opacity: 0.58;
+  }
+}
+
+@keyframes sub-blue-bloom {
+  0%, 100% {
+    box-shadow:
+      var(--sub-shadow-float),
+      0 0 0 1px rgba(56, 189, 248, 0.06),
+      0 0 18px rgba(34, 211, 238, 0.04);
+  }
+  50% {
+    box-shadow:
+      var(--sub-shadow-float),
+      0 0 0 1px rgba(56, 189, 248, 0.14),
+      0 0 34px rgba(34, 211, 238, 0.12);
+  }
+}
+
+@keyframes sub-light-rim {
+  0%, 100% { opacity: 0.32; filter: brightness(1); }
+  50% { opacity: 0.86; filter: brightness(1.35); }
+}
+
+@keyframes sub-glass-reflection {
+  from { background-position: 170% 0; }
+  to { background-position: -80% 0; }
+}
+
+@keyframes sub-map-blue-pulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 3px 6px rgba(0, 0, 0, 0.78))
+      drop-shadow(0 0 3px rgba(34, 211, 238, 0.10));
+  }
+  50% {
+    filter:
+      drop-shadow(0 4px 8px rgba(0, 0, 0, 0.84))
+      drop-shadow(0 0 9px rgba(34, 211, 238, 0.34));
+  }
+}
+
+@keyframes sub-control-light {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.025),
+      0 3px 10px rgba(0, 0, 0, 0.28);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.055),
+      0 4px 13px rgba(0, 0, 0, 0.34),
+      0 0 10px rgba(56, 189, 248, 0.035);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   WORLD LIGHTING — moving light leaks, never scanlines
+   -------------------------------------------------------------------------- */
+
+.sub-vignette::after {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  pointer-events: none;
+  opacity: 0.72;
+  background:
+    radial-gradient(
+      42rem 30rem at 12% 18%,
+      rgba(56, 189, 248, 0.105),
+      rgba(34, 211, 238, 0.035) 34%,
+      transparent 72%
+    ),
+    radial-gradient(
+      36rem 26rem at 88% 74%,
+      rgba(14, 116, 144, 0.085),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 22rem at 82% 8%,
+      rgba(245, 158, 11, 0.045),
+      transparent 72%
+    );
+  filter: blur(24px) saturate(118%);
+  mix-blend-mode: screen;
+  animation: sub-light-leak-drift 12s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* Danger gradually replaces the cool blue leak with red at the screen edges. */
+.sub-game-shell[data-heat-tier="2"] .sub-vignette::after {
+  background:
+    radial-gradient(42rem 30rem at 12% 18%, rgba(56,189,248,.09), transparent 72%),
+    radial-gradient(38rem 28rem at 92% 72%, rgba(239,68,68,.075), transparent 70%);
+}
+
+.sub-game-shell[data-heat-tier="3"] .sub-vignette::after {
+  background:
+    radial-gradient(38rem 28rem at 10% 20%, rgba(56,189,248,.07), transparent 72%),
+    radial-gradient(42rem 30rem at 94% 70%, rgba(239,68,68,.12), transparent 68%);
+}
+
+.sub-game-shell[data-heat-tier="4"] .sub-vignette::after {
+  background:
+    radial-gradient(34rem 26rem at 8% 20%, rgba(56,189,248,.055), transparent 72%),
+    radial-gradient(48rem 34rem at 94% 66%, rgba(239,68,68,.18), transparent 66%);
+  animation-duration: 7s;
+}
+
+/* --------------------------------------------------------------------------
+   HUD — one coherent shadow / blur language
+   -------------------------------------------------------------------------- */
+
+.sub-topbar {
+  border-color: rgba(125, 211, 252, 0.105) !important;
+  background:
+    linear-gradient(180deg, rgba(16, 20, 27, 0.91), rgba(7, 8, 12, 0.94)) !important;
+  box-shadow:
+    var(--sub-shadow-float),
+    0 0 0 1px rgba(56, 189, 248, 0.055),
+    0 0 26px rgba(34, 211, 238, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
+  backdrop-filter: blur(var(--sub-blur-hud)) saturate(122%) !important;
+  -webkit-backdrop-filter: blur(var(--sub-blur-hud)) saturate(122%) !important;
+  animation: sub-blue-bloom 5.2s ease-in-out infinite;
+}
+
+.sub-topbar::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  left: 12px !important;
+  right: 12px !important;
+  top: 0 !important;
+  height: 1px !important;
+  pointer-events: none !important;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(56,189,248,.15) 18%,
+    rgba(125,211,252,.72) 50%,
+    rgba(56,189,248,.15) 82%,
+    transparent
+  ) !important;
+  animation: sub-light-rim 3.8s ease-in-out infinite;
+}
+
+.sub-topbar::after {
+  display: none !important;
+}
+
+.sub-resource-icon svg {
+  filter:
+    drop-shadow(0 2px 3px rgba(0,0,0,.76))
+    drop-shadow(0 0 5px currentColor);
+}
+
+.sub-dock {
+  filter:
+    drop-shadow(0 12px 20px rgba(0,0,0,.52))
+    drop-shadow(0 0 13px rgba(34,211,238,.07));
+}
+
+.sub-dock .sub-hud-btn {
+  text-shadow: 0 2px 8px rgba(0,0,0,.78);
+}
+
+.sub-dock .sub-hud-btn svg {
+  filter:
+    drop-shadow(0 2px 4px rgba(0,0,0,.80))
+    drop-shadow(0 0 5px rgba(56,189,248,.16));
+}
+
+.sub-dock .sub-hud-btn-active svg {
+  filter:
+    drop-shadow(0 2px 4px rgba(0,0,0,.85))
+    drop-shadow(0 0 8px rgba(125,211,252,.50))
+    drop-shadow(0 0 14px rgba(34,211,238,.18));
+}
+
+.sub-game-shell[data-heat-tier="3"] .sub-dock,
+.sub-game-shell[data-heat-tier="4"] .sub-dock {
+  filter:
+    drop-shadow(0 12px 20px rgba(0,0,0,.56))
+    drop-shadow(0 0 12px rgba(239,68,68,.12));
+}
+
+/* --------------------------------------------------------------------------
+   PANELS / CARDS — smoky glass + edge lights + deep shadows
+   -------------------------------------------------------------------------- */
+
+.sub-sheet-panel,
+.sub-menu-modal,
+.sub-nav-tray,
+.sub-opp-card,
+.sub-map-tip {
+  border-color: rgba(125, 211, 252, 0.105) !important;
+  background-color: rgba(7, 9, 13, 0.89) !important;
+  box-shadow:
+    var(--sub-shadow-panel),
+    0 0 0 1px rgba(56,189,248,.045),
+    0 0 34px rgba(34,211,238,.055),
+    inset 0 1px 0 rgba(255,255,255,.055) !important;
+  backdrop-filter: blur(var(--sub-blur-panel)) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(var(--sub-blur-panel)) saturate(125%) !important;
+}
+
+.sub-nav-tray {
+  background:
+    radial-gradient(120% 90% at 12% 0%, rgba(56,189,248,.075), transparent 48%),
+    linear-gradient(180deg, rgba(13,16,22,.96), rgba(7,8,11,.94)) !important;
+}
+
+.sub-sheet-panel,
+.sub-menu-modal {
+  background:
+    radial-gradient(90% 46% at 12% 0%, rgba(56,189,248,.055), transparent 58%),
+    radial-gradient(75% 42% at 92% 100%, rgba(239,68,68,.035), transparent 62%),
+    rgba(7,8,11,.91) !important;
+}
+
+.sub-opp-card {
+  background:
+    radial-gradient(95% 46% at 10% 0%, color-mix(in srgb, var(--mk, #ef4444) 9%, transparent), transparent 58%),
+    radial-gradient(70% 38% at 96% 100%, rgba(56,189,248,.055), transparent 65%),
+    rgba(7,8,11,.92) !important;
+}
+
+.sub-map-tip {
+  background:
+    radial-gradient(100% 90% at 12% 0%, rgba(56,189,248,.065), transparent 55%),
+    rgba(5,7,10,.92) !important;
+  box-shadow:
+    0 16px 42px rgba(0,0,0,.68),
+    0 0 0 1px rgba(125,211,252,.09),
+    0 0 18px rgba(34,211,238,.055) !important;
+}
+
+/* Slow glass reflection shared by reusable surfaces. */
+.sub-nav-tray::after,
+.sub-opp-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 42%,
+      rgba(255,255,255,.035) 47%,
+      rgba(125,211,252,.07) 50%,
+      rgba(255,255,255,.025) 54%,
+      transparent 60%,
+      transparent 100%
+    );
+  background-size: 270% 100%;
+  animation: sub-glass-reflection 9s linear infinite;
+}
+
+.sub-nav-tray > *,
+.sub-opp-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Reusable cards receive consistent lift and cyan under-light. */
+.sub-game-shell .sub-card,
+.sub-operation-row,
+.sub-settings-row,
+.sub-kpi,
+.sub-kpi-cell {
+  box-shadow:
+    0 8px 24px rgba(0,0,0,.30),
+    0 2px 8px rgba(0,0,0,.20),
+    inset 0 1px 0 rgba(255,255,255,.025) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sub-game-shell .sub-card:hover,
+  .sub-operation-row:hover,
+  .sub-settings-row:hover,
+  .sub-kpi:hover,
+  .sub-kpi-cell:hover {
+    box-shadow:
+      0 13px 32px rgba(0,0,0,.42),
+      0 4px 12px rgba(0,0,0,.25),
+      0 0 0 1px rgba(56,189,248,.075),
+      0 0 18px rgba(34,211,238,.055),
+      inset 0 1px 0 rgba(255,255,255,.05) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   CONTROLS — subtle blue tech light, semantic focus
+   -------------------------------------------------------------------------- */
+
+.sub-game-shell .sub-btn:not(:disabled),
+.sub-game-shell input:not([type="range"]),
+.sub-game-shell textarea,
+.sub-game-shell [role="combobox"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 3px 10px rgba(0,0,0,.28) !important;
+}
+
+.sub-game-shell .sub-btn:not(:disabled) {
+  animation: sub-control-light 4.6s ease-in-out infinite;
+}
+
+.sub-game-shell .sub-btn:not(:disabled):hover,
+.sub-game-shell [role="combobox"]:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 7px 18px rgba(0,0,0,.36),
+    0 0 0 1px rgba(56,189,248,.10),
+    0 0 14px rgba(34,211,238,.06) !important;
+}
+
+.sub-game-shell input:focus,
+.sub-game-shell textarea:focus,
+.sub-game-shell [role="combobox"]:focus-visible {
+  border-color: rgba(56,189,248,.38) !important;
+  box-shadow:
+    0 0 0 1px rgba(56,189,248,.22),
+    0 0 0 4px rgba(34,211,238,.065),
+    0 8px 22px rgba(0,0,0,.40) !important;
+}
+
+/* --------------------------------------------------------------------------
+   MAP LIGHTING — blue navigation light, red danger, amber return
+   -------------------------------------------------------------------------- */
+
+.hq-pin {
+  filter:
+    drop-shadow(0 3px 5px rgba(0,0,0,.84))
+    drop-shadow(0 0 6px rgba(125,211,252,.48))
+    drop-shadow(0 0 14px rgba(34,211,238,.18)) !important;
+}
+
+.prop-pin {
+  filter:
+    drop-shadow(0 3px 5px rgba(0,0,0,.74))
+    drop-shadow(0 0 5px rgba(56,189,248,.22));
+}
+
+.opp-pin {
+  animation:
+    sub-fx-marker-pulse 3.6s ease-in-out infinite,
+    sub-map-blue-pulse 4.8s ease-in-out infinite;
+}
+
+.opp-pin-selected {
+  box-shadow:
+    0 7px 18px rgba(0,0,0,.74),
+    0 0 0 1px color-mix(in srgb, var(--mk, #fff) 62%, transparent),
+    0 0 18px color-mix(in srgb, var(--mk, #fff) 46%, transparent),
+    0 0 30px rgba(34,211,238,.09) !important;
+}
+
+.unit-car-body {
+  box-shadow:
+    0 3px 7px rgba(0,0,0,.78),
+    0 0 7px color-mix(in srgb, var(--mk, #22d3ee) 44%, transparent),
+    0 0 14px color-mix(in srgb, var(--mk, #22d3ee) 18%, transparent) !important;
+}
+
+.unit-car-returning .unit-car-body {
+  box-shadow:
+    0 3px 7px rgba(0,0,0,.78),
+    0 0 8px rgba(245,158,11,.42),
+    0 0 16px rgba(245,158,11,.16) !important;
+}
+
+.unit-car-chased .unit-car-body {
+  box-shadow:
+    0 3px 7px rgba(0,0,0,.82),
+    0 0 10px rgba(239,68,68,.68),
+    0 0 22px rgba(239,68,68,.28) !important;
+}
+
+.op-pin {
+  box-shadow:
+    0 3px 7px rgba(0,0,0,.76),
+    0 0 7px rgba(125,211,252,.30),
+    0 0 13px rgba(34,211,238,.10) !important;
+}
+
+.op-leader {
+  box-shadow:
+    0 3px 7px rgba(0,0,0,.78),
+    0 0 8px rgba(245,158,11,.62),
+    0 0 16px rgba(245,158,11,.20) !important;
+}
+
+.police-lights .police-car-body,
+.police-pursuit .police-car-body {
+  box-shadow:
+    0 3px 8px rgba(0,0,0,.82),
+    -6px 0 12px rgba(59,130,246,.65),
+    6px 0 12px rgba(239,68,68,.52),
+    0 0 24px rgba(59,130,246,.22) !important;
+}
+
+.leaflet-overlay-pane path.sub-route-line-outbound {
+  filter:
+    drop-shadow(0 0 2px rgba(255,255,255,.34))
+    drop-shadow(0 0 5px rgba(56,189,248,.42))
+    drop-shadow(0 0 10px rgba(34,211,238,.14));
+}
+
+.leaflet-overlay-pane path.sub-route-line-returning {
+  filter:
+    drop-shadow(0 0 2px rgba(255,255,255,.28))
+    drop-shadow(0 0 6px rgba(245,158,11,.46))
+    drop-shadow(0 0 11px rgba(245,158,11,.15));
+}
+
+/* --------------------------------------------------------------------------
+   SEMANTIC LIGHT — danger becomes red, normal UI remains cool blue
+   -------------------------------------------------------------------------- */
+
+.sub-game-shell[data-heat-tier="3"] .sub-topbar,
+.sub-game-shell[data-heat-tier="4"] .sub-topbar {
+  border-color: rgba(239,68,68,.15) !important;
+  box-shadow:
+    var(--sub-shadow-float),
+    0 0 0 1px rgba(239,68,68,.08),
+    0 0 28px rgba(239,68,68,.09),
+    inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+
+.sub-game-shell[data-heat-tier="4"] .sub-sheet-panel,
+.sub-game-shell[data-heat-tier="4"] .sub-menu-modal {
+  box-shadow:
+    var(--sub-shadow-panel),
+    0 0 0 1px rgba(239,68,68,.08),
+    0 0 36px rgba(239,68,68,.065),
+    inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+
+/* Toasts inherit the same glass/shadow hierarchy. */
+.sub-toast {
+  border-color: rgba(125,211,252,.11) !important;
+  background:
+    radial-gradient(100% 100% at 10% 0%, rgba(56,189,248,.06), transparent 55%),
+    rgba(8,9,12,.94) !important;
+  box-shadow:
+    0 16px 44px rgba(0,0,0,.62),
+    0 0 0 1px rgba(56,189,248,.055),
+    0 0 18px rgba(34,211,238,.045),
+    inset 0 1px 0 rgba(255,255,255,.045) !important;
+  backdrop-filter: blur(14px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(120%) !important;
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE / ACCESSIBILITY
+   -------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  :root {
+    --sub-blur-hud: 7px;
+    --sub-blur-panel: 11px;
+  }
+
+  .sub-vignette::after {
+    filter: blur(18px) saturate(112%);
+    opacity: .58;
+    animation-duration: 15s;
+  }
+
+  .sub-sheet-panel,
+  .sub-menu-modal,
+  .sub-nav-tray,
+  .sub-opp-card,
+  .sub-map-tip {
+    box-shadow:
+      0 22px 56px rgba(0,0,0,.66),
+      0 0 0 1px rgba(56,189,248,.045),
+      0 0 20px rgba(34,211,238,.04),
+      inset 0 1px 0 rgba(255,255,255,.04) !important;
+  }
+}
+
+html.sub-reduced-motion .sub-vignette::after,
+html.sub-reduced-motion .sub-topbar,
+html.sub-reduced-motion .sub-topbar::before,
+html.sub-reduced-motion .sub-nav-tray::after,
+html.sub-reduced-motion .sub-opp-card::after,
+html.sub-reduced-motion .sub-game-shell .sub-btn:not(:disabled),
+html.sub-reduced-motion .opp-pin {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-vignette::after,
+  .sub-topbar,
+  .sub-topbar::before,
+  .sub-nav-tray::after,
+  .sub-opp-card::after,
+  .sub-game-shell .sub-btn:not(:disabled),
+  .opp-pin {
+    animation: none !important;
+  }
+}
