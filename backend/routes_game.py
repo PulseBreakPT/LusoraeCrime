@@ -10,6 +10,7 @@ from datetime import timedelta
 
 from db import db
 from mutation_guard import MutationInput, idempotent
+from player_access import get_player
 from auth import get_current_user
 from geo import (is_valid_hq_location, is_in_portugal, in_water_body,
                  distance_to_boundary_m)
@@ -136,23 +137,6 @@ REST_DURATION_S = 90
 # de condição) — exposta no /catalog (weapon_meta.sell_fraction) para o
 # frontend usar a MESMA régua que a rota /weapons/sell.
 WEAPON_SELL_FRACTION = 0.4
-
-
-async def get_player(user: dict, allow_pending: bool = False) -> dict:
-    player = await db.players.find_one({"user_id": user["_id"]})
-    if not player:
-        raise HTTPException(status_code=404, detail="Organização não encontrada")
-    if not player.get("hq"):
-        # Conta nova: o jogo só arranca depois de o jogador escolher onde
-        # montar o Quartel-General (POST /game/hq/place).
-        if allow_pending:
-            return player
-        raise HTTPException(status_code=409, detail="Estabelece primeiro o teu Quartel-General")
-    player["hq"].setdefault("level", 1)
-    player["hq"].setdefault("upgrading_until", None)
-    player["hq"].setdefault("upgrade_history", [])
-    player.setdefault("priorities", {"active": "equilibrio"})
-    return player
 
 
 async def _debit_clean_atomic(player: dict, amount: int, extra_inc: Optional[dict] = None):
