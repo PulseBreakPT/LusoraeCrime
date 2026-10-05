@@ -27,7 +27,7 @@ const DialogContent = React.forwardRef(({ className, overlayClassName, children,
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "sub-modal-surface fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
+        "sub-shad-dialog sub-modal-surface fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
         className
       )}
       {...props}
@@ -35,7 +35,7 @@ const DialogContent = React.forwardRef(({ className, overlayClassName, children,
       {children}
       <DialogPrimitive.Close
         aria-label="Fechar"
-        className="absolute right-2 top-2 z-30 flex h-11 w-11 items-center justify-center rounded-xl border border-transparent bg-transparent p-0 text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:pointer-events-none"
+        className="sub-shad-dialog-close absolute right-2 top-2 z-30 flex h-11 w-11 items-center justify-center rounded-xl border border-transparent bg-transparent p-0 text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:pointer-events-none"
       >
         <X className="h-4 w-4" />
         <span className="sr-only">Fechar</span>
