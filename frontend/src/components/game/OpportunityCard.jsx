@@ -299,7 +299,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
             </Button>
           </Tip>
-          <Button data-testid="opportunity-card-close" variant="ghost" size="icon" onClick={onClose} className="h-7 w-7 text-zinc-500 hover:text-white">
+          <Button data-testid="opportunity-card-close" variant="ghost" size="iconCompact" onClick={onClose} className="text-zinc-500 hover:text-white">
             <X size={16} />
           </Button>
         </div>
@@ -463,8 +463,9 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               data-testid="dispatch-advanced-toggle"
               type="button"
               variant="ghost"
+              size="compact"
               onClick={() => setShowAdvancedSetup((value) => !value)}
-              className="mt-2 h-7 w-full justify-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
+              className="mt-2 w-full justify-center gap-1 font-mono font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
             >
               {showAdvancedSetup ? "Ocultar configuração" : "Configuração avançada"}
               <ChevronDown size={11} className={`transition-transform ${showAdvancedSetup ? "rotate-180" : ""}`} />
@@ -720,12 +721,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               data-testid="dispatch-team-button"
               onClick={handleDispatch}
               disabled={!selectedTeamId || busy || expired}
-              variant={!selectedTeamId || busy || expired || confirmLowChance ? "outline" : "success"}
+              variant={confirmLowChance ? "warning" : !selectedTeamId || busy || expired ? "outline" : "success"}
               className={`mt-3 w-full shrink-0 font-bold uppercase tracking-wider ${
                 !selectedTeamId || busy || expired
-                  ? "border-red-500/30 bg-red-500/10 from-transparent to-transparent text-red-400 shadow-none hover:bg-red-500/20"
-                  : confirmLowChance
-                  ? "border-amber-500/50 bg-gradient-to-b from-amber-500/30 to-amber-600/20 text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.25)] hover:border-amber-400/70 hover:from-amber-500/40 hover:to-amber-600/30 hover:text-amber-200"
+                  ? "border-red-500/30 bg-red-500/10 text-red-400 shadow-none hover:bg-red-500/20"
                   : ""
               }`}
             >
