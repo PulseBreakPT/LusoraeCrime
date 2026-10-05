@@ -18,6 +18,7 @@ from city_data import (
 from city_systems import (
     city_snapshot, business_projection, season_info, boss_status,
 )
+from economy_director import city_business_cap
 
 router = APIRouter(prefix="/api/game/city", tags=["city"])
 
@@ -153,6 +154,9 @@ async def buy_business(body: BusinessBuyInput, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=f"Este negócio desbloqueia no nível {required_level}")
     pid = str(player["_id"])
     owned = await db.city_businesses.count_documents({"player_id": pid})
+    capacity = city_business_cap(player.get("level", 1))
+    if owned >= capacity:
+        raise HTTPException(status_code=400, detail=f"Rede empresarial cheia ({owned}/{capacity}); sobe de nível para expandir")
     same = await db.city_businesses.count_documents({"player_id": pid, "type_key": body.type_key})
     price = int(cfg["price"] * (1 + owned * 0.08 + same * 0.12))
     await _change_clean(player, -price, f"Compra de negócio: {cfg['name']}", "city_business_buy")
