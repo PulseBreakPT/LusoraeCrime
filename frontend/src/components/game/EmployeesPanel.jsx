@@ -386,7 +386,7 @@ const EmployeeCard = ({ e, onNavigate }) => {
             <SectionHeader icon={GraduationCap} title="Desenvolvimento" />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Select value={course} onValueChange={setCourse}>
-                <SelectTrigger data-testid={`emp-train-select-${e.id}`} className="h-8 min-h-0 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                <SelectTrigger data-testid={`emp-train-select-${e.id}`} size="compact" className="text-white">
                   <SelectValue placeholder="Escolher formação..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -797,7 +797,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
             <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider">
               Efetivo ({state.employees.length})
             </TabsTrigger>
-            <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger data-testid="tab-recruit" value="recruit" className="font-mono text-[10px] font-bold uppercase tracking-wider">
               Recrutar ({(state.candidates || []).length})
             </TabsTrigger>
           </TabsList>
@@ -936,7 +936,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
 
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <Select value={recruitSort} onValueChange={setRecruitSort}>
-                <SelectTrigger data-testid="recruit-sort" className="h-8 min-h-0 w-full border-white/10 bg-black/50 font-mono text-[10px] text-zinc-300">
+                <SelectTrigger data-testid="recruit-sort" size="compact">
                   <ArrowUpDown size={11} className="mr-1 shrink-0 text-zinc-500" />
                   <SelectValue />
                 </SelectTrigger>
