@@ -10,11 +10,14 @@ const SelectGroup = SelectPrimitive.Group
 
 const SelectValue = SelectPrimitive.Value
 
-const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) => (
+const SelectTrigger = React.forwardRef(({ className, children, size = "default", ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-11 w-full items-center justify-between whitespace-nowrap rounded-lg border border-white/10 bg-[#0d0d10] px-3 py-2 text-base ring-offset-background transition-colors duration-150 data-[placeholder]:text-muted-foreground hover:border-white/20 hover:bg-[#111115] focus:outline-none focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm [&>span]:line-clamp-1",
+      "flex w-full items-center justify-between whitespace-nowrap rounded-lg border border-white/10 bg-[#0d0d10] ring-offset-background transition-[border-color,background-color,color,box-shadow] duration-150 data-[placeholder]:text-muted-foreground hover:border-white/20 hover:bg-[#111115] focus:outline-none focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      size === "compact"
+        ? "h-9 px-2.5 py-1.5 font-mono text-[11px]"
+        : "h-11 px-3 py-2 text-base sm:h-10 sm:text-sm",
       className
     )}
     {...props}>
@@ -83,7 +86,7 @@ const SelectItem = React.forwardRef(({ className, children, ...props }, ref) => 
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-2 pr-8 text-sm outline-none transition-colors duration-100 focus:bg-red-500/15 focus:text-white data-[state=checked]:text-white data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex min-h-9 w-full cursor-default select-none items-center rounded-md py-1.5 pl-2.5 pr-8 text-sm outline-none transition-colors duration-100 focus:bg-white/[0.06] focus:text-white data-[state=checked]:bg-red-500/10 data-[state=checked]:text-white data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}>

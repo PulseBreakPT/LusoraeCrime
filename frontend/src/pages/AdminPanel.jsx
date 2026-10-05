@@ -234,7 +234,7 @@ export default function AdminPanel() {
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 gap-1 border border-white/10 bg-zinc-900/50 sm:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3 gap-1 sm:grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <TrendingUp size={16} />
               <span className="hidden sm:inline">Dashboard</span>
@@ -490,7 +490,7 @@ export default function AdminPanel() {
                     <p className="text-zinc-500 text-xs">
                       Isto vai limpar todas as equipas, operacionais, veículos, propriedades e operações.
                     </p>
-                    <Button onClick={handleResetProgress} variant="outline" className="w-full border-orange-500/50 bg-gradient-to-b from-orange-500 to-orange-700 text-white hover:border-orange-400/70 hover:from-orange-400 hover:to-orange-600 hover:text-white">
+                    <Button onClick={handleResetProgress} variant="destructive" className="w-full">
                       <RotateCcw size={16} className="mr-2" />
                       Resetar Tudo
                     </Button>
@@ -504,7 +504,7 @@ export default function AdminPanel() {
                     {userDetails.user.role === "admin" ? (
                       <>
                         <p className="text-green-400 text-sm font-semibold">✓ Utilizador é administrador</p>
-                        <Button onClick={() => handleSetRole("player")} variant="outline" className="w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white">
+                        <Button onClick={() => handleSetRole("player")} variant="warning" className="w-full">
                           <Lock size={16} className="mr-2" />
                           Remover Admin
                         </Button>

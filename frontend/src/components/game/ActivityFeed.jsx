@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { ScrollArea } from "../ui/scroll-area";
+import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import {
   Send, Users, Car, Crosshair, Building2, Banknote, Siren, CheckCircle2,
@@ -222,18 +223,21 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
 const FilterChips = ({ counts, filter, onFilter }) => (
   <div className="sub-feed-chiprow sub-notify-filters px-2.5 pt-2" role="tablist" aria-label="Filtrar notificações">
     {CATEGORIES.filter((c) => c.key === "all" || counts[c.key]).map((c) => (
-      <button
+      <Button
         key={c.key}
         type="button"
         role="tab"
+        variant="filter"
+        size="compact"
         aria-selected={filter === c.key}
+        aria-pressed={filter === c.key}
         data-testid={`feed-filter-${c.key}`}
         onClick={() => onFilter(c.key)}
-        className={`sub-feed-chip ${filter === c.key ? "is-active" : ""}`}
+        className="gap-1 font-mono text-[10px] uppercase tracking-[0.04em]"
       >
         {c.label}
         <span className="sub-feed-chip-n">{counts[c.key] || 0}</span>
-      </button>
+      </Button>
     ))}
   </div>
 );
