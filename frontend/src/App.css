@@ -4265,10 +4265,10 @@ html.sub-focus-mode .sub-optional-hud {
     border-color: rgba(255, 255, 255, 0.075) !important;
     box-shadow: none !important;
     transition:
-        background-color 140ms ease,
-        border-color 140ms ease,
-        color 140ms ease,
-        transform 140ms ease !important;
+        background-color var(--sub-motion-fast) var(--sub-ease-out),
+        border-color var(--sub-motion-fast) var(--sub-ease-out),
+        color var(--sub-motion-fast) var(--sub-ease-out),
+        transform var(--sub-motion-fast) var(--sub-ease-out) !important;
 }
 
 .sub-hud-btn:hover {
@@ -4294,6 +4294,10 @@ html.sub-focus-mode .sub-optional-hud {
     background: rgba(255, 255, 255, 0.045) !important;
 }
 
+.sub-dock .sub-hud-btn:active {
+    transform: scale(0.96) !important;
+}
+
 .sub-dock .sub-hud-btn-active {
     background: rgba(220, 38, 38, 0.13) !important;
     border-color: rgba(239, 68, 68, 0.26) !important;
@@ -4310,6 +4314,19 @@ html.sub-focus-mode .sub-optional-hud {
         inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    transform-origin: center bottom;
+    animation: sub-nav-tray-enter var(--sub-motion-base) var(--sub-ease-out) both;
+}
+
+@keyframes sub-nav-tray-enter {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(6px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
 }
 
 .sub-nav-action {
@@ -4317,14 +4334,19 @@ html.sub-focus-mode .sub-optional-hud {
     border: 1px solid transparent !important;
     background: rgba(255, 255, 255, 0.018) !important;
     transition:
-        background-color 130ms ease,
-        border-color 130ms ease,
-        color 130ms ease !important;
+        background-color var(--sub-motion-fast) var(--sub-ease-out),
+        border-color var(--sub-motion-fast) var(--sub-ease-out),
+        color var(--sub-motion-fast) var(--sub-ease-out),
+        transform var(--sub-motion-fast) var(--sub-ease-out) !important;
 }
 
 .sub-nav-action:hover {
     background: rgba(255, 255, 255, 0.055) !important;
     border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.sub-nav-action:active {
+    transform: scale(0.96);
 }
 
 .sub-nav-action.is-active {
@@ -4512,6 +4534,10 @@ html.sub-focus-mode .sub-optional-hud {
     .sub-settings-row,
     .sub-hud-btn {
         transition: none !important;
+    }
+
+    .sub-nav-tray {
+        animation: none !important;
     }
 }
 
@@ -4845,6 +4871,58 @@ html.sub-focus-mode .sub-optional-hud {
     -webkit-backdrop-filter: none;
 }
 
+@keyframes sub-modal-enter {
+    from {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 8px)) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes sub-modal-exit {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 4px)) scale(0.992);
+    }
+}
+
+@keyframes sub-overlay-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes sub-overlay-exit {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.sub-modal-overlay[data-state="open"] {
+    animation: sub-overlay-enter var(--sub-motion-base) var(--sub-ease-out) both !important;
+}
+
+.sub-modal-overlay[data-state="closed"] {
+    animation: sub-overlay-exit var(--sub-motion-fast) var(--sub-ease-out) both !important;
+}
+
+.sub-sheet-panel[data-state="open"],
+.sub-menu-modal[data-state="open"],
+.sub-modal-surface[data-state="open"] {
+    animation: sub-modal-enter var(--sub-motion-slow) var(--sub-ease-out) both !important;
+}
+
+.sub-sheet-panel[data-state="closed"],
+.sub-menu-modal[data-state="closed"],
+.sub-modal-surface[data-state="closed"] {
+    animation: sub-modal-exit var(--sub-motion-fast) var(--sub-ease-out) both !important;
+}
+
 /* Shell canónica dos menus. */
 .sub-sheet-panel,
 .sub-menu-modal {
@@ -4859,7 +4937,7 @@ html.sub-focus-mode .sub-optional-hud {
     height: var(--sub-modal-height) !important;
     min-height: var(--sub-modal-height) !important;
     max-height: var(--sub-modal-height) !important;
-    transform: translate(-50%, -50%) !important;
+    transform: translate(-50%, -50%);
     transform-origin: center center !important;
     border: 1px solid var(--sub-modal-border) !important;
     border-radius: var(--sub-modal-radius) !important;
@@ -4938,12 +5016,14 @@ html.sub-focus-mode .sub-optional-hud {
     line-height: 1.25 !important;
     letter-spacing: 0.035em !important;
     text-shadow: none !important;
+    text-wrap: balance;
 }
 
 .sub-sheet-panel .sub-sheet-description {
     max-width: 36rem !important;
     color: var(--sub-text-secondary) !important;
     font-size: 11px !important;
+    text-wrap: pretty;
 }
 
 /* Fechar é visualmente discreto, mas mantém 44×44 px para touch. */
@@ -5037,6 +5117,7 @@ html.sub-focus-mode .sub-optional-hud {
 @media (prefers-reduced-motion: reduce) {
     .sub-sheet-panel,
     .sub-menu-modal,
+    .sub-modal-surface,
     .sub-modal-overlay {
         animation: none !important;
         transition: none !important;
