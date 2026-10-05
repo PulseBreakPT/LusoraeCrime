@@ -9,6 +9,7 @@ import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
 import { Card } from "../ui/card";
+import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
@@ -202,7 +203,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           }}
           className="h-auto w-full min-w-0 border-input bg-black/60 px-1.5 py-0.5 font-mono text-xs text-white"
         />
-        <button
+        <Button variant="bare" size="bare"
           type="button"
           aria-label="Guardar nome"
           data-testid={testId && `${testId}-save`}
@@ -211,8 +212,8 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-success transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] hover:brightness-125 active:scale-[0.96] sm:h-10 sm:w-10"
         >
           <Check size={14} />
-        </button>
-        <button
+        </Button>
+        <Button variant="bare" size="bare"
           type="button"
           aria-label="Cancelar edição"
           data-testid={testId && `${testId}-cancel`}
@@ -221,7 +222,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] hover:text-white active:scale-[0.96] sm:h-10 sm:w-10"
         >
           <X size={14} />
-        </button>
+        </Button>
       </span>
     );
   }
@@ -230,7 +231,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
     <span className="flex min-w-0 flex-1 items-center gap-1.5">
       <span className={`truncate ${textClassName}`}>{value}</span>
       <Tip tip="Renomear">
-        <button
+        <Button variant="bare" size="bare"
           type="button"
           aria-label="Renomear"
           data-testid={testId && `${testId}-edit`}
@@ -238,7 +239,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-600 transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] hover:text-white active:scale-[0.96] sm:h-10 sm:w-10"
         >
           <Pencil size={11} />
-        </button>
+        </Button>
       </Tip>
     </span>
   );
@@ -248,7 +249,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
 // operacionais e veículos favoritos ficam sempre fixos no topo da respetiva lista.
 export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
   <Tip tip={active ? "Remover dos favoritos" : "Marcar como favorito — fica sempre no topo da lista"}>
-    <button
+    <Button variant="bare" size="bare"
       type="button"
       aria-label={active ? "Remover dos favoritos" : "Adicionar aos favoritos"}
       aria-pressed={active}
@@ -257,7 +258,7 @@ export const FavoriteStar = ({ active, onToggle, testId, size = 13 }) => (
       className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg p-0 transition-[background-color,color,transform] duration-150 hover:bg-white/[0.05] active:scale-[0.96] sm:h-10 sm:w-10 ${active ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-white"}`}
     >
       <Star size={size} fill={active ? "currentColor" : "none"} />
-    </button>
+    </Button>
   </Tip>
 );
 
@@ -299,7 +300,7 @@ export const ConfirmButton = ({
   }, [armed, armMs]);
   return (
     <Tip tip={armed ? "Clica outra vez para confirmar — ação irreversível." : tip} block className={className}>
-      <button type="button"
+      <Button variant="bare" size="bare" type="button"
         data-testid={testId}
         onClick={() => { if (skipArm) { onConfirm(); return; } if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
         disabled={disabled}
@@ -314,7 +315,7 @@ export const ConfirmButton = ({
         )}
       >
         {Icon && <Icon size={11} />} {armed ? confirmLabel : label}
-      </button>
+      </Button>
     </Tip>
   );
 };
@@ -359,7 +360,7 @@ export const PurchaseButton = ({
   };
   return (
     <Tip tip={tip} block className={className}>
-      <button type="button"
+      <Button variant="bare" size="bare" type="button"
         data-testid={testId}
         onClick={handleClick}
         disabled={!can || pending}
@@ -386,7 +387,7 @@ export const PurchaseButton = ({
         ) : children != null ? children : (
           <>{Icon && <Icon size={11} />} {armed ? confirmLabel : label}</>
         )}
-      </button>
+      </Button>
     </Tip>
   );
 };
