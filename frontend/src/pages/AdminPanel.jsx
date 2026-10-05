@@ -504,7 +504,7 @@ export default function AdminPanel() {
                     {userDetails.user.role === "admin" ? (
                       <>
                         <p className="text-green-400 text-sm font-semibold">✓ Utilizador é administrador</p>
-                        <Button onClick={handleRevokeAdmin} variant="outline" className="w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white">
+                        <Button onClick={() => handleSetRole("player")} variant="outline" className="w-full border-amber-500/50 bg-gradient-to-b from-amber-500 to-amber-700 text-white hover:border-amber-400/70 hover:from-amber-400 hover:to-amber-600 hover:text-white">
                           <Lock size={16} className="mr-2" />
                           Remover Admin
                         </Button>
