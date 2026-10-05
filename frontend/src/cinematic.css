@@ -463,3 +463,434 @@ html.sub-reduced-motion .unit-car-moving .unit-car-body::before {
     display: none;
   }
 }
+
+
+/* --- ALWAYS-ON FRONTEND FX V2 ------------------------------------------------- */
+
+/* User-facing direction: the world should always feel live. These effects are
+   intentionally persistent, with reduced-motion remaining the escape hatch. */
+
+@keyframes sub-fx-world-scan {
+  0% { transform: translate3d(-38%, -12%, 0) rotate(13deg); opacity: 0; }
+  14% { opacity: 0.34; }
+  52% { opacity: 0.18; }
+  100% { transform: translate3d(138%, 18%, 0) rotate(13deg); opacity: 0; }
+}
+
+@keyframes sub-fx-scanline-fall {
+  from { background-position: 0 -140px; }
+  to { background-position: 0 140px; }
+}
+
+@keyframes sub-fx-map-breathe {
+  0%, 100% { opacity: 0.84; filter: brightness(1) saturate(1); }
+  50% { opacity: 1; filter: brightness(1.035) saturate(1.06); }
+}
+
+@keyframes sub-fx-edge-breathe {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 0.9; }
+}
+
+@keyframes sub-fx-heat-breathe {
+  0%, 100% { opacity: 0.26; }
+  50% { opacity: 0.88; }
+}
+
+@keyframes sub-fx-hud-float {
+  0%, 100% { transform: translate3d(0, 0, 0); filter: brightness(1); }
+  50% { transform: translate3d(0, -1.5px, 0); filter: brightness(1.12); }
+}
+
+@keyframes sub-fx-icon-pulse {
+  0%, 100% { opacity: 0.86; filter: brightness(0.98) drop-shadow(0 2px 4px rgba(0,0,0,.55)); }
+  50% { opacity: 1; filter: brightness(1.18) drop-shadow(0 3px 8px rgba(0,0,0,.72)); }
+}
+
+@keyframes sub-fx-marker-pulse {
+  0%, 100% {
+    box-shadow:
+      0 3px 9px rgba(0, 0, 0, 0.64),
+      0 0 5px -2px var(--mk, #fff);
+  }
+  50% {
+    box-shadow:
+      0 5px 13px rgba(0, 0, 0, 0.70),
+      0 0 13px -1px color-mix(in srgb, var(--mk, #fff) 58%, transparent);
+  }
+}
+
+@keyframes sub-fx-marker-ring {
+  0% { transform: scale(0.78); opacity: 0.34; }
+  72% { opacity: 0.12; }
+  100% { transform: scale(1.58); opacity: 0; }
+}
+
+@keyframes sub-fx-panel-breathe {
+  0%, 100% {
+    box-shadow:
+      0 22px 56px rgba(0, 0, 0, 0.62),
+      0 0 0 1px rgba(255,255,255,.035),
+      inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  50% {
+    box-shadow:
+      0 26px 64px rgba(0, 0, 0, 0.70),
+      0 0 0 1px rgba(239,68,68,.13),
+      0 0 26px rgba(239,68,68,.055),
+      inset 0 1px 0 rgba(255,255,255,.075);
+  }
+}
+
+@keyframes sub-fx-card-sheen {
+  0% { background-position: 160% 0, 0 0; }
+  100% { background-position: -90% 0, 0 0; }
+}
+
+@keyframes sub-fx-progress-glint {
+  from { transform: translateX(-180%) skewX(-20deg); }
+  to { transform: translateX(520%) skewX(-20deg); }
+}
+
+@keyframes sub-fx-target-idle {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sub-fx-target-dot {
+  0%, 100% { opacity: 0.72; transform: scale(.86); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+
+@keyframes sub-fx-car-tail {
+  0%, 100% { opacity: 0.5; filter: brightness(1); }
+  50% { opacity: 1; filter: brightness(1.7); }
+}
+
+@keyframes sub-fx-toast-edge {
+  0%, 100% { box-shadow: 0 12px 34px rgba(0,0,0,.58), 0 0 0 1px rgba(255,255,255,.05); }
+  50% { box-shadow: 0 15px 40px rgba(0,0,0,.66), 0 0 0 1px rgba(239,68,68,.17), 0 0 22px rgba(239,68,68,.07); }
+}
+
+@keyframes sub-fx-resource-glow {
+  0%, 100% { text-shadow: 0 1px 2px rgba(0,0,0,.96), 0 3px 9px rgba(0,0,0,.70); }
+  50% { text-shadow: 0 1px 2px rgba(0,0,0,.96), 0 3px 10px rgba(0,0,0,.78), 0 0 10px currentColor; }
+}
+
+/* Persistent tactical scan over the whole playfield. */
+.sub-vignette::before {
+  content: "";
+  position: absolute;
+  top: -32%;
+  bottom: -32%;
+  left: -28%;
+  width: 26%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,.015) 24%,
+    rgba(34,211,238,.075) 48%,
+    rgba(255,255,255,.025) 58%,
+    transparent 100%
+  );
+  filter: blur(1.2px);
+  animation: sub-fx-world-scan 7.8s linear infinite;
+}
+
+/* Fine moving scanlines remain visible without obscuring roads or labels. */
+.sub-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,.018) 0 1px,
+      transparent 1px 5px
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(255,255,255,.028) 49%,
+      transparent 51%
+    );
+  background-size: 100% 5px, 100% 140px;
+  animation: sub-fx-scanline-fall 6.5s linear infinite;
+}
+
+/* Constant map breathing makes the world feel rendered, not static. */
+.sub-dark-map .leaflet-tile-pane {
+  animation: sub-fx-map-breathe 7.2s ease-in-out infinite;
+}
+
+/* Persistent cinematic edge lighting. */
+.sub-game-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 74px rgba(0,0,0,.24),
+    inset 0 -34px 58px rgba(0,0,0,.13);
+  background:
+    linear-gradient(90deg, rgba(239,68,68,.028), transparent 15%, transparent 85%, rgba(245,158,11,.018)),
+    radial-gradient(90% 34% at 50% 100%, rgba(239,68,68,.025), transparent 72%);
+  animation: sub-fx-edge-breathe 5.4s ease-in-out infinite;
+}
+
+/* Wanted heat progressively contaminates the screen edges. */
+.sub-game-shell[data-heat-tier="1"]::after {
+  background:
+    radial-gradient(85% 36% at 50% 100%, rgba(239,68,68,.055), transparent 74%),
+    linear-gradient(90deg, rgba(239,68,68,.035), transparent 18%, transparent 82%, rgba(239,68,68,.025));
+}
+
+.sub-game-shell[data-heat-tier="2"]::after {
+  background:
+    radial-gradient(90% 42% at 50% 100%, rgba(239,68,68,.085), transparent 74%),
+    linear-gradient(90deg, rgba(239,68,68,.055), transparent 18%, transparent 82%, rgba(239,68,68,.04));
+  animation: sub-fx-heat-breathe 3.6s ease-in-out infinite;
+}
+
+.sub-game-shell[data-heat-tier="3"]::after {
+  background:
+    radial-gradient(95% 46% at 50% 100%, rgba(239,68,68,.13), transparent 72%),
+    linear-gradient(90deg, rgba(239,68,68,.08), transparent 20%, transparent 80%, rgba(239,68,68,.065));
+  animation: sub-fx-heat-breathe 2.7s ease-in-out infinite;
+}
+
+.sub-game-shell[data-heat-tier="4"]::after {
+  background:
+    radial-gradient(100% 52% at 50% 100%, rgba(239,68,68,.19), transparent 70%),
+    linear-gradient(90deg, rgba(239,68,68,.11), transparent 21%, transparent 79%, rgba(239,68,68,.095));
+  animation: sub-fx-heat-breathe 1.85s ease-in-out infinite;
+}
+
+/* HUD stays visibly alive even when the player is not interacting. */
+[data-testid="resource-bar"] {
+  animation: sub-fx-hud-float 4.8s ease-in-out infinite;
+}
+
+[data-testid="resource-bar"] .sub-resource-value {
+  animation: sub-fx-resource-glow 4.2s ease-in-out infinite;
+}
+
+[data-testid="resource-bar"] > *:nth-child(2) .sub-resource-value {
+  animation-delay: .7s;
+}
+
+[data-testid="resource-bar"] > *:nth-child(3) .sub-resource-value {
+  animation-delay: 1.4s;
+}
+
+.sub-dock .sub-hud-btn svg {
+  animation: sub-fx-icon-pulse 3.4s ease-in-out infinite;
+}
+
+.sub-dock .sub-hud-btn:nth-child(2) svg { animation-delay: .42s; }
+.sub-dock .sub-hud-btn:nth-child(3) svg { animation-delay: .84s; }
+.sub-dock .sub-hud-btn:nth-child(4) svg { animation-delay: 1.26s; }
+.sub-dock .sub-hud-btn:nth-child(5) svg { animation-delay: 1.68s; }
+
+/* Every active opportunity has a restrained radar echo, not only urgent ones. */
+.opp-pin {
+  animation: sub-fx-marker-pulse 3.6s ease-in-out infinite;
+}
+
+.opp-pin:not(.opp-pin-selected)::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--mk, #fff) 36%, transparent);
+  pointer-events: none;
+  animation: sub-fx-marker-ring 2.9s var(--sub-fx-ease-soft) infinite;
+}
+
+.opp-pin:nth-child(2n) {
+  animation-delay: .5s;
+}
+
+/* Mission target remains animated throughout the whole mission. */
+.mission-target .mission-target-ring {
+  border-style: dashed;
+  animation: sub-fx-target-idle 6.8s linear infinite;
+}
+
+.mission-target .mission-target-dot {
+  animation: sub-fx-target-dot 1.65s ease-in-out infinite;
+}
+
+.mission-target-hot .mission-target-ring {
+  animation-duration: 2.8s;
+}
+
+/* Moving vehicles get persistent tail-light feedback in addition to the wake. */
+.unit-car-moving .unit-car-body::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 5px;
+  height: 2px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: #ef4444;
+  box-shadow:
+    -2.8px 0 3px rgba(239,68,68,.82),
+    2.8px 0 3px rgba(239,68,68,.82);
+  animation: sub-fx-car-tail 1.4s ease-in-out infinite;
+}
+
+/* Panels and mission cards visibly breathe while open. */
+.sub-sheet-panel,
+.sub-menu-modal,
+.sub-nav-tray,
+.sub-opp-card {
+  animation: sub-fx-panel-breathe 4.6s ease-in-out infinite;
+}
+
+/* Inner cards receive a slow travelling reflection. */
+.sub-game-shell .sub-card {
+  background-image:
+    linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 39%,
+      rgba(255,255,255,.045) 47%,
+      rgba(255,255,255,.075) 50%,
+      rgba(255,255,255,.032) 53%,
+      transparent 61%,
+      transparent 100%
+    ),
+    linear-gradient(165deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.014) 55%, rgba(220,38,38,.022) 100%);
+  background-size: 260% 100%, 100% 100%;
+  animation: sub-fx-card-sheen 8.6s linear infinite;
+}
+
+/* Progress bars always show energy moving through the filled segment. */
+.sub-game-shell [role="progressbar"] > div {
+  position: relative;
+  overflow: hidden;
+}
+
+.sub-game-shell [role="progressbar"] > div::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 22%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.48), transparent);
+  animation: sub-fx-progress-glint 2.65s ease-in-out infinite;
+}
+
+/* Notification UI should read as part of the game, not browser chrome. */
+.sub-toast {
+  animation: sub-fx-toast-edge 3.3s ease-in-out infinite;
+}
+
+.sub-toast-ico {
+  filter:
+    drop-shadow(0 1px 2px rgba(0,0,0,.8))
+    drop-shadow(0 0 5px rgba(239,68,68,.16));
+}
+
+/* Selection creates a stronger moving spotlight around the selected mission. */
+.sub-game-shell.sub-has-selection .opp-pin-selected {
+  animation: sub-fx-marker-pulse 1.65s ease-in-out infinite;
+}
+
+.sub-game-shell.sub-has-selection .sub-vignette::before {
+  animation-duration: 4.8s;
+  opacity: .58;
+}
+
+/* Heat also accelerates key ambient rhythms so danger is readable peripherally. */
+.sub-game-shell[data-heat-tier="3"] .sub-dock .sub-hud-btn svg,
+.sub-game-shell[data-heat-tier="4"] .sub-dock .sub-hud-btn svg {
+  animation-duration: 2.3s;
+}
+
+.sub-game-shell[data-heat-tier="4"] .sub-vignette::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(239,68,68,.015) 25%,
+    rgba(239,68,68,.10) 48%,
+    rgba(255,255,255,.025) 58%,
+    transparent 100%
+  );
+  animation-duration: 4.5s;
+}
+
+/* Touch devices keep the full visual identity, only reducing blur cost. */
+@media (pointer: coarse) {
+  .sub-dark-map .leaflet-tile-pane {
+    animation-duration: 9s;
+  }
+
+  .sub-vignette::before {
+    width: 34%;
+    animation-duration: 9.5s;
+  }
+
+  .sub-game-shell::after {
+    opacity: .72;
+  }
+
+  .sub-game-shell .sub-card {
+    animation-duration: 11s;
+  }
+}
+
+/* Reduced motion leaves the visual treatment present but freezes the movement. */
+html.sub-reduced-motion .sub-vignette::before,
+html.sub-reduced-motion .sub-vignette::after,
+html.sub-reduced-motion .sub-dark-map .leaflet-tile-pane,
+html.sub-reduced-motion .sub-game-shell::after,
+html.sub-reduced-motion [data-testid="resource-bar"],
+html.sub-reduced-motion [data-testid="resource-bar"] .sub-resource-value,
+html.sub-reduced-motion .sub-dock .sub-hud-btn svg,
+html.sub-reduced-motion .opp-pin,
+html.sub-reduced-motion .opp-pin::after,
+html.sub-reduced-motion .mission-target .mission-target-ring,
+html.sub-reduced-motion .mission-target .mission-target-dot,
+html.sub-reduced-motion .unit-car-moving .unit-car-body::after,
+html.sub-reduced-motion .sub-sheet-panel,
+html.sub-reduced-motion .sub-menu-modal,
+html.sub-reduced-motion .sub-nav-tray,
+html.sub-reduced-motion .sub-opp-card,
+html.sub-reduced-motion .sub-game-shell .sub-card,
+html.sub-reduced-motion .sub-game-shell [role="progressbar"] > div::after,
+html.sub-reduced-motion .sub-toast {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-vignette::before,
+  .sub-vignette::after,
+  .sub-dark-map .leaflet-tile-pane,
+  .sub-game-shell::after,
+  [data-testid="resource-bar"],
+  [data-testid="resource-bar"] .sub-resource-value,
+  .sub-dock .sub-hud-btn svg,
+  .opp-pin,
+  .opp-pin::after,
+  .mission-target .mission-target-ring,
+  .mission-target .mission-target-dot,
+  .unit-car-moving .unit-car-body::after,
+  .sub-sheet-panel,
+  .sub-menu-modal,
+  .sub-nav-tray,
+  .sub-opp-card,
+  .sub-game-shell .sub-card,
+  .sub-game-shell [role="progressbar"] > div::after,
+  .sub-toast {
+    animation: none !important;
+  }
+}
