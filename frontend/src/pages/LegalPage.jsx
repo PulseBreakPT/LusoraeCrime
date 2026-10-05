@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { LegalShell, LegalSkeleton, LegalError } from "../components/legal/LegalShell";
+import { Card } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Separator } from "../components/ui/separator";
 import { FileText, CalendarDays, BadgeCheck } from "lucide-react";
 
 const ROUTE_DOC = {
@@ -63,7 +66,8 @@ export default function LegalPage() {
         <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
           {/* Índice (desktop) */}
           <aside className="hidden lg:block">
-            <nav aria-label="Índice" className="sub-toc sticky top-24 rounded-lg p-4">
+            <Card className="sub-toc sticky top-24 rounded-lg p-4">
+              <nav aria-label="Índice">
               <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                 <span className="h-1 w-1 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" aria-hidden="true" />
                 Índice
@@ -80,7 +84,8 @@ export default function LegalPage() {
                   </a>
                 ))}
               </div>
-            </nav>
+              </nav>
+            </Card>
           </aside>
 
           {/* Documento */}
@@ -94,18 +99,18 @@ export default function LegalPage() {
             <div className="mt-3 h-0.5 w-20 bg-gradient-to-r from-red-600 via-red-600/60 to-transparent" />
 
             <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-zinc-500">
-              <span data-testid="legal-version" className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono font-bold uppercase tracking-wider text-zinc-300">
+              <Badge data-testid="legal-version" variant="outline" className="gap-1.5 rounded-full border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono font-bold uppercase tracking-wider text-zinc-300">
                 <BadgeCheck size={12} className="text-red-400" aria-hidden="true" /> Versão {doc.version}
-              </span>
+              </Badge>
               <span className="flex items-center gap-1.5">
                 <CalendarDays size={12} aria-hidden="true" /> Em vigor desde {formatDate(doc.effective_date)}
               </span>
             </div>
 
             {doc.summary && (
-              <p className="sub-doc-summary mt-6 rounded-md px-4 py-3.5 text-sm leading-relaxed text-zinc-300">
+              <Card className="sub-doc-summary mt-6 rounded-md px-4 py-3.5 text-sm leading-relaxed text-zinc-300">
                 {doc.summary}
-              </p>
+              </Card>
             )}
 
             <div className="mt-10 space-y-10">
@@ -138,14 +143,14 @@ export default function LegalPage() {
 
             {doc.available_versions?.length > 0 && (
               <div className="mt-14 pt-1">
-                <div className="sub-hairline mb-5" aria-hidden="true" />
+                <Separator className="sub-hairline mb-5" aria-hidden="true" />
                 <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-600">Histórico de versões</p>
                 <ul className="mt-2.5 space-y-1.5">
                   {doc.available_versions.slice().reverse().map((v) => (
                     <li key={v.version} className="flex items-center gap-2.5 text-xs text-zinc-500">
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${v.version === doc.version ? "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" : "bg-zinc-700"}`} aria-hidden="true" />
                       Versão {v.version} — em vigor desde {formatDate(v.effective_date)}
-                      {v.version === doc.version && <span className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-400">Atual</span>}
+                      {v.version === doc.version && <Badge className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-400">Atual</Badge>}
                     </li>
                   ))}
                 </ul>
