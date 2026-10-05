@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Badge } from "../ui/badge";
 import { PanelWatermark } from "./hud";
@@ -37,15 +38,11 @@ const timeLeft = (seconds) => {
 const ActionButton = ({ children, onClick, disabled, tone = "default" }) => (
   <Button
     type="button"
-    size="sm"
-    variant="outline"
+    size="compact"
+    variant={tone === "danger" ? "destructive" : tone === "good" ? "success" : "outline"}
     disabled={disabled}
     onClick={onClick}
-    className={`h-8 font-mono text-[10px] uppercase tracking-[0.08em] ${
-      tone === "danger" ? "border-red-500/25 text-red-300 hover:bg-red-500/10" :
-      tone === "good" ? "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10" :
-      "border-white/10 bg-black/20 text-zinc-300"
-    }`}
+    className="font-mono uppercase tracking-[0.08em]"
   >
     {children}
   </Button>
@@ -143,9 +140,9 @@ export const CityPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid h-auto w-full grid-cols-5 gap-1 bg-black/40 p-1">
+          <TabsList className="grid h-auto w-full grid-cols-5 gap-1">
             {TABS.map(([key, label, Icon]) => (
-              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] uppercase data-[state=active]:bg-red-600 data-[state=active]:text-white">
+              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider">
                 <Icon size={11} /><span className="hidden min-[430px]:inline">{label}</span>
               </TabsTrigger>
             ))}
@@ -502,11 +499,11 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   ) : (
                     <div className="mt-2 space-y-2">
                       <div className="flex gap-2">
-                        <Input value={allianceName} onChange={(e) => setAllianceName(e.target.value)} placeholder="Nome da nova aliança" className="h-8 bg-black/30 text-xs" />
+                        <Input value={allianceName} onChange={(e) => setAllianceName(e.target.value)} placeholder="Nome da nova aliança" size="compact" />
                         <ActionButton disabled={!!busy || allianceName.trim().length < 3} onClick={async () => { const d=await act("alliance-create","social/alliance/create",{name:allianceName.trim()},"Aliança criada"); if(d)setAllianceName(""); }}>Criar</ActionButton>
                       </div>
                       <div className="flex gap-2">
-                        <Input value={allianceCode} onChange={(e) => setAllianceCode(e.target.value.toUpperCase())} maxLength={12} placeholder="Código de convite" className="h-8 bg-black/30 font-mono text-xs uppercase" />
+                        <Input value={allianceCode} onChange={(e) => setAllianceCode(e.target.value.toUpperCase())} maxLength={12} placeholder="Código de convite" size="compact" className="font-mono uppercase" />
                         <ActionButton disabled={!!busy || allianceCode.trim().length < 4} onClick={async () => { const d=await act("alliance-join","social/alliance/join",{code:allianceCode.trim()},"Entraste na aliança"); if(d)setAllianceCode(""); }}>Entrar</ActionButton>
                       </div>
                     </div>
@@ -574,8 +571,8 @@ export const CityPanel = ({ open, onOpenChange }) => {
                     })}
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Input value={chat} onChange={(e) => setChat(e.target.value)} maxLength={280} placeholder="Mensagem…" className="h-8 bg-black/30 text-xs" />
-                    <Button size="icon" variant="outline" disabled={!!busy || !chat.trim()} className="h-8 w-8 border-white/10" onClick={async () => { const d=await act("chat","social/chat",{message:chat.trim()}); if(d)setChat(""); }}><Send size={12} /></Button>
+                    <Input value={chat} onChange={(e) => setChat(e.target.value)} maxLength={280} placeholder="Mensagem…" size="compact" />
+                    <Button size="iconCompact" variant="outline" disabled={!!busy || !chat.trim()} onClick={async () => { const d=await act("chat","social/chat",{message:chat.trim()}); if(d)setChat(""); }}><Send size={12} /></Button>
                   </div>
                 </Card>
 
@@ -583,10 +580,17 @@ export const CityPanel = ({ open, onOpenChange }) => {
                   <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Dices size={13} className="text-amber-400" /> Casino clandestino</p>
                   <p className="mt-1 text-[10px] text-zinc-500">Apostas entre 100 € e 5 000 € usando apenas dinheiro do jogo.</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Input type="number" min={100} max={5000} value={bet} onChange={(e) => setBet(e.target.value)} className="h-8 w-28 bg-black/30 text-xs" />
-                    <select value={rouletteChoice} onChange={(e) => setRouletteChoice(e.target.value)} className="h-8 rounded-md border border-white/10 bg-black/40 px-2 font-mono text-[10px] text-zinc-300">
-                      <option value="red">Vermelho</option><option value="black">Preto</option><option value="green">Zero</option>
-                    </select>
+                    <Input type="number" min={100} max={5000} value={bet} onChange={(e) => setBet(e.target.value)} size="compact" className="w-28" />
+                    <Select value={rouletteChoice} onValueChange={setRouletteChoice}>
+                      <SelectTrigger size="compact" className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="red">Vermelho</SelectItem>
+                        <SelectItem value="black">Preto</SelectItem>
+                        <SelectItem value="green">Zero</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <ActionButton disabled={!!busy} onClick={() => playCasino("roulette")}>Roleta</ActionButton>
                     <ActionButton disabled={!!busy} onClick={() => playCasino("blackjack")}>Blackjack</ActionButton>
                   </div>
