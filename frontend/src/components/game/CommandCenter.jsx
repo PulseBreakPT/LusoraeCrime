@@ -1,3 +1,4 @@
+import { Button } from "../ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -332,7 +333,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
             {visible.map((command, index) => {
               const Icon = command.Icon || Search;
               return (
-                <button
+                <Button variant="bare" size="bare"
                   key={command.id}
                   type="button"
                   role="option"
@@ -356,7 +357,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
                       {command.shortcut}
                     </kbd>
                   )}
-                </button>
+                </Button>
               );
             })}
             {visible.length === 0 && (
