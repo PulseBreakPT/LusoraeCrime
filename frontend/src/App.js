@@ -1,6 +1,7 @@
 import "@/App.css";
 import "@/cinematic.css";
 import "@/lighting.css";
+import "@/shadcn-system.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
