@@ -266,6 +266,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   return (
     <Card
       data-testid="opportunity-card"
+      data-risk={safeRiskLevel(opp.risk)}
+      data-hot={opp.hot ? "true" : "false"}
       style={{
         "--mk": color,
         bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
