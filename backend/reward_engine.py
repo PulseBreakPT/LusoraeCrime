@@ -3,6 +3,7 @@
 
 import math
 from reward_config import *
+from economy_director import guard_reward
 
 
 def get_vehicle_weight(vehicle_model: str, vehicles_dict: dict) -> float:
@@ -295,7 +296,8 @@ def calculate_money_reward(
     # gradual para operações de late-game, sem saltos bruscos na economia.
     late_levels = max(0, min(100, int(org_level or 1)) - 10)
     reward_cap = MONEY_REWARD_MAX + late_levels * MONEY_REWARD_MAX_LATE_PER_LEVEL
-    return int(max(MONEY_REWARD_MIN, min(reward_cap, reward)))
+    tuned = int(max(MONEY_REWARD_MIN, min(reward_cap, reward)))
+    return max(MONEY_REWARD_MIN, guard_reward(tuned, org_level, "operation"))
 
 
 def calculate_xp_reward(
