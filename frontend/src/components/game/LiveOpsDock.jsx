@@ -110,8 +110,10 @@ export function LiveOpsPanel({ state, serverNow, onDecision }) {
     setDecisionBusy(false);
   }, [selectedId]);
 
-  const log = sel?.live_log || [];
-  const revealed = useMemo(() => log.filter((e) => Date.parse(e.at) <= now), [log, now]);
+  const revealed = useMemo(
+    () => (sel?.live_log || []).filter((e) => Date.parse(e.at) <= now),
+    [sel?.live_log, now]
+  );
 
   // Auto-scroll do feed para a linha mais recente.
   useEffect(() => {
