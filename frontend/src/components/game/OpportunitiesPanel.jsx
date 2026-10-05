@@ -166,7 +166,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           </div>
           <div className="grid grid-cols-1 gap-1.5 min-[430px]:grid-cols-3">
             <Select value={sortKey} onValueChange={setSortKey}>
-              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger size="compact" className="gap-1 text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -176,7 +176,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
             <Select value={catFilter} onValueChange={setCatFilter}>
-              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger size="compact" className="gap-1 text-white">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>
@@ -187,7 +187,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
             <Select value={forceFilter} onValueChange={setForceFilter}>
-              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger size="compact" className="gap-1 text-white">
                 <SelectValue placeholder="Força" />
               </SelectTrigger>
               <SelectContent>
@@ -199,16 +199,20 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Button
-              variant="outline" size="sm"
+              variant="filter"
+              size="compact"
+              aria-pressed={reachableOnly}
               onClick={() => setReachableOnly((v) => !v)}
-              className={`min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${reachableOnly ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-400"}`}
+              className="w-full gap-1 font-mono"
             >
               <CheckCircle2 size={11} /> Só alcançáveis
             </Button>
             <Button
-              variant="outline" size="sm"
+              variant="filter"
+              size="compact"
+              aria-pressed={favOnly}
               onClick={() => setFavOnly((v) => !v)}
-              className={`min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${favOnly ? "bg-amber-500/15 text-amber-300" : "text-zinc-400"}`}
+              className="w-full gap-1 font-mono"
             >
               <Star size={11} /> Favoritas
             </Button>
