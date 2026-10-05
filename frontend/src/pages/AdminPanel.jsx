@@ -490,7 +490,7 @@ export default function AdminPanel() {
                     <p className="text-zinc-500 text-xs">
                       Isto vai limpar todas as equipas, operacionais, veículos, propriedades e operações.
                     </p>
-                    <Button onClick={handleResetProgress} variant="outline" className="w-full border-orange-500/50 bg-gradient-to-b from-orange-500 to-orange-700 text-white hover:border-orange-400/70 hover:from-orange-400 hover:to-orange-600 hover:text-white">
+                    <Button onClick={handleResetProgress} variant="destructive" className="w-full">
                       <RotateCcw size={16} className="mr-2" />
                       Resetar Tudo
                     </Button>
