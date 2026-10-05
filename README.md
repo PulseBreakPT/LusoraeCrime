@@ -83,7 +83,7 @@ O loop principal combina gestão, planeamento e execução:
 9. **Controlar territórios**, contactos e atividades de rua.
 10. **Planear grandes golpes** através do sistema Mastermind.
 
-O motor usa um modelo de progressão persistente e data-driven: o conteúdo vive sobretudo em `game_data.py`, `economy_constants.py`, `quests_data.py`, `street_data.py` e `mastermind_data.py`.
+O motor usa um modelo de progressão persistente e data-driven: o conteúdo vive sobretudo em `game_data.py`, `economy_constants.py`, `city_data.py`, `quests_data.py` e `mastermind_data.py`.
 
 ---
 
@@ -696,8 +696,8 @@ A aceitação do disclaimer é auditada no backend com versão e registo tempora
                                ▼
 ┌────────────────────────────────────────────────────────────────┐
 │                          FastAPI                               │
-│ Auth · Game · Street · Mastermind · Admin · Legal             │
-│ Engine · Economy · Quests · World Gen · Geo · Live Ops        │
+│ Auth · Game · Organization · City · Mastermind · Admin · Legal│
+│ Engine · Economy Director · Quests · World · City · Live Ops  │
 └──────────────────────────────┬─────────────────────────────────┘
                                │ Motor/PyMongo
                                ▼
@@ -714,6 +714,10 @@ Internet → Caddy → React estático
 ### Filosofia do motor
 
 O backend usa um **tick lazy**: o estado avança durante leituras/ações relevantes em vez de depender de um game loop permanente para tudo. Entre outras coisas, o motor trata de spawn, expiração, progresso de missões, calor, RH, economia e eventos persistentes.
+
+O tick é serializado por jogador através de uma lease atómica, para que polling concorrente em várias tabs/dispositivos não duplique rendimento, salários, raids ou automações. A recuperação offline usa uma janela única de **28 dias** tanto para produção como para custos fixos. Rotas resolvidas no despacho ficam persistidas e são tratadas como geometria canónica da missão.
+
+A progressão 1–100 usa um contrato de desbloqueios versionado: alterar preços ou recompensas não desloca silenciosamente conteúdo entre níveis. Operações, quests, Mastermind e temporadas passam ainda pelo `economy_director.py`, que aplica guardrails globais contra multiplicadores ou farms que escapem ao balanceamento normal.
 
 ---
 
@@ -1094,13 +1098,19 @@ SUBMUNDO/
 │   ├── economy_constants.py
 │   ├── economic_simulator.py
 │   ├── routes_game.py
-│   ├── routes_street.py
+│   ├── routes_city.py
+│   ├── routes_organization.py
+│   ├── organization_systems.py
+│   ├── organization_intelligence.py
+│   ├── organization_automation.py
+│   ├── organization_events.py
+│   ├── economy_director.py
 │   ├── routes_mastermind.py
 │   ├── routes_admin.py
 │   ├── routes_legal.py
 │   ├── quests.py
 │   ├── quests_data.py
-│   ├── street_data.py
+│   ├── city_data.py
 │   ├── mastermind_data.py
 │   ├── live_ops.py
 │   ├── live_phrases.py
@@ -1129,7 +1139,6 @@ SUBMUNDO/
 │   └── scripts/
 ├── docs/
 │   ├── GENERAL_IMPROVEMENTS_25.md
-│   ├── LIVE_CITY_SANDBOX_25.md
 │   └── MASTERMIND_HEISTS_25.md
 ├── memory/
 │   └── PRD.md
