@@ -1,3 +1,4 @@
+import { Button } from "../ui/button";
 import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContextV2";
 import { fmtMoney, fmtDuration } from "../../lib/game";
@@ -181,7 +182,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                           </div>
                           {owns ? (
                             cat === "hq_skin" ? (
-                              <button type="button"
+                              <Button variant="bare" size="bare" type="button"
                                 data-testid={`shop-equip-hq_skin-${key}`}
                                 onClick={() => equipHqSkin(state.player.hq_skin_key === key ? null : key)}
                                 className={`shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold uppercase ${
@@ -191,7 +192,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 }`}
                               >
                                 {state.player.hq_skin_key === key ? "Ativa" : "Equipar"}
-                              </button>
+                              </Button>
                             ) : cat === "vehicle_paint" ? (
                               <Select onValueChange={(selection) => {
                                 const [mode, vehicleId] = selection.split(":");
