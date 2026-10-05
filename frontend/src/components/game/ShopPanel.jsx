@@ -108,13 +108,13 @@ export const ShopPanel = ({ open, onOpenChange }) => {
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-2 gap-1 bg-black/40 sm:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t.key}
                 data-testid={`shop-tab-${t.key}`}
                 value={t.key}
-                className="gap-1 px-1 font-mono text-[10px] font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="gap-1 px-1 font-mono text-[10px] font-bold uppercase tracking-wider"
               >
                 <t.icon size={12} /> {t.label}
               </TabsTrigger>
@@ -197,7 +197,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, vehicleId] = selection.split(":");
                                 equipPaint(vehicleId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-36 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger size="compact" className="w-full shrink-0 text-white sm:w-36">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -220,7 +220,7 @@ export const ShopPanel = ({ open, onOpenChange }) => {
                                 const [mode, teamId] = selection.split(":");
                                 equipEmblem(teamId, mode === "remove" ? null : key);
                               }}>
-                                <SelectTrigger className="h-7 w-full shrink-0 sm:w-36 border-white/10 bg-black/60 font-mono text-[10px] text-white">
+                                <SelectTrigger size="compact" className="w-full shrink-0 text-white sm:w-36">
                                   <SelectValue placeholder="Equipar em…" />
                                 </SelectTrigger>
                                 <SelectContent>
