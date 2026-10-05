@@ -113,6 +113,7 @@ from economy_constants import (
 from economy_calendar import next_weekly_settlement, is_weekly_settlement
 from game_data import operation_profile_of
 from time_rules import portugal_hour_allowed
+from economy_director import passive_portfolio_scale
 
 from organization_automation import run_organization_automation
 from organization_events import maybe_spawn_organization_event
@@ -3113,12 +3114,13 @@ def property_condition_factor(p):
     return p.get("condition", 100.0) / 100.0
 
 
-async def _apply_passive_income(db, player, props, hours, bonuses, now):
+async def _apply_passive_income(db, player, props, hours, bonuses, now, territory_rate=0):
     if hours <= 0:
-        return
+        return 1.0
     dirty_rate = 0
     heat_rate = 0
     launder_rate = 0
+    dirty_property_rates = []
     # Químicos na equipa tornam os laboratórios mais produtivos.
     prestige = prestige_effects(player)
     specialization = organization_specialization_effects(player)
@@ -3138,14 +3140,32 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
         factor = property_condition_factor(p) * property_operations_factor(p)
         if pt.get("dirty_per_h"):
             rate = pt["dirty_per_h"] * p["level"] * factor * lab_mult * hq_income_mult * float(specialization.get("property_income_mult", 1.0) or 1.0)
-            share = rate * hours
             dirty_rate += rate
-            await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_dirty_generated": share}})
+            dirty_property_rates.append((p["_id"], rate))
         if pt.get("heat_per_h"):
             heat_rate += pt["heat_per_h"] * p["level"] * factor * hq_heat_mult
         if pt.get("launder_per_h"):
             launder_rate += pt["launder_per_h"] * p["level"] * factor * float(specialization.get("property_income_mult", 1.0) or 1.0)
     launder_rate *= (1 + bonuses.get("empresa_boost", 0) + float(prestige.get("laundry_bonus", 0.0))) * hq_income_mult
+
+    # Properties and territories create new money and therefore share one
+    # career envelope. Laundry is excluded: it only converts existing dirty
+    # money into clean money at a loss.
+    income_scale = passive_portfolio_scale(
+        player.get("level", 1),
+        1.0,
+        territory_rate,
+        dirty_rate,
+    )
+    if income_scale < 1.0:
+        dirty_rate *= income_scale
+    for property_id, raw_rate in dirty_property_rates:
+        share = raw_rate * income_scale * hours
+        if share:
+            await db.properties.update_one(
+                {"_id": property_id},
+                {"$inc": {"total_dirty_generated": share}},
+            )
 
     if dirty_rate > 0:
         fd = player.get("frac_dirty", 0.0) + dirty_rate * hours
@@ -3178,6 +3198,7 @@ async def _apply_passive_income(db, player, props, hours, bonuses, now):
                     factor = property_condition_factor(p) * property_operations_factor(p)
                     share = conv * (pt["launder_per_h"] * p["level"] * factor * (1 + bonuses.get("empresa_boost", 0)) * hq_income_mult / launder_rate)
                     await db.properties.update_one({"_id": p["_id"]}, {"$inc": {"total_laundered": share}})
+    return income_scale
 
 
 async def _complete_property_upgrades(db, player, props, now):
@@ -3388,7 +3409,12 @@ async def advance(db, player):
     )
     if event and event.get("id") != previous_event_id:
         await add_event(db, pid, "system", f"Decisão da organização: {event['title']}.")
-    await _apply_passive_income(db, player, props, minutes / 60, bonuses, now)
+    territory_rate = territory_income_per_hour(player)
+    passive_income_scale = await _apply_passive_income(
+        db, player, props, minutes / 60, bonuses, now,
+        territory_rate=territory_rate,
+    )
+    territory_rate *= passive_income_scale
     await _complete_property_upgrades(db, player, props, now)
     await _complete_hq_upgrade(db, player, now)
     await _maybe_raid(db, player, props, minutes, now)
@@ -3415,7 +3441,7 @@ async def advance(db, player):
 
     # Territórios: rendimento passivo com pressão rival crescente e defesa que
     # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
-    territory_rate = territory_income_per_hour(player)
+    # territory_rate já partilha o envelope passivo com a produção dos imóveis.
     if minutes > 0 and territory_rate > 0:
         ft = float(player.get("frac_territory", 0.0) or 0.0) + territory_rate * (minutes / 60.0)
         territory_gain = int(ft)
