@@ -8,6 +8,7 @@ from city_data import (
     WEATHER_STATES, DAYPARTS, CITY_EVENTS, BUSINESS_TYPES, RIVAL_ARCHETYPES, RIVAL_ACTIONS,
     SEASON_LENGTH_DAYS, SEASON_ANCHOR_ISO, SEASON_REWARDS,
 )
+from economy_director import guard_reward, city_business_cap
 
 LISBON = ZoneInfo("Europe/Lisbon")
 
@@ -386,7 +387,7 @@ async def _settle_previous_season(db, player, record):
         "season_id": season_id,
         "rank": rank,
         "points": points,
-        "clean": int(reward.get("clean", 0) or 0),
+        "clean": guard_reward(reward.get("clean", 0), int(player.get("level", 1) or 1), "season"),
         "respect": int(reward.get("respect", 0) or 0),
         "claimed_at": _utc_now().isoformat(),
     }
@@ -648,6 +649,7 @@ async def city_snapshot(db, player):
         "rival_actions": RIVAL_ACTIONS,
         "businesses": business_out,
         "business_catalog": BUSINESS_TYPES,
+        "business_capacity": {"used": len(businesses), "max": city_business_cap(player.get("level", 1))},
         "business_totals": {
             "unclaimed_clean": sum(p["clean"] for p in projections),
             "unclaimed_dirty": sum(p["dirty"] for p in projections),
