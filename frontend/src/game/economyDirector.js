@@ -56,4 +56,11 @@ export const guardReward = (amount, level, source) =>
 
 export const passiveHourlyCeiling = (level) => careerEconomyBand(level).ceiling_per_hour;
 
+export const passivePortfolioScale = (level, hours, clean, dirty) => {
+  const windowHours = Math.max(0, Number(hours) || 0);
+  const total = Math.max(0, Number(clean) || 0) + Math.max(0, Number(dirty) || 0);
+  if (!total || !windowHours) return 1;
+  return Math.max(0, Math.min(1, (passiveHourlyCeiling(level) * windowHours) / total));
+};
+
 export const cityBusinessCap = (level) => Math.min(12, 2 + Math.floor(levelOf(level) / 10));
