@@ -80,8 +80,8 @@ def run():
     assert "city_chat_reports" in admin
 
     # State polling must never simulate the same elapsed interval twice.
-    assert "simulation_lease_token" in engine
-    assert "simulation_lease_until" in engine
+    assert "state_lease_owner" in engine
+    assert "acquire_player_state_lease" in engine
     assert "OFFLINE_SIMULATION_MAX_MINUTES" in engine
     assert "OFFLINE_PAYROLL_MAX_CYCLES" in engine
 
