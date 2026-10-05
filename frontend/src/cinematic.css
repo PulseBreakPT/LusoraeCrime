@@ -188,9 +188,7 @@
   filter:
     drop-shadow(0 0 2px rgba(244, 244, 245, 0.30))
     drop-shadow(0 0 5px rgba(34, 211, 238, 0.10));
-  transition:
-    opacity var(--sub-fx-standard) ease,
-    stroke-width var(--sub-fx-standard) ease;
+  transition: opacity var(--sub-fx-standard) ease;
 }
 
 .leaflet-overlay-pane path.sub-route-line-returning {
