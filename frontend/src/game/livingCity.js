@@ -237,6 +237,8 @@ export const advanceLocalCity = (save) => {
   return save;
 };
 
+const cityBusinessCap=(level)=>Math.min(12,2+Math.floor(clamp(Number(level||1),1,100)/10));
+
 const businessProjection=(b)=>{
   const cfg=LOCAL_BUSINESS_TYPES[b.type_key]||{},last=Date.parse(b.last_collect_at||b.bought_at||nowIso());
   const hours=clamp((Date.now()-last)/3600000,0,168),level=Math.max(1,Number(b.level||1)),eff=clamp(Number(b.condition??100)/100,.35,1.35);
@@ -293,7 +295,7 @@ export const localCitySnapshot = (save) => {
     season:{...season,your_points:Number(save.city.season.points||0),leaderboard:npcLeaderboard(save,season),last_reward:clone(save.city.last_season_reward||null)},
     news:news.slice(0,12),
     rivals:save.city.rivals.map((r)=>({...clone(r),threat:clamp(Math.round(r.power+r.hostility*.35-playerPower*.35),0,100)})),
-    businesses,business_catalog:clone(LOCAL_BUSINESS_TYPES),business_totals:totals,
+    businesses,business_catalog:clone(LOCAL_BUSINESS_TYPES),business_capacity:{used:businesses.length,max:cityBusinessCap(save.player.level)},business_totals:totals,
     rival_actions:clone(ACTIONS),
     social:{
       alliance:save.city.social.alliance ? {
@@ -349,7 +351,7 @@ export const handleLocalCityRequest = (save,verb,path,payload={}) => {
   if(verb==="post"&&path==="/game/city/businesses/buy"){
     const cfg=LOCAL_BUSINESS_TYPES[payload.type_key];if(!cfg)fail(404,"Tipo de negócio inexistente");
     if(Number(save.player.level||1)<Number(cfg.min_level||1))fail(400,`Este negócio desbloqueia no nível ${cfg.min_level}`);
-    const owned=save.city.businesses.length,same=save.city.businesses.filter(x=>x.type_key===payload.type_key).length;
+    const owned=save.city.businesses.length,capacity=cityBusinessCap(save.player.level);if(owned>=capacity)fail(400,"Rede empresarial cheia ("+owned+"/"+capacity+"); sobe de nível para expandir");const same=save.city.businesses.filter(x=>x.type_key===payload.type_key).length;
     const price=Math.round(cfg.price*(1+owned*.08+same*.12));spend(save,price,`Compra de negócio: ${cfg.name}`,"city_business_buy");
     const b={id:uid("biz"),type_key:payload.type_key,name:cfg.name,level:1,condition:100,security:cfg.security,reputation:50,bought_at:nowIso(),last_collect_at:nowIso(),total_clean:0,total_dirty:0};
     save.city.businesses.push(b);pushEvent(save,"system",`${cfg.name} entrou na rede empresarial da organização.`);
