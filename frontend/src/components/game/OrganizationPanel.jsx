@@ -313,7 +313,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                 {(intelligence.recommendations || []).length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     {(intelligence.recommendations || []).slice(0, 5).map((rec, index) => (
-                      <button
+                      <Button variant="bare" size="bare"
                         type="button"
                         key={`${rec.title}-${index}`}
                         onClick={() => setTab(rec.tab || "centro")}
@@ -321,7 +321,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                       >
                         <p className="text-[11px] font-semibold text-zinc-200">{rec.title}</p>
                         <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-500">{rec.reason}</p>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -329,7 +329,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
             )}
 
             {(intelligence?.alerts || []).filter((item) => item.severity === "critical").slice(0, 3).map((alert) => (
-              <button
+              <Button variant="bare" size="bare"
                 type="button"
                 key={alert.code}
                 onClick={() => setTab(alert.tab || "centro")}
@@ -342,7 +342,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     <p className="mt-0.5 text-[10px] text-red-200/60">{alert.detail}</p>
                   </div>
                 </div>
-              </button>
+              </Button>
             ))}
 
             {intelligence?.event && (
@@ -355,7 +355,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                 <p className="text-[11px] leading-relaxed text-zinc-400">{intelligence.event.description}</p>
                 <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   {(intelligence.event.options || []).map((option) => (
-                    <button
+                    <Button variant="bare" size="bare"
                       type="button"
                       key={option.key}
                       onClick={async () => {
@@ -369,7 +369,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     >
                       <p className="text-[11px] font-semibold text-amber-100">{option.label}</p>
                       <p className="mt-0.5 text-[10px] text-amber-100/50">{option.hint}</p>
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </Card>
@@ -682,7 +682,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                     <p className="mb-1.5 font-mono text-[10px] uppercase text-zinc-500">Preset operacional</p>
                     <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {Object.entries(teamPresets).map(([presetKey, preset]) => (
-                        <button
+                        <Button variant="bare" size="bare"
                           type="button"
                           key={presetKey}
                           disabled={team.status !== "idle"}
@@ -691,7 +691,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
                           className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 font-mono text-[10px] text-zinc-400 transition hover:border-sky-400/30 hover:text-sky-200 disabled:opacity-40"
                         >
                           {preset.name}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
