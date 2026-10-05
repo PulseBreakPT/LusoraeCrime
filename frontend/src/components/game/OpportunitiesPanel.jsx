@@ -161,12 +161,12 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Pesquisar operações"
               placeholder="Procurar por nome, zona ou tipo…"
-              className="sub-operations-search h-9 border-white/10 bg-black/60 pl-8 font-mono text-xs text-white"
+              size="compact" className="sub-operations-search pl-8 font-mono text-white"
             />
           </div>
           <div className="sub-operations-selects grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             <Select value={sortKey} onValueChange={setSortKey}>
-              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
+              <SelectTrigger size="compact" className="gap-1 text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -187,7 +187,7 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
               </SelectContent>
             </Select>
             <Select value={forceFilter} onValueChange={setForceFilter}>
-              <SelectTrigger className="col-span-2 h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white sm:col-span-1">
+              <SelectTrigger size="compact" className="col-span-2 gap-1 text-white sm:col-span-1">
                 <SelectValue placeholder="Força" />
               </SelectTrigger>
               <SelectContent>
@@ -199,16 +199,20 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Button
-              variant="outline" size="sm"
+              variant="filter"
+              size="compact"
+              aria-pressed={reachableOnly}
               onClick={() => setReachableOnly((v) => !v)}
-              className={`sub-filter-chip min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${reachableOnly ? "is-active bg-emerald-500/15 text-emerald-300" : "text-zinc-400"}`}
+              className={`sub-filter-chip w-full gap-1 font-mono ${reachableOnly ? "is-active" : ""}`}
             >
               <CheckCircle2 size={11} /> Só alcançáveis
             </Button>
             <Button
-              variant="outline" size="sm"
+              variant="filter"
+              size="compact"
+              aria-pressed={favOnly}
               onClick={() => setFavOnly((v) => !v)}
-              className={`sub-filter-chip min-h-10 w-full gap-1 border-white/15 px-2 font-mono text-[10px] ${favOnly ? "is-active bg-amber-500/15 text-amber-300" : "text-zinc-400"}`}
+              className={`sub-filter-chip w-full gap-1 font-mono ${favOnly ? "is-active" : ""}`}
             >
               <Star size={11} /> Favoritas
             </Button>
