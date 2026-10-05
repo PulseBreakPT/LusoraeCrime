@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, BriefcaseBusiness, Check, Clock3, Coins,
   Crosshair, Gauge, ListChecks, LockKeyhole, Package, Play,
@@ -37,8 +37,8 @@ export const MastermindPanel = ({ open, onOpenChange }) => {
     abortMastermindHeist, tradeBlackMarket, resolveBounty, scanSignalCache,
   } = useGame();
   const mastermind = state?.mastermind;
-  const teams = state?.teams || [];
-  const vehicles = state?.vehicles || [];
+  const teams = useMemo(() => state?.teams || [], [state?.teams]);
+  const vehicles = useMemo(() => state?.vehicles || [], [state?.vehicles]);
   const [tab, setTab] = useState("board");
   const [draft, setDraft] = useState({
     team_id: "",
