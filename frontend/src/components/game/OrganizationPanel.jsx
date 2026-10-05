@@ -40,8 +40,8 @@ const daysLeft = (iso, now) => iso ? Math.max(0, Math.ceil((Date.parse(iso) - no
 const SmallAction = ({ children, dense = false, className = "", ...props }) => (
   <Button
     variant="outline"
-    size="sm"
-    className={`${dense ? "h-7 min-h-0 px-1.5" : "h-8 min-h-0 px-2"} border-white/10 bg-white/[0.03] font-mono text-[10px] ${className}`}
+    size="compact"
+    className={`${dense ? "px-1.5" : "px-2.5"} font-mono ${className}`}
     {...props}
   >
     {children}
