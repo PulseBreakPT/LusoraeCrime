@@ -882,3 +882,432 @@ html.sub-reduced-motion .sub-toast {
     animation: none !important;
   }
 }
+
+
+/* --- SSS EFFECTS EXPANSION V3 ------------------------------------------------ */
+
+@keyframes sub-fx-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sub-fx-beacon {
+  0% { transform: scale(.72); opacity: .72; }
+  70% { opacity: .14; }
+  100% { transform: scale(2.15); opacity: 0; }
+}
+
+@keyframes sub-fx-property-beacon {
+  0%, 100% { transform: scale(.92); opacity: .24; }
+  50% { transform: scale(1.28); opacity: .58; }
+}
+
+@keyframes sub-fx-edge-run {
+  from { background-position: 160% 0; }
+  to { background-position: -60% 0; }
+}
+
+@keyframes sub-fx-active-dot {
+  0%, 100% { transform: translateX(-50%) scale(.82); opacity: .66; }
+  50% { transform: translateX(-50%) scale(1.3); opacity: 1; }
+}
+
+@keyframes sub-fx-panel-icon {
+  0%, 100% { transform: translateY(0) rotate(0); filter: brightness(1); }
+  50% { transform: translateY(-1px) rotate(2deg); filter: brightness(1.28); }
+}
+
+@keyframes sub-fx-kpi-energy {
+  0%, 100% { opacity: .18; transform: scaleX(.38); }
+  50% { opacity: .82; transform: scaleX(1); }
+}
+
+@keyframes sub-fx-operator-glow {
+  0%, 100% {
+    text-shadow:
+      0 1px 1px rgba(0,0,0,.95),
+      0 2px 4px rgba(0,0,0,.78),
+      0 0 5px rgba(255,255,255,.08);
+  }
+  50% {
+    text-shadow:
+      0 1px 1px rgba(0,0,0,.98),
+      0 2px 5px rgba(0,0,0,.86),
+      0 0 9px rgba(34,211,238,.34);
+  }
+}
+
+@keyframes sub-fx-police-aura {
+  0%, 100% {
+    filter:
+      drop-shadow(-4px 0 6px rgba(59,130,246,.34))
+      drop-shadow(4px 0 6px rgba(239,68,68,.22));
+  }
+  50% {
+    filter:
+      drop-shadow(-7px 0 11px rgba(59,130,246,.68))
+      drop-shadow(7px 0 11px rgba(239,68,68,.48));
+  }
+}
+
+@keyframes sub-fx-police-orbit {
+  0% { transform: rotate(0deg) scale(.88); opacity: .34; }
+  50% { opacity: .7; }
+  100% { transform: rotate(360deg) scale(1.16); opacity: .34; }
+}
+
+@keyframes sub-fx-route-spark {
+  from { stroke-dashoffset: 0; opacity: .25; }
+  50% { opacity: .72; }
+  to { stroke-dashoffset: -46; opacity: .25; }
+}
+
+@keyframes sub-fx-live-ops {
+  0%, 100% { opacity: .3; }
+  50% { opacity: .82; }
+}
+
+@keyframes sub-fx-card-corner {
+  0%, 100% { opacity: .18; }
+  50% { opacity: .68; }
+}
+
+@keyframes sub-fx-btn-core {
+  0%, 100% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
+  50% { box-shadow: inset 0 0 13px rgba(255,255,255,.035); }
+}
+
+/* HQ: persistent command beacon. */
+.hq-pin {
+  position: relative;
+  overflow: visible;
+}
+
+.hq-pin::before,
+.hq-pin::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.hq-pin::before {
+  border: 1px solid rgba(250,250,250,.6);
+  box-shadow: 0 0 12px rgba(250,250,250,.24);
+  animation: sub-fx-beacon 2.8s var(--sub-fx-ease-soft) infinite;
+}
+
+.hq-pin::after {
+  inset: -4px;
+  border: 1px dashed rgba(245,158,11,.42);
+  animation: sub-fx-orbit 8s linear infinite;
+}
+
+/* Properties constantly signal the owned network on the map. */
+.prop-pin {
+  position: relative;
+  overflow: visible;
+}
+
+.prop-pin::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  z-index: -1;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 0 12px rgba(255,255,255,.06);
+  animation: sub-fx-property-beacon 3.6s ease-in-out infinite;
+}
+
+/* Non-urgent opportunities also get a slow tactical orbit. */
+.opp-pin:not(.opp-pin-urgent)::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--mk, #fff) 38%, transparent);
+  opacity: .5;
+  pointer-events: none;
+  animation: sub-fx-orbit 9.5s linear infinite;
+}
+
+/* Active dock destination gets an orbit ring in addition to the lower dot. */
+.sub-dock .sub-hud-btn {
+  position: relative;
+}
+
+.sub-dock .sub-hud-btn::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.045);
+  opacity: .5;
+  pointer-events: none;
+  animation: sub-fx-orbit 12s linear infinite;
+}
+
+.sub-dock .sub-hud-btn-active::after {
+  inset: 5px;
+  border-style: dashed;
+  border-color: rgba(248,113,113,.5);
+  box-shadow: 0 0 12px rgba(239,68,68,.18);
+  opacity: .9;
+  animation-duration: 5.2s;
+}
+
+.sub-dock .sub-hud-btn-active::before {
+  animation: sub-fx-active-dot 1.7s ease-in-out infinite;
+}
+
+/* Navigation tray has a continuously travelling energy edge. */
+.sub-nav-tray {
+  position: relative;
+}
+
+.sub-nav-tray::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 0;
+  height: 1px;
+  border-radius: 999px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(239,68,68,.12) 30%,
+      rgba(248,113,113,.82) 48%,
+      rgba(255,255,255,.88) 50%,
+      rgba(248,113,113,.82) 52%,
+      rgba(239,68,68,.12) 70%,
+      transparent 100%
+    );
+  background-size: 260% 100%;
+  animation: sub-fx-edge-run 4.2s linear infinite;
+}
+
+/* Panels keep a moving brand-energy cue without hijacking their entry motion. */
+.sub-sheet-panel .sub-sheet-title svg,
+.sub-sheet-panel .sub-section-header svg,
+.sub-sheet-panel .sub-watermark svg {
+  transform-origin: center;
+  animation: sub-fx-panel-icon 3.1s ease-in-out infinite;
+}
+
+/* KPI blocks gain a small living energy line at the bottom. */
+.sub-sheet-panel .sub-kpi,
+.sub-sheet-panel .sub-kpi-cell {
+  position: relative;
+  overflow: hidden;
+}
+
+.sub-sheet-panel .sub-kpi::before,
+.sub-sheet-panel .sub-kpi-cell::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 0;
+  height: 1px;
+  transform-origin: center;
+  background: linear-gradient(90deg, transparent, rgba(239,68,68,.8), transparent);
+  pointer-events: none;
+  animation: sub-fx-kpi-energy 3.4s ease-in-out infinite;
+}
+
+/* Cards receive corner energy accents in addition to their travelling sheen. */
+.sub-game-shell .sub-card:not(.sub-flash):not(.sub-flash-amber):not(.sub-flash-blue) {
+  position: relative;
+}
+
+.sub-game-shell .sub-card:not(.sub-flash):not(.sub-flash-amber):not(.sub-flash-blue)::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  border-top: 1px solid rgba(248,113,113,.48);
+  border-right: 1px solid rgba(248,113,113,.48);
+  animation: sub-fx-card-corner 3.8s ease-in-out infinite;
+}
+
+/* Buttons retain the existing hover sheen but also have a permanent inner pulse. */
+.sub-game-shell .sub-btn:not(:disabled) {
+  animation: sub-fx-btn-core 4.5s ease-in-out infinite;
+}
+
+/* Operator labels feel connected to the tactical network. */
+.op-name {
+  animation: sub-fx-operator-glow 3.3s ease-in-out infinite;
+}
+
+.op-leader {
+  animation: sub-fx-marker-pulse 2.2s ease-in-out infinite;
+}
+
+/* Police response becomes much more readable at a glance. */
+.police-car {
+  overflow: visible;
+}
+
+.police-lights,
+.police-pursuit {
+  animation: sub-fx-police-aura 1.05s ease-in-out infinite;
+}
+
+.police-pursuit::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: 999px;
+  border-top: 1px solid rgba(96,165,250,.78);
+  border-right: 1px solid rgba(239,68,68,.66);
+  border-bottom: 1px solid rgba(96,165,250,.34);
+  border-left: 1px solid rgba(239,68,68,.32);
+  animation: sub-fx-police-orbit 1.3s linear infinite;
+}
+
+/* Route cores now sparkle while the unit is travelling. */
+.leaflet-overlay-pane path.sub-route-line {
+  stroke-dasharray: 10 3 2 3;
+  animation: sub-fx-route-spark 1.7s linear infinite;
+}
+
+.leaflet-overlay-pane path.sub-route-line-returning {
+  animation-duration: 1.25s;
+}
+
+/* Active operations push a visible ambient pulse through the shell. */
+.sub-game-shell.sub-operations-live::before {
+  background:
+    radial-gradient(
+      30rem 22rem at calc(50% + var(--sub-parallax-x, 0px)) calc(46% + var(--sub-parallax-y, 0px)),
+      rgba(34,211,238,.07),
+      transparent 68%
+    ),
+    radial-gradient(
+      28rem 21rem at calc(72% + var(--sub-parallax-x, 0px)) calc(24% + var(--sub-parallax-y, 0px)),
+      rgba(239,68,68,.055),
+      transparent 72%
+    );
+  animation: sub-fx-live-ops 2.7s ease-in-out infinite;
+}
+
+/* Mission HUD badge visibly transmits when operations are active. */
+.sub-game-shell.sub-operations-live .sub-available-missions-hud {
+  filter:
+    drop-shadow(0 1px 1px rgba(0,0,0,.92))
+    drop-shadow(0 3px 6px rgba(0,0,0,.58))
+    drop-shadow(0 0 9px rgba(239,68,68,.32)) !important;
+}
+
+.sub-game-shell.sub-operations-live .sub-available-missions-count {
+  text-shadow:
+    0 1px 2px rgba(0,0,0,.95),
+    0 0 8px rgba(239,68,68,.72);
+}
+
+/* Filled wanted stars heartbeat; empty stars subtly twinkle. */
+.sub-wanted-hud svg.fill-red-600 {
+  filter: drop-shadow(0 0 5px rgba(239,68,68,.56));
+}
+
+.sub-wanted-hud svg:not(.fill-red-600) {
+  animation: sub-fx-icon-pulse 4.4s ease-in-out infinite;
+}
+
+.sub-wanted-hud svg:nth-child(2) { animation-delay: .35s; }
+.sub-wanted-hud svg:nth-child(3) { animation-delay: .7s; }
+.sub-wanted-hud svg:nth-child(4) { animation-delay: 1.05s; }
+.sub-wanted-hud svg:nth-child(5) { animation-delay: 1.4s; }
+
+/* Loading uplink feels like a powered system rather than a plain bar. */
+.sub-progress-fill {
+  box-shadow:
+    0 0 10px rgba(220,38,38,.48),
+    0 0 24px rgba(245,158,11,.12);
+}
+
+.sub-progress-fill::after {
+  content: "";
+  display: block !important;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      110deg,
+      transparent 0%,
+      transparent 38%,
+      rgba(255,255,255,.48) 49%,
+      rgba(255,255,255,.8) 50%,
+      rgba(255,255,255,.34) 52%,
+      transparent 63%,
+      transparent 100%
+    );
+  background-size: 240% 100%;
+  animation: sub-fx-edge-run 2.1s linear infinite;
+}
+
+/* Accessibility: freeze all new movement while keeping the visual hierarchy. */
+html.sub-reduced-motion .hq-pin::before,
+html.sub-reduced-motion .hq-pin::after,
+html.sub-reduced-motion .prop-pin::before,
+html.sub-reduced-motion .opp-pin::before,
+html.sub-reduced-motion .sub-dock .sub-hud-btn::after,
+html.sub-reduced-motion .sub-dock .sub-hud-btn-active::before,
+html.sub-reduced-motion .sub-nav-tray::before,
+html.sub-reduced-motion .sub-sheet-panel .sub-sheet-title svg,
+html.sub-reduced-motion .sub-sheet-panel .sub-section-header svg,
+html.sub-reduced-motion .sub-sheet-panel .sub-watermark svg,
+html.sub-reduced-motion .sub-sheet-panel .sub-kpi::before,
+html.sub-reduced-motion .sub-sheet-panel .sub-kpi-cell::before,
+html.sub-reduced-motion .sub-game-shell .sub-card::before,
+html.sub-reduced-motion .sub-game-shell .sub-btn,
+html.sub-reduced-motion .op-name,
+html.sub-reduced-motion .op-leader,
+html.sub-reduced-motion .police-lights,
+html.sub-reduced-motion .police-pursuit,
+html.sub-reduced-motion .police-pursuit::before,
+html.sub-reduced-motion .leaflet-overlay-pane path.sub-route-line,
+html.sub-reduced-motion .sub-game-shell.sub-operations-live::before,
+html.sub-reduced-motion .sub-wanted-hud svg,
+html.sub-reduced-motion .sub-progress-fill::after {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hq-pin::before,
+  .hq-pin::after,
+  .prop-pin::before,
+  .opp-pin::before,
+  .sub-dock .sub-hud-btn::after,
+  .sub-dock .sub-hud-btn-active::before,
+  .sub-nav-tray::before,
+  .sub-sheet-panel .sub-sheet-title svg,
+  .sub-sheet-panel .sub-section-header svg,
+  .sub-sheet-panel .sub-watermark svg,
+  .sub-sheet-panel .sub-kpi::before,
+  .sub-sheet-panel .sub-kpi-cell::before,
+  .sub-game-shell .sub-card::before,
+  .sub-game-shell .sub-btn,
+  .op-name,
+  .op-leader,
+  .police-lights,
+  .police-pursuit,
+  .police-pursuit::before,
+  .leaflet-overlay-pane path.sub-route-line,
+  .sub-game-shell.sub-operations-live::before,
+  .sub-wanted-hud svg,
+  .sub-progress-fill::after {
+    animation: none !important;
+  }
+}
