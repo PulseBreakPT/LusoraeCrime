@@ -256,13 +256,13 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
             </p>
           )}
           {weapons.some((w) => !w.employee_id) && state.employees.length === 0 && (
-            <button type="button"
+            <Button variant="bare" size="bare" type="button"
               data-testid="weapons-nav-employees"
               onClick={() => onNavigate && onNavigate("employees")}
               className="col-span-full w-full rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-center font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
             >
               Sem operacionais para equipar — recruta em Operacionais
-            </button>
+            </Button>
           )}
           {sortedWeapons.map((w) => {
             const baseModel = catalog?.weapon_models?.[w.model_key];
@@ -408,13 +408,13 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
                   </SelectContent>
                 </Select>
                 {!w.employee_id && (
-                  <button type="button"
+                  <Button variant="bare" size="bare" type="button"
                     data-testid={`weapon-auto-assign-${w.id}`}
                     onClick={() => autoAssignWeapon(w.id)}
                     className="relative z-[1] mt-1 flex items-center gap-1 font-mono text-[10px] text-cyan-400 underline-offset-2 hover:underline"
                   >
                     <Wand2 size={10} /> Atribuir automaticamente ao mais adequado
-                  </button>
+                  </Button>
                 )}
 
                 <div className="relative z-[1] mt-2 flex gap-1.5">
