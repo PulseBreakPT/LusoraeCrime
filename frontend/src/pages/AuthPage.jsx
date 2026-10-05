@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContextV2";
 import { Button } from "../components/ui/button";
+import { Card } from "../components/ui/card";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Separator } from "../components/ui/separator";
 import {
   Loader2,
   ShieldCheck,
@@ -87,19 +90,19 @@ export default function AuthPage() {
                 [Car, "Frota e logística"],
                 [Building2, "Propriedades e QG"],
               ].map(([Icon, label]) => (
-                <div
+                <Card
                   key={label}
-                  className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.03] p-3 text-sm text-zinc-300"
+                  className="sub-card flex items-center gap-3 rounded-lg border-white/8 bg-white/[0.03] p-3 text-sm text-zinc-300"
                 >
                   <Icon size={17} className="text-red-500" />
                   {label}
-                </div>
+                </Card>
               ))}
             </div>
           </section>
 
           <section className="mx-auto w-full max-w-md">
-            <div className="rounded-2xl border border-white/10 bg-black/70 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+            <Card className="sub-card rounded-2xl border-white/10 bg-black/70 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
               <div className="text-center">
                 <ShieldCheck className="mx-auto h-9 w-9 text-red-500" />
                 <h2 className="mt-4 font-display text-4xl font-black uppercase tracking-tight">
@@ -149,15 +152,13 @@ export default function AuthPage() {
               )}
 
               {error && (
-                <div
-                  role="alert"
-                  className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-center text-xs leading-relaxed text-red-300"
-                >
-                  {error}
-                </div>
+                <Alert variant="destructive" className="mt-4 border-red-500/20 bg-red-500/10 text-center">
+                  <AlertDescription className="text-xs leading-relaxed text-red-300">{error}</AlertDescription>
+                </Alert>
               )}
 
-              <div className="mt-6 border-t border-white/8 pt-5 text-center text-[11px] leading-relaxed text-zinc-500">
+              <div className="mt-6 text-center text-[11px] leading-relaxed text-zinc-500">
+                <Separator className="mb-5 bg-white/8" />
                 <p>
                   No modo convidado, o progresso fica guardado apenas neste dispositivo.
                   Para o manter entre dispositivos, usa a Conta Google.
@@ -173,7 +174,7 @@ export default function AuthPage() {
                   </Link>.
                 </p>
               </div>
-            </div>
+            </Card>
 
           </section>
         </div>
