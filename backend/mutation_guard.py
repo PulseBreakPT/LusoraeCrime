@@ -15,8 +15,12 @@ class MutationInput(BaseModel):
     request_id: str | None = Field(default=None, max_length=80)
 
 
-def idempotent(action_name: str):
-    """Execute a request-id mutation at most once for a player for 24 hours."""
+def idempotent(action_name: str, *, audit_collection: str | None = None):
+    """Execute a request-id mutation at most once for a player for 24 hours.
+
+    Domains may opt into a lightweight audit trail without reimplementing the
+    retry/receipt protocol.
+    """
     def decorator(fn):
         @wraps(fn)
         async def wrapped(*args, **kwargs):
@@ -67,6 +71,21 @@ def idempotent(action_name: str):
                 {"key": key},
                 {"$set": {"status": "done", "result": result}},
             )
+            if audit_collection:
+                try:
+                    payload = body.model_dump() if body is not None else {}
+                    payload.pop("request_id", None)
+                    await db[audit_collection].insert_one({
+                        "player_user_id": str(user["_id"]),
+                        "action": action_name,
+                        "payload": payload,
+                        "result": result,
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                    })
+                except Exception:
+                    # Audit failure must never turn a completed mutation into
+                    # an API error (which could encourage a dangerous retry).
+                    pass
             return result
 
         return wrapped
