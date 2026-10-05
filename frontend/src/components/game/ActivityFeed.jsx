@@ -182,7 +182,7 @@ function useLiveOps(state, onFresh) {
 // ---------- Separadores da central (partilhados desktop/mobile) ----------
 const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) => (
   <div className="sub-notify-tabs flex border-b border-white/[0.06]" role="tablist" aria-label="Notificações">
-    <button
+    <Button variant="bare" size="bare"
       type="button"
       role="tab"
       aria-selected={tab === "live"}
@@ -199,9 +199,9 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
           {liveCount}
         </span>
       )}
-    </button>
+    </Button>
     <span className="w-px shrink-0 bg-white/[0.06]" />
-    <button
+    <Button variant="bare" size="bare"
       type="button"
       role="tab"
       aria-selected={tab === "log"}
@@ -215,7 +215,7 @@ const ConsoleTabs = ({ tab, onTab, liveCount, unread, idPrefix = "console" }) =>
       {unread > 0 && (
         <span className="sub-feed-unread font-mono">{unread > 9 ? "9+" : unread}</span>
       )}
-    </button>
+    </Button>
   </div>
 );
 
@@ -246,7 +246,7 @@ const FilterChips = ({ counts, filter, onFilter }) => (
 const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
   const Icon = iconFor(e, e.dest);
   return (
-    <button
+    <Button variant="bare" size="bare"
       type="button"
       data-testid="feed-row"
       data-sev={e.sev}
@@ -272,7 +272,7 @@ const FeedRow = ({ e, nowMs, onNavigate, flash }) => {
         </p>
       </div>
       <span className="shrink-0 pt-0.5 font-mono text-[10px] text-zinc-600">{relTime(e.ts, nowMs)}</span>
-    </button>
+    </Button>
   );
 };
 
@@ -350,7 +350,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
       }`}
     >
       <div className="sub-notify-head flex items-center justify-between gap-3 border-b border-white/[0.07] px-3.5 py-3">
-        <button
+        <Button variant="bare" size="bare"
           type="button"
           data-testid="feed-collapse-toggle"
           onClick={toggleCollapsed}
@@ -380,11 +380,11 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
             size={11}
             className={`shrink-0 text-zinc-500 transition-transform ${collapsed ? "rotate-180" : ""}`}
           />
-        </button>
+        </Button>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="text-[10px] tabular-nums text-zinc-600">{events.length}</span>
           {!collapsed && (
-            <button
+            <Button variant="bare" size="bare"
               type="button"
               data-testid="feed-expand-toggle"
               onClick={() => setExpanded((x) => !x)}
@@ -392,7 +392,7 @@ export const ActivityFeed = ({ onNavigate, suppressed }) => {
               className="sub-feed-iconbtn"
             >
               {expanded ? <Minimize2 size={10} /> : <Maximize2 size={10} />}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -528,7 +528,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
 
       <div className="flex items-end justify-end gap-2">
         {tickerVisible && !open && latest && latestDest && (
-          <button
+          <Button variant="bare" size="bare"
             type="button"
             data-testid="activity-feed-ticker"
             onClick={() => {
@@ -544,10 +544,10 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
               {parseActivityMessage(latest.message)}
             </span>
             <span className="shrink-0 font-mono text-[10px] text-zinc-600">{relTime(latest.ts, nowMs)}</span>
-          </button>
+          </Button>
         )}
 
-        <button
+        <Button variant="bare" size="bare"
           data-testid="activity-feed-mobile-toggle"
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -564,7 +564,7 @@ export const ActivityFeedMobile = ({ onNavigate, suppressed }) => {
               {liveCount > 0 ? liveCount : unread > 9 ? "9+" : unread}
             </span>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
