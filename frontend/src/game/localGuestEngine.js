@@ -627,15 +627,18 @@ const loadSave = () => {
     ensureOrganizationSave(save);
     ensureLocalCity(save);
     save.version = LOCAL_GUEST_SAVE_VERSION;
-    persist(save);
+    // Normalization/migration must not consume offline time. Persist the
+    // migrated shape while preserving last_tick; tick() owns elapsed-time
+    // simulation and only the post-tick save advances the clock.
+    persist(save, false);
     return save;
   } catch (_e) {
     return createInitialSave();
   }
 };
 
-const persist = (save) => {
-  save.last_tick = Date.now();
+const persist = (save, touchTick = true) => {
+  if (touchTick) save.last_tick = Date.now();
   localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 };
 
