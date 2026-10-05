@@ -17,7 +17,8 @@ from city_data import (
     BUSINESS_TYPES, RIVAL_ACTIONS, CASINO_MIN_BET, CASINO_MAX_BET,
 )
 from city_systems import (
-    city_snapshot, business_projection, season_info, boss_status,
+    city_snapshot, business_projection, guarded_business_projections,
+    season_info, boss_status,
 )
 from economy_director import city_business_cap
 
@@ -215,10 +216,13 @@ async def collect_businesses(body: MutationInput, user: dict = Depends(get_curre
     businesses = await db.city_businesses.find({"player_id": pid}).to_list(100)
     if not businesses:
         raise HTTPException(status_code=400, detail="Ainda não tens negócios urbanos")
+    projections = guarded_business_projections(
+        player,
+        [business_projection(business, now) for business in businesses],
+    )
     total_clean = total_dirty = 0
     total_heat = 0.0
-    for business in businesses:
-        projection = business_projection(business, now)
+    for business, projection in zip(businesses, projections):
         claim = await db.city_businesses.update_one(
             {"_id": business["_id"], "last_collect_at": business.get("last_collect_at")},
             {"$set": {"last_collect_at": now.isoformat()},
