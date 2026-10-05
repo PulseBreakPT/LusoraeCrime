@@ -55,7 +55,7 @@ jobs:
       - name: Test offline guest engine
         env:
           CI: "true"
-        run: yarn test --watchAll=false --runInBand --runTestsByPath src/game/localGuestEngine.test.js src/game/livingCity.test.js src/lib/mapTiles.test.js src/lib/game.activity.test.js src/lib/routing.test.js src/lib/uiActionOwnership.test.js
+        run: yarn test --watchAll=false --runInBand --runTestsByPath src/game/localGuestEngine.test.js src/game/livingCity.test.js src/game/economyDirector.test.js src/lib/mapTiles.test.js src/lib/game.activity.test.js src/lib/routing.test.js src/lib/uiActionOwnership.test.js
 
       - name: Build frontend
         env:
