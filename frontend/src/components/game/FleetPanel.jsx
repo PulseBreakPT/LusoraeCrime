@@ -73,7 +73,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
 export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
     state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle,
-    transferVehicle, renameVehicle, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles, repairFleetAll,
+    transferVehicle, renameVehicle, favoriteVehicleIds, toggleFavoriteVehicle, repairFleetAll,
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
@@ -111,9 +111,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
     .filter((v) => repairableIds.includes(v.id))
     .reduce((a, v) => a + Math.max(50, Math.round((100 - v.condition) * v.price * 0.002)), 0);
   const repairAll = () => repairFleetAll();
-
-  const idleTeamsCount = state.teams.filter((t) => t.status === "idle").length;
-  const canOptimize = state.vehicles.length > 0 && idleTeamsCount > 0;
 
   const filteredVehicles = state.vehicles.filter((v) =>
     matchesSearch(query, v.name, catalog?.vehicle_models?.[v.model_key]?.name || v.model_key)
@@ -175,24 +172,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               size="compact" className="pl-7 font-mono text-white placeholder:text-zinc-600"
             />
           </div>
-          <Tip tip={canOptimize
-            ? `Redistribui os veículos disponíveis pelas ${idleTeamsCount} equipas livres, escolhendo os mais adequados e garantindo lugares para todos os membros.`
-            : state.vehicles.length === 0 ? "Sem veículos na frota." : "Nenhuma equipa disponível para receber veículos."}>
-            <Button
-              type="button"
-              data-testid="fleet-optimize"
-              variant="outline"
-              size="compact"
-              onClick={() => canOptimize && optimizeVehicles()}
-              disabled={!canOptimize}
-              className={cn(
-                "shrink-0 gap-1 font-mono font-bold uppercase",
-                canOptimize ? "text-cyan-300" : "text-zinc-600"
-              )}
-            >
-              <Sparkles size={11} /> Otimizar
-            </Button>
-          </Tip>
           {repairableIds.length > 0 && (
             <PurchaseButton
               testId="fleet-repair-all"
