@@ -1282,6 +1282,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
         "vehicle_name": vehicle_name,
         "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
+        "fuel_needed": round(float(prep.get("fuel_needed", 0) or 0), 2),
+        "fuel_cost": round(float(prep.get("fuel_needed", 0) or 0) * FUEL_PRICES.get(vehicle.get("fuel_type"), 1.8), 2),
         "weapon_loud": prep.get("weapon_loud", False),
         "repeat_type": repeat_type,
         "repeat_count": prep.get("repeat_count", 0),
