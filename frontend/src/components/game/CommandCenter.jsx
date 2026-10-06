@@ -45,7 +45,7 @@ const PANEL_ICONS = {
   foryou: Sparkles, opscenter: RadioTower, operations: Crosshair, quests: Target, mastermind: Vault,
   teams: Users, employees: IdCard, fleet: Car, weapons: Swords, warehouse: Warehouse,
   empire: Building2, properties: Warehouse, businesses: Building2, territory: Network, hq: Landmark,
-  world: RadioTower, management: Network, intel: BrainCircuit,
+  world: RadioTower, intel: BrainCircuit,
   shop: ShoppingBag, settings: Settings,
 };
 
