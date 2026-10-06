@@ -3,6 +3,11 @@ import { propertyMarketPrice } from "../lib/propertyMarket";
 import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance, localBossLeadership } from "./livingCity";
 import { guardReward, passivePortfolioScale } from "./economyDirector";
 import { isValidHqLocation } from "../lib/land";
+import {
+  LOCAL_CERTIFICATIONS, enrichLocalOpportunities, localOperationalSnapshot,
+  localOperationRequirements, localMissingTeamRequirements, localReinforcementEffect,
+  buildLocalFollowUp,
+} from "./operationalDirector";
 
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
@@ -115,7 +120,7 @@ const makeEmployee = (role, teamId = null, index = 0) => {
     rarity: "comum", rank: "recruta", level: 1, xp: 0, age: 24 + (index * 3) % 18,
     salary: sp.salary, loyalty: 72, morale: 74, fatigue: 0, attrs: attrsFor(role),
     talents: [], team_id: teamId, weapon_id: null, status: "idle", status_until: null,
-    history: [], betrayal_risk: 0.04,
+    training: null, certifications: [], history: [], betrayal_risk: 0.04,
   };
 };
 
@@ -408,6 +413,9 @@ const ensureOrganizationSave = (save) => {
   save.player.territories ||= {};
   save.player.prestige_items ||= [];
   save.player.governance ||= {};
+  save.player.dispatch_presets ||= {};
+  save.player.staging_areas ||= [];
+  save.player.operational_rules ||= {};
   save.player.organization_policy ||= {
     reserve_cash:25000,
     max_single_spend_pct:.35,
@@ -449,6 +457,8 @@ const ensureOrganizationSave = (save) => {
   });
   (save.employees || []).forEach((employee) => {
     employee.stationed_property_id ||= null;
+    employee.certifications ||= [];
+    employee.training ||= null;
   });
   return save;
 };
@@ -1102,7 +1112,14 @@ const tick = (save) => {
   save.employees.forEach((e)=>{
     if(e.status_until && Date.parse(e.status_until)<=now){
       if(e.status==="resting") e.fatigue=Math.max(0,(e.fatigue||0)-55);
-      if(e.status==="training"){e.xp=(e.xp||0)+80;e.level=Math.min(10,(e.level||1)+1);}
+      if(e.status==="training"){
+        e.xp=(e.xp||0)+80;
+        e.level=Math.min(10,(e.level||1)+1);
+        const cert=LOCAL_CERTIFICATIONS[e.training?.course_key];
+        e.certifications ||= [];
+        if(cert && !e.certifications.includes(cert.key)) e.certifications.push(cert.key);
+        e.training=null;
+      }
       if(["resting","training","healing"].includes(e.status)) e.status="idle";
       e.status_until=null;
     }
@@ -1728,7 +1745,7 @@ const mutateGame=(save,path,payload)=>{
       }
       e.team_id=p.team_id||null;return {ok:true};
     }
-    if(path==="employees/train"){const course=LOCAL_CATALOG.training_courses[p.course_key];if(!course)fail(400,"Formação inválida");chargeClean(save,course.cost,"Formação");e.status="training";e.status_until=new Date(Date.now()+course.duration_s*1000).toISOString();return {ok:true};}
+    if(path==="employees/train"){const course=LOCAL_CATALOG.training_courses[p.course_key];if(!course)fail(400,"Formação inválida");chargeClean(save,course.cost,"Formação");e.status="training";e.training={course_key:p.course_key};e.status_until=new Date(Date.now()+course.duration_s*1000).toISOString();return {ok:true};}
     if(path==="employees/rest"){e.status="resting";e.status_until=new Date(Date.now()+25000).toISOString();return {ok:true};}
     if(path==="employees/promote"){const idx=LOCAL_CATALOG.ranks.indexOf(e.rank);if(idx>=LOCAL_CATALOG.ranks.length-1)fail(400,"Patente máxima");const cost=LOCAL_CATALOG.hr_costs.promote_base*(idx+1);chargeClean(save,cost,"Promoção");e.rank=LOCAL_CATALOG.ranks[idx+1];e.morale=clamp(e.morale+10,0,100);return {ok:true};}
     if(path==="employees/bonus"){chargeClean(save,1000,"Bónus");e.morale=clamp(e.morale+15,0,100);e.loyalty=clamp(e.loyalty+8,0,100);return {ok:true};}
