@@ -10,7 +10,7 @@ import { Card } from "../ui/card";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Table, TableBody, TableCell, TableRow } from "../ui/table";
 import {
-  Building2, Banknote, MapPin, Siren, TrendingUp, TrendingDown,
+  Building2, Banknote, Siren, TrendingUp, TrendingDown,
   AlertTriangle, History, ChevronDown, Clock,
 } from "lucide-react";
 
@@ -55,11 +55,6 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
     : null;
   const dirtyCap = state.caps?.dirty_money;
   const baseLaunderRate = catalog?.economy_meta?.launder_base_rate ?? 0.78;
-  const maxOrgLevel = catalog?.max_org_level || 100;
-  const unlockMap = catalog?.org_level_unlocks || {};
-  const nextUnlockLevel = Array.from({ length: Math.max(0, maxOrgLevel - p.level) }, (_, i) => p.level + i + 1)
-    .find((level) => (unlockMap[level] || unlockMap[String(level)] || []).length > 0);
-  const nextUnlocks = nextUnlockLevel ? (unlockMap[nextUnlockLevel] || unlockMap[String(nextUnlockLevel)] || []) : [];
 
   const handleLaunder = async () => {
     const value = parseInt(amount, 10);
@@ -255,40 +250,6 @@ export const EmpirePanel = ({ open, onOpenChange, focusTarget }) => {
             </Tip>
           </Card>
         </div>
-
-        <Tip tip={p.next_level_respect ? `Nível ${p.level} — faltam ${p.next_level_respect - p.respect} de respeito para o próximo. O respeito ganha-se em operações bem-sucedidas e desbloqueia conteúdo novo.` : `Nível máximo ${maxOrgLevel} alcançado — endgame SUBMUNDO totalmente desbloqueado.`} block>
-          <Card className="mt-2 sub-card p-3 shadow-none" data-testid="empire-level-card">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-                Nível <span className="ml-1 font-mono text-sm font-bold text-primary">{p.level}</span>
-              </p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-                Respeito <span className="ml-1 font-mono text-sm font-bold text-white">{p.respect}</span>
-                {p.next_level_respect && <span className="text-zinc-600">/{p.next_level_respect}</span>}
-              </p>
-            </div>
-            <MiniBar value={p.next_level_respect ? (p.respect / p.next_level_respect) * 100 : 100} color="#DC2626" className="mt-2" height="h-1.5" />
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-2 font-mono text-[10px]">
-              <span className="text-zinc-500">Progressão</span>
-              <span className="font-bold text-zinc-300">{p.level}/{maxOrgLevel}</span>
-            </div>
-            {nextUnlockLevel && (
-              <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-cyan-400/80">
-                Próximo marco N{nextUnlockLevel}: {nextUnlocks.slice(0, 3).map((item) => item.name).join(" · ")}
-                {nextUnlocks.length > 3 ? ` +${nextUnlocks.length - 3}` : ""}
-              </p>
-            )}
-          </Card>
-        </Tip>
-
-        <div className="mt-6">
-          <SectionHeader icon={MapPin} title="Quartel-general" />
-          <Card className="sub-card p-3 shadow-none">
-            <p className="text-sm font-semibold text-white">{p.hq.name}</p>
-            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">{p.region || "Portugal"} · {p.hq?.lat?.toFixed?.(3) ?? "—"}, {p.hq?.lng?.toFixed?.(3) ?? "—"}</p>
-          </Card>
-        </div>
-
 
         <div className="mt-6 pb-2">
           <Button variant="bare" size="bare" type="button"
