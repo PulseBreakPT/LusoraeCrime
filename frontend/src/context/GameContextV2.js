@@ -542,6 +542,12 @@ export function GameProvider({ children }) {
     action("operations/staging/delete", { staging_id: stagingId }, "Ponto de apoio removido");
   const saveOperationalRules = (rules) =>
     action("operations/rules", { rules }, "Regras operacionais atualizadas");
+  const startOperationalPatrol = (teamId, district, durationMinutes = 30) =>
+    action("operations/patrol/start", {
+      team_id: teamId, district, duration_minutes: durationMinutes,
+    }, "Vigilância iniciada");
+  const stopOperationalPatrol = (teamId) =>
+    action("operations/patrol/stop", { team_id: teamId }, "Vigilância cancelada");
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
       const payload = { opportunity_id: opportunityId, team_id: teamId };
@@ -997,6 +1003,8 @@ export function GameProvider({ children }) {
         createStagingArea,
         deleteStagingArea,
         saveOperationalRules,
+        startOperationalPatrol,
+        stopOperationalPatrol,
         recommendOpportunityForTeam,
         recommendTeamForOpportunity,
         recommendRepeatForTeam,

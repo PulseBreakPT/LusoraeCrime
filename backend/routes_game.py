@@ -313,6 +313,16 @@ class OperationalRulesInput(MutationInput):
     rules: dict
 
 
+class PatrolStartInput(MutationInput):
+    team_id: str
+    district: str = Field(min_length=1, max_length=80)
+    duration_minutes: int = Field(default=30, ge=15, le=120)
+
+
+class PatrolStopInput(MutationInput):
+    team_id: str
+
+
 class VehicleAssignInput(MutationInput):
     vehicle_id: str
     team_id: Optional[str] = None
@@ -2056,6 +2066,102 @@ async def save_operational_rules(body: OperationalRulesInput, user: dict = Depen
     }
     await db.players.update_one({"_id": player["_id"]}, {"$set": {"operational_rules": clean}})
     return {"ok": True, "rules": clean}
+
+
+@router.post("/operations/patrol/start")
+@idempotent("operations.patrol.start")
+async def start_operational_patrol(body: PatrolStartInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    district = next(
+        (d for d in (player.get("districts") or []) if str(d.get("name") or d.get("key")) == body.district),
+        None,
+    )
+    if not district:
+        raise HTTPException(status_code=400, detail="Zona operacional inválida")
+
+    team = await db.teams.find_one({
+        "_id": _oid(body.team_id, "Equipa inválida"),
+        "player_id": pid,
+        "status": "idle",
+    })
+    if not team:
+        raise HTTPException(status_code=400, detail="A equipa não está disponível para vigilância")
+    if not team.get("vehicle_id"):
+        raise HTTPException(status_code=400, detail="A equipa precisa de veículo para vigiar uma zona")
+
+    vehicle = await db.vehicles.find_one({
+        "_id": _oid(team["vehicle_id"], "Veículo inválido"),
+        "player_id": pid,
+    })
+    if not vehicle or float(vehicle.get("condition", 0) or 0) < 35 or vehicle.get("seized_until"):
+        raise HTTPException(status_code=400, detail="O veículo da equipa não está apto para vigilância")
+
+    members = await db.employees.find({
+        "player_id": pid,
+        "team_id": str(team["_id"]),
+        "status": "idle",
+        "fatigue": {"$lt": 90},
+    }).to_list(50)
+    if not members:
+        raise HTTPException(status_code=400, detail="A equipa não tem operacionais disponíveis")
+
+    now = now_utc()
+    duration = max(15, min(120, int(body.duration_minutes)))
+    patrol = {
+        "district": body.district,
+        "lat": district.get("lat"),
+        "lng": district.get("lng"),
+        "started_at": now.isoformat(),
+        "ends_at": (now + timedelta(minutes=duration)).isoformat(),
+        "duration_minutes": duration,
+        "member_ids": [str(member["_id"]) for member in members],
+    }
+    claimed = await db.teams.find_one_and_update(
+        {"_id": team["_id"], "player_id": pid, "status": "idle"},
+        {"$set": {"status": "patrolling", "patrol": patrol, "available_at": patrol["ends_at"]}},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="A equipa acabou de ficar ocupada")
+
+    ids = [member["_id"] for member in members]
+    await db.employees.update_many(
+        {"_id": {"$in": ids}, "status": "idle"},
+        {"$set": {"status": "patrolling", "status_until": patrol["ends_at"]}},
+    )
+    await add_event(
+        db,
+        pid,
+        "intel",
+        f"{team['name']} iniciou vigilância em {body.district} durante {duration} min.",
+    )
+    return {"ok": True, "patrol": patrol}
+
+
+@router.post("/operations/patrol/stop")
+@idempotent("operations.patrol.stop")
+async def stop_operational_patrol(body: PatrolStopInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    pid = str(player["_id"])
+    team = await db.teams.find_one({
+        "_id": _oid(body.team_id, "Equipa inválida"),
+        "player_id": pid,
+        "status": "patrolling",
+    })
+    if not team:
+        raise HTTPException(status_code=400, detail="Esta equipa não está em vigilância")
+
+    await db.teams.update_one(
+        {"_id": team["_id"]},
+        {"$set": {"status": "idle", "patrol": None, "available_at": None}},
+    )
+    await db.employees.update_many(
+        {"player_id": pid, "team_id": str(team["_id"]), "status": "patrolling"},
+        {"$set": {"status": "idle", "status_until": None}},
+    )
+    await add_event(db, pid, "intel", f"Vigilância de {team['name']} cancelada.")
+    return {"ok": True}
 
 
 @router.post("/teams/create")

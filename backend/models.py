@@ -66,6 +66,7 @@ class Player(BaseDocument):
     dispatch_presets: dict = {}
     staging_areas: List[dict] = []
     operational_rules: dict = {}
+    district_intel: dict = {}
 
 
 class Team(BaseDocument):
@@ -90,6 +91,7 @@ class Team(BaseDocument):
     doctrine: str = "balanced"
     policies: dict = {}
     loadout: dict = {}
+    patrol: Optional[dict] = None
 
 
 class Employee(BaseDocument):

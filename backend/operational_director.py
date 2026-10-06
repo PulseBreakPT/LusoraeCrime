@@ -247,7 +247,13 @@ def intel_profile(opportunity: dict, capabilities: dict) -> dict:
     roles = capabilities.get("roles") or set()
     specialists = {"informador", "espiao", "hacker", "engenheiro_social"}
     specialist_bonus = 1 if roles & specialists else 0
-    score = max(1, min(5, 5 - risk + specialist_bonus))
+    patrol_bonus = 0
+    district_intel = (capabilities.get("district_intel") or {}).get(str(opportunity.get("district") or ""))
+    if district_intel:
+        expires = _parse_dt(district_intel.get("expires_at"))
+        if not expires or expires > datetime.now(timezone.utc):
+            patrol_bonus = max(0, min(2, int(district_intel.get("level", 1) or 1)))
+    score = max(1, min(5, 5 - risk + specialist_bonus + patrol_bonus))
     labels = {1: "Fragmentária", 2: "Baixa", 3: "Razoável", 4: "Boa", 5: "Excelente"}
     confidence = {1: 0.48, 2: 0.60, 3: 0.72, 4: 0.84, 5: 0.93}[score]
     spread = round((1.0 - confidence) * 0.22, 3)
@@ -348,6 +354,7 @@ def capability_snapshot(
         "usable_vehicle_count": len(usable_vehicles),
         "property_types": {p.get("type_key") for p in properties},
         "inventory": dict(player.get("inventory") or {}),
+        "district_intel": dict(player.get("district_intel") or {}),
         "heat": float(player.get("heat", 0) or 0),
         "level": int(player.get("level", 1) or 1),
     }
@@ -520,6 +527,12 @@ def operational_snapshot(
         local_ops = [o for o in enriched if o.get("district") == name and o.get("status") == "active"]
         attention = float((player.get("district_attention") or {}).get(name, 0) or 0)
         territory = (player.get("territories") or {}).get(name) or {}
+        patrols = [
+            t for t in teams
+            if t.get("status") == "patrolling"
+            and (t.get("patrol") or {}).get("district") == name
+        ]
+        intel = (player.get("district_intel") or {}).get(name) or {}
         coverage.append({
             "district": name,
             "lat": district.get("lat"),
@@ -529,6 +542,8 @@ def operational_snapshot(
             "attention": round(attention, 1),
             "territory_tier": int(territory.get("tier", 0) or 0),
             "pressure": round(float(territory.get("pressure", 0) or 0), 1),
+            "patrols": len(patrols),
+            "intel": intel,
         })
 
     counts = {READINESS_PLAYABLE: 0, READINESS_STRETCH: 0, READINESS_LOCKED: 0}

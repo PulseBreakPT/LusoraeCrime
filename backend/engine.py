@@ -2682,6 +2682,96 @@ async def _process_statuses(db, pid, now):
         await add_event(db, pid, "team", msg)
 
 
+async def _complete_patrols(db, player, now):
+    """Conclui vigilâncias territoriais e transforma tempo de equipa em intel real."""
+    pid = str(player["_id"])
+    teams = await db.teams.find({"player_id": pid, "status": "patrolling"}).to_list(100)
+    for team in teams:
+        patrol = dict(team.get("patrol") or {})
+        ends_at = parse_dt(patrol.get("ends_at")) if patrol.get("ends_at") else None
+        if not ends_at or ends_at > now:
+            continue
+
+        district = patrol.get("district")
+        if not district:
+            await db.teams.update_one(
+                {"_id": team["_id"]},
+                {"$set": {"status": "idle", "patrol": None, "available_at": None}},
+            )
+            continue
+
+        members = await db.employees.find({
+            "player_id": pid,
+            "team_id": str(team["_id"]),
+            "status": "patrolling",
+        }).to_list(50)
+        roles = {m.get("role_key") for m in members}
+        specialist = bool(roles & {"informador", "espiao", "hacker", "engenheiro_social"})
+        avg_level = (
+            sum(float(m.get("level", 1) or 1) for m in members) / max(1, len(members))
+        )
+        intel_level = 2 if specialist or avg_level >= 5 else 1
+
+        attention = dict(player.get("district_attention") or {})
+        attention_drop = 6.0 + min(8.0, len(members) * 1.5) + (3.0 if specialist else 0.0)
+        attention[district] = max(0.0, float(attention.get(district, 0) or 0) - attention_drop)
+
+        territories = dict(player.get("territories") or {})
+        if district in territories:
+            info = dict(territories.get(district) or {})
+            info["pressure"] = max(
+                0.0,
+                float(info.get("pressure", 0) or 0) - (4.0 + intel_level * 2.5),
+            )
+            info["defense"] = min(
+                100.0,
+                float(info.get("defense", 100) or 0) + (1.5 + intel_level),
+            )
+            territories[district] = info
+
+        intel = dict(player.get("district_intel") or {})
+        intel[district] = {
+            "level": intel_level,
+            "source": "patrol",
+            "team_id": str(team["_id"]),
+            "team_name": team.get("name", "Equipa"),
+            "updated_at": now.isoformat(),
+            "expires_at": (now + timedelta(minutes=90 + 30 * intel_level)).isoformat(),
+        }
+        player["district_attention"] = attention
+        player["territories"] = territories
+        player["district_intel"] = intel
+        await db.players.update_one(
+            {"_id": player["_id"]},
+            {"$set": {
+                "district_attention": attention,
+                "territories": territories,
+                "district_intel": intel,
+            }},
+        )
+        await db.teams.update_one(
+            {"_id": team["_id"]},
+            {"$set": {"status": "idle", "patrol": None, "available_at": None}},
+        )
+        if members:
+            ids = [m["_id"] for m in members]
+            await db.employees.update_many(
+                {"_id": {"$in": ids}},
+                {"$set": {"status": "idle"}, "$inc": {"fatigue": 8.0, "xp": 20}},
+            )
+            await db.employees.update_many(
+                {"_id": {"$in": ids}, "fatigue": {"$gt": 100}},
+                {"$set": {"fatigue": 100.0}},
+            )
+        await add_event(
+            db,
+            pid,
+            "intel",
+            f"{team.get('name', 'Equipa')} concluiu vigilância em {district}: "
+            f"atenção local -{round(attention_drop)} e intel nível {intel_level}.",
+        )
+
+
 BAILOUT_GRANT = 8000
 BAILOUT_MIN_FUNDS = 6000  # candidato "comum" mais barato ronda ~4.300€; margem de segurança
 
@@ -3369,6 +3459,7 @@ async def advance(db, player):
 
     await _complete_trainings(db, player, now)
     await _process_statuses(db, pid, now)
+    await _complete_patrols(db, player, now)
 
     last = parse_dt(player["last_tick"])
     raw_minutes = max(0.0, (now - last).total_seconds() / 60)
