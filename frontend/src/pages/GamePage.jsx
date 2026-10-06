@@ -528,7 +528,7 @@ const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick 
       className={`sub-hud-btn relative flex h-12 min-w-[3.45rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 ${active ? "sub-hud-btn-active" : ""}`}
     >
       <Icon size={18} className={color} />
-      <span className="max-w-[3.1rem] truncate text-[8px] font-semibold leading-none tracking-tight text-zinc-400">{label}</span>
+      <span className="max-w-[3.1rem] truncate text-[10px] font-semibold leading-none tracking-tight text-zinc-400">{label}</span>
       {alert && (
         <span
           className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full"
