@@ -22,6 +22,7 @@ from routes_city import router as city_router
 from engine import vehicle_doc, starting_employee, gen_attrs, now_utc, default_stats
 from game_data import SPECIALIZATIONS, HQ_DEFAULT_PRIORITY, WEAPON_MODELS
 from road_routing import road_router
+from realtime import router as realtime_router, start_realtime, stop_realtime
 
 app = FastAPI(title="SUBMUNDO API")
 
@@ -32,11 +33,17 @@ app.include_router(admin_router)
 app.include_router(legal_router)
 app.include_router(organization_router)
 app.include_router(city_router)
+app.include_router(realtime_router)
 
 
 @app.get("/api/")
 async def root():
     return {"message": "SUBMUNDO API", "status": "operational"}
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "operational", "service": "submundo-api"}
 
 
 app.add_middleware(
@@ -199,9 +206,11 @@ async def startup():
     await migrate_v2()
     await migrate_v4()
     await migrate_integrated_org()
+    await start_realtime()
 
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    await stop_realtime()
     await road_router.close()
     client.close()

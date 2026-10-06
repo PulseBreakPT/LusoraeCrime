@@ -22,6 +22,7 @@ from city_systems import (
     season_info, boss_status,
 )
 from economy_director import city_business_cap
+from realtime import publish_realtime_event
 
 router = APIRouter(prefix="/api/game/city", tags=["city"])
 
@@ -425,8 +426,20 @@ async def post_chat(body: ChatInput, user: dict = Depends(get_current_user)):
         "message": body.message.strip(),
         "ts": now_utc().isoformat(),
     }
-    await db.city_chat.insert_one(doc)
-    return {"ok": True}
+    result = await db.city_chat.insert_one(doc)
+    message_id = str(result.inserted_id)
+    await publish_realtime_event(
+        "city.chat.message",
+        {
+            "id": message_id,
+            "player_id": pid,
+            "org_name": doc["org_name"],
+            "message": doc["message"],
+            "ts": doc["ts"],
+        },
+        channel="chat",
+    )
+    return {"ok": True, "message_id": message_id}
 
 
 @router.post("/social/chat/report")
@@ -636,7 +649,20 @@ async def challenge_pvp(body: PvpChallengeInput, user: dict = Depends(get_curren
         "expires_at": (now + timedelta(hours=12)).isoformat(),
     }
     result = await db.city_pvp_challenges.insert_one(doc)
-    return {"ok": True, "challenge_id": str(result.inserted_id)}
+    challenge_id = str(result.inserted_id)
+    await publish_realtime_event(
+        "city.pvp.challenge",
+        {
+            "challenge_id": challenge_id,
+            "attacker_id": attacker_id,
+            "attacker_name": doc["attacker_name"],
+            "expires_at": doc["expires_at"],
+        },
+        scope="player",
+        target=defender_id,
+        channel="pvp",
+    )
+    return {"ok": True, "challenge_id": challenge_id}
 
 
 @router.post("/social/pvp/accept")
@@ -729,7 +755,21 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
     )
     await add_event(db, str(winner["_id"]), "system", f"Conflito PvP vencido contra {loser.get('org_name', 'rival')}.")
     await add_event(db, str(loser["_id"]), "warning", f"Conflito PvP perdido contra {winner.get('org_name', 'rival')}.")
-    return {"ok": True, "winner_id": str(winner["_id"]), "winner_name": winner.get("org_name"), "consequence": consequence}
+    result_payload = {
+        "challenge_id": str(challenge["_id"]),
+        "winner_id": str(winner["_id"]),
+        "winner_name": winner.get("org_name"),
+        "consequence": consequence,
+    }
+    for participant_id in (str(attacker["_id"]), str(defender["_id"])):
+        await publish_realtime_event(
+            "city.pvp.resolved",
+            result_payload,
+            scope="player",
+            target=participant_id,
+            channel="pvp",
+        )
+    return {"ok": True, **result_payload}
 
 
 @router.post("/social/pvp/decline")
