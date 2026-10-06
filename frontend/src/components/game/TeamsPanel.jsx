@@ -8,7 +8,7 @@ import {
   chanceColor, goodBarColor, teamsReadiness, teamReadiness, vehicleRangeKm,
   teamTier, teamMomentum, teamCoordination, teamFamiliarity, teamRoles, teamSynergy, TEAM_OP_CATEGORIES,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, FavoriteStar, PurchaseButton, SectionHeader, EntityDetailBar, openEntityFromCard } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -563,8 +563,19 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const [repeatRecs, setRepeatRecs] = useState({});
   const [autoBusy, setAutoBusy] = useState(false);
   const [compositionBusy, setCompositionBusy] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
   useTick(open);
   usePanelFocus(open, focusTarget);
+  useEffect(() => {
+    if (!open) {
+      setSelectedTeamId(null);
+      return;
+    }
+    const prefix = "team-card-";
+    if (focusTarget?.testId?.startsWith(prefix)) {
+      setSelectedTeamId(focusTarget.testId.slice(prefix.length));
+    }
+  }, [open, focusTarget?.token, focusTarget?.testId]);
 
   const optimizeComposition = async () => {
     if (compositionBusy) return;
@@ -671,6 +682,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const freeEmployees = state.employees.filter((e) => !e.team_id && e.status === "idle");
   const freeVehicles = state.vehicles.filter((v) => !v.team_id && !v.transfer);
   const nav = (p) => onNavigate && onNavigate(p);
+  const selectedTeam = selectedTeamId
+    ? state.teams.find((team) => String(team.id) === String(selectedTeamId))
+    : null;
 
   // Veredicto via helper unificado (mesma definição do OpportunityCard/
   // opportunityReachable — antes divergiam). Preserva a forma { ok, ready,
@@ -698,7 +712,16 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           </SheetDescription>
         </SheetHeader>
 
-        <Button
+        {selectedTeam && (
+          <EntityDetailBar
+            testId="team-detail-bar"
+            title={selectedTeam.name}
+            meta="Ficha individual da equipa"
+            onBack={() => setSelectedTeamId(null)}
+          />
+        )}
+
+        {!selectedTeamId && <Button
           type="button"
           variant="outline"
           size="compact"
@@ -708,7 +731,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
         >
           Doutrinas · loadouts · políticas
           <Sparkles size={11} className="text-cyan-300" />
-        </Button>
+        </Button>}
 
         {(() => {
           const tr = teamsReadiness(state, serverNow());
@@ -775,6 +798,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           {/* Favoritas sempre no topo; dentro de cada grupo, equipas ocupadas primeiro (o
               jogador quer ver o que está em ação), depois prontas, e por fim bloqueadas. */}
           {[...state.teams]
+            .filter((team) => !selectedTeamId || String(team.id) === String(selectedTeamId))
             .sort((a, b) => {
               const favA = favoriteTeamIds.includes(a.id) ? 0 : 1;
               const favB = favoriteTeamIds.includes(b.id) ? 0 : 1;
@@ -811,7 +835,9 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               <Card
                 key={t.id}
                 data-testid={`team-card-${t.id}`}
-                className={`sub-card sub-team-card p-2.5 shadow-none ${justReturned ? "sub-flash" : ""}`}
+                data-entity-detail={selectedTeamId && String(t.id) === String(selectedTeamId) ? "open" : "closed"}
+                onClick={(event) => openEntityFromCard(event, () => setSelectedTeamId(String(t.id)))}
+                className={`sub-card sub-team-card p-2.5 shadow-none transition-colors ${selectedTeamId ? "cursor-default border-cyan-500/20" : "cursor-pointer hover:border-cyan-500/20"} ${justReturned ? "sub-flash" : ""}`}
                 style={{ "--ttier": tier.color }}
               >
                 {/* Cabeçalho: identidade da unidade sem ilustração decorativa */}
@@ -1137,12 +1163,14 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           })}
         </div>
 
-        <TeamBuilder
-          state={state}
-          catalog={catalog}
-          createTeam={createTeam}
-          onNavigate={onNavigate}
-        />
+        {!selectedTeamId && (
+          <TeamBuilder
+            state={state}
+            catalog={catalog}
+            createTeam={createTeam}
+            onNavigate={onNavigate}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );
