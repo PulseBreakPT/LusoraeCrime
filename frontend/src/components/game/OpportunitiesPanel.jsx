@@ -195,6 +195,17 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
         </SummaryStrip>
 
+        {Number(state.player.stats?.ops_dispatched || 0) === 0 && (
+          <Card data-testid="first-operation-guide" className="mt-2 border-emerald-500/20 bg-emerald-500/[0.04] p-2.5 shadow-none">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">Primeira operação · guia rápido</p>
+            <div className="mt-1.5 grid gap-1 text-[10px] leading-relaxed text-zinc-400">
+              <p><span className="font-bold text-zinc-200">1.</span> Escolhe uma operação ou usa <span className="text-cyan-300">Comparar</span> para veres retorno, tempo, combustível e risco.</p>
+              <p><span className="font-bold text-zinc-200">2.</span> No despacho, escolhe recomendação Segura, Rentável ou Rápida e confirma a equipa.</p>
+              <p><span className="font-bold text-zinc-200">3.</span> Acompanha a equipa no mapa. No regresso, <span className="text-zinc-200">Relatórios</span> abre o resultado, custos, fatores e próximo passo.</p>
+            </div>
+          </Card>
+        )}
+
         <div className="mt-3 grid grid-cols-2 gap-1.5">
           <Button
             type="button"
