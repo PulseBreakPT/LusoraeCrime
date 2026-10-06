@@ -555,15 +555,27 @@ const TeamBuilder = ({ state, catalog, createTeam, onNavigate }) => {
 export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
     state, catalog, serverNow, createTeam, assignEmployee, assignVehicle,
-    dispatchTeam, recommendOpportunityForTeam, recommendRepeatForTeam,
+    optimizeEmployees, optimizeVehicles, dispatchTeam, recommendOpportunityForTeam, recommendRepeatForTeam,
     favoriteTeamIds, toggleFavoriteTeam, justReturnedTeamIds,
   } = useGame();
   const { autoSelectBestVehicle } = useSettings();
   const [recommendations, setRecommendations] = useState({});
   const [repeatRecs, setRepeatRecs] = useState({});
   const [autoBusy, setAutoBusy] = useState(false);
+  const [compositionBusy, setCompositionBusy] = useState(false);
   useTick(open);
   usePanelFocus(open, focusTarget);
+
+  const optimizeComposition = async () => {
+    if (compositionBusy) return;
+    setCompositionBusy(true);
+    try {
+      await optimizeEmployees();
+      await optimizeVehicles();
+    } finally {
+      setCompositionBusy(false);
+    }
+  };
 
   // Despacho automático: envia cada equipa livre para a melhor oportunidade
   // que o servidor recomendar (a recomendação já valida todos os requisitos).
@@ -706,7 +718,21 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           );
         })()}
 
-        <div className="mt-3">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Tip block tip="Organiza automaticamente operacionais livres e veículos disponíveis nas equipas, respeitando vagas, especializações e adequação.">
+            <Button
+              variant="outline"
+              size="compact"
+              type="button"
+              data-testid="teams-optimize"
+              onClick={optimizeComposition}
+              disabled={compositionBusy}
+              className="w-full gap-1 font-mono text-cyan-300 disabled:text-zinc-600"
+            >
+              <Sparkles size={11} />
+              {compositionBusy ? "A otimizar…" : "Otimizar equipas"}
+            </Button>
+          </Tip>
           <Tip
             block
             tip="Despacho automático: envia cada equipa livre para a melhor oportunidade que o servidor recomendar — só missões cujos requisitos (membros, veículo, combustível, nível) a equipa cumpre mesmo."
@@ -716,7 +742,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               onClick={() => !autoBusy && readyIds.length > 0 && autoDispatchAll()}
               disabled={autoBusy || readyIds.length === 0}
               className={cn(
-                "mt-2 flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
+                "flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] font-bold uppercase transition-colors",
                 !autoBusy && readyIds.length > 0
                   ? "border-amber-500/40 bg-amber-500/10 text-amber-400 hover:border-amber-500/60 hover:bg-amber-500/20"
                   : "cursor-not-allowed border-white/10 bg-white/[0.03] text-zinc-600"
