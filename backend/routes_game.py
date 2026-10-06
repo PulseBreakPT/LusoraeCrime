@@ -1222,6 +1222,7 @@ async def road_route(body: RoadRouteInput, user: dict = Depends(get_current_user
 async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current_user)):
     player, opp, team = await _validate_dispatch_inputs(body, user)
     prep = await _prepare_dispatch(player, opp, team, resolve_routes=True)
+    metrics = _recommendation_metrics(prep)
     return {
         "chance": round(prep["chance"], 3),
         "breakdown": prep["breakdown"],
@@ -1229,6 +1230,12 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "duration_s": opp["duration_s"],
         "fuel_needed": round(prep["fuel_needed"], 1),
         "reward": prep["reward"],
+        "expected_profit": metrics["expected_profit"],
+        "expected_profit_per_min": metrics["expected_profit_per_min"],
+        "fuel_cost": metrics["fuel_cost"],
+        "duration_total_s": metrics["duration_total_s"],
+        "top_negatives": prep.get("top_negatives", []),
+        "weak_link": (prep.get("top_negatives") or [None])[0],
         "reward_bonus_pct": round((prep["reward_mult"] - 1) * 100, 1),
         "reward_breakdown": prep.get("reward_breakdown", []),
         "age_decay_pct": round((prep["age_mult"] - 1) * 100, 1),
