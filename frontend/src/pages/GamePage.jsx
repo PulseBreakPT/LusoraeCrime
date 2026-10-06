@@ -54,7 +54,6 @@ export default function GamePage() {
     businesses: playerLevel >= 5,
     warehouse: playerLevel >= 10,
     territory: playerLevel >= 10,
-    management: playerLevel >= 10,
     mastermind: playerLevel >= 10,
   };
   const shellAlerts = state ? orgAlerts(state) : { total: 0 };
@@ -549,15 +548,6 @@ export default function GamePage() {
           title="Território"
           description="Controlo, defesa, influência e expansão da tua rede."
           onOpenChange={(o) => setOpenPanel(o ? "territory" : null)}
-        />
-      )}
-      {openPanel === "management" && unlocks.management && (
-        <OrganizationPanel
-          open
-          initialTab="centro"
-          title="Gestão avançada"
-          description="Políticas, automação e sistemas avançados da organização."
-          onOpenChange={(o) => setOpenPanel(o ? "management" : null)}
         />
       )}
       {openPanel === "businesses" && unlocks.businesses && (
