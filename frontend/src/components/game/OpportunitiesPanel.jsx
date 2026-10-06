@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Target, Search, Clock, AlertTriangle, Star, CheckCircle2, MapPin, SlidersHorizontal, Scale, Loader2 } from "lucide-react";
+import { Target, Search, Clock, Star, CheckCircle2, MapPin, SlidersHorizontal, Scale, Loader2 } from "lucide-react";
 
 // Força competente (do backend, opp.police_force). Escalável: mais uma força =
 // mais uma entrada.
