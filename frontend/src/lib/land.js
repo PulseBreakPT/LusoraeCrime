@@ -1,7 +1,7 @@
 // Geografia partilhada com o backend: o modo convidado usa os mesmos
 // polígonos de Portugal e corpos de água que o jogo autenticado.
-import portugal from "../data/portugal.geojson";
-import water from "../data/water_pt.geojson";
+import portugal from "../data/portugal.json";
+import water from "../data/water_pt.json";
 
 const ringBbox = (ring) => {
   let minLng=Infinity,minLat=Infinity,maxLng=-Infinity,maxLat=-Infinity;
