@@ -23,6 +23,8 @@ describe("UI action ownership", () => {
   const opportunities = read("components/game/OpportunitiesPanel.jsx");
   const organization = read("components/game/OrganizationPanel.jsx");
   const properties = read("components/game/PropertiesPanel.jsx");
+  const hud = read("components/game/hud.jsx");
+  const liveMap = read("components/game/LiveMap.jsx");
 
   test("team management does not duplicate recovery or fleet maintenance mutations", () => {
     for (const forbidden of [
@@ -222,6 +224,42 @@ describe("UI action ownership", () => {
     expect(gamePage).toContain('className="sub-bottom-nav-shell pointer-events-auto absolute left-1/2 z-[70]"');
     expect(gamePage).toMatch(/const openFromNav = \(panel\) => \{[\s\S]*?setCommandOpen\(false\);[\s\S]*?setSelectedOpp\(null\);[\s\S]*?setOpenPanel\(canonicalGamePanel\(panel\)\);/);
     expect(gamePage).toMatch(/const toggleNavGroup = \(group\) => \{[\s\S]*?setOpenPanel\(null\);[\s\S]*?setNavGroup/);
+  });
+
+  test("clickable management entities open exact individual dossiers", () => {
+    expect(hud).toContain("EntityDetailBar");
+    expect(hud).toContain("openEntityFromCard");
+
+    expect(teams).toContain("selectedTeamId");
+    expect(teams).toContain('data-testid="team-detail-bar"');
+    expect(teams).toContain("data-entity-detail");
+
+    expect(employees).toContain("selectedEmployeeId");
+    expect(employees).toContain('data-testid="employee-detail-bar"');
+    expect(employees).toContain("onOpenDetail");
+
+    expect(fleet).toContain("selectedVehicleId");
+    expect(fleet).toContain('data-testid="vehicle-detail-bar"');
+    expect(fleet).toContain("data-entity-detail");
+
+    expect(weapons).toContain("selectedWeaponId");
+    expect(weapons).toContain('data-testid="weapon-detail-bar"');
+    expect(weapons).toContain("data-entity-detail");
+
+    expect(properties).toContain("selectedPropertyId");
+    expect(properties).toContain('data-testid="property-detail-bar"');
+    expect(properties).toContain("data-entity-detail");
+  });
+
+  test("map entities drill directly into their exact dossier", () => {
+    expect(gamePage).toContain('onSelectHQ={() => openFromNav("hq")}');
+    expect(gamePage).toContain('focusTestId: `property-card-${property.id}`');
+    expect(gamePage).toContain('focusTestId: `team-card-${teamId}`');
+    expect(gamePage).toContain('focusTestId: `vehicle-card-${vehicleId}`');
+
+    expect(liveMap).toContain("onSelectProperty && onSelectProperty(p)");
+    expect(liveMap).toContain("onSelectTeam?.(mission.team_id)");
+    expect(liveMap).toContain("onSelectVehicle?.(vehicle.id)");
   });
 
   test("World has one navigation surface", () => {
