@@ -42,7 +42,7 @@ const fuzzyScore = (query, text) => {
 };
 
 const PANEL_ICONS = {
-  operations: Crosshair, quests: Target, mastermind: Vault,
+  opscenter: RadioTower, operations: Crosshair, quests: Target, mastermind: Vault,
   teams: Users, employees: IdCard, fleet: Car, weapons: Swords,
   empire: Building2, properties: Warehouse, hq: Landmark,
   organization: Network, city: RadioTower, intel: BrainCircuit,
