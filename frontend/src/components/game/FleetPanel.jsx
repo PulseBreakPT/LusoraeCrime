@@ -140,6 +140,18 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           <SheetDescription className="text-zinc-500">Sem rodas não há golpes — abastece, repara e mantém tudo pronto a sair.</SheetDescription>
         </SheetHeader>
 
+        <Button
+          type="button"
+          variant="outline"
+          size="compact"
+          data-testid="fleet-open-lifecycle"
+          onClick={() => onNavigate && onNavigate("fleetcare")}
+          className="mt-3 w-full justify-between font-mono text-[10px] text-zinc-300"
+        >
+          Pneus · seguros · IPO · revisões
+          <Sparkles size={11} className="text-cyan-300" />
+        </Button>
+
         {(() => {
           const vs = state.vehicles;
           const operational = vs.filter((v) => v.condition >= 30 && v.fuel_l >= v.tank_l * 0.12).length;
