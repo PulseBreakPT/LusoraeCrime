@@ -601,7 +601,7 @@ const CandidateCard = ({ c, assessment, sourceName }) => {
 };
 
 export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
-  const { state, catalog, serverNow, refreshPool, restEmployee, restAllEligible, favoriteEmployeeIds, optimizeEmployees } = useGame();
+  const { state, catalog, serverNow, refreshPool, restEmployee, restAllEligible, favoriteEmployeeIds } = useGame();
   const { rememberFilters, rememberSort } = useSettings();
   const [tab, setTab] = usePreferenceState("empTab", "roster", rememberSort);
   const [query, setQuery] = useState("");
@@ -642,11 +642,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
   // QI do efetivo — o Otimizar preenche vagas de equipas disponíveis com quem
   // está de fora, por aptidão à especialização (nunca move membros entre equipas).
   const teamMax = catalog.team_max_members || 4;
-  const freeIdleCount = state.employees.filter((e) => e.status === "idle" && !e.team_id).length;
-  const openTeamsCount = state.teams.filter(
-    (t) => t.status === "idle" && state.employees.filter((e) => e.team_id === t.id).length < teamMax
-  ).length;
-  const canOptimize = freeIdleCount > 0 && openTeamsCount > 0;
 
   const searched = state.employees.filter((e) =>
     matchesSearch(query, e.name, catalog.specializations[e.role_key]?.name || e.role_key)
@@ -820,25 +815,6 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                       <SelectItem value="salary">Maior custo</SelectItem>
                     </SelectContent>
                   </Select>
-
-                  <Tip tip={canOptimize
-                    ? `Distribui ${freeIdleCount} operacional(is) sem equipa pelas equipas livres com vagas, respeitando especializações.`
-                    : freeIdleCount === 0 ? "Não tens operacionais livres sem equipa." : "Não existem equipas livres com vagas."}>
-                    <Button
-                      type="button"
-                      size="compact"
-                      variant="outline"
-                      data-testid="employees-optimize"
-                      onClick={() => canOptimize && optimizeEmployees()}
-                      disabled={!canOptimize}
-                      className={cn(
-                        "w-full gap-1 font-mono font-bold uppercase",
-                        canOptimize ? "text-cyan-300" : "text-zinc-600"
-                      )}
-                    >
-                      <Sparkles size={11} /> Otimizar
-                    </Button>
-                  </Tip>
 
                   <Button
                     data-testid="employees-toggle-unavailable"
