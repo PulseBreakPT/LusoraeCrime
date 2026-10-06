@@ -125,7 +125,7 @@ from organization_systems import (
     prestige_effects, department_level, property_operations_factor, rival_profile, property_staff_profile,
     organization_specialization_effects,
 )
-from operational_director import CERTIFICATIONS, build_follow_up_opportunity
+from operational_director import CERTIFICATIONS, build_follow_up_opportunity, district_category_multiplier
 
 logger = logging.getLogger(__name__)
 
@@ -943,7 +943,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
     reserved_points = list(active_points)
     min_spawn_separation_m = 500.0
 
-    def _choose_center():
+    def _choose_center(category):
         # Tal como nos tipos: primeiro uma zona que ainda não esteja visível no
         # mapa nem tenha sido usada neste lote. Se a geografia disponível for
         # curta (ilha pequena, poucas zonas já geocodificadas), relaxa de forma
@@ -964,7 +964,8 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             # Cada repetição recente corta fortemente o peso, mas nunca a zero:
             # continua possível voltar à zona mais tarde de forma orgânica.
             novelty_mult = 0.35 ** min(3, recent_n)
-            weights.append(max(0.01, base_weight * novelty_mult))
+            semantic_mult = district_category_multiplier(spot, category)
+            weights.append(max(0.01, base_weight * novelty_mult * semantic_mult))
         return random.choices(pool, weights=weights)[0]
 
     def _sample_distinct_point(spot, origin_prop_id):
@@ -995,7 +996,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
 
     def _build_doc(key, rare, extra_mult=1.0, special=False, expires_range=(240, 600)):
         t = OPPORTUNITY_TYPES[key]
-        spot, _, origin_prop_id = _choose_center()
+        spot, _, origin_prop_id = _choose_center(t["category"])
         duration_s = random.randint(*t["duration_s"])
         mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s) * extra_mult
         if rare:
