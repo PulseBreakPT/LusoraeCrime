@@ -500,7 +500,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 {activeMission.reinforcement_request.title || "Reforço recomendado"}
               </p>
               <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{activeMission.reinforcement_request.description}</p>
-              <p className="mt-1 font-mono text-[9px] text-zinc-600">
+              <p className="mt-1 font-mono text-[10px] text-zinc-600">
                 {activeMission.reinforcement_request.received || 0}/{activeMission.reinforcement_request.needed || 0} reforços
               </p>
               <div className="mt-2 flex flex-wrap gap-1">
@@ -520,7 +520,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   </Button>
                 ))}
                 {!supportCandidates.length && (
-                  <span className="font-mono text-[9px] text-zinc-600">Sem equipas de reserva disponíveis.</span>
+                  <span className="font-mono text-[10px] text-zinc-600">Sem equipas de reserva disponíveis.</span>
                 )}
               </div>
             </div>
