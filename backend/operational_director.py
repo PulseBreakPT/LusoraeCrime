@@ -416,6 +416,8 @@ def operational_snapshot(
         territory = (player.get("territories") or {}).get(name) or {}
         coverage.append({
             "district": name,
+            "lat": district.get("lat"),
+            "lng": district.get("lng"),
             "profile": district_profile(district),
             "active_operations": len(local_ops),
             "attention": round(attention, 1),
