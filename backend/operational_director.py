@@ -213,13 +213,16 @@ def operation_requirements(opportunity: dict) -> dict:
 
     required_roles = set(base["required"])
     recommended_roles = set(base["recommended"]) | set(prof.get("roles", set()))
-    required_certs = set(base["certs"])
+    required_certs = set()
+    recommended_certs = set(base["certs"]) | set(prof.get("certs", set()))
 
-    # Risco alto transforma parte da recomendação em requisito real e justifica
-    # coordenação multi-equipa em late game.
+    # Certificações são retrocompatíveis: em risco baixo/médio melhoram a
+    # preparação, mas só se tornam obrigatórias nas operações realmente
+    # avançadas. Isto evita bloquear saves anteriores ao sistema.
     support_teams = 0
     if risk >= 4:
         support_teams = 1
+        required_certs |= set(base["certs"])
         if category == "especial" and recommended_roles:
             required_roles.add(sorted(recommended_roles)[0])
     if risk >= 5:
@@ -233,7 +236,7 @@ def operation_requirements(opportunity: dict) -> dict:
         "required_roles": sorted(required_roles),
         "recommended_roles": sorted(recommended_roles - required_roles),
         "required_certifications": sorted(required_certs),
-        "recommended_certifications": sorted(set(prof.get("certs", set())) - required_certs),
+        "recommended_certifications": sorted(recommended_certs - required_certs),
         "min_members": min_members,
         "support_teams": support_teams,
         "required_models": required_models,
