@@ -979,7 +979,7 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     # o relatório de falha explicar PORQUÊ ("Fator crítico: ...").
     top_negatives = [
         {"key": i["key"], "label": i["label"], "pct": i["pct"]}
-        for i in sorted((i for i in breakdown if i["pct"] < 0 and i["key"] != "rendimentos_decrescentes"),
+        for i in sorted((i for i in breakdown if i["pct"] < 0 and i["key"] not in {"rendimentos_decrescentes", "limite_probabilidade"}),
                         key=lambda i: i["pct"])[:3]
     ]
     weapon_loud = any(
