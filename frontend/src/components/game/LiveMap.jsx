@@ -1160,7 +1160,6 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             key={safeMission.id}
             mission={safeMission}
             serverNow={serverNow}
-            onSelectVehicle={onSelectVehicle}
             dim={baseFilter !== "all" && (safeMission.origin_property_id || "hq") !== baseFilter}
             followed={safeMission.id === followId}
             onToggleFollow={() => setFollowId((cur) => (cur === safeMission.id ? null : safeMission.id))}
@@ -1180,6 +1179,7 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             key={v.id}
             vehicle={v}
             serverNow={serverNow}
+            onSelectVehicle={onSelectVehicle}
             dim={
               baseFilter !== "all" &&
               (v.property_id || "hq") !== baseFilter &&
