@@ -5848,3 +5848,360 @@ html.sub-focus-mode .sub-optional-hud {
         min-height: 3.15rem !important;
     }
 }
+
+
+/* ============================================================
+   SUBMUNDO TV / 10-FOOT RESPONSIVE MODE V1
+   Large-screen profile inspired by current Android TV/tvOS guidance:
+   larger readable type, generous safe areas, remote-friendly targets
+   and unmistakable focus states. Desktop/mobile rules above remain intact.
+   ============================================================ */
+@media (min-width: 1600px) and (min-height: 850px) {
+    :root {
+        --sub-tv-safe-x: clamp(64px, 4.166vw, 96px);
+        --sub-tv-safe-y: clamp(48px, 5.55vh, 72px);
+        --sub-tv-body: clamp(16px, 0.86vw, 19px);
+        --sub-tv-small: clamp(14px, 0.74vw, 16px);
+        --sub-tv-label: clamp(15px, 0.78vw, 17px);
+        --sub-tv-title: clamp(22px, 1.2vw, 28px);
+        --sub-tv-control: clamp(56px, 3.15vw, 68px);
+    }
+
+    .sub-game-shell {
+        font-size: var(--sub-tv-body);
+    }
+
+    /* The game currently uses 10–12px utility text heavily. On a television
+       that is too small from normal sofa distance, so only the large-screen
+       profile promotes those micro sizes. */
+    .sub-game-shell [class*="text-[10px]"],
+    .sub-game-shell [class*="text-[10.5px]"],
+    .sub-game-shell [class*="text-[11px]"],
+    .sub-game-shell [class*="text-[11.5px]"],
+    .sub-game-shell [class*="text-[12px]"],
+    .sub-game-shell .text-xs {
+        font-size: var(--sub-tv-small) !important;
+        line-height: 1.45 !important;
+    }
+
+    .sub-game-shell .text-sm {
+        font-size: var(--sub-tv-body) !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Keep primary HUD inside a TV-safe region instead of hugging the bezel. */
+    [data-testid="resource-bar"] {
+        top: var(--sub-tv-safe-y) !important;
+        left: var(--sub-tv-safe-x) !important;
+        right: var(--sub-tv-safe-x) !important;
+    }
+
+    [data-testid="resource-bar"] .sub-topbar {
+        max-width: 46rem !important;
+        gap: 0.85rem !important;
+    }
+
+    [data-testid="resource-bar"] .sub-minimal-stat {
+        min-height: 62px !important;
+        gap: 0.45rem !important;
+        padding: 0.55rem 0.8rem !important;
+    }
+
+    [data-testid="resource-bar"] .sub-resource-label,
+    .sub-resource-grid .sub-resource-label {
+        font-size: var(--sub-tv-small) !important;
+        line-height: 1.2 !important;
+        letter-spacing: 0.055em !important;
+    }
+
+    [data-testid="resource-bar"] .sub-resource-value,
+    .sub-resource-grid .sub-resource-value {
+        font-size: clamp(18px, 0.95vw, 22px) !important;
+        line-height: 1.12 !important;
+    }
+
+    [data-testid="resource-bar"] .sub-resource-icon {
+        width: 1.65rem !important;
+        height: 1.65rem !important;
+        flex-basis: 1.65rem !important;
+    }
+
+    [data-testid="resource-bar"] .sub-resource-icon svg {
+        width: 18px !important;
+        height: 18px !important;
+    }
+
+    /* Remote/controller targets. */
+    .sub-bottom-nav-shell {
+        bottom: max(var(--sub-tv-safe-y), calc(1.25rem + env(safe-area-inset-bottom, 0px))) !important;
+    }
+
+    .sub-dock {
+        gap: 0.85rem !important;
+    }
+
+    .sub-dock .sub-hud-btn,
+    .sub-dock .sub-hud-btn:hover,
+    .sub-dock .sub-hud-btn:focus-visible,
+    .sub-dock .sub-hud-btn-active {
+        width: var(--sub-tv-control) !important;
+        height: var(--sub-tv-control) !important;
+        min-width: var(--sub-tv-control) !important;
+        min-height: var(--sub-tv-control) !important;
+    }
+
+    .sub-dock .sub-hud-btn svg {
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    .sub-dock .sub-hud-btn-active::before {
+        width: 6px !important;
+        height: 6px !important;
+        bottom: 3px !important;
+    }
+
+    .sub-nav-tray {
+        width: min(42rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        padding: 12px !important;
+        border-radius: 20px !important;
+    }
+
+    .sub-nav-action {
+        min-height: 72px !important;
+        gap: 0.75rem !important;
+        padding: 0.8rem 1rem !important;
+        border-radius: 14px !important;
+    }
+
+    .sub-nav-action svg {
+        width: 24px !important;
+        height: 24px !important;
+        flex: 0 0 auto;
+    }
+
+    .sub-nav-action span {
+        font-size: var(--sub-tv-label) !important;
+        line-height: 1.25 !important;
+    }
+
+    /* Visible focus is essential when the pointer is a remote/D-pad. */
+    .sub-game-shell :where(
+        button,
+        a,
+        input,
+        textarea,
+        select,
+        [role="button"],
+        [role="tab"],
+        [role="menuitem"],
+        [role="combobox"],
+        [tabindex]:not([tabindex="-1"])
+    ):focus-visible {
+        outline: 3px solid rgba(248, 113, 113, 0.95) !important;
+        outline-offset: 4px !important;
+        box-shadow:
+            0 0 0 2px rgba(7, 7, 9, 0.92),
+            0 0 0 7px rgba(239, 68, 68, 0.22),
+            0 10px 28px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    /* Panels stay centered and readable instead of becoming very wide. */
+    .sub-sheet-panel,
+    .sub-menu-modal {
+        width: min(70rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        max-width: min(70rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        height: min(78vh, 54rem) !important;
+        min-height: min(78vh, 54rem) !important;
+        max-height: min(78vh, 54rem) !important;
+        border-radius: 22px !important;
+        padding-left: 1.65rem !important;
+        padding-right: 1.65rem !important;
+        padding-bottom: 1.35rem !important;
+    }
+
+    .sub-operations-panel {
+        width: min(66rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        max-width: min(66rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+    }
+
+    .sub-modal-title,
+    .sub-sheet-panel .sub-sheet-title,
+    .sub-operations-head .sub-sheet-title {
+        font-size: var(--sub-tv-title) !important;
+        line-height: 1.2 !important;
+        letter-spacing: 0.025em !important;
+    }
+
+    .sub-sheet-panel .sub-sheet-description,
+    .sub-operations-head .sub-sheet-description {
+        max-width: 52rem !important;
+        font-size: var(--sub-tv-small) !important;
+        line-height: 1.55 !important;
+    }
+
+    .sub-sheet-panel .sub-sheet-close,
+    .sub-menu-modal > button {
+        top: 0.75rem !important;
+        right: 0.75rem !important;
+        width: 56px !important;
+        min-width: 56px !important;
+        height: 56px !important;
+        min-height: 56px !important;
+    }
+
+    .sub-sheet-panel .sub-sheet-close svg,
+    .sub-menu-modal > button svg {
+        width: 22px !important;
+        height: 22px !important;
+    }
+
+    .sub-sheet-scroll {
+        scroll-padding-top: 7rem !important;
+        scroll-padding-bottom: 2rem !important;
+    }
+
+    .sub-sheet-panel :where(button, [role="button"], [role="tab"], [role="combobox"]) {
+        min-height: 52px;
+    }
+
+    .sub-sheet-panel :where(input:not([type="range"]), textarea, select) {
+        min-height: 52px;
+        font-size: 16px !important;
+    }
+
+    .sub-sheet-panel .sub-summary-strip .sub-kpi,
+    .sub-sheet-panel .sub-kpi {
+        min-height: 5.6rem !important;
+    }
+
+    .sub-settings-row {
+        min-height: 64px !important;
+        padding-top: 0.8rem !important;
+        padding-bottom: 0.8rem !important;
+    }
+
+    /* Notifications and transient feedback remain readable at distance. */
+    .sub-toast {
+        width: min(31rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        font-size: var(--sub-tv-small) !important;
+    }
+
+    .sub-toast [data-title] {
+        font-size: var(--sub-tv-label) !important;
+    }
+
+    .sub-toast [data-description] {
+        font-size: var(--sub-tv-small) !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Map controls and symbols need to remain identifiable from the sofa. */
+    .sub-dark-map .leaflet-control-zoom a {
+        width: 52px !important;
+        height: 52px !important;
+        line-height: 50px !important;
+        font-size: 24px !important;
+    }
+
+    .opp-pin {
+        width: 44px !important;
+        height: 44px !important;
+    }
+
+    .opp-pin-type {
+        width: 18px !important;
+        height: 18px !important;
+        font-size: 12px !important;
+    }
+
+    .hq-pin {
+        width: 42px !important;
+        height: 42px !important;
+    }
+
+    .unit-car,
+    .police-car {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    .mission-target {
+        width: 38px !important;
+        height: 38px !important;
+    }
+
+    .op-name {
+        max-width: 15rem !important;
+        font-size: var(--sub-tv-small) !important;
+        line-height: 1.2 !important;
+    }
+
+    .sub-available-missions-hud {
+        right: var(--sub-tv-safe-x) !important;
+        width: 52px !important;
+        height: 52px !important;
+    }
+
+    .sub-available-missions-hud svg {
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    .sub-available-missions-count {
+        font-size: 13px !important;
+    }
+
+    .sub-wanted-hud {
+        left: var(--sub-tv-safe-x) !important;
+        top: calc(var(--sub-tv-safe-y) + 74px) !important;
+        transform: scale(1.18);
+        transform-origin: left top;
+    }
+
+    .sub-fps-value {
+        font-size: 20px !important;
+    }
+
+    .sub-fps-label {
+        font-size: 12px !important;
+    }
+
+    /* Prevent long lines on a wide television from becoming tiring to scan. */
+    .sub-sheet-panel p,
+    .sub-sheet-panel li,
+    .sub-sheet-panel dd,
+    .sub-sheet-panel .sub-world-pulse-description {
+        max-width: 72ch;
+    }
+}
+
+/* Native-4K / very large browser viewports get one additional step without
+   changing information density dramatically. */
+@media (min-width: 2560px) and (min-height: 1200px) {
+    :root {
+        --sub-tv-body: clamp(19px, 0.74vw, 23px);
+        --sub-tv-small: clamp(16px, 0.62vw, 19px);
+        --sub-tv-label: clamp(17px, 0.68vw, 21px);
+        --sub-tv-title: clamp(26px, 1vw, 34px);
+        --sub-tv-control: clamp(68px, 2.65vw, 78px);
+    }
+
+    .sub-sheet-panel,
+    .sub-menu-modal {
+        width: min(82rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        max-width: min(82rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        height: min(80vh, 64rem) !important;
+        min-height: min(80vh, 64rem) !important;
+        max-height: min(80vh, 64rem) !important;
+    }
+
+    .sub-operations-panel {
+        width: min(76rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+        max-width: min(76rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+    }
+
+    .sub-nav-tray {
+        width: min(48rem, calc(100vw - (var(--sub-tv-safe-x) * 2))) !important;
+    }
+}
