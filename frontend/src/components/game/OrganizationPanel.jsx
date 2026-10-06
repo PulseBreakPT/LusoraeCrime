@@ -67,7 +67,7 @@ export const OrganizationPanel = ({
     claimTerritory, consolidateTerritory, defendTerritory,
     buyPrestige, buyProtection, fetchFinanceSummary,
     fetchOrganizationIntelligence, fetchOrganizationAudit,
-    setOrganizationPolicy, runOrganizationAutomation, resolveOrganizationEvent,
+    setOrganizationPolicy, runOrganizationAutomation, resolveOrganizationEvent, updateAutomationSettings,
   } = useGame();
   const [tab, setTab] = useState(initialTab);
   const [finance, setFinance] = useState(null);
@@ -89,6 +89,7 @@ export const OrganizationPanel = ({
   const orgCatalog = catalog?.organization || {};
   const org = state?.organization || {};
   const money = state?.player?.clean_money || 0;
+  const runtimeAutomation = state?.player?.settings || {};
   const now = serverNow();
 
   useEffect(() => {
@@ -241,6 +242,8 @@ export const OrganizationPanel = ({
     const result = await setOrganizationPolicy(policyDraft);
     if (result?.ok) setPolicyDirty(false);
   };
+  const patchRuntimeAutomation = (patch) => updateAutomationSettings(patch);
+
   const runAutomation = async () => {
     if (policyDirty && policyDraft) {
       const saved = await setOrganizationPolicy(policyDraft);
@@ -466,6 +469,53 @@ export const OrganizationPanel = ({
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <SmallAction disabled={!policyDirty} onClick={savePolicy}>Guardar política</SmallAction>
                 <SmallAction onClick={runAutomation}><Bot size={11} /> Executar agora</SmallAction>
+              </div>
+            </Card>
+
+            <Card className="sub-card p-3" data-testid="management-runtime-automations">
+              <SectionHeader icon={Bot} title="Automatizações operacionais" meta="execução persistente" />
+              <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
+                Regras que atuam sobre frota, operacionais e recompensas mesmo sem estares neste painel.
+              </p>
+              <div className="space-y-1.5">
+                {[
+                  ["auto_repair_enabled", "auto_repair_threshold", "Reparar veículos", "Durabilidade"],
+                  ["auto_refuel_enabled", "auto_refuel_threshold", "Abastecer veículos", "Combustível"],
+                  ["auto_rest_enabled", "auto_rest_threshold", "Descansar operacionais", "Energia"],
+                ].map(([enabledKey, thresholdKey, label, metric]) => (
+                  <div key={enabledKey} className="flex items-center gap-2 rounded border border-white/[0.08] px-2 py-2">
+                    <Checkbox
+                      checked={!!runtimeAutomation[enabledKey]}
+                      onCheckedChange={(checked) => patchRuntimeAutomation({ [enabledKey]: checked === true })}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold text-zinc-300">{label}</p>
+                      <p className="font-mono text-[9px] uppercase text-zinc-600">{metric} abaixo do limite</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        aria-label={`Limite de ${label.toLowerCase()}`}
+                        type="number"
+                        min="1"
+                        max="99"
+                        disabled={!runtimeAutomation[enabledKey]}
+                        value={runtimeAutomation[thresholdKey] ?? (thresholdKey === "auto_repair_threshold" ? 30 : 20)}
+                        onChange={(e) => patchRuntimeAutomation({
+                          [thresholdKey]: Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)),
+                        })}
+                        className="h-8 w-14 bg-black/50 px-1.5 text-right font-mono text-[10px]"
+                      />
+                      <span className="font-mono text-[9px] text-zinc-600">%</span>
+                    </div>
+                  </div>
+                ))}
+                <label className="flex items-center gap-2 rounded border border-white/[0.08] px-2 py-2 text-[10px] text-zinc-300">
+                  <Checkbox
+                    checked={!!runtimeAutomation.auto_claim_quests}
+                    onCheckedChange={(checked) => patchRuntimeAutomation({ auto_claim_quests: checked === true })}
+                  />
+                  <span>Recolher automaticamente recompensas concluídas</span>
+                </label>
               </div>
             </Card>
 
