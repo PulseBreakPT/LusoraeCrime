@@ -778,19 +778,19 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                 >
                   <div className="grid grid-cols-3 gap-1.5 text-center">
                     <div className="min-w-0">
-                      <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Valor esperado</p>
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">Valor esperado</p>
                       <p className={`mt-0.5 truncate font-mono text-[11px] font-bold ${Number(preview.expected_profit || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                         {fmtMoney(preview.expected_profit || 0)}
                       </p>
                     </div>
                     <div className="min-w-0 border-x border-white/[0.06] px-1">
-                      <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Eficiência</p>
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">Eficiência</p>
                       <p className="mt-0.5 truncate font-mono text-[11px] font-bold text-cyan-300">
                         {fmtMoney(preview.expected_profit_per_min || 0)}/min
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Tempo total</p>
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">Tempo total</p>
                       <p className="mt-0.5 truncate font-mono text-[11px] font-bold text-zinc-200">
                         {fmtDuration(preview.duration_total_s || 0)}
                       </p>
@@ -809,7 +809,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   )}
 
                   {preview.city_world?.weather?.name && (
-                    <p className="mt-1.5 truncate font-mono text-[9px] text-zinc-600">
+                    <p className="mt-1.5 truncate font-mono text-[10px] text-zinc-600">
                       Mundo agora · {preview.city_world.daypart?.name} · {preview.city_world.weather.name} · {preview.city_world.event?.name}
                     </p>
                   )}
