@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Target, Search, Clock, TrendingUp, AlertTriangle, Star, CheckCircle2, MapPin, SlidersHorizontal, Scale, Loader2 } from "lucide-react";
+import { Target, Search, Clock, AlertTriangle, Star, CheckCircle2, MapPin, SlidersHorizontal, Scale, Loader2 } from "lucide-react";
 
 // Força competente (do backend, opp.police_force). Escalável: mais uma força =
 // mais uma entrada.
@@ -139,9 +139,6 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
     }
   };
   const pulse = state?.retention?.world_pulse || null;
-  const pulseEndsS = pulse?.ends_at
-    ? Math.max(0, (Date.parse(pulse.ends_at) - serverNow()) / 1000)
-    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -155,40 +152,6 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
             Todas as oportunidades no mapa — ordena, filtra e despacha sem procurar pino a pino.
           </SheetDescription>
         </SheetHeader>
-
-        {pulse && (
-          <Card
-            data-testid="world-pulse-card"
-            className="sub-world-pulse mt-3 border-cyan-500/15 bg-cyan-500/[0.035] p-3 shadow-none"
-          >
-            <div className="flex items-start gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-300">
-                <TrendingUp size={15} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="text-xs font-bold text-white">{pulse.label}</p>
-                  <span className="rounded-full border border-cyan-500/20 bg-cyan-500/[0.07] px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase text-cyan-300">
-                    {SPEC_LABELS[pulse.category] || pulse.category}
-                  </span>
-                  {pulseEndsS != null && (
-                    <span className="ml-auto font-mono text-[10px] tabular-nums text-zinc-500">
-                      {fmtDuration(pulseEndsS)}
-                    </span>
-                  )}
-                </div>
-                <p className="sub-world-pulse-description mt-1 text-[10px] leading-relaxed text-zinc-500">{pulse.description}</p>
-                <p className="sub-world-pulse-effect mt-1.5 font-mono text-[10px] text-cyan-300">
-                  +{pulse.reward_bonus_pct}% recompensa
-                  {pulse.heat_delta_pct !== 0 && (
-                    <> · {pulse.heat_delta_pct > 0 ? "+" : ""}{pulse.heat_delta_pct}% geração de calor</>
-                  )}
-                  {" "}nas operações desta categoria durante a janela.
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
 
         <SummaryStrip cols={2} className="sub-operations-summary mt-3" testId="opportunities-summary">
           <Kpi icon={Target} label="No mapa" value={`${opps.length}`} color="#38BDF8" />
