@@ -85,6 +85,17 @@ DISTRICT_ARCHETYPES = {
     },
 }
 
+POI_CATALOG = {
+    "residencial": ["Bairro residencial", "Condomínio", "Rua secundária", "Garagem privada"],
+    "comercial": ["Zona comercial", "Mercado", "Centro de serviços", "Parque de estacionamento"],
+    "industrial": ["Armazém logístico", "Parque industrial", "Zona de cargas", "Oficina"],
+    "turistico": ["Zona hoteleira", "Frente turística", "Área de entretenimento", "Parque público"],
+    "portuario": ["Terminal de carga", "Marina", "Cais", "Zona portuária"],
+    "rural": ["Estrada rural", "Quinta isolada", "Zona florestal", "Armazém periférico"],
+    "empresarial": ["Centro empresarial", "Escritórios", "Nó tecnológico", "Parque corporativo"],
+}
+
+
 
 DEFAULT_DISPATCH_PRESETS = {
     "baixo_perfil": {
@@ -198,6 +209,55 @@ def district_profile(district: dict | str | None) -> dict:
         chosen = pool[_stable_index(f"{key}:{name}:{ring}", len(pool))]
     cfg = DISTRICT_ARCHETYPES[chosen]
     return {"key": chosen, "ring": ring, **cfg}
+
+
+def district_category_multiplier(district: dict | str | None, category: str) -> float:
+    profile = district_profile(district)
+    return float((profile.get("category_weights") or {}).get(category, 1.0))
+
+
+def poi_for_operation(district: dict | str | None, opportunity: dict) -> dict:
+    profile = district_profile(district)
+    pool = POI_CATALOG.get(profile["key"], ["Ponto operacional"])
+    seed = f"{profile['key']}:{opportunity.get('type_key')}:{opportunity.get('district')}:{opportunity.get('lat')}:{opportunity.get('lng')}"
+    name = pool[_stable_index(seed, len(pool))]
+    return {
+        "key": f"{profile['key']}_{_stable_index(seed + ':poi', 9999)}",
+        "name": name,
+        "profile": profile["key"],
+        "tags": list(profile.get("tags") or []),
+    }
+
+
+def recommended_dispatch_preset(opportunity: dict) -> str:
+    category = opportunity.get("category")
+    profile = opportunity.get("profile")
+    risk = int(opportunity.get("risk", 1) or 1)
+    if category == "logistica":
+        return "logistica_segura"
+    if category in {"tecnica", "influencia"} or profile == "stealth":
+        return "baixo_perfil"
+    if category == "assalto" or risk >= 4:
+        return "assalto_pesado"
+    return "baixo_perfil"
+
+
+def intel_profile(opportunity: dict, capabilities: dict) -> dict:
+    risk = max(1, min(5, int(opportunity.get("risk", 1) or 1)))
+    roles = capabilities.get("roles") or set()
+    specialists = {"informador", "espiao", "hacker", "engenheiro_social"}
+    specialist_bonus = 1 if roles & specialists else 0
+    score = max(1, min(5, 5 - risk + specialist_bonus))
+    labels = {1: "Fragmentária", 2: "Baixa", 3: "Razoável", 4: "Boa", 5: "Excelente"}
+    confidence = {1: 0.48, 2: 0.60, 3: 0.72, 4: 0.84, 5: 0.93}[score]
+    spread = round((1.0 - confidence) * 0.22, 3)
+    return {
+        "score": score,
+        "label": labels[score],
+        "confidence": confidence,
+        "chance_uncertainty": spread,
+        "exact_after_preview": score >= 4,
+    }
 
 
 def certifications_for_employee(employee: dict) -> set[str]:
@@ -408,8 +468,11 @@ def enrich_opportunities(
         opp = dict(raw)
         profile = district_profile(district_map.get(str(opp.get("district"))) or str(opp.get("district") or "Zona"))
         opp["district_profile"] = profile
+        opp["poi"] = poi_for_operation(district_map.get(str(opp.get("district"))) or str(opp.get("district") or "Zona"), opp)
         opp["readiness"] = classify_opportunity_readiness(opp, caps)
         opp["requirements"] = opp["readiness"]["requirements"]
+        opp["dispatch_preset"] = recommended_dispatch_preset(opp)
+        opp["intel"] = intel_profile(opp, caps)
         out.append(opp)
     return out
 
