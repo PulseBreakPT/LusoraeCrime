@@ -49,7 +49,14 @@ const SmallAction = ({ children, dense = false, className = "", ...props }) => (
   </Button>
 );
 
-export const OrganizationPanel = ({ open, onOpenChange }) => {
+export const OrganizationPanel = ({
+  open,
+  onOpenChange,
+  initialTab = "centro",
+  visibleTabs = null,
+  title = "Gestão do Império",
+  description = "Políticas, automação, logística e controlo organizacional.",
+}) => {
   const {
     state, catalog, serverNow,
     buySupply, sellSupply,
@@ -62,7 +69,7 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
     fetchOrganizationIntelligence, fetchOrganizationAudit,
     setOrganizationPolicy, runOrganizationAutomation, resolveOrganizationEvent,
   } = useGame();
-  const [tab, setTab] = useState("centro");
+  const [tab, setTab] = useState(initialTab);
   const [finance, setFinance] = useState(null);
   const [intelligence, setIntelligence] = useState(null);
   const [audit, setAudit] = useState([]);
@@ -73,6 +80,11 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
   const [loadouts, setLoadouts] = useState({});
   const [propertyStaff, setPropertyStaff] = useState({});
   const draftsInitializedRef = useRef(false);
+  const scopedTabs = visibleTabs?.length ? TABS.filter((item) => visibleTabs.includes(item.key)) : TABS;
+
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
 
   const orgCatalog = catalog?.organization || {};
   const org = state?.organization || {};
@@ -251,22 +263,24 @@ export const OrganizationPanel = ({ open, onOpenChange }) => {
         <SheetHeader>
           <PanelWatermark icon={Network} />
           <SheetTitle className="flex items-center gap-2 text-white">
-            <Network size={18} className="text-red-400" /> Organização
+            <Network size={18} className="text-red-400" /> {title}
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            Logística, ativos, território e finanças numa única cadeia operacional.
+            {description}
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="flex h-auto w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {TABS.map(({ key, label, icon: Icon }) => (
-              <TabsTrigger key={key} value={key} className="min-h-9 min-w-[78px] flex-1 gap-1 whitespace-nowrap px-2 font-mono text-[10px] font-bold uppercase tracking-wider">
-                <Icon size={11} /> {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {scopedTabs.length > 1 && (
+          <Tabs value={tab} onValueChange={setTab} className="mt-3">
+            <TabsList className="flex h-auto w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {scopedTabs.map(({ key, label, icon: Icon }) => (
+                <TabsTrigger key={key} value={key} className="min-h-9 min-w-[78px] flex-1 gap-1 whitespace-nowrap px-2 font-mono text-[10px] font-bold uppercase tracking-wider">
+                  <Icon size={11} /> {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
 
         {tab === "centro" && (
           <div className="mt-3 space-y-4">
