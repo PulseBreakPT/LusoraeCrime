@@ -213,6 +213,17 @@ describe("UI action ownership", () => {
     expect(organization).not.toContain("Gestão do Império");
   });
 
+  test("Map and World are reliable primary navigation destinations", () => {
+    expect(gamePage).toContain("world: true");
+    expect(gamePage).toContain('testId="nav-map"');
+    expect(gamePage).toContain("onClick={returnToMap}");
+    expect(gamePage).toContain('testId="nav-group-world"');
+    expect(gamePage).toContain('onClick={() => openFromNav("world")}');
+    expect(gamePage).toContain('className="sub-bottom-nav-shell pointer-events-auto absolute left-1/2 z-[70]"');
+    expect(gamePage).toMatch(/const openFromNav = \(panel\) => \{[\s\S]*?setCommandOpen\(false\);[\s\S]*?setSelectedOpp\(null\);[\s\S]*?setOpenPanel\(canonicalGamePanel\(panel\)\);/);
+    expect(gamePage).toMatch(/const toggleNavGroup = \(group\) => \{[\s\S]*?setOpenPanel\(null\);[\s\S]*?setNavGroup/);
+  });
+
   test("World has one navigation surface", () => {
     expect(gamePage).not.toContain('data-testid="open-world-pulse"');
     expect(gamePage).not.toContain('data-testid="open-world-news"');
