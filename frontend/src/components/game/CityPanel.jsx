@@ -23,7 +23,7 @@ const TABS = [
   ["news", "Notícias", Newspaper],
   ["rivals", "Rivais", Skull],
   ["business", "Negócios", Building2],
-  ["social", "Social", Users],
+  ["social", "Rede", Users],
 ];
 
 const pct = (value) => `${Number(value || 0) >= 0 ? "+" : ""}${Math.round(Number(value || 0) * 100)}%`;
