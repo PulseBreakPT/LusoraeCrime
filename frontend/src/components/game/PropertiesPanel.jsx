@@ -50,7 +50,7 @@ const LevelDots = ({ level, max, color }) => (
   </Tip>
 );
 
-export const PropertiesPanel = ({ open, onOpenChange, focusTarget }) => {
+export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const { state, catalog, serverNow, sellProperty, upgradeProperty, renameProperty, startPlacement, optimizeProperties } = useGame();
   const [query, setQuery] = useState("");
   useTick(open);
