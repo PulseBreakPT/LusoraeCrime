@@ -1098,6 +1098,31 @@ const finalizeMission = (save, mission) => {
     mission.pending_reward=0; mission.pending_pays=mission.pays;
     addEvent(save,"warning",`${team?.name||"Equipa"} falhou ${mission.opportunity?.name||"a operação"}.`);
   }
+  for(const supportTeamId of mission.support_team_ids||[]){
+    const supportTeam=save.teams.find((t)=>t.id===supportTeamId);
+    if(supportTeam){
+      supportTeam.status="idle";
+      supportTeam.available_at=null;
+      supportTeam.support_missions=Number(supportTeam.support_missions||0)+1;
+    }
+    save.employees.filter((e)=>e.team_id===supportTeamId&&e.status==="on_mission").forEach((e)=>{
+      e.status="idle";
+      e.fatigue=clamp(Number(e.fatigue||0)+10,0,100);
+      e.xp=Number(e.xp||0)+25;
+    });
+  }
+  for(const supportVehicleId of mission.support_vehicle_ids||[]){
+    const supportVehicle=save.vehicles.find((v)=>v.id===supportVehicleId);
+    if(supportVehicle)supportVehicle.condition=clamp(Number(supportVehicle.condition||100)-1.5,0,100);
+  }
+
+  const follow=buildLocalFollowUp(mission);
+  if(follow && !(save.opportunities||[]).some((o)=>o.parent_mission_id===mission.id)){
+    save.opportunities.push(follow);
+    mission.chain_follow_up_id=follow.id;
+    addEvent(save,"intel",`Nova cadeia operacional: ${follow.name} em ${follow.district}.`);
+  }
+
   updateLevel(save);
   save.history.unshift(clone(mission)); save.history=save.history.slice(0,30);
 };
@@ -1105,6 +1130,7 @@ const finalizeMission = (save, mission) => {
 const tick = (save) => {
   advanceLocalCity(save);
   const now=Date.now();
+  save.player.staging_areas=(save.player.staging_areas||[]).filter((area)=>!area.expires_at||Date.parse(area.expires_at)>now);
   const previous=Number(save.last_tick||now);
   const rawElapsed=Math.max(0,(now-previous)/1000);
   const elapsed=Math.min(OFFLINE_SIMULATION_MAX_S,rawElapsed);
@@ -1785,6 +1811,10 @@ const mutateGame=(save,path,payload)=>{
     const mission=save.missions.find(m=>m.id===p.mission_id);if(!mission)fail(404,"Missão não encontrada");
     const team=save.teams.find(t=>t.id===mission.team_id);if(team)team.status="idle";
     save.employees.filter(e=>mission.member_ids.includes(e.id)).forEach(e=>e.status="idle");
+    for(const supportTeamId of mission.support_team_ids||[]){
+      const support=save.teams.find((t)=>t.id===supportTeamId);if(support)support.status="idle";
+      save.employees.filter((e)=>e.team_id===supportTeamId&&e.status==="on_mission").forEach((e)=>{e.status="idle";});
+    }
     const opp=save.opportunities.find(o=>o.id===mission.opportunity_id);if(opp)opp.status="active";
     mission.phase="done";mission.outcome="recalled";save.history.unshift(clone(mission));save.missions=save.missions.filter(m=>m.id!==mission.id);
     return {ok:true};
