@@ -94,6 +94,7 @@ from city_systems import (
 from operational_director import (
     CERTIFICATIONS, DEFAULT_DISPATCH_PRESETS, enrich_opportunities,
     operational_snapshot, operation_requirements, reinforcement_effect,
+    missing_team_requirements,
 )
 from game_data import operation_profile_of, OPERATION_PROFILE_LABELS, ORG_LEVEL_UNLOCKS, MAX_ORG_LEVEL
 from organization_systems import (
@@ -793,6 +794,13 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     }).to_list(50)
     if not members:
         raise HTTPException(status_code=400, detail="A equipa não tem membros disponíveis (sem operacionais ou demasiado fatigados)")
+
+    req = operation_requirements(opp)
+    crew_missing = missing_team_requirements(req, members)
+    if crew_missing:
+        labels = ", ".join(item["label"] for item in crew_missing[:4])
+        raise HTTPException(status_code=400, detail=f"Equipa sem requisitos operacionais: {labels}")
+
     weapon_docs = await db.weapons.find({
         "player_id": pid, "employee_id": {"$in": [str(e["_id"]) for e in members]},
     }).to_list(50)
