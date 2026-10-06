@@ -1416,7 +1416,7 @@ const localRetention=(save,caps)=>{
 const publicState=(save)=>{
   ensureOrganizationSave(save);
   if(!save.player.hq){
-    return {hq_pending:true,server_time:nowIso(),player:{
+    return {hq_pending:true,server_time:nowIso(),local_recovery:readRecovery(),player:{
       id:save.player.id,org_name:save.player.org_name,clean_money:save.player.clean_money,
       dirty_money:save.player.dirty_money,level:save.player.level,
     }};
