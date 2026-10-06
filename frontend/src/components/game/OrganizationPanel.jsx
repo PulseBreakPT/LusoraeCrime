@@ -54,7 +54,7 @@ export const OrganizationPanel = ({
   onOpenChange,
   initialTab = "centro",
   visibleTabs = null,
-  title = "Gestão do Império",
+  title = "Sistemas avançados",
   description = "Políticas, automação, logística e controlo organizacional.",
 }) => {
   const {
