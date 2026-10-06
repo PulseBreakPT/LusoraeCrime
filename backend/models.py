@@ -251,6 +251,9 @@ class Opportunity(BaseDocument):
     requirements: dict = {}
     readiness: dict = {}
     district_profile: dict = {}
+    poi: dict = {}
+    dispatch_preset: Optional[str] = None
+    intel: dict = {}
     chain_id: Optional[str] = None
     parent_mission_id: Optional[str] = None
     chain_stage: int = 0
