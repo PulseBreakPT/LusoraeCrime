@@ -49,8 +49,11 @@ export default function GamePage() {
   const gameReady = Boolean(state);
   const playerLevel = Number(state?.player?.level || 1);
   const unlocks = {
-    city: playerLevel >= 5,
-    organization: playerLevel >= 10,
+    world: playerLevel >= 5,
+    businesses: playerLevel >= 5,
+    warehouse: playerLevel >= 10,
+    territory: playerLevel >= 10,
+    management: playerLevel >= 10,
     mastermind: playerLevel >= 10,
   };
   const shellAlerts = state ? orgAlerts(state) : { total: 0 };
@@ -117,6 +120,7 @@ export default function GamePage() {
   }, [gameReady, settings.reducedMotion]);
 
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
+  const [worldFocusTab, setWorldFocusTab] = useState("pulse");
   const [baseFilter, setBaseFilter] = useState("all");
   const [stamp, setStamp] = useState(null);
   // Carimbo de confirmação de despacho — celebração breve (1.7s) no centro do
@@ -153,6 +157,20 @@ export default function GamePage() {
     setNavGroup(null);
     setMapLegendOpen(false);
     setOpenPanel(panel);
+  };
+
+  const openWorldTab = (tab) => {
+    setWorldFocusTab(tab);
+    openFromNav("world");
+  };
+
+  const returnToMap = () => {
+    setFocusTarget(null);
+    setNavGroup(null);
+    setMapLegendOpen(false);
+    setCommandOpen(false);
+    setSelectedOpp(null);
+    setOpenPanel(null);
   };
 
   const toggleNavGroup = (group) => {
@@ -342,7 +360,7 @@ export default function GamePage() {
           style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
         >
           {navGroup && (
-            <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2.5 w-[min(92vw,26rem)] -translate-x-1/2">
+            <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2.5 w-[min(94vw,31rem)] -translate-x-1/2">
               {navGroup === "operations" && (
                 <div className={`grid ${unlocks.mastermind ? "grid-cols-4" : "grid-cols-3"} gap-1`}>
                   <NavAction testId="open-opscenter-button" icon={RadioTower} label={areaLabel("opscenter")} color="text-cyan-300" alert={(state.operational?.requires_action || []).length > 0} onClick={() => openFromNav("opscenter")} />
@@ -355,40 +373,62 @@ export default function GamePage() {
               )}
 
               {navGroup === "crew" && (
-                <div className="grid grid-cols-2 gap-1">
+                <div className="grid grid-cols-3 gap-1 min-[430px]:grid-cols-5">
                   <NavAction testId="open-teams-button" icon={Users} label="Equipas" color="text-cyan-400" alert={alerts.teams > 0} onClick={() => openFromNav("teams")} />
                   <NavAction testId="open-employees-button" icon={IdCard} label="Operacionais" color="text-emerald-400" alert={hrAlertCount > 0} onClick={() => openFromNav("employees")} />
-                </div>
-              )}
-
-              {navGroup === "equipment" && (
-                <div className="grid grid-cols-2 gap-1">
                   <NavAction testId="open-fleet-button" icon={Car} label="Frota" color="text-amber-400" alert={fleetAlertCount > 0} onClick={() => openFromNav("fleet")} />
                   <NavAction testId="open-weapons-button" icon={Swords} label="Armamento" color="text-red-400" alert={weaponsDamaged > 0 || weaponsUnequipped > 0} onClick={() => openFromNav("weapons")} />
+                  {unlocks.warehouse && (
+                    <NavAction testId="open-warehouse-button" icon={Warehouse} label="Armazém" color="text-sky-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("warehouse")} />
+                  )}
                 </div>
               )}
 
               {navGroup === "empire" && (
-                <div className="grid grid-cols-3 gap-1">
-                  <NavAction testId="open-empire-button" icon={Building2} label="Império" color="text-red-500" alert={empireAlert} onClick={() => openFromNav("empire")} />
-                  <NavAction testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-amber-300" alert={alerts.raidRisk} onClick={() => openFromNav("properties")} />
-                  <NavAction testId="open-hq-button" icon={Landmark} label="QG" color="text-zinc-200" onClick={() => openFromNav("hq")} />
+                <>
+                  <div className="grid grid-cols-3 gap-1 min-[430px]:grid-cols-5">
+                    <NavAction testId="open-empire-button" icon={Building2} label="Finanças" color="text-emerald-300" alert={empireAlert} onClick={() => openFromNav("empire")} />
+                    <NavAction testId="open-properties-button" icon={Warehouse} label="Imóveis" color="text-amber-300" alert={alerts.raidRisk} onClick={() => openFromNav("properties")} />
+                    {unlocks.businesses && (
+                      <NavAction testId="open-businesses-button" icon={Building2} label="Negócios" color="text-cyan-300" onClick={() => openFromNav("businesses")} />
+                    )}
+                    {unlocks.territory && (
+                      <NavAction testId="open-territory-button" icon={MapIcon} label="Território" color="text-red-300" onClick={() => openFromNav("territory")} />
+                    )}
+                    <NavAction testId="open-hq-button" icon={Landmark} label="QG" color="text-zinc-200" onClick={() => openFromNav("hq")} />
+                  </div>
+                  {unlocks.management && (
+                    <Button
+                      type="button"
+                      variant="bare"
+                      size="bare"
+                      data-testid="open-management-button"
+                      onClick={() => openFromNav("management")}
+                      className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
+                    >
+                      <span className="flex items-center gap-2"><Network size={12} /> Gestão avançada</span>
+                      <span>Políticas · automação</span>
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {navGroup === "world" && unlocks.world && (
+                <div className="grid grid-cols-4 gap-1">
+                  <NavAction testId="open-world-pulse" icon={RadioTower} label="Pulso" color="text-red-300" onClick={() => openWorldTab("pulse")} />
+                  <NavAction testId="open-world-news" icon={BrainCircuit} label="Notícias" color="text-zinc-300" onClick={() => openWorldTab("news")} />
+                  <NavAction testId="open-world-rivals" icon={Crosshair} label="Rivais" color="text-amber-300" onClick={() => openWorldTab("rivals")} />
+                  <NavAction testId="open-world-social" icon={Users} label="Rede" color="text-cyan-300" onClick={() => openWorldTab("social")} />
                 </div>
               )}
 
-              {navGroup === "menu" && (
+              {navGroup === "utilities" && (
                 <>
-                  <div className="grid grid-cols-3 gap-1">
+                  <div className="grid grid-cols-5 gap-1">
+                    <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
                     <NavAction testId="open-intel-button" icon={BrainCircuit} label="Relatórios" color="text-red-400" alert={alerts.total > 0} onClick={() => openFromNav("intel")} />
                     <NavAction testId="open-shop-button" icon={ShoppingBag} label="Loja" color="text-amber-300" onClick={() => openFromNav("shop")} />
-                    <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
                     <NavAction testId="map-legend-toggle" icon={MapIcon} label="Legenda" color="text-zinc-300" active={mapLegendOpen} onClick={() => { setNavGroup(null); setMapLegendOpen((value) => !value); }} />
-                    {unlocks.organization && (
-                      <NavAction testId="open-organization-button" icon={Network} label={areaLabel("organization")} color="text-cyan-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("organization")} />
-                    )}
-                    {unlocks.city && (
-                      <NavAction testId="open-city-button" icon={RadioTower} label={areaLabel("city")} color="text-red-300" onClick={() => openFromNav("city")} />
-                    )}
                     <NavAction testId="open-settings-button" icon={Settings} label="Definições" color="text-zinc-400" onClick={() => openFromNav("settings")} />
                   </div>
 
@@ -420,7 +460,20 @@ export default function GamePage() {
             </div>
           )}
 
-          <div className="sub-dock flex items-center gap-1.5 px-1.5 py-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            data-testid="nav-utilities"
+            aria-label="Ferramentas"
+            aria-expanded={navGroup === "utilities"}
+            onClick={() => toggleNavGroup("utilities")}
+            className={`sub-hud-btn absolute bottom-1 right-full mr-2 h-10 w-10 rounded-xl p-0 ${navGroup === "utilities" ? "sub-hud-btn-active" : ""}`}
+          >
+            <MenuIcon size={17} className="text-zinc-300" />
+          </Button>
+
+          <div className="sub-dock flex items-center gap-1 px-1.5 py-1.5">
             <GroupButton
               testId="nav-group-operations"
               icon={Crosshair}
@@ -435,18 +488,17 @@ export default function GamePage() {
               icon={Users}
               label="Crew"
               color="text-cyan-400"
-              alert={alerts.teams > 0 || hrAlertCount > 0}
-              active={navGroup === "crew" || ["teams", "employees"].includes(openPanel)}
+              alert={alerts.teams > 0 || hrAlertCount > 0 || fleetAlertCount > 0}
+              active={navGroup === "crew" || ["teams", "employees", "fleet", "weapons", "warehouse"].includes(openPanel)}
               onClick={() => toggleNavGroup("crew")}
             />
             <GroupButton
-              testId="nav-group-equipment"
-              icon={Swords}
-              label="Equipamento"
-              color="text-amber-300"
-              alert={fleetAlertCount > 0 || weaponsDamaged > 0 || weaponsUnequipped > 0}
-              active={navGroup === "equipment" || ["fleet", "weapons"].includes(openPanel)}
-              onClick={() => toggleNavGroup("equipment")}
+              testId="nav-map"
+              icon={MapIcon}
+              label="Mapa"
+              color="text-white"
+              active={!openPanel && !selectedOpp && !navGroup}
+              onClick={returnToMap}
             />
             <GroupButton
               testId="nav-group-empire"
@@ -454,17 +506,17 @@ export default function GamePage() {
               label="Império"
               color="text-red-400"
               alert={empireAlert || alerts.raidRisk}
-              active={navGroup === "empire" || ["empire", "properties", "hq"].includes(openPanel)}
+              active={navGroup === "empire" || ["empire", "properties", "businesses", "territory", "hq", "management"].includes(openPanel)}
               onClick={() => toggleNavGroup("empire")}
             />
             <GroupButton
-              testId="nav-group-menu"
-              icon={MenuIcon}
-              label="Menu"
-              color="text-zinc-200"
-              alert={alerts.total > 0 || wantedStars >= 3}
-              active={navGroup === "menu" || ["intel", "shop", "organization", "city", "settings"].includes(openPanel) || commandOpen || mapLegendOpen}
-              onClick={() => toggleNavGroup("menu")}
+              testId="nav-group-world"
+              icon={RadioTower}
+              label="Mundo"
+              color="text-red-300"
+              alert={wantedStars >= 3}
+              active={navGroup === "world" || openPanel === "world"}
+              onClick={() => unlocks.world ? toggleNavGroup("world") : null}
             />
           </div>
         </div>
@@ -481,8 +533,57 @@ export default function GamePage() {
         />
       )}
       {openPanel === "shop" && <ShopPanel open onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />}
-      {openPanel === "organization" && unlocks.organization && <OrganizationPanel open onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />}
-      {openPanel === "city" && unlocks.city && <CityPanel open onOpenChange={(o) => setOpenPanel(o ? "city" : null)} />}
+      {openPanel === "warehouse" && unlocks.warehouse && (
+        <OrganizationPanel
+          open
+          initialTab="stock"
+          visibleTabs={["stock"]}
+          title="Armazém"
+          description="Consumíveis, stock e capacidade logística da organização."
+          onOpenChange={(o) => setOpenPanel(o ? "warehouse" : null)}
+        />
+      )}
+      {openPanel === "territory" && unlocks.territory && (
+        <OrganizationPanel
+          open
+          initialTab="territorios"
+          visibleTabs={["territorios"]}
+          title="Território"
+          description="Controlo, defesa, influência e expansão da tua rede."
+          onOpenChange={(o) => setOpenPanel(o ? "territory" : null)}
+        />
+      )}
+      {openPanel === "management" && unlocks.management && (
+        <OrganizationPanel
+          open
+          initialTab="centro"
+          title="Gestão avançada"
+          description="Políticas, automação e sistemas avançados da organização."
+          onOpenChange={(o) => setOpenPanel(o ? "management" : null)}
+        />
+      )}
+      {openPanel === "businesses" && unlocks.businesses && (
+        <CityPanel
+          open
+          initialTab="business"
+          visibleTabs={["business"]}
+          title="Negócios"
+          description="Rede empresarial, rendimentos, upgrades e expansão."
+          onOpenChange={(o) => setOpenPanel(o ? "businesses" : null)}
+        />
+      )}
+      {openPanel === "world" && unlocks.world && (
+        <CityPanel
+          open
+          initialTab={worldFocusTab}
+          visibleTabs={["pulse", "news", "rivals", "social"]}
+          title="Mundo"
+          description="Pulso urbano, notícias, rivais e rede local."
+          onOpenChange={(o) => setOpenPanel(o ? "world" : null)}
+        />
+      )}
+      {openPanel === "organization" && unlocks.management && <OrganizationPanel open title="Gestão avançada" onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />}
+      {openPanel === "city" && unlocks.world && <CityPanel open visibleTabs={["pulse", "news", "rivals", "social"]} title="Mundo" onOpenChange={(o) => setOpenPanel(o ? "city" : null)} />}
       {openPanel === "operations" && (
         <OpportunitiesPanel
           open
