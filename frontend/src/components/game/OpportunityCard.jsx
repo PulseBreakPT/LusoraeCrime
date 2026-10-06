@@ -658,7 +658,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
                 <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                   <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
-                  {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
+                  {(preview.reward_breakdown || []).map((source) => (
+                    <span key={source.key} className={Number(source.pct) >= 0 ? "text-cyan-400" : "text-amber-400"}>
+                      {" "}({Number(source.pct) >= 0 ? "+" : ""}{Math.round(Number(source.pct) * 10) / 10}% {source.label})
+                    </span>
+                  ))}
+                  {!(preview.reward_breakdown || []).length && preview.reward_bonus_pct !== 0 && (
+                    <span className={preview.reward_bonus_pct > 0 ? "text-cyan-400" : "text-amber-400"}>
+                      {" "}({preview.reward_bonus_pct > 0 ? "+" : ""}{preview.reward_bonus_pct}% bónus)
+                    </span>
+                  )}
                   {preview.age_decay_pct < 0 && (
                     <Tip tip="Esta oportunidade está disponível há algum tempo — a recompensa vai encolhendo quanto mais tempo ficar por reclamar.">
                       <span className="text-amber-400"> ({preview.age_decay_pct}% tempo)</span>
