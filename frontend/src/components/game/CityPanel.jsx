@@ -48,9 +48,16 @@ const ActionButton = ({ children, onClick, disabled, tone = "default" }) => (
   </Button>
 );
 
-export const CityPanel = ({ open, onOpenChange }) => {
+export const CityPanel = ({
+  open,
+  onOpenChange,
+  initialTab = "pulse",
+  visibleTabs = null,
+  title = "Mundo",
+  description = "Pulso urbano, acontecimentos, rivais e rede local.",
+}) => {
   const { state, refresh: refreshGame } = useGame();
-  const [tab, setTab] = useState("pulse");
+  const [tab, setTab] = useState(initialTab);
   const [city, setCity] = useState(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState("");
@@ -59,6 +66,11 @@ export const CityPanel = ({ open, onOpenChange }) => {
   const [allianceCode, setAllianceCode] = useState("");
   const [rouletteChoice, setRouletteChoice] = useState("red");
   const [bet, setBet] = useState(500);
+  const scopedTabs = visibleTabs?.length ? TABS.filter(([key]) => visibleTabs.includes(key)) : TABS;
+
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -132,22 +144,27 @@ export const CityPanel = ({ open, onOpenChange }) => {
         <SheetHeader>
           <PanelWatermark icon={RadioTower} />
           <SheetTitle className="flex items-center gap-2 text-white">
-            <RadioTower size={18} className="text-red-400" /> Cidade Viva
+            <RadioTower size={18} className="text-red-400" /> {title}
           </SheetTitle>
           <SheetDescription className="text-zinc-500">
-            Clima, horário, acontecimentos, rivais, negócios e competição partilham o mesmo estado do mundo.
+            {description}
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid h-auto w-full grid-cols-5 gap-1">
-            {TABS.map(([key, label, Icon]) => (
-              <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider">
-                <Icon size={11} /><span className="hidden min-[430px]:inline">{label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {scopedTabs.length > 1 && (
+          <Tabs value={tab} onValueChange={setTab} className="mt-3">
+            <TabsList
+              className="grid h-auto w-full gap-1"
+              style={{ gridTemplateColumns: `repeat(${scopedTabs.length}, minmax(0, 1fr))` }}
+            >
+              {scopedTabs.map(([key, label, Icon]) => (
+                <TabsTrigger key={key} value={key} className="min-w-0 gap-1 px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-wider">
+                  <Icon size={11} /><span className="hidden min-[430px]:inline">{label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
 
         {loading && !city ? (
           <div className="flex items-center justify-center gap-2 py-16 font-mono text-xs text-zinc-500">
