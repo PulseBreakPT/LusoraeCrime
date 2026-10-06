@@ -270,7 +270,9 @@ export default function GamePage() {
           }
         }}
         onSelectHQ={() => openFromNav("hq")}
-        onSelectProperty={() => openFromNav("properties")}
+        onSelectProperty={(property) => navigateTo("properties", { focusTestId: `property-card-${property.id}` })}
+        onSelectTeam={(teamId) => navigateTo("teams", { focusTestId: `team-card-${teamId}` })}
+        onSelectVehicle={(vehicleId) => navigateTo("fleet", { focusTestId: `vehicle-card-${vehicleId}` })}
         baseFilter={baseFilter}
       />
       <div className="sub-vignette" aria-hidden="true" />
