@@ -335,6 +335,9 @@ def default_team_policies() -> dict[str, Any]:
 
 def ensure_employee_profile(emp: dict) -> dict:
     # Determinístico para saves antigos, sem depender de random no GET.
+    # Certificações foram introduzidas depois dos perfis humanos; saves antigos
+    # recebem uma lista vazia sem perder traits já existentes.
+    emp.setdefault("certifications", [])
     if emp.get("traits"):
         return emp
     seed = sum(ord(ch) for ch in str(emp.get("_id") or emp.get("name") or "x"))
