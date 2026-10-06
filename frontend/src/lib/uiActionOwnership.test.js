@@ -21,6 +21,8 @@ describe("UI action ownership", () => {
   const forYou = read("components/game/ForYouPanel.jsx");
   const city = read("components/game/CityPanel.jsx");
   const opportunities = read("components/game/OpportunitiesPanel.jsx");
+  const organization = read("components/game/OrganizationPanel.jsx");
+  const properties = read("components/game/PropertiesPanel.jsx");
 
   test("team management does not duplicate recovery or fleet maintenance mutations", () => {
     for (const forbidden of [
@@ -152,6 +154,7 @@ describe("UI action ownership", () => {
     expect(forYou).toContain("state.retention?.next_moves");
     expect(forYou).toContain('title="Próximos movimentos"');
     expect(intel).not.toContain('data-testid="retention-roadmap"');
+    expect(intel).not.toContain("retention?.next_moves");
 
     // Mundo owns the pulse surface. Operations may use the pulse modifier
     // contextually, but must not reproduce the full World card.
@@ -182,6 +185,32 @@ describe("UI action ownership", () => {
     expect(hq).not.toContain("Gestão avançada");
     expect(empire).not.toContain('data-testid="empire-level-card"');
     expect(empire).not.toContain('title="Quartel-general"');
+    expect(hq).not.toContain('data-testid="hq-departments"');
+  });
+
+  test("unique advanced systems stay under their canonical owner", () => {
+    expect(navigation).toContain('id:"teamops"');
+    expect(navigation).toContain('id:"fleetcare"');
+    expect(navigation).toContain('id:"weaponworkshop"');
+    expect(navigation).toContain('id:"propertyinfra"');
+    expect(navigation).toContain('id:"hqsystems"');
+
+    expect(teams).toContain('data-testid="teams-open-doctrines"');
+    expect(fleet).toContain('data-testid="fleet-open-lifecycle"');
+    expect(weapons).toContain('data-testid="weapons-open-workshop"');
+    expect(properties).toContain('data-testid="properties-open-infrastructure"');
+    expect(hq).toContain('data-testid="hq-open-systems"');
+
+    expect(gamePage).toContain('visibleTabs={["crew"]}');
+    expect(gamePage).toContain('visibleTabs={["frota"]}');
+    expect(gamePage).toContain('visibleTabs={["arsenal"]}');
+    expect(gamePage).toContain('visibleTabs={["imoveis"]}');
+    expect(gamePage).toContain('visibleTabs={["centro"]}');
+
+    expect(organization).not.toContain("Centro Financeiro");
+    expect(organization).not.toContain("Inteligência operacional");
+    expect(organization).not.toContain("Auditoria recente");
+    expect(organization).not.toContain("Gestão do Império");
   });
 
 
