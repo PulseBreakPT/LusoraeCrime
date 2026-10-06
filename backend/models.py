@@ -63,6 +63,9 @@ class Player(BaseDocument):
     territories: dict = {}
     prestige_items: List[str] = []
     governance: dict = {}
+    dispatch_presets: dict = {}
+    staging_areas: List[dict] = []
+    operational_rules: dict = {}
 
 
 class Team(BaseDocument):
@@ -121,6 +124,7 @@ class Employee(BaseDocument):
     sentence: Optional[dict] = None
     relations: dict = {}
     stationed_property_id: Optional[str] = None
+    certifications: List[str] = []
 
 
 class Candidate(BaseDocument):
@@ -244,6 +248,13 @@ class Opportunity(BaseDocument):
     generated_by_property_id: Optional[str] = None
     police_force: Optional[str] = None
     profile: str = "confrontation"
+    requirements: dict = {}
+    readiness: dict = {}
+    district_profile: dict = {}
+    chain_id: Optional[str] = None
+    parent_mission_id: Optional[str] = None
+    chain_stage: int = 0
+    chain_kind: Optional[str] = None
 
 
 class Mission(BaseDocument):
@@ -303,6 +314,14 @@ class Mission(BaseDocument):
     doctrine_fatigue_mult: float = 1.0
     loadout: dict = {}
     loadout_injury_mult: float = 1.0
+    support_team_ids: List[str] = []
+    support_vehicle_ids: List[str] = []
+    reinforcement_effects: List[dict] = []
+    reinforcement_request: Optional[dict] = None
+    chain_id: Optional[str] = None
+    parent_mission_id: Optional[str] = None
+    chain_stage: int = 0
+    chain_kind: Optional[str] = None
 
 
 class Event(BaseDocument):
