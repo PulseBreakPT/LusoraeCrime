@@ -3439,15 +3439,25 @@ async def relocate_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)
     }
     districts = generate_district_points(lat, lng)
     pid = str(player["_id"])
-    await db.players.update_one(
-        {"_id": player["_id"], "stats.ops_dispatched": {"$in": [0, None]}},
+    claimed = await db.players.find_one_and_update(
+        {
+            "_id": player["_id"],
+            "$or": [
+                {"stats.ops_dispatched": 0},
+                {"stats.ops_dispatched": None},
+                {"stats.ops_dispatched": {"$exists": False}},
+            ],
+        },
         {"$set": {
             "hq": hq,
             "districts": districts,
             "region": region,
             "hq_relocated_at": now_utc().isoformat(),
         }},
+        return_document=ReturnDocument.AFTER,
     )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="O primeiro despacho acabou de começar — o QG já não pode ser mudado.")
     # Antes do primeiro despacho não há oportunidades ocupadas; substituir as
     # ativas evita manter alvos gerados à volta da localização antiga.
     await db.opportunities.delete_many({"player_id": pid, "status": "active"})
