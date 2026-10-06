@@ -188,6 +188,18 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
           <SheetDescription className="text-zinc-500">As ferramentas do ofício — compra, mantém e distribui com cabeça.</SheetDescription>
         </SheetHeader>
 
+        <Button
+          type="button"
+          variant="outline"
+          size="compact"
+          data-testid="weapons-open-workshop"
+          onClick={() => onNavigate && onNavigate("weaponworkshop")}
+          className="mt-3 w-full justify-between font-mono text-[10px] text-zinc-300"
+        >
+          Munições · modificações
+          <Wand2 size={11} className="text-cyan-300" />
+        </Button>
+
         <SummaryStrip cols={4} className="mt-3" testId="weapons-summary">
           <Kpi icon={CheckCircle2} label="Equipadas" value={`${equippedCount}/${weapons.length}`} color={equippedCount === weapons.length && weapons.length > 0 ? "#34D399" : "#F59E0B"}
             tip="Armas atualmente atribuídas a um funcionário vs. total no inventário." />
@@ -312,7 +324,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
                       </span>
                     </Tip>
                     {ammo.ammoKey && (
-                      <Tip tip={`Munições carregadas: ${ammo.loaded}/${ammo.capacity}. Recarrega no painel Organização.`}>
+                      <Tip tip={`Munições carregadas: ${ammo.loaded}/${ammo.capacity}. Recarrega em Munições e modificações.`}>
                         <span className={cn(
                           "inline-flex items-center gap-0.5 font-mono text-[10px]",
                           ammo.fraction < 0.3 ? "text-red-400" : "text-zinc-500"
