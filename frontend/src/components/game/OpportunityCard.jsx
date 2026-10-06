@@ -251,6 +251,15 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
         run: () => { onClose(); onNavigate && onNavigate("fleet"); },
       };
     }
+    if (r.operational || r.reason.startsWith("Falta função:") || r.reason.startsWith("Falta certificação:")) {
+      return {
+        icon: Users,
+        label: "RH",
+        color: "text-amber-400",
+        can: true,
+        run: () => { onClose(); onNavigate && onNavigate("employees"); },
+      };
+    }
     if (r.reason === "Sem veículo") {
       const free = state.vehicles.filter((v) => !v.team_id && !v.transfer);
       return free.length
@@ -377,6 +386,30 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             value={opp.district_profile.name}
             color="#94A3B8"
             tip={"Perfil da zona: " + ((opp.district_profile.tags || []).join(", ") || "misto") + ". Este perfil influencia a lógica operacional e a cobertura."}
+          />
+        )}
+        {opp.poi?.name && (
+          <Chip
+            icon={MapPin}
+            value={opp.poi.name}
+            color="#67E8F9"
+            tip={"Ponto de interesse funcional desta operação · " + ((opp.poi.tags || []).join(", ") || opp.poi.profile || "zona")}
+          />
+        )}
+        {opp.intel?.label && (
+          <Chip
+            icon={IdCard}
+            value={"Intel " + opp.intel.label}
+            color={Number(opp.intel.score || 0) >= 4 ? "#34D399" : Number(opp.intel.score || 0) >= 3 ? "#F59E0B" : "#F87171"}
+            tip={"Qualidade da informação disponível antes do despacho · confiança " + Math.round(Number(opp.intel.confidence || 0) * 100) + "%."}
+          />
+        )}
+        {opp.dispatch_preset && state?.operational?.presets?.[opp.dispatch_preset] && (
+          <Chip
+            icon={Sparkles}
+            value={state.operational.presets[opp.dispatch_preset].name || opp.dispatch_preset}
+            color="#A5B4FC"
+            tip="Plano de despacho recomendado para o perfil desta operação."
           />
         )}
       </div>
@@ -834,15 +867,15 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             <Button
               data-testid="dispatch-team-button"
               onClick={handleDispatch}
-              disabled={!selectedTeamId || busy || expired}
-              variant={confirmLowChance ? "warning" : !selectedTeamId || busy || expired ? "outline" : "success"}
+              disabled={!selectedTeamId || !selectedTeamReadiness?.ok || busy || expired || readinessState === "locked"}
+              variant={confirmLowChance ? "warning" : !selectedTeamId || !selectedTeamReadiness?.ok || busy || expired || readinessState === "locked" ? "outline" : "success"}
               className={`mt-3 w-full shrink-0 font-bold uppercase tracking-wider ${
-                !selectedTeamId || busy || expired
+                !selectedTeamId || !selectedTeamReadiness?.ok || busy || expired || readinessState === "locked"
                   ? "border-red-500/30 bg-red-500/10 text-red-400 shadow-none hover:bg-red-500/20"
                   : ""
               }`}
             >
-              {expired ? "Operação expirada" : busy ? "A despachar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Despachar"}
+              {expired ? "Operação expirada" : readinessState === "locked" ? "Faltam requisitos" : busy ? "A despachar..." : confirmLowChance ? "Confirmar mesmo assim?" : "Despachar"}
             </Button>
           </Tip>
       )}
