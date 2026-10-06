@@ -431,19 +431,8 @@ export const OrganizationPanel = ({
                 </label>
               </div>
             </Card>
-</p></div>
-                  <div><p className="font-mono text-[10px] uppercase text-zinc-500">Despesas</p><p className="font-mono text-xs font-bold text-red-300">{fmtMoney(finance.expenses)}</p></div>
-                  <div><p className="font-mono text-[10px] uppercase text-zinc-500">Património</p><p className="font-mono text-xs font-bold text-sky-300">{fmtMoney(finance.asset_value)}</p></div>
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-1 text-[10px] text-zinc-500">
-                  <span>Imóveis {fmtMoney(finance.property_value)}</span>
-                  <span>Frota {fmtMoney(finance.fleet_value)}</span>
-                  <span>Arsenal {fmtMoney(finance.weapon_value)}</span>
-                </div>
-              </Card>
-            )}
 
-            <div>
+<div>
               <SectionHeader icon={UserRoundCog} title="Departamentos do QG" />
               <div className="space-y-2">
                 {Object.entries(departmentCatalog).map(([key, d]) => {
