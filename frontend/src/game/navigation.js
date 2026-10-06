@@ -24,6 +24,14 @@ export const GAME_AREAS = [
   { id:"settings", label:"Definições", hint:"Interface, jogabilidade, dados e notificações", group:"utility", shortcut:null, minLevel:1, aliases:["configurações","configuracoes","settings","definições","definicoes"] },
 ];
 
+export const GAME_SUBAREAS = [
+  { id:"teamops", label:"Doutrinas e loadouts", group:"crew", owner:"teams", minLevel:1 },
+  { id:"fleetcare", label:"Ciclo de vida da frota", group:"crew", owner:"fleet", minLevel:1 },
+  { id:"weaponworkshop", label:"Munições e modificações", group:"crew", owner:"weapons", minLevel:1 },
+  { id:"propertyinfra", label:"Infraestrutura dos imóveis", group:"empire", owner:"properties", minLevel:1 },
+  { id:"hqsystems", label:"Sistemas do QG", group:"empire", owner:"hq", minLevel:5 },
+];
+
 // Saves/eventos antigos podem continuar a referir destinos removidos da UI.
 // Canonicalizamos esses ids para uma única fonte de verdade sem voltar a
 // expor ecrãs duplicados na navegação ou pesquisa.
@@ -35,12 +43,14 @@ export const LEGACY_PANEL_ALIASES = Object.freeze({
 
 export const canonicalGamePanel = (id) => LEGACY_PANEL_ALIASES[id] || id;
 
-export const GAME_PANEL_IDS = GAME_AREAS.map((area) => area.id);
+const ALL_GAME_AREAS = [...GAME_AREAS, ...GAME_SUBAREAS];
+
+export const GAME_PANEL_IDS = ALL_GAME_AREAS.map((area) => area.id);
 export const GAME_PANEL_SET = new Set(GAME_PANEL_IDS);
 export const GAME_PANEL_SHORTCUTS = Object.fromEntries(
   GAME_AREAS.filter((area) => area.shortcut && !area.hidden).map((area) => [area.shortcut, area.id])
 );
-export const GAME_AREA_BY_ID = Object.fromEntries(GAME_AREAS.map((area) => [area.id, area]));
+export const GAME_AREA_BY_ID = Object.fromEntries(ALL_GAME_AREAS.map((area) => [area.id, area]));
 
 export const gameArea = (id) => GAME_AREA_BY_ID[id] || null;
 export const areaLabel = (id) => GAME_AREA_BY_ID[id]?.label || id;
