@@ -28,7 +28,7 @@ const TABS = [
 
 const DEPARTMENT_ICONS = { financeiro: Wallet, rh: UserCog, logistica: Truck, investigacao: Fingerprint, comunicacoes: Radio };
 
-export const HQPanel = ({ open, onOpenChange }) => {
+export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, catalog, serverNow, upgradeHQ, setOrgPriority, startHqRelocation } = useGame();
   const [tab, setTab] = useState("geral");
   useTick(open);
@@ -64,8 +64,22 @@ export const HQPanel = ({ open, onOpenChange }) => {
           </SheetDescription>
         </SheetHeader>
 
+        {state.player.level >= 5 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="compact"
+            data-testid="hq-open-systems"
+            onClick={() => onNavigate && onNavigate("hqsystems")}
+            className="mt-3 w-full justify-between font-mono text-[10px] text-zinc-300"
+          >
+            Automação · departamentos · proteção
+            <SlidersHorizontal size={11} className="text-cyan-300" />
+          </Button>
+        )}
+
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3 gap-1">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t.key}
