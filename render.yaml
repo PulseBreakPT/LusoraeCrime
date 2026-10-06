@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: submundo-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: submundo
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://pulsebreakpt.github.io,capacitor://localhost,http://localhost,https://localhost,http://localhost:3000
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: submundo-realtime
+          property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: GOOGLE_WEB_CLIENT_ID
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  - type: keyvalue
+    name: submundo-realtime
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
