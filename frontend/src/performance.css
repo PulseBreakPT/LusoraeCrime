@@ -246,14 +246,8 @@ html.sub-reduced-motion .sub-game-shell::after {
    -------------------------------------------------------------------------- */
 
 @keyframes sub-opp-card-center-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(-50%, calc(-50% + 14px), 0) scale(.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(-50%, -50%, 0) scale(1);
-  }
+  from { opacity: 0; scale: .985; }
+  to { opacity: 1; scale: 1; }
 }
 
 .sub-opp-card-centered {
@@ -263,9 +257,16 @@ html.sub-reduced-motion .sub-game-shell::after {
   right: auto !important;
   bottom: auto !important;
   margin: 0 !important;
-  transform: translate3d(-50%, -50%, 0);
+  transform: translate3d(-50%, -50%, 0) !important;
   transform-origin: 50% 50%;
   animation: sub-opp-card-center-enter 280ms cubic-bezier(.22,1,.36,1) both !important;
+}
+
+.sub-game-shell .sub-opp-card-centered:hover,
+.sub-game-shell .sub-opp-card-centered:focus,
+.sub-game-shell .sub-opp-card-centered:focus-within,
+.sub-game-shell .sub-opp-card-centered:active {
+  transform: translate3d(-50%, -50%, 0) !important;
 }
 
 .sub-opp-card-centered[data-risk="4"],
