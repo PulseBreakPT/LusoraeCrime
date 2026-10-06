@@ -1,52 +1,114 @@
-// Lightweight client-side land validator used only in local guest mode.
-// Normal authenticated play validates against backend/data/portugal.geojson
-// (plus water_pt.geojson), which remains the authoritative geography.
+// Geografia partilhada com o backend: o modo convidado usa os mesmos
+// polígonos de Portugal e corpos de água que o jogo autenticado.
+import portugal from "../data/portugal.geojson";
+import water from "../data/water_pt.geojson";
 
-const MAINLAND = [
-  [-9.52, 41.96], [-8.90, 42.14], [-8.20, 42.15], [-7.15, 41.93],
-  [-6.20, 41.58], [-6.18, 41.02], [-6.70, 40.35], [-6.86, 39.75],
-  [-7.05, 39.03], [-7.45, 38.45], [-7.38, 37.12], [-7.70, 37.00],
-  [-8.20, 36.95], [-8.95, 37.02], [-9.12, 37.38], [-9.52, 38.70],
-  [-9.43, 39.35], [-9.16, 40.15], [-8.95, 40.85], [-8.78, 41.45],
-];
+const ringBbox = (ring) => {
+  let minLng=Infinity,minLat=Infinity,maxLng=-Infinity,maxLat=-Infinity;
+  for (const point of ring || []) {
+    const lng=Number(point?.[0]),lat=Number(point?.[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+    minLng=Math.min(minLng,lng); minLat=Math.min(minLat,lat);
+    maxLng=Math.max(maxLng,lng); maxLat=Math.max(maxLat,lat);
+  }
+  return [minLng,minLat,maxLng,maxLat];
+};
 
-const ISLAND_BOXES = [
-  // Madeira + Porto Santo
-  [-17.30, 32.55, -16.65, 32.90],
-  [-16.45, 32.98, -16.25, 33.16],
-  // Açores
-  [-31.35, 39.34, -31.00, 39.60], // Flores
-  [-31.18, 39.62, -31.02, 39.77], // Corvo
-  [-28.90, 38.45, -28.50, 38.72], // Faial
-  [-28.62, 38.32, -27.95, 38.62], // Pico
-  [-28.38, 38.48, -27.68, 38.82], // São Jorge
-  [-28.18, 38.95, -27.82, 39.18], // Graciosa
-  [-27.45, 38.58, -26.98, 38.87], // Terceira
-  [-25.95, 37.62, -25.00, 38.02], // São Miguel
-  [-25.22, 36.88, -24.86, 37.10], // Santa Maria
-];
-
-function pointInPolygon(lng, lat, polygon) {
-  let inside = false;
-  let j = polygon.length - 1;
-  for (let i = 0; i < polygon.length; i += 1) {
-    const [xi, yi] = polygon[i];
-    const [xj, yj] = polygon[j];
-    if ((yi > lat) !== (yj > lat)) {
-      const cross = ((xj - xi) * (lat - yi)) / Math.max(1e-12, yj - yi) + xi;
-      if (lng < cross) inside = !inside;
+const loadPolygons = (collection) => {
+  const result=[];
+  for (const feature of collection?.features || []) {
+    const geometry=feature?.geometry;
+    if (!geometry) continue;
+    const polys=geometry.type==="MultiPolygon"
+      ? geometry.coordinates
+      : geometry.type==="Polygon" ? [geometry.coordinates] : [];
+    for (const rings of polys) {
+      if (!rings?.[0]?.length) continue;
+      result.push({ bbox:ringBbox(rings[0]), rings });
     }
-    j = i;
+  }
+  return result;
+};
+
+const PORTUGAL=loadPolygons(portugal);
+const WATER=loadPolygons(water);
+
+const pointInRing = (lng,lat,ring) => {
+  let inside=false;
+  let j=ring.length-1;
+  for (let i=0;i<ring.length;i+=1) {
+    const xi=Number(ring[i][0]),yi=Number(ring[i][1]);
+    const xj=Number(ring[j][0]),yj=Number(ring[j][1]);
+    if ((yi>lat)!==(yj>lat)) {
+      const cross=((xj-xi)*(lat-yi))/(yj-yi)+xi;
+      if (lng<cross) inside=!inside;
+    }
+    j=i;
   }
   return inside;
+};
+
+const inPolyset = (polyset,lat,lng) => {
+  for (const {bbox,rings} of polyset) {
+    const [x0,y0,x1,y1]=bbox;
+    if (!(x0<=lng&&lng<=x1&&y0<=lat&&lat<=y1)) continue;
+    if (!pointInRing(lng,lat,rings[0])) continue;
+    const inHole=rings.slice(1).some((ring)=>pointInRing(lng,lat,ring));
+    if (!inHole) return true;
+  }
+  return false;
+};
+
+const segmentDistanceM = (lat,lng,ax,ay,bx,by) => {
+  const kx=111320*Math.cos(lat*Math.PI/180);
+  const ky=110540;
+  const px=lng*kx,py=lat*ky,x1=ax*kx,y1=ay*ky,x2=bx*kx,y2=by*ky;
+  const dx=x2-x1,dy=y2-y1;
+  if (dx===0&&dy===0) return Math.hypot(px-x1,py-y1);
+  const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/(dx*dx+dy*dy)));
+  return Math.hypot(px-(x1+t*dx),py-(y1+t*dy));
+};
+
+const distanceToPolysetM = (polyset,lat,lng,margin=.15) => {
+  let best=Infinity;
+  for (const {bbox,rings} of polyset) {
+    const [x0,y0,x1,y1]=bbox;
+    if (!(x0-margin<=lng&&lng<=x1+margin&&y0-margin<=lat&&lat<=y1+margin)) continue;
+    for (const ring of rings) {
+      let j=ring.length-1;
+      for (let i=0;i<ring.length;i+=1) {
+        best=Math.min(best,segmentDistanceM(lat,lng,ring[j][0],ring[j][1],ring[i][0],ring[i][1]));
+        j=i;
+      }
+    }
+  }
+  return best;
+};
+
+const validPoint = (lat,lng) =>
+  Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+  && Number(lat)>=-90 && Number(lat)<=90 && Number(lng)>=-180 && Number(lng)<=180;
+
+export function isInPortugal(lat,lng) {
+  if (!validPoint(lat,lng)) return false;
+  return inPolyset(PORTUGAL,Number(lat),Number(lng));
 }
 
-export function isOnLand(lat, lng) {
-  const y = Number(lat);
-  const x = Number(lng);
-  if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
-  if (pointInPolygon(x, y, MAINLAND)) return true;
-  return ISLAND_BOXES.some(([minLng, minLat, maxLng, maxLat]) =>
-    x >= minLng && x <= maxLng && y >= minLat && y <= maxLat
-  );
+export function isInWaterBody(lat,lng) {
+  if (!validPoint(lat,lng)) return false;
+  return inPolyset(WATER,Number(lat),Number(lng));
+}
+
+export function isOnLand(lat,lng) {
+  return isInPortugal(lat,lng) && !isInWaterBody(lat,lng);
+}
+
+export function distanceToBoundaryM(lat,lng) {
+  if (!validPoint(lat,lng)) return Infinity;
+  return distanceToPolysetM(PORTUGAL,Number(lat),Number(lng),.15);
+}
+
+export function isValidHqLocation(lat,lng,minInlandM=120) {
+  if (!isOnLand(lat,lng)) return false;
+  return distanceToBoundaryM(Number(lat),Number(lng)) >= Number(minInlandM||0);
 }
