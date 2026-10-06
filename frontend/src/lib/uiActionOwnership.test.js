@@ -231,24 +231,34 @@ describe("UI action ownership", () => {
     expect(hud).toContain("openEntityFromCard");
 
     expect(teams).toContain("selectedTeamId");
-    expect(teams).toContain('data-testid="team-detail-bar"');
+    expect(teams).toContain('testId="team-detail-bar"');
     expect(teams).toContain("data-entity-detail");
 
     expect(employees).toContain("selectedEmployeeId");
-    expect(employees).toContain('data-testid="employee-detail-bar"');
+    expect(employees).toContain('testId="employee-detail-bar"');
     expect(employees).toContain("onOpenDetail");
 
     expect(fleet).toContain("selectedVehicleId");
-    expect(fleet).toContain('data-testid="vehicle-detail-bar"');
+    expect(fleet).toContain('testId="vehicle-detail-bar"');
     expect(fleet).toContain("data-entity-detail");
 
     expect(weapons).toContain("selectedWeaponId");
-    expect(weapons).toContain('data-testid="weapon-detail-bar"');
+    expect(weapons).toContain('testId="weapon-detail-bar"');
     expect(weapons).toContain("data-entity-detail");
 
     expect(properties).toContain("selectedPropertyId");
-    expect(properties).toContain('data-testid="property-detail-bar"');
+    expect(properties).toContain('testId="property-detail-bar"');
     expect(properties).toContain("data-entity-detail");
+
+    expect(city).toContain("selectedRivalId");
+    expect(city).toContain('testId="rival-detail-bar"');
+    expect(city).toContain("selectedBusinessId");
+    expect(city).toContain('testId="business-detail-bar"');
+
+    expect(teams).toContain('data-testid={`team-member-open-${m.id}`}');
+    expect(teams).toContain('focusTestId: `employee-card-${m.id}`');
+    expect(teams).toContain('data-testid={`team-vehicle-open-${vehicle.id}`}');
+    expect(teams).toContain('focusTestId: `vehicle-card-${vehicle.id}`');
   });
 
   test("map entities drill directly into their exact dossier", () => {
