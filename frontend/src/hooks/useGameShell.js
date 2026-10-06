@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { parseActivityMessage } from "../lib/game";
-import { GAME_PANEL_IDS, GAME_PANEL_SET, GAME_PANEL_SHORTCUTS } from "../game/navigation";
+import { GAME_PANEL_IDS, GAME_PANEL_SET, GAME_PANEL_SHORTCUTS, canonicalGamePanel } from "../game/navigation";
 
 export const GAME_PANELS = GAME_PANEL_IDS;
 const PANEL_SET = GAME_PANEL_SET;
@@ -9,10 +9,10 @@ const LAST_PANEL_KEY = "submundo.last-panel";
 
 export function initialGamePanel() {
   if (typeof window === "undefined") return null;
-  const fromUrl = new URLSearchParams(window.location.search).get("panel");
+  const fromUrl = canonicalGamePanel(new URLSearchParams(window.location.search).get("panel"));
   if (PANEL_SET.has(fromUrl)) return fromUrl;
   try {
-    const saved = window.localStorage.getItem(LAST_PANEL_KEY);
+    const saved = canonicalGamePanel(window.localStorage.getItem(LAST_PANEL_KEY));
     return PANEL_SET.has(saved) ? saved : null;
   } catch {
     return null;
@@ -87,7 +87,7 @@ export function useGameShell({
   // Back/forward também restaura o painel indicado na URL.
   useEffect(() => {
     const onPopState = () => {
-      const panel = new URLSearchParams(window.location.search).get("panel");
+      const panel = canonicalGamePanel(new URLSearchParams(window.location.search).get("panel"));
       setOpenPanel(PANEL_SET.has(panel) ? panel : null);
     };
     window.addEventListener("popstate", onPopState);
