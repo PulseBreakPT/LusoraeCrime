@@ -35,6 +35,12 @@ const candidateIcon = (status) => {
 };
 
 // Cada clique/toque no mapa reposiciona o pin candidato (arrastar também).
+const HQ_SUGGESTIONS = [
+  { name:"Lisboa", lat:38.7369, lng:-9.1427, note:"Início no centro litoral; as primeiras zonas nascem à volta daqui." },
+  { name:"Porto", lat:41.1579, lng:-8.6291, note:"Início no Norte; as primeiras zonas nascem à volta daqui." },
+  { name:"Faro", lat:37.0194, lng:-7.9304, note:"Início no Algarve; as primeiras zonas nascem à volta daqui." },
+];
+
 const ClickPicker = ({ onPick }) => {
   useMapEvents({ click: (e) => onPick(e.latlng.lat, e.latlng.lng) });
   return null;
@@ -147,10 +153,29 @@ export default function HQOnboarding() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-red-500">Fundação da organização</p>
           <h1 className="mt-1 text-lg font-bold text-white">Estabelece o teu Quartel-General</h1>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-            <span className="font-semibold text-zinc-200">{player.org_name || "A tua organização"}</span> precisa de uma base.
-            Toca em qualquer ponto de <span className="text-zinc-200">terra firme portuguesa</span> (continente, Madeira ou Açores) —
-            o mar é estritamente proibido. As zonas de operação nascem em redor do QG.
+            <span className="font-semibold text-zinc-200">{player.org_name || "A tua organização"}</span> precisa de uma base para começar.
+            As oportunidades e deslocações nascem em redor do QG, por isso a escolha é sobretudo geográfica. Não existe um bónus secreto por cidade.
           </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+            Escolhe terra firme portuguesa. Podes mudar o QG durante o tutorial, até despachares a primeira operação.
+          </p>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {HQ_SUGGESTIONS.map((item)=>(
+              <Button
+                key={item.name}
+                type="button"
+                variant="outline"
+                size="compact"
+                title={item.note}
+                onClick={()=>pick(item.lat,item.lng)}
+                disabled={placing}
+                className="h-auto min-h-8 flex-col gap-0 border-white/10 bg-black/30 px-1.5 py-1 text-center"
+              >
+                <span className="text-[10px] font-bold text-zinc-200">{item.name}</span>
+                <span className="max-w-full truncate font-mono text-[8px] text-zinc-600">sugestão</span>
+              </Button>
+            ))}
+          </div>
           <div className="mt-2 flex gap-2">
             <span className="rounded-md border border-emerald-900/60 bg-emerald-950/40 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-400">
               {fmtMoney(player.clean_money || 0)} limpos
@@ -214,7 +239,7 @@ export default function HQOnboarding() {
             )}
           </Button>
           <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-wider text-zinc-600">
-            Decisão permanente — o QG não pode ser mudado depois
+            Ajustável até ao primeiro despacho — depois a localização fica fixa
           </p>
         </div>
       </div>
