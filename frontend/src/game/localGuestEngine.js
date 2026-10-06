@@ -6,7 +6,7 @@ import { isValidHqLocation } from "../lib/land";
 import {
   LOCAL_CERTIFICATIONS, enrichLocalOpportunities, localOperationalSnapshot,
   localOperationRequirements, localMissingTeamRequirements, localReinforcementEffect,
-  buildLocalFollowUp,
+  localDistrictCategoryMultiplier, buildLocalFollowUp,
 } from "./operationalDirector";
 
 const MODE_KEY = "submundo_guest_mode_v2";
@@ -291,7 +291,7 @@ const makeOpportunities = (save, count = 5) => {
     return pool[Math.floor(Math.random() * pool.length)];
   };
 
-  const pickDistrict = () => {
+  const pickDistrict = (category) => {
     const used = new Set(generatedDistricts);
     const keyOf = (d) => d.key || d.name || "hq";
     const fresh = districtPool.filter((d) =>
@@ -300,7 +300,15 @@ const makeOpportunities = (save, count = 5) => {
     const nonActive = districtPool.filter((d) => !activeDistricts.has(keyOf(d)) && !used.has(keyOf(d)));
     const unique = districtPool.filter((d) => !used.has(keyOf(d)));
     const pool = fresh.length ? fresh : nonActive.length ? nonActive : unique.length ? unique : districtPool;
-    return pool[Math.floor(Math.random() * pool.length)] || save.player.hq;
+    if(!pool.length)return save.player.hq;
+    const weights=pool.map((district)=>Math.max(.05,localDistrictCategoryMultiplier(district,category)));
+    const total=weights.reduce((sum,value)=>sum+value,0);
+    let roll=Math.random()*total;
+    for(let index=0;index<pool.length;index+=1){
+      roll-=weights[index];
+      if(roll<=0)return pool[index];
+    }
+    return pool[pool.length-1] || save.player.hq;
   };
 
   const pointNearDistrict = (district) => {
@@ -320,7 +328,7 @@ const makeOpportunities = (save, count = 5) => {
 
   for (let i = 0; i < amount; i += 1) {
     const [typeKey, cfg] = pickType();
-    const district = pickDistrict();
+    const district = pickDistrict(cfg.category);
     const districtKey = district.key || district.name || "hq";
     const point = pointNearDistrict(district);
     generatedTypes.push(typeKey);
