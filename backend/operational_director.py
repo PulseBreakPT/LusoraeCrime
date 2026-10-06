@@ -535,6 +535,12 @@ def operational_snapshot(
     for opp in enriched:
         counts[opp["readiness"]["state"]] += 1
 
+    active_staging = []
+    for area in player.get("staging_areas") or []:
+        expires = _parse_dt(area.get("expires_at"))
+        if not expires or expires > now:
+            active_staging.append(area)
+
     return {
         "requires_action": pending,
         "readiness_counts": counts,
@@ -544,7 +550,7 @@ def operational_snapshot(
         "coverage": sorted(coverage, key=lambda row: (-row["active_operations"], -row["attention"]))[:12],
         "world": world or {},
         "presets": {**DEFAULT_DISPATCH_PRESETS, **dict(player.get("dispatch_presets") or {})},
-        "staging_areas": list(player.get("staging_areas") or []),
+        "staging_areas": active_staging,
         "operational_rules": dict(player.get("operational_rules") or {}),
     }
 
