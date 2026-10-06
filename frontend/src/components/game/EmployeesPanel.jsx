@@ -153,7 +153,8 @@ const EmployeeCard = ({ e, onNavigate }) => {
             <FavoriteStar testId={`emp-favorite-${e.id}`} active={favoriteEmployeeIds.includes(e.id)} onToggle={() => toggleFavoriteEmployee(e.id)} />
             <InlineRename
               testId={`emp-rename-${e.id}`} value={e.name} onSave={(name) => renameEmployee(e.id, name)}
-              textClassName="text-sm font-bold text-white"
+              truncateText={false}
+              textClassName="min-w-0 leading-snug text-sm font-bold text-white"
             />
             <span data-testid={`employee-level-${e.id}`} className="shrink-0 font-mono text-[10px] font-bold text-cyan-400">N{e.level}/{maxLevel}</span>
             <span className="shrink-0 font-mono text-[10px] text-zinc-600">{e.age} anos</span>
