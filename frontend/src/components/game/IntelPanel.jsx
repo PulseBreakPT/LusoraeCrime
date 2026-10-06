@@ -18,7 +18,7 @@ const questTabFor = (quest) => {
   return "alertas";
 };
 
-const LatestReturnSummary = ({ onNavigate }) => {
+const LatestReturnSummary = () => {
   const { state } = useGame();
   const latest=(state?.history || []).find((mission)=>["success","partial","failure","police"].includes(
     mission.chase_outcome === "caught" ? "police" : mission.outcome
@@ -29,7 +29,6 @@ const LatestReturnSummary = ({ onNavigate }) => {
   const fuelCost=Number(latest.fuel_cost || 0);
   const critical=(latest.top_negatives || [])[0];
   const eventCount=Array.isArray(latest.live_log) ? latest.live_log.length : 0;
-  const nextMove=state?.retention?.next_moves?.[0] || null;
   return (
     <div className="mt-3" data-testid="latest-return-summary">
       <SectionHeader icon={ArrowRight} title="Último regresso" meta={OUTCOME_LABELS[outcome] || outcome} />
@@ -62,18 +61,6 @@ const LatestReturnSummary = ({ onNavigate }) => {
             <span>{critical ? `Fator crítico: ${critical.label} (${Math.round(Number(critical.pct||0)*100)}%).` : "Sem fator crítico negativo dominante no despacho."} {eventCount ? `Foram registados ${eventCount} eventos durante a operação.` : "Sem eventos adicionais registados."}</span>
           </p>
         </div>
-        {nextMove && (
-          <Button variant="bare" size="bare" type="button"
-            onClick={()=>onNavigate && onNavigate(nextMove.panel, nextMove.focus_test_id ? {focusTestId:nextMove.focus_test_id} : undefined)}
-            className="mt-2 flex w-full items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.025] px-2.5 py-2 text-left hover:bg-white/[0.05]"
-          >
-            <span>
-              <span className="block font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600">Próximo passo</span>
-              <span className="mt-0.5 block text-[10px] font-semibold text-zinc-200">{nextMove.title}</span>
-            </span>
-            <ArrowRight size={12} className="shrink-0 text-zinc-500"/>
-          </Button>
-        )}
       </Card>
     </div>
   );
@@ -313,7 +300,7 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
 
         <RecommendedActions onNavigate={onNavigate} />
 
-        <LatestReturnSummary onNavigate={onNavigate} />
+        <LatestReturnSummary />
 
         <Section title="Resumo de operações" testId="intel-operations">
           <Grid>
