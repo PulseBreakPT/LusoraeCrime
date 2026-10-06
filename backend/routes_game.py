@@ -89,7 +89,12 @@ from live_ops import build_dispatch_script, build_recall_script, update_memory
 from retention_engine import build_retention_snapshot, mission_decision, world_pulse
 from city_systems import (
     operation_world_modifier, business_network_effect, boss_leadership_modifier,
-    ensure_rivals, advance_rival_world,
+    ensure_rivals, advance_rival_world, world_context,
+)
+from operational_director import (
+    CERTIFICATIONS, DEFAULT_DISPATCH_PRESETS, enrich_opportunities,
+    operational_snapshot, operation_requirements, reinforcement_effect,
+    missing_team_requirements,
 )
 from game_data import operation_profile_of, OPERATION_PROFILE_LABELS, ORG_LEVEL_UNLOCKS, MAX_ORG_LEVEL
 from organization_systems import (
@@ -279,6 +284,35 @@ class MissionDecisionInput(MutationInput):
     option_id: str
 
 
+class MissionReinforceInput(MutationInput):
+    mission_id: str
+    team_id: str
+
+
+class DispatchPresetInput(MutationInput):
+    key: str = Field(min_length=2, max_length=32)
+    config: dict
+
+
+class DispatchPresetDeleteInput(MutationInput):
+    key: str = Field(min_length=2, max_length=32)
+
+
+class StagingAreaInput(MutationInput):
+    name: str = Field(min_length=1, max_length=40)
+    lat: float
+    lng: float
+    duration_hours: int = Field(default=4, ge=1, le=12)
+
+
+class StagingAreaDeleteInput(MutationInput):
+    staging_id: str
+
+
+class OperationalRulesInput(MutationInput):
+    rules: dict
+
+
 class VehicleAssignInput(MutationInput):
     vehicle_id: str
     team_id: Optional[str] = None
@@ -396,6 +430,8 @@ async def catalog():
         "hr_costs": {"promote_base": PROMOTE_BASE_COST, "pool_refresh": POOL_REFRESH_COST,
                      "heal_base": HEAL_BASE_COST, "release_base": RELEASE_BASE_COST},
         "training_courses": TRAINING_COURSES,
+        "certifications": CERTIFICATIONS,
+        "dispatch_presets": DEFAULT_DISPATCH_PRESETS,
         "emp_level_xp": EMP_LEVEL_XP,
         "vehicle_models": VEHICLE_MODELS,
         "fuel_prices": FUEL_PRICES,
@@ -639,6 +675,13 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
     eligible_active.sort(key=lambda o: str(o.get("created_at") or ""), reverse=True)
     taken_opportunities = [o for o in opportunities if o.get("status") == "taken"]
     opportunities = eligible_active[:5] + taken_opportunities
+    opportunities = enrich_opportunities(
+        opportunities, player, teams, employees, vehicles, properties
+    )
+    operations_snapshot = operational_snapshot(
+        player, teams, employees, vehicles, properties, opportunities, missions,
+        world=world_context(now_utc(), player.get("region") or "Portugal"),
+    )
 
     caps = caps[0]
     p = Player.from_mongo(player).model_dump()
@@ -708,6 +751,7 @@ async def get_state(user: dict = Depends(get_current_user), skip_advance: bool =
         "quests": quests_out,
         "caps": caps_out,
         "retention": retention,
+        "operational": operations_snapshot,
         "bonuses": bonuses,
         "salary_total": gross_salary,
         "weekly_fixed_total": weekly_fixed_total,
@@ -750,6 +794,13 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     }).to_list(50)
     if not members:
         raise HTTPException(status_code=400, detail="A equipa não tem membros disponíveis (sem operacionais ou demasiado fatigados)")
+
+    req = operation_requirements(opp)
+    crew_missing = missing_team_requirements(req, members)
+    if crew_missing:
+        labels = ", ".join(item["label"] for item in crew_missing[:4])
+        raise HTTPException(status_code=400, detail=f"Equipa sem requisitos operacionais: {labels}")
+
     weapon_docs = await db.weapons.find({
         "player_id": pid, "employee_id": {"$in": [str(e["_id"]) for e in members]},
     }).to_list(50)
@@ -1274,6 +1325,20 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         vehicle_name=vehicle_name, memory=player.get("phrase_memory"),
     )
     decision = mission_decision(opp["category"], opp["risk"], arrive, finish)
+    requirements = operation_requirements(opp)
+    chain_id = str(opp.get("chain_id") or opp.get("_id"))
+    support_needed = int(requirements.get("support_teams", 0) or 0)
+    reinforcement_request = None
+    if support_needed > 0:
+        reinforcement_request = {
+            "status": "pending",
+            "title": f"Reforço recomendado · {support_needed} equipa(s)",
+            "description": "Podes enviar equipas adicionais para melhorar a margem operacional e reduzir consequências.",
+            "needed": support_needed,
+            "received": 0,
+            "opens_at": depart.isoformat(),
+            "expires_at": finish.isoformat(),
+        }
 
     mission = {
         "player_id": pid, "team_id": str(team["_id"]), "team_name": team["name"],
@@ -1288,6 +1353,15 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "repeat_type": repeat_type,
         "repeat_count": prep.get("repeat_count", 0),
         "operation_profile": prep.get("operation_profile", "confrontation"),
+        "requirements": requirements,
+        "reinforcement_request": reinforcement_request,
+        "support_team_ids": [],
+        "support_vehicle_ids": [],
+        "reinforcement_effects": [],
+        "chain_id": chain_id,
+        "parent_mission_id": opp.get("parent_mission_id"),
+        "chain_stage": int(opp.get("chain_stage", 0) or 0),
+        "chain_kind": opp.get("chain_kind"),
         "talents": prep["talents"],
         # QI da equipa (SSS v4): campos que alimentam perseguições, clutch save,
         # papéis internos, aviso do líder e forense de falha.
@@ -1322,6 +1396,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
             "profile": prep.get("operation_profile", "confrontation"),
             "distance_km": round(prep.get("dist", 0) / 1000.0, 2),
             "police_force": opp.get("police_force") or police_force_for(opp["lat"], opp["lng"]),
+            "min_members": opp.get("min_members", 1),
+            "required_models": opp.get("required_models") or [],
         },
         # Dados de recompensa dinâmica para cálculo consistente de XP/reputação
         "reward_xp": prep.get("reward_xp"),
@@ -1657,6 +1733,13 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
         {"$set": {"phrase_memory": update_memory(player.get("phrase_memory"), recall_used)}},
     )
     await db.teams.update_one({"_id": ObjectId(m["team_id"])}, {"$set": {"status": "returning"}})
+    support_team_ids = [tid for tid in (m.get("support_team_ids") or []) if ObjectId.is_valid(str(tid))]
+    if support_team_ids:
+        support_oids = [ObjectId(str(tid)) for tid in support_team_ids]
+        await db.teams.update_many(
+            {"_id": {"$in": support_oids}, "player_id": pid},
+            {"$set": {"status": "returning"}},
+        )
     if m.get("opportunity_id"):
         await db.opportunities.update_one(
             {"_id": ObjectId(m["opportunity_id"]), "status": "taken", "expires_at": {"$gt": now.isoformat()}},
@@ -1786,6 +1869,193 @@ async def resolve_mission_decision(body: MissionDecisionInput, user: dict = Depe
             "fatigue_delta": fatigue_delta,
         },
     }
+
+
+@router.post("/missions/reinforce")
+@idempotent("missions.reinforce")
+async def reinforce_mission(body: MissionReinforceInput, user: dict = Depends(get_current_user)):
+    """Destaca uma segunda equipa para uma operação já lançada.
+
+    O reforço não substitui a equipa principal e tem um bónus deliberadamente
+    limitado. A equipa de apoio fica ocupada até ao regresso da missão.
+    """
+    player = await get_player(user)
+    pid = str(player["_id"])
+    mission = await db.missions.find_one({
+        "_id": _oid(body.mission_id, "Operação inválida"),
+        "player_id": pid,
+    })
+    if not mission or mission.get("phase") not in {"en_route", "operating"}:
+        raise HTTPException(status_code=400, detail="Esta operação já não aceita reforços")
+
+    if body.team_id == mission.get("team_id") or body.team_id in (mission.get("support_team_ids") or []):
+        raise HTTPException(status_code=400, detail="Esta equipa já participa na operação")
+
+    team = await db.teams.find_one({
+        "_id": _oid(body.team_id, "Equipa inválida"),
+        "player_id": pid,
+        "status": "idle",
+    })
+    if not team:
+        raise HTTPException(status_code=400, detail="A equipa de apoio não está disponível")
+    if not team.get("vehicle_id"):
+        raise HTTPException(status_code=400, detail="A equipa de apoio não tem veículo")
+
+    vehicle = await db.vehicles.find_one({
+        "_id": _oid(team["vehicle_id"], "Veículo inválido"),
+        "player_id": pid,
+    })
+    if not vehicle or float(vehicle.get("condition", 0) or 0) < 30:
+        raise HTTPException(status_code=400, detail="O veículo de apoio não está operacional")
+
+    members = await db.employees.find({
+        "player_id": pid,
+        "team_id": str(team["_id"]),
+        "status": "idle",
+        "fatigue": {"$lt": 90},
+    }).to_list(50)
+    if not members:
+        raise HTTPException(status_code=400, detail="A equipa de apoio não tem operacionais disponíveis")
+
+    effect = reinforcement_effect(mission, team, members, vehicle)
+    claimed = await db.teams.find_one_and_update(
+        {"_id": team["_id"], "player_id": pid, "status": "idle"},
+        {"$set": {"status": "supporting"}},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="A equipa acabou de ficar ocupada")
+
+    member_ids = [e["_id"] for e in members]
+    await db.employees.update_many(
+        {"_id": {"$in": member_ids}, "status": "idle"},
+        {"$set": {"status": "on_mission"}},
+    )
+
+    request = dict(mission.get("reinforcement_request") or {})
+    received = int(request.get("received", 0) or 0) + 1
+    needed = max(0, int(request.get("needed", 0) or 0))
+    if request:
+        request["received"] = received
+        if received >= needed:
+            request["status"] = "fulfilled"
+
+    updated = await db.missions.update_one(
+        {"_id": mission["_id"], "player_id": pid, "phase": {"$in": ["en_route", "operating"]}},
+        {
+            "$addToSet": {
+                "support_team_ids": str(team["_id"]),
+                "support_vehicle_ids": str(vehicle["_id"]),
+            },
+            "$push": {
+                "reinforcement_effects": {
+                    **effect,
+                    "team_id": str(team["_id"]),
+                    "vehicle_id": str(vehicle["_id"]),
+                    "at": now_utc().isoformat(),
+                },
+                "live_log": {
+                    "at": now_utc().isoformat(),
+                    "speaker": "COMANDO",
+                    "kind": "comp_good",
+                    "text": f"{team['name']} entrou como reforço · {effect['chance_delta'] * 100:+.0f}% chance.",
+                    "pct": effect["chance_delta"],
+                },
+            },
+            "$inc": {"live_chance_delta": effect["chance_delta"]},
+            "$set": {"reinforcement_request": request or None},
+        },
+    )
+    if updated.modified_count != 1:
+        await db.teams.update_one({"_id": team["_id"]}, {"$set": {"status": "idle"}})
+        await db.employees.update_many({"_id": {"$in": member_ids}}, {"$set": {"status": "idle"}})
+        raise HTTPException(status_code=409, detail="A operação mudou antes do reforço chegar")
+
+    await add_event(db, pid, "team", f"{team['name']} enviada como apoio a {mission['team_name']}.")
+    return {"ok": True, "effect": effect}
+
+
+@router.post("/operations/presets/save")
+@idempotent("operations.presets.save")
+async def save_dispatch_preset(body: DispatchPresetInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    key = "".join(ch for ch in body.key.lower().strip().replace(" ", "_") if ch.isalnum() or ch == "_")
+    if len(key) < 2:
+        raise HTTPException(status_code=400, detail="Nome do plano inválido")
+    config = dict(body.config or {})
+    allowed = {
+        "name", "preferred_specs", "min_chance", "max_heat",
+        "min_vehicle_condition", "prefer_discreet_vehicle", "reserve_teams", "supplies",
+    }
+    config = {k: v for k, v in config.items() if k in allowed}
+    config["name"] = str(config.get("name") or body.key)[:40]
+    await db.players.update_one(
+        {"_id": player["_id"]},
+        {"$set": {f"dispatch_presets.{key}": config}},
+    )
+    return {"ok": True, "key": key, "config": config}
+
+
+@router.post("/operations/presets/delete")
+@idempotent("operations.presets.delete")
+async def delete_dispatch_preset(body: DispatchPresetDeleteInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    key = "".join(ch for ch in body.key.lower().strip().replace(" ", "_") if ch.isalnum() or ch == "_")
+    await db.players.update_one({"_id": player["_id"]}, {"$unset": {f"dispatch_presets.{key}": ""}})
+    return {"ok": True}
+
+
+@router.post("/operations/staging/create")
+@idempotent("operations.staging.create")
+async def create_staging_area(body: StagingAreaInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    if not is_on_land(body.lat, body.lng):
+        raise HTTPException(status_code=400, detail="O ponto de apoio tem de ficar em terra")
+    duration = max(1, min(12, int(body.duration_hours)))
+    cost = 1800 + duration * 350
+    await _debit_clean_atomic(player, cost)
+    now = now_utc()
+    staging = {
+        "id": str(ObjectId()),
+        "name": body.name.strip(),
+        "lat": round(float(body.lat), 6),
+        "lng": round(float(body.lng), 6),
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=duration)).isoformat(),
+        "capacity_teams": 2 + min(2, int(player.get("level", 1) or 1) // 5),
+        "cost": cost,
+    }
+    await db.players.update_one({"_id": player["_id"]}, {"$push": {"staging_areas": staging}})
+    await add_event(db, str(player["_id"]), "system", f"Ponto de apoio '{staging['name']}' criado por {duration}h.")
+    return {"ok": True, "staging": staging}
+
+
+@router.post("/operations/staging/delete")
+@idempotent("operations.staging.delete")
+async def delete_staging_area(body: StagingAreaDeleteInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    await db.players.update_one(
+        {"_id": player["_id"]},
+        {"$pull": {"staging_areas": {"id": body.staging_id}}},
+    )
+    return {"ok": True}
+
+
+@router.post("/operations/rules")
+@idempotent("operations.rules")
+async def save_operational_rules(body: OperationalRulesInput, user: dict = Depends(get_current_user)):
+    player = await get_player(user)
+    rules = dict(body.rules or {})
+    clean = {
+        "auto_low_risk": bool(rules.get("auto_low_risk", False)),
+        "max_auto_risk": max(1, min(3, int(rules.get("max_auto_risk", 1) or 1))),
+        "min_auto_chance": max(0.55, min(0.95, float(rules.get("min_auto_chance", 0.75) or 0.75))),
+        "max_heat": max(20, min(90, int(rules.get("max_heat", 65) or 65))),
+        "reserve_teams": max(0, min(3, int(rules.get("reserve_teams", 1) or 1))),
+        "min_vehicle_condition": max(30, min(95, int(rules.get("min_vehicle_condition", 65) or 65))),
+    }
+    await db.players.update_one({"_id": player["_id"]}, {"$set": {"operational_rules": clean}})
+    return {"ok": True, "rules": clean}
 
 
 @router.post("/teams/create")

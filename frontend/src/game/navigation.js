@@ -1,4 +1,5 @@
 export const GAME_AREAS = [
+  { id:"opscenter", label:"Central", hint:"Prontidão, reforços, cobertura e regras operacionais", group:"operations", shortcut:null, minLevel:1, aliases:["central","despacho","coordenação","coordenacao","reforços","reforcos"] },
   { id:"operations", label:"Operações", hint:"O que posso fazer agora e qual compensa?", group:"operations", shortcut:"1", minLevel:1, aliases:["oportunidades","despacho","operações","operacoes"] },
   { id:"quests", label:"Objetivos", hint:"O que devo fazer a seguir e o que desbloqueio?", group:"operations", shortcut:"2", minLevel:1, aliases:["missões","missoes","contratos","objetivos"] },
   { id:"mastermind", label:"Golpes", hint:"Grandes golpes, preparação e mercado clandestino", group:"operations", shortcut:null, minLevel:10, aliases:["mastermind","grandes golpes","golpes"] },

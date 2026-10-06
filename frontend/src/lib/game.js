@@ -886,6 +886,28 @@ export function teamReadiness(state, catalog, team, { opp = null, now = Date.now
   if (opp && ready.length < (opp.min_members || 1)) {
     return { ok: false, reason: `Mín. ${opp.min_members} membros` };
   }
+  if (opp?.requirements) {
+    const roles = new Set(ready.map((employee) => employee.role_key).filter(Boolean));
+    const certifications = new Set(ready.flatMap((employee) => employee.certifications || []));
+    const missingRole = (opp.requirements.required_roles || []).find((role) => !roles.has(role));
+    if (missingRole) {
+      const label = catalog?.specializations?.[missingRole]?.name || missingRole.replaceAll("_", " ");
+      return { ok: false, reason: `Falta função: ${label}`, operational: true };
+    }
+    const missingCertification = (opp.requirements.required_certifications || []).find(
+      (certification) => !certifications.has(certification)
+    );
+    if (missingCertification) {
+      const certConfig = Object.values(catalog?.certifications || {}).find(
+        (item) => item?.key === missingCertification
+      );
+      return {
+        ok: false,
+        reason: `Falta certificação: ${certConfig?.name || missingCertification.replaceAll("_", " ")}`,
+        operational: true,
+      };
+    }
+  }
   const vehicle = (state?.vehicles || []).find((v) => v.id === team.vehicle_id);
   if (!vehicle) return { ok: false, reason: "Sem veículo" };
   if (vehicle.transfer && Date.parse(vehicle.transfer.ends_at) > now) {

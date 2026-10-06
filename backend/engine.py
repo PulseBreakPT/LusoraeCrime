@@ -125,6 +125,7 @@ from organization_systems import (
     prestige_effects, department_level, property_operations_factor, rival_profile, property_staff_profile,
     organization_specialization_effects,
 )
+from operational_director import CERTIFICATIONS, build_follow_up_opportunity, district_category_multiplier
 
 logger = logging.getLogger(__name__)
 
@@ -426,6 +427,7 @@ def employee_from_candidate(c, now_iso):
         "history": [{"ts": now_iso, "text": f"Recrutado ({RECRUIT_SOURCES[c['source']]['name']})."}],
         "hired_at": now_iso,
         "stress": 8.0, "traits": [], "injury": None, "sentence": None, "relations": {},
+        "certifications": [],
     }
 
 
@@ -941,7 +943,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
     reserved_points = list(active_points)
     min_spawn_separation_m = 500.0
 
-    def _choose_center():
+    def _choose_center(category):
         # Tal como nos tipos: primeiro uma zona que ainda não esteja visível no
         # mapa nem tenha sido usada neste lote. Se a geografia disponível for
         # curta (ilha pequena, poucas zonas já geocodificadas), relaxa de forma
@@ -962,7 +964,8 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
             # Cada repetição recente corta fortemente o peso, mas nunca a zero:
             # continua possível voltar à zona mais tarde de forma orgânica.
             novelty_mult = 0.35 ** min(3, recent_n)
-            weights.append(max(0.01, base_weight * novelty_mult))
+            semantic_mult = district_category_multiplier(spot, category)
+            weights.append(max(0.01, base_weight * novelty_mult * semantic_mult))
         return random.choices(pool, weights=weights)[0]
 
     def _sample_distinct_point(spot, origin_prop_id):
@@ -993,7 +996,7 @@ async def spawn_opportunities(db, player, props, rare_chance=0.0):
 
     def _build_doc(key, rare, extra_mult=1.0, special=False, expires_range=(240, 600)):
         t = OPPORTUNITY_TYPES[key]
-        spot, _, origin_prop_id = _choose_center()
+        spot, _, origin_prop_id = _choose_center(t["category"])
         duration_s = random.randint(*t["duration_s"])
         mult = (1 + 0.30 * (level - 1)) * random.uniform(0.8, 1.35) * duration_reward_mult(duration_s) * extra_mult
         if rare:
@@ -2577,6 +2580,38 @@ async def _progress_mission(db, player, m, now):
                 {"_id": ObjectId(m["opportunity_id"])},
                 {"$set": {"status": "consumed"}},
             )
+
+        # Equipas de apoio regressam juntamente com a equipa principal.
+        support_team_ids = [tid for tid in (m.get("support_team_ids") or []) if ObjectId.is_valid(str(tid))]
+        if support_team_ids:
+            support_oids = [ObjectId(str(tid)) for tid in support_team_ids]
+            await db.teams.update_many(
+                {"_id": {"$in": support_oids}, "player_id": m["player_id"]},
+                {"$set": {"status": "idle", "available_at": reorg_until}},
+            )
+            await db.employees.update_many(
+                {"player_id": m["player_id"], "team_id": {"$in": [str(tid) for tid in support_team_ids]}, "status": "on_mission"},
+                {"$set": {"status": "idle"}},
+            )
+
+        # Cadeias operacionais: uma operação pode deixar uma pista, recuperação
+        # ou limpeza posterior. A pesquisa pelo parent_mission_id torna o spawn
+        # idempotente mesmo se o tick for repetido após uma falha.
+        if not await db.opportunities.find_one({
+            "player_id": m["player_id"],
+            "parent_mission_id": str(m["_id"]),
+        }):
+            follow = build_follow_up_opportunity(m, m.get("outcome") or "failure", now)
+            if follow:
+                inserted = await db.opportunities.insert_one(follow)
+                await add_event(
+                    db,
+                    m["player_id"],
+                    "intel",
+                    f"Nova cadeia operacional: {follow['name']} em {follow['district']}.",
+                )
+                updates["chain_follow_up_id"] = str(inserted.inserted_id)
+
         await add_event(db, m["player_id"], "team", f"{m['team_name']} regressou à base.")
     if updates:
         await db.missions.update_one({"_id": m["_id"]}, {"$set": updates})
@@ -2599,9 +2634,14 @@ async def _complete_trainings(db, player, now):
         attrs = e.get("attrs") or {}
         if course.get("attr"):
             attrs[course["attr"]] = min(10, attrs.get(course["attr"], 2) + 1)
+        certifications = list(e.get("certifications") or [])
+        cert = CERTIFICATIONS.get(tr["course_key"])
+        if cert and cert["key"] not in certifications:
+            certifications.append(cert["key"])
         sets = {
             "xp": xp, "level": new_level, "status": "idle", "training": None, "attrs": attrs,
             "morale": min(100.0, e.get("morale", 70) + course.get("morale", 0)),
+            "certifications": certifications,
         }
         await db.employees.update_one({"_id": e["_id"]}, {"$set": sets})
         player["stats"]["trainings_completed"] = player["stats"].get("trainings_completed", 0) + 1

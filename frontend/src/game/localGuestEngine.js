@@ -3,6 +3,11 @@ import { propertyMarketPrice } from "../lib/propertyMarket";
 import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance, localBossLeadership } from "./livingCity";
 import { guardReward, passivePortfolioScale } from "./economyDirector";
 import { isValidHqLocation } from "../lib/land";
+import {
+  LOCAL_CERTIFICATIONS, enrichLocalOpportunities, localOperationalSnapshot,
+  localOperationRequirements, localMissingTeamRequirements, localReinforcementEffect,
+  localDistrictCategoryMultiplier, buildLocalFollowUp,
+} from "./operationalDirector";
 
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
@@ -115,7 +120,7 @@ const makeEmployee = (role, teamId = null, index = 0) => {
     rarity: "comum", rank: "recruta", level: 1, xp: 0, age: 24 + (index * 3) % 18,
     salary: sp.salary, loyalty: 72, morale: 74, fatigue: 0, attrs: attrsFor(role),
     talents: [], team_id: teamId, weapon_id: null, status: "idle", status_until: null,
-    history: [], betrayal_risk: 0.04,
+    training: null, certifications: [], history: [], betrayal_risk: 0.04,
   };
 };
 
@@ -286,7 +291,7 @@ const makeOpportunities = (save, count = 5) => {
     return pool[Math.floor(Math.random() * pool.length)];
   };
 
-  const pickDistrict = () => {
+  const pickDistrict = (category) => {
     const used = new Set(generatedDistricts);
     const keyOf = (d) => d.key || d.name || "hq";
     const fresh = districtPool.filter((d) =>
@@ -295,7 +300,15 @@ const makeOpportunities = (save, count = 5) => {
     const nonActive = districtPool.filter((d) => !activeDistricts.has(keyOf(d)) && !used.has(keyOf(d)));
     const unique = districtPool.filter((d) => !used.has(keyOf(d)));
     const pool = fresh.length ? fresh : nonActive.length ? nonActive : unique.length ? unique : districtPool;
-    return pool[Math.floor(Math.random() * pool.length)] || save.player.hq;
+    if(!pool.length)return save.player.hq;
+    const weights=pool.map((district)=>Math.max(.05,localDistrictCategoryMultiplier(district,category)));
+    const total=weights.reduce((sum,value)=>sum+value,0);
+    let roll=Math.random()*total;
+    for(let index=0;index<pool.length;index+=1){
+      roll-=weights[index];
+      if(roll<=0)return pool[index];
+    }
+    return pool[pool.length-1] || save.player.hq;
   };
 
   const pointNearDistrict = (district) => {
@@ -315,7 +328,7 @@ const makeOpportunities = (save, count = 5) => {
 
   for (let i = 0; i < amount; i += 1) {
     const [typeKey, cfg] = pickType();
-    const district = pickDistrict();
+    const district = pickDistrict(cfg.category);
     const districtKey = district.key || district.name || "hq";
     const point = pointNearDistrict(district);
     generatedTypes.push(typeKey);
@@ -408,6 +421,9 @@ const ensureOrganizationSave = (save) => {
   save.player.territories ||= {};
   save.player.prestige_items ||= [];
   save.player.governance ||= {};
+  save.player.dispatch_presets ||= {};
+  save.player.staging_areas ||= [];
+  save.player.operational_rules ||= {};
   save.player.organization_policy ||= {
     reserve_cash:25000,
     max_single_spend_pct:.35,
@@ -449,6 +465,8 @@ const ensureOrganizationSave = (save) => {
   });
   (save.employees || []).forEach((employee) => {
     employee.stationed_property_id ||= null;
+    employee.certifications ||= [];
+    employee.training ||= null;
   });
   return save;
 };
@@ -1088,6 +1106,31 @@ const finalizeMission = (save, mission) => {
     mission.pending_reward=0; mission.pending_pays=mission.pays;
     addEvent(save,"warning",`${team?.name||"Equipa"} falhou ${mission.opportunity?.name||"a operação"}.`);
   }
+  for(const supportTeamId of mission.support_team_ids||[]){
+    const supportTeam=save.teams.find((t)=>t.id===supportTeamId);
+    if(supportTeam){
+      supportTeam.status="idle";
+      supportTeam.available_at=null;
+      supportTeam.support_missions=Number(supportTeam.support_missions||0)+1;
+    }
+    save.employees.filter((e)=>e.team_id===supportTeamId&&e.status==="on_mission").forEach((e)=>{
+      e.status="idle";
+      e.fatigue=clamp(Number(e.fatigue||0)+10,0,100);
+      e.xp=Number(e.xp||0)+25;
+    });
+  }
+  for(const supportVehicleId of mission.support_vehicle_ids||[]){
+    const supportVehicle=save.vehicles.find((v)=>v.id===supportVehicleId);
+    if(supportVehicle)supportVehicle.condition=clamp(Number(supportVehicle.condition||100)-1.5,0,100);
+  }
+
+  const follow=buildLocalFollowUp(mission);
+  if(follow && !(save.opportunities||[]).some((o)=>o.parent_mission_id===mission.id)){
+    save.opportunities.push(follow);
+    mission.chain_follow_up_id=follow.id;
+    addEvent(save,"intel",`Nova cadeia operacional: ${follow.name} em ${follow.district}.`);
+  }
+
   updateLevel(save);
   save.history.unshift(clone(mission)); save.history=save.history.slice(0,30);
 };
@@ -1095,6 +1138,7 @@ const finalizeMission = (save, mission) => {
 const tick = (save) => {
   advanceLocalCity(save);
   const now=Date.now();
+  save.player.staging_areas=(save.player.staging_areas||[]).filter((area)=>!area.expires_at||Date.parse(area.expires_at)>now);
   const previous=Number(save.last_tick||now);
   const rawElapsed=Math.max(0,(now-previous)/1000);
   const elapsed=Math.min(OFFLINE_SIMULATION_MAX_S,rawElapsed);
@@ -1102,7 +1146,14 @@ const tick = (save) => {
   save.employees.forEach((e)=>{
     if(e.status_until && Date.parse(e.status_until)<=now){
       if(e.status==="resting") e.fatigue=Math.max(0,(e.fatigue||0)-55);
-      if(e.status==="training"){e.xp=(e.xp||0)+80;e.level=Math.min(10,(e.level||1)+1);}
+      if(e.status==="training"){
+        e.xp=(e.xp||0)+80;
+        e.level=Math.min(10,(e.level||1)+1);
+        const cert=LOCAL_CERTIFICATIONS[e.training?.course_key];
+        e.certifications ||= [];
+        if(cert && !e.certifications.includes(cert.key)) e.certifications.push(cert.key);
+        e.training=null;
+      }
       if(["resting","training","healing"].includes(e.status)) e.status="idle";
       e.status_until=null;
     }
@@ -1424,12 +1475,14 @@ const publicState=(save)=>{
   const caps=calcCaps(save);
   const p=clone(save.player);
   p.next_level_respect=rankThresholds[p.level]||null;
+  const enrichedOpportunities=enrichLocalOpportunities(save);
+  const operational=localOperationalSnapshot(save,localCityWorld(save));
   return {
     server_time:nowIso(),player:p,teams:clone(save.teams),employees:clone(save.employees),
     candidates:clone(save.candidates),vehicles:clone(save.vehicles),weapons:clone(save.weapons),
-    properties:clone(save.properties),opportunities:clone(save.opportunities),missions:clone(save.missions),
+    properties:clone(save.properties),opportunities:clone(enrichedOpportunities),missions:clone(save.missions),
     history:clone(save.history),events:clone(save.events),quests:clone(save.quests),caps,
-    retention:localRetention(save,caps),
+    retention:localRetention(save,caps),operational:clone(operational),
     bonuses:{heal:0,legal:0,bribe_discount:0,repair_discount:save.properties.some(p=>p.type_key==="oficina") ? 0.15 : 0},
     ...(()=>{
       const economy=LOCAL_CATALOG.economy_meta||{};
@@ -1597,6 +1650,9 @@ const mutateGame=(save,path,payload)=>{
     if(!eligibility.ok)fail(400,eligibility.reasons[0]);
     const members=eligibility.members;
     const vehicle=eligibility.vehicle;
+    const requirements=localOperationRequirements(opp);
+    const crewMissing=localMissingTeamRequirements(requirements,members);
+    if(crewMissing.length) fail(400,`Equipa sem requisitos operacionais: ${crewMissing.slice(0,4).map((item)=>item.label).join(", ")}`);
     const start=Date.now();
     const origin=vehicleOriginFor(save,vehicle) || {lat:Number(opp.lat),lng:Number(opp.lng)};
     const target={lat:Number(opp.lat),lng:Number(opp.lng)};
@@ -1642,10 +1698,20 @@ const mutateGame=(save,path,payload)=>{
       road_outward:roadOutward,road_inward:roadInward,
       live_log:[],
       decision:localMissionDecision(opp.category,opp.risk,arriveAt,finishAt),
+      requirements,
+      support_team_ids:[],support_vehicle_ids:[],reinforcement_effects:[],
+      reinforcement_request:requirements.support_teams>0?{
+        status:"pending",title:`Reforço recomendado · ${requirements.support_teams} equipa(s)`,
+        description:"Podes enviar equipas adicionais para melhorar a margem operacional e reduzir consequências.",
+        needed:requirements.support_teams,received:0,opens_at:departAt,expires_at:finishAt,
+      }:null,
+      chain_id:opp.chain_id||opp.id,parent_mission_id:opp.parent_mission_id||null,
+      chain_stage:Number(opp.chain_stage||0),chain_kind:opp.chain_kind||null,
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       city_world:cityWorld,city_heat_mult:Number(cityWorld.modifiers?.heat_mult||1),
       opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
-        reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),risk:opp.risk,heat:Number(opp.heat||0)*Number(cityWorld.modifiers?.heat_mult||1),pays:opp.pays,profile:profile.profile}};
+        reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),risk:opp.risk,heat:Number(opp.heat||0)*Number(cityWorld.modifiers?.heat_mult||1),pays:opp.pays,profile:profile.profile,
+        min_level:opp.min_level,min_members:opp.min_members,required_models:[...(opp.required_models||[])],distance_km:opp.dist_km}};
     team.status="on_mission";team.last_type_key=opp.type_key;team.last_type_at=new Date(start).toISOString();team.repeat_type_count=repeatCount;members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
@@ -1674,10 +1740,89 @@ const mutateGame=(save,path,payload)=>{
     addEvent(save,"intel",`${mission.team_name}: decisão tática — ${option.label}.`);
     return {ok:true,choice:option.id,effects:{chance_delta:option.chance_delta||0,reward_mult:option.reward_mult||1,heat_delta:option.heat_delta||0,fatigue_delta:option.fatigue_delta||0}};
   }
+  if(path==="missions/reinforce"){
+    const mission=save.missions.find((m)=>m.id===p.mission_id);
+    if(!mission||!["en_route","operating"].includes(mission.phase))fail(400,"Esta operação já não aceita reforços");
+    if(p.team_id===mission.team_id||(mission.support_team_ids||[]).includes(p.team_id))fail(400,"Esta equipa já participa na operação");
+    const team=save.teams.find((t)=>t.id===p.team_id&&t.status==="idle");
+    if(!team)fail(400,"A equipa de apoio não está disponível");
+    if(!team.vehicle_id)fail(400,"A equipa de apoio não tem veículo");
+    const vehicle=save.vehicles.find((v)=>v.id===team.vehicle_id);
+    if(!vehicle||Number(vehicle.condition||0)<30)fail(400,"O veículo de apoio não está operacional");
+    const members=save.employees.filter((e)=>e.team_id===team.id&&e.status==="idle"&&Number(e.fatigue||0)<90);
+    if(!members.length)fail(400,"A equipa de apoio não tem operacionais disponíveis");
+    const effect=localReinforcementEffect(mission,team,members,vehicle);
+    team.status="supporting";
+    members.forEach((e)=>{e.status="on_mission";});
+    mission.support_team_ids ||= [];
+    mission.support_vehicle_ids ||= [];
+    mission.reinforcement_effects ||= [];
+    mission.support_team_ids.push(team.id);
+    mission.support_vehicle_ids.push(vehicle.id);
+    mission.reinforcement_effects.push({...effect,team_id:team.id,vehicle_id:vehicle.id,at:nowIso()});
+    mission.live_chance_delta=Number(mission.live_chance_delta||0)+Number(effect.chance_delta||0);
+    mission.live_log ||= [];
+    mission.live_log.push({at:nowIso(),speaker:"COMANDO",kind:"comp_good",text:`${team.name} entrou como reforço · +${Math.round(effect.chance_delta*100)}% chance.`,pct:effect.chance_delta});
+    if(mission.reinforcement_request){
+      mission.reinforcement_request.received=Number(mission.reinforcement_request.received||0)+1;
+      if(mission.reinforcement_request.received>=Number(mission.reinforcement_request.needed||0))mission.reinforcement_request.status="fulfilled";
+    }
+    addEvent(save,"team",`${team.name} enviada como apoio a ${mission.team_name}.`);
+    return {ok:true,effect};
+  }
+  if(path==="operations/presets/save"){
+    const rawKey=String(p.key||"").trim().toLowerCase().replace(/\s+/g,"_");
+    const key=rawKey.replace(/[^a-z0-9_]/g,"").slice(0,32);
+    if(key.length<2)fail(400,"Nome do plano inválido");
+    const allowed=["name","preferred_specs","min_chance","max_heat","min_vehicle_condition","prefer_discreet_vehicle","reserve_teams","supplies"];
+    const cfg={};
+    for(const field of allowed)if(Object.prototype.hasOwnProperty.call(p.config||{},field))cfg[field]=p.config[field];
+    cfg.name=String(cfg.name||p.key).slice(0,40);
+    save.player.dispatch_presets ||= {};
+    save.player.dispatch_presets[key]=cfg;
+    return {ok:true,key,config:cfg};
+  }
+  if(path==="operations/presets/delete"){
+    const key=String(p.key||"").trim().toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
+    if(save.player.dispatch_presets)delete save.player.dispatch_presets[key];
+    return {ok:true};
+  }
+  if(path==="operations/staging/create"){
+    const lat=Number(p.lat),lng=Number(p.lng);
+    if(!isValidHqLocation(lat,lng,60))fail(400,"O ponto de apoio tem de ficar em terra portuguesa");
+    const duration=clamp(Math.round(Number(p.duration_hours||4)),1,12);
+    const cost=1800+duration*350;
+    chargeClean(save,cost,"Ponto de apoio operacional");
+    const staging={id:uid("staging"),name:String(p.name||"Ponto de apoio").slice(0,40),lat,lng,created_at:nowIso(),expires_at:new Date(Date.now()+duration*3600000).toISOString(),capacity_teams:2+Math.min(2,Math.floor(Number(save.player.level||1)/5)),cost};
+    save.player.staging_areas ||= [];
+    save.player.staging_areas.push(staging);
+    addEvent(save,"system",`Ponto de apoio '${staging.name}' criado por ${duration}h.`);
+    return {ok:true,staging};
+  }
+  if(path==="operations/staging/delete"){
+    save.player.staging_areas=(save.player.staging_areas||[]).filter((area)=>area.id!==p.staging_id);
+    return {ok:true};
+  }
+  if(path==="operations/rules"){
+    const rules=p.rules||{};
+    save.player.operational_rules={
+      auto_low_risk:Boolean(rules.auto_low_risk),
+      max_auto_risk:clamp(Math.round(Number(rules.max_auto_risk||1)),1,3),
+      min_auto_chance:clamp(Number(rules.min_auto_chance||.75),.55,.95),
+      max_heat:clamp(Math.round(Number(rules.max_heat||65)),20,90),
+      reserve_teams:clamp(Math.round(Number(rules.reserve_teams??1)),0,3),
+      min_vehicle_condition:clamp(Math.round(Number(rules.min_vehicle_condition||65)),30,95),
+    };
+    return {ok:true,rules:clone(save.player.operational_rules)};
+  }
   if(path==="missions/recall"){
     const mission=save.missions.find(m=>m.id===p.mission_id);if(!mission)fail(404,"Missão não encontrada");
     const team=save.teams.find(t=>t.id===mission.team_id);if(team)team.status="idle";
     save.employees.filter(e=>mission.member_ids.includes(e.id)).forEach(e=>e.status="idle");
+    for(const supportTeamId of mission.support_team_ids||[]){
+      const support=save.teams.find((t)=>t.id===supportTeamId);if(support)support.status="idle";
+      save.employees.filter((e)=>e.team_id===supportTeamId&&e.status==="on_mission").forEach((e)=>{e.status="idle";});
+    }
     const opp=save.opportunities.find(o=>o.id===mission.opportunity_id);if(opp)opp.status="active";
     mission.phase="done";mission.outcome="recalled";save.history.unshift(clone(mission));save.missions=save.missions.filter(m=>m.id!==mission.id);
     return {ok:true};
@@ -1728,7 +1873,7 @@ const mutateGame=(save,path,payload)=>{
       }
       e.team_id=p.team_id||null;return {ok:true};
     }
-    if(path==="employees/train"){const course=LOCAL_CATALOG.training_courses[p.course_key];if(!course)fail(400,"Formação inválida");chargeClean(save,course.cost,"Formação");e.status="training";e.status_until=new Date(Date.now()+course.duration_s*1000).toISOString();return {ok:true};}
+    if(path==="employees/train"){const course=LOCAL_CATALOG.training_courses[p.course_key];if(!course)fail(400,"Formação inválida");chargeClean(save,course.cost,"Formação");e.status="training";e.training={course_key:p.course_key};e.status_until=new Date(Date.now()+course.duration_s*1000).toISOString();return {ok:true};}
     if(path==="employees/rest"){e.status="resting";e.status_until=new Date(Date.now()+25000).toISOString();return {ok:true};}
     if(path==="employees/promote"){const idx=LOCAL_CATALOG.ranks.indexOf(e.rank);if(idx>=LOCAL_CATALOG.ranks.length-1)fail(400,"Patente máxima");const cost=LOCAL_CATALOG.hr_costs.promote_base*(idx+1);chargeClean(save,cost,"Promoção");e.rank=LOCAL_CATALOG.ranks[idx+1];e.morale=clamp(e.morale+10,0,100);return {ok:true};}
     if(path==="employees/bonus"){chargeClean(save,1000,"Bónus");e.morale=clamp(e.morale+15,0,100);e.loyalty=clamp(e.loyalty+8,0,100);return {ok:true};}
