@@ -698,6 +698,18 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           </SheetDescription>
         </SheetHeader>
 
+        <Button
+          type="button"
+          variant="outline"
+          size="compact"
+          data-testid="teams-open-doctrines"
+          onClick={() => onNavigate && onNavigate("teamops")}
+          className="mt-3 w-full justify-between font-mono text-[10px] text-zinc-300"
+        >
+          Doutrinas · loadouts · políticas
+          <Sparkles size={11} className="text-cyan-300" />
+        </Button>
+
         {(() => {
           const tr = teamsReadiness(state, serverNow());
           const assigned = state.employees.filter((e) => e.team_id);
