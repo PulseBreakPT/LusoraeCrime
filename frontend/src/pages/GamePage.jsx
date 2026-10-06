@@ -23,6 +23,7 @@ import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
 import { DisclaimerModal } from "../components/game/DisclaimerModal";
+import { GuestSaveRecovery } from "../components/game/GuestSaveRecovery";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
@@ -510,6 +511,7 @@ export default function GamePage() {
           entrada; fonte de verdade: user.disclaimer_accepted no servidor),
           por cima de toda a UI (z-[130]); "Sim" regista o compromisso e
           liberta o jogo, "Não" leva a um ecrã de recusa com logout seguro. */}
+      <GuestSaveRecovery />
       <DisclaimerModal />
     </div>
   );
