@@ -28,15 +28,29 @@ describe("UI action ownership", () => {
       "refuelVehicle",
       "repairVehicle",
       "recallTeam",
-      "optimizeEmployees",
-      "optimizeVehicles",
       "team-member-rest-",
       "team-refuel-",
       "team-repair-",
-      "teams-optimize",
     ]) {
       expect(teams).not.toContain(forbidden);
     }
+  });
+
+  test("team composition has a single owner in Teams", () => {
+    expect(teams).toContain("optimizeEmployees");
+    expect(teams).toContain("optimizeVehicles");
+    expect(teams).toContain('data-testid="teams-optimize"');
+    expect(teams).toContain('data-testid={`team-add-member-${t.id}`}');
+    expect(teams).toContain('data-testid={`team-vehicle-select-${t.id}`}');
+
+    expect(employees).not.toContain("assignEmployee");
+    expect(employees).not.toContain('data-testid={`emp-team-select-${e.id}`}');
+    expect(employees).not.toContain("unassignWeapon");
+    expect(employees).not.toContain('data-testid={`emp-unassign-weapon-${e.id}`}');
+    expect(fleet).not.toContain("assignVehicle");
+    expect(fleet).not.toContain('data-testid={`vehicle-team-select-${v.id}`}');
+
+    expect(weapons).toContain('data-testid={`weapon-employee-select-${w.id}`}');
   });
 
   test("Intel recommends destinations instead of executing Empire mutations", () => {
