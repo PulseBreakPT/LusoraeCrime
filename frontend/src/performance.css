@@ -1,0 +1,239 @@
+/* ==========================================================================
+   SUBMUNDO — PERFORMANCE GOVERNOR
+   Final override layer. Keeps the cinematic red identity while removing the
+   highest-cost continuous paints/composites, especially on touch devices.
+   ========================================================================== */
+
+/* 1) Biggest hotspot: never animate filters over Leaflet's entire tile pane.
+   The static dark-map grade from App.css remains intact. */
+.sub-dark-map .leaflet-tile-pane {
+  animation: none !important;
+}
+
+/* 2) Full-screen light volumes stay visible, but no longer combine large blur
+   kernels with blend modes on every frame. Radial gradients already feather. */
+.sub-dark-map.leaflet-container::before {
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: .38;
+  animation-duration: 18s !important;
+  will-change: transform, opacity;
+}
+
+.sub-vignette::after {
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: .48;
+  animation-duration: 20s !important;
+  will-change: transform, opacity;
+}
+
+/* The old broad tactical sweep is less important than stable map FPS. */
+.sub-vignette::before {
+  filter: none !important;
+  opacity: .22;
+  animation-duration: 13s !important;
+}
+
+/* Full-screen edge lighting only animates opacity, and at a slower cadence. */
+.sub-game-shell::after {
+  animation-duration: 9s !important;
+}
+
+/* 3) Avoid filter animation on every live vehicle/police marker. Keep a static
+   light signature; movement itself is already handled by Leaflet/rAF. */
+.unit-car:not(.unit-car-returning),
+.unit-car-chased {
+  animation: none !important;
+  filter:
+    drop-shadow(0 2px 4px rgba(0,0,0,.82))
+    drop-shadow(0 0 5px rgba(239,68,68,.26)) !important;
+}
+
+.unit-car-chased {
+  filter:
+    drop-shadow(0 2px 5px rgba(0,0,0,.86))
+    drop-shadow(0 0 9px rgba(239,68,68,.48)) !important;
+}
+
+.police-lights,
+.police-pursuit {
+  animation: none !important;
+  filter:
+    drop-shadow(-4px 0 7px rgba(59,130,246,.46))
+    drop-shadow(4px 0 7px rgba(239,68,68,.42)) !important;
+}
+
+/* Selected mission remains animated, but remove the filter-based secondary
+   animation; the existing pulse/ring supplies the motion more cheaply. */
+.opp-pin-selected {
+  animation: sub-fx-marker-pulse 2.35s ease-in-out infinite !important;
+}
+
+/* Generic cards do not need a permanent travelling sheen while the map runs.
+   Keep sheen for explicit flash/reward states handled elsewhere. */
+.sub-game-shell .sub-card:not(.sub-flash):not(.sub-flash-amber):not(.sub-flash-blue) {
+  animation: none !important;
+  background-position: 50% 0, 0 0 !important;
+}
+
+/* Open trays/modals keep their entrance motion, but avoid perpetual shadow
+   breathing which forces repeated paint of large surfaces. */
+.sub-nav-tray {
+  animation: sub-nav-tray-enter var(--sub-motion-base) var(--sub-ease-out) both !important;
+}
+
+.sub-sheet-panel::before,
+.sub-menu-modal::before,
+.sub-sheet-panel::after,
+.sub-menu-modal::after {
+  animation-duration: 14s !important;
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE / TOUCH PERFORMANCE MODE
+   Android GPUs benefit most from removing backdrop blur and mass animation.
+   Visual depth is retained through opaque gradients, borders and shadows.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse), (max-width: 900px) {
+  /* Freeze large ambient overlays instead of repainting them continuously. */
+  .sub-dark-map.leaflet-container::before,
+  .sub-vignette::after,
+  .sub-vignette::before,
+  .sub-game-shell::after {
+    animation: none !important;
+    will-change: auto !important;
+  }
+
+  .sub-dark-map.leaflet-container::before {
+    opacity: .30;
+  }
+
+  .sub-vignette::after {
+    opacity: .38;
+  }
+
+  .sub-vignette::before {
+    display: none !important;
+  }
+
+  /* Backdrop-filter is one of the most expensive effects over a moving map.
+     Use nearly-opaque glass substitutes on touch devices. */
+  .sub-topbar,
+  .sub-sheet-panel,
+  .sub-menu-modal,
+  .sub-nav-tray,
+  .sub-opp-card,
+  .sub-map-tip,
+  .sub-toast,
+  .sub-modal-overlay,
+  .sub-shad-card,
+  .sub-shad-alert,
+  .sub-shad-select-content,
+  .sub-shad-popover,
+  .sub-shad-dropdown,
+  .sub-shad-command,
+  .sub-shad-badge {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .sub-topbar {
+    background:
+      radial-gradient(95% 130% at 9% 0%, rgba(239,68,68,.065), transparent 56%),
+      rgba(8,8,11,.975) !important;
+  }
+
+  .sub-sheet-panel,
+  .sub-menu-modal,
+  .sub-nav-tray,
+  .sub-opp-card,
+  .sub-map-tip {
+    background-color: rgba(8,7,10,.985) !important;
+  }
+
+  .sub-modal-overlay {
+    background: rgba(0,0,0,.79) !important;
+  }
+
+  /* Do not animate every button, icon and generic mission pin at once. */
+  .sub-game-shell .sub-btn:not(:disabled),
+  .sub-dock .sub-hud-btn svg,
+  .opp-pin:not(.opp-pin-selected),
+  .opp-pin:not(.opp-pin-selected)::after,
+  .prop-pin:not(.placement-pin)::after,
+  .sub-topbar,
+  .sub-topbar::before,
+  .sub-nav-tray::before,
+  .sub-nav-tray::after,
+  .sub-opp-card::after,
+  .sub-sheet-panel::before,
+  .sub-sheet-panel::after,
+  .sub-menu-modal::before,
+  .sub-menu-modal::after,
+  .sub-modal-title,
+  .sub-modal-title svg,
+  .sub-sheet-panel .sub-sheet-title,
+  .sub-sheet-panel .sub-sheet-title svg {
+    animation: none !important;
+  }
+
+  /* Route energy stays visible as a dashed/static glow but stops updating SVG
+     stroke offsets every frame on mobile. */
+  .leaflet-overlay-pane path.sub-route-line,
+  .leaflet-overlay-pane path.sub-route-flow {
+    animation: none !important;
+  }
+
+  /* Retain one meaningful animation: the selected/active target. */
+  .opp-pin-selected {
+    animation: sub-fx-marker-pulse 3s ease-in-out infinite !important;
+  }
+
+  .mission-target::before {
+    animation-duration: 3.2s !important;
+  }
+
+  .mission-target-hot::before {
+    animation-duration: 2.1s !important;
+  }
+
+  /* Reduce oversized multi-shadow stacks on modal surfaces. */
+  .sub-sheet-panel,
+  .sub-menu-modal {
+    box-shadow:
+      0 24px 58px rgba(0,0,0,.72),
+      0 8px 24px rgba(0,0,0,.38),
+      0 0 0 1px rgba(239,68,68,.075),
+      0 0 20px rgba(239,68,68,.055),
+      inset 0 1px 0 rgba(255,255,255,.04) !important;
+  }
+}
+
+/* Very small screens: prioritize map response above ambient decoration. */
+@media (max-width: 480px) {
+  .sub-dark-map.leaflet-container::before {
+    opacity: .22;
+  }
+
+  .sub-vignette::after {
+    opacity: .28;
+  }
+
+  .mission-target:not(.mission-target-hot)::before {
+    animation: none !important;
+  }
+
+  .hq-pin::before {
+    animation-duration: 4.5s !important;
+  }
+}
+
+/* User accessibility preference remains authoritative. */
+html.sub-reduced-motion .sub-dark-map.leaflet-container::before,
+html.sub-reduced-motion .sub-vignette::after,
+html.sub-reduced-motion .sub-vignette::before,
+html.sub-reduced-motion .sub-game-shell::after {
+  animation: none !important;
+  will-change: auto !important;
+}
