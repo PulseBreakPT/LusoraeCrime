@@ -16,7 +16,7 @@ import {
   Network, Wallet, PackageOpen, Users, Car, Swords, Warehouse, MapPinned,
   TrendingUp, ShieldCheck, Gauge, Wrench, Fuel, Shield, ClipboardCheck,
   Crosshair, Plus, Minus, Crown,
-  Boxes, UserRoundCog, Landmark, Banknote, Activity, AlertTriangle, Bot, History,
+  Boxes, UserRoundCog, Landmark, AlertTriangle, Bot,
 } from "lucide-react";
 
 const TABS = [
