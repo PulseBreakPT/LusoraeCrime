@@ -172,7 +172,7 @@ export default function HQOnboarding() {
                 className="h-auto min-h-8 flex-col gap-0 border-white/10 bg-black/30 px-1.5 py-1 text-center"
               >
                 <span className="text-[10px] font-bold text-zinc-200">{item.name}</span>
-                <span className="max-w-full truncate font-mono text-[8px] text-zinc-600">sugestão</span>
+                <span className="max-w-full truncate font-mono text-[10px] text-zinc-600">sugestão</span>
               </Button>
             ))}
           </div>
