@@ -7,7 +7,7 @@ import {
   weaponTier, WEAPON_STATS, weaponStatValue, weaponJamRisk, weaponConditionFactor, weaponSkillInfo,
   weaponWearPerMission, weaponAdequacy, weaponModelWithUpgrades, weaponAmmoInfo,
 } from "../../lib/game";
-import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader, EntityDetailBar, openEntityFromCard } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -123,10 +123,18 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
     optimizeWeapons, repairWeaponsAll,
   } = useGame();
   const [query, setQuery] = useState("");
+  const [selectedWeaponId, setSelectedWeaponId] = useState(null);
   useTick(open);
   usePanelFocus(open, focusTarget);
   useEffect(() => {
-    if (open && focusTarget?.testId?.startsWith("weapon-card-")) setQuery("");
+    if (!open) {
+      setSelectedWeaponId(null);
+      return;
+    }
+    if (focusTarget?.testId?.startsWith("weapon-card-")) {
+      setQuery("");
+      setSelectedWeaponId(focusTarget.testId.slice("weapon-card-".length));
+    }
   }, [open, focusTarget?.token, focusTarget?.testId]);
   if (!state) return null;
 
@@ -156,7 +164,9 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
   const filteredWeapons = weapons.filter((w) =>
     matchesSearch(query, w.name, catalog?.weapon_models?.[w.model_key]?.name || w.model_key)
   );
-  const sortedWeapons = [...filteredWeapons].sort((a, b) => {
+  const sortedWeapons = [...filteredWeapons]
+    .filter((weapon) => !selectedWeaponId || String(weapon.id) === String(selectedWeaponId))
+    .sort((a, b) => {
     const rank = (w) => {
       if (weaponBusy(w)) return 1;
       if (w.condition < 30) return 2;
@@ -164,6 +174,9 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
     };
     return rank(a) - rank(b);
   });
+  const selectedWeapon = selectedWeaponId
+    ? weapons.find((weapon) => String(weapon.id) === String(selectedWeaponId))
+    : null;
 
   const avgCondition = weapons.length ? Math.round(weapons.reduce((a, w) => a + w.condition, 0) / weapons.length) : 0;
   const equippedCount = weapons.filter((w) => w.employee_id).length;
@@ -188,7 +201,16 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
           <SheetDescription className="text-zinc-500">As ferramentas do ofício — compra, mantém e distribui com cabeça.</SheetDescription>
         </SheetHeader>
 
-        <Button
+        {selectedWeapon && (
+          <EntityDetailBar
+            testId="weapon-detail-bar"
+            title={selectedWeapon.name}
+            meta="Ficha individual da arma"
+            onBack={() => setSelectedWeaponId(null)}
+          />
+        )}
+
+        {!selectedWeaponId && <Button
           type="button"
           variant="outline"
           size="compact"
@@ -198,7 +220,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
         >
           Munições · modificações
           <Wand2 size={11} className="text-cyan-300" />
-        </Button>
+        </Button>}
 
         <SummaryStrip cols={4} className="mt-3" testId="weapons-summary">
           <Kpi icon={CheckCircle2} label="Equipadas" value={`${equippedCount}/${weapons.length}`} color={equippedCount === weapons.length && weapons.length > 0 ? "#34D399" : "#F59E0B"}
@@ -295,7 +317,17 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
             const profMax = meta.proficiency_max ?? 100;
             const profBonus = Math.sqrt(Math.max(0, prof) / profMax) * (meta.proficiency_bonus_max_pct ?? 0.08);
             return (
-              <Card key={w.id} data-testid={`weapon-card-${w.id}`} className="h-full min-w-0 sub-card sub-weapon-card p-2.5 shadow-none" style={{ "--wtier": tier.color }}>
+              <Card
+                key={w.id}
+                data-testid={`weapon-card-${w.id}`}
+                data-entity-detail={selectedWeaponId && String(w.id) === String(selectedWeaponId) ? "open" : "closed"}
+                onClick={(event) => openEntityFromCard(event, () => setSelectedWeaponId(String(w.id)))}
+                className={cn(
+                  "h-full min-w-0 sub-card sub-weapon-card p-2.5 shadow-none transition-colors",
+                  selectedWeaponId ? "cursor-default border-cyan-500/20" : "cursor-pointer hover:border-cyan-500/20"
+                )}
+                style={{ "--wtier": tier.color }}
+              >
                 <div className="relative z-[1] min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="min-w-0 truncate text-sm font-bold text-white">{w.name}</p>
@@ -463,7 +495,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
           })}
         </div>
 
-        <div className="mt-6">
+        {!selectedWeaponId && <div className="mt-6">
           <SectionHeader icon={Swords} title="Arsenal" meta={catalog ? `${Object.keys(catalog.weapon_models || {}).length} modelos` : undefined} />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {catalog &&
@@ -559,7 +591,7 @@ export const WeaponsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) =>
                 );
               })}
           </div>
-        </div>
+        </div>}
       </SheetContent>
     </Sheet>
   );
