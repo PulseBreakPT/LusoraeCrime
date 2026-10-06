@@ -415,6 +415,13 @@ export function GameProvider({ children }) {
     };
   }, [user]);
 
+  // Enquanto existem missões em curso, o próprio /state continua a ser o
+  // relógio autoritativo que avança fases. Mantemos a cadência histórica nesse
+  // caso; o modo live só abranda o fallback quando o mundo está estável.
+  const hasTimeSensitiveSimulation = Boolean(
+    (state?.missions || []).some((mission) => mission.phase && mission.phase !== "done")
+  );
+
   // Polling — arranca sempre que há utilizador. Se o boot não entregou
   // estado inicial (fallback/timeout), o primeiro fetch é imediato para
   // nunca deixar o GamePage preso em "A ligar à rede...".
@@ -434,7 +441,7 @@ export function GameProvider({ children }) {
       const fails = consecutiveFailuresRef.current;
       // Backoff exponencial quando o backend está em baixo (até 30s); cadência
       // normal ~4s caso contrário.
-      const normalCadence = realtimeConnected ? 15000 : 4000;
+      const normalCadence = realtimeConnected && !hasTimeSensitiveSimulation ? 15000 : 4000;
       const delay = fails > 0
         ? Math.min(30000, 4000 * 2 ** fails)
         : Math.max(2000, normalCadence - elapsed);
@@ -451,14 +458,17 @@ export function GameProvider({ children }) {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    pollTimeout = setTimeout(schedulePoll, hasLoadedRef.current ? (realtimeConnected ? 15000 : 4000) : 0);
+    pollTimeout = setTimeout(
+      schedulePoll,
+      hasLoadedRef.current ? (realtimeConnected && !hasTimeSensitiveSimulation ? 15000 : 4000) : 0
+    );
 
     return () => {
       isRunning = false;
       if (pollTimeout) clearTimeout(pollTimeout);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user, refresh, realtimeConnected]);
+  }, [user, refresh, realtimeConnected, hasTimeSensitiveSimulation]);
 
   const serverNow = useCallback(() => Date.now() + offsetRef.current, []);
 
