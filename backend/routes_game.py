@@ -3413,6 +3413,48 @@ async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
     return {"ok": True, "hq": hq, "region": region, "districts": len(districts)}
 
 
+@router.post("/hq/relocate")
+@idempotent("hq.relocate")
+async def relocate_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
+    """Durante o tutorial, antes do primeiro despacho, o jogador pode corrigir
+    a localização do QG. Depois da primeira operação a decisão fica bloqueada."""
+    player = await get_player(user)
+    if int((player.get("stats") or {}).get("ops_dispatched", 0) or 0) > 0:
+        raise HTTPException(status_code=409, detail="O QG só pode ser mudado antes da primeira operação.")
+    valid, reason = _hq_location_verdict(body.lat, body.lng)
+    if not valid or not is_valid_hq_location(body.lat, body.lng, min_inland_m=HQ_MIN_INLAND_M):
+        raise HTTPException(status_code=422, detail=reason or "Localização inválida para o Quartel-General.")
+    lat, lng = round(float(body.lat), 6), round(float(body.lng), 6)
+    g = await reverse_geocode(db, lat, lng, zoom=16)
+    label = street_label(g)
+    region = locality_label(g) or ""
+    current_hq = dict(player.get("hq") or {})
+    hq = {
+        **current_hq,
+        "name": f"QG · {label}" if label else "Quartel-General",
+        "lat": lat,
+        "lng": lng,
+    }
+    districts = generate_district_points(lat, lng)
+    pid = str(player["_id"])
+    await db.players.update_one(
+        {"_id": player["_id"], "stats.ops_dispatched": {"$in": [0, None]}},
+        {"$set": {
+            "hq": hq,
+            "districts": districts,
+            "region": region,
+            "hq_relocated_at": now_utc().isoformat(),
+        }},
+    )
+    # Antes do primeiro despacho não há oportunidades ocupadas; substituir as
+    # ativas evita manter alvos gerados à volta da localização antiga.
+    await db.opportunities.delete_many({"player_id": pid, "status": "active"})
+    where = label or f"{lat:.4f}, {lng:.4f}"
+    await add_event(db, pid, "system", f"QG reposicionado durante o tutorial para {where}. As zonas estão a ser recalculadas.")
+    asyncio.create_task(name_districts_task(db, player["_id"]))
+    return {"ok": True, "hq": hq, "region": region, "districts": len(districts)}
+
+
 @router.post("/hq/upgrade")
 @idempotent("hq.upgrade")
 async def upgrade_hq(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
