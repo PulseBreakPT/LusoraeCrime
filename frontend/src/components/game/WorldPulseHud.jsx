@@ -56,7 +56,7 @@ export const WorldPulseHud = ({ world, realtimeConnected, onOpen }) => {
               {world.event?.name || "Mundo"}
             </span>
           </span>
-          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 font-mono text-[9px] text-zinc-500">
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 font-mono text-[10px] text-zinc-500">
             <span className="truncate">{world.daypart?.name} · {world.weather?.name}</span>
             {categorySignals.length > 0 && (
               <span className="hidden shrink-0 text-cyan-300 min-[430px]:inline">
@@ -67,7 +67,7 @@ export const WorldPulseHud = ({ world, realtimeConnected, onOpen }) => {
         </span>
 
         <span
-          className={`inline-flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase ${realtimeConnected ? "text-emerald-400" : "text-zinc-600"}`}
+          className={`inline-flex shrink-0 items-center gap-1 font-mono text-[10px] uppercase ${realtimeConnected ? "text-emerald-400" : "text-zinc-600"}`}
           aria-label={realtimeConnected ? "Atualização em tempo real ligada" : "Atualização periódica"}
         >
           {realtimeConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
