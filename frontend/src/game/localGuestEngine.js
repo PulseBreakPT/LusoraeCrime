@@ -1706,6 +1706,81 @@ const mutateGame=(save,path,payload)=>{
     addEvent(save,"intel",`${mission.team_name}: decisão tática — ${option.label}.`);
     return {ok:true,choice:option.id,effects:{chance_delta:option.chance_delta||0,reward_mult:option.reward_mult||1,heat_delta:option.heat_delta||0,fatigue_delta:option.fatigue_delta||0}};
   }
+  if(path==="missions/reinforce"){
+    const mission=save.missions.find((m)=>m.id===p.mission_id);
+    if(!mission||!["en_route","operating"].includes(mission.phase))fail(400,"Esta operação já não aceita reforços");
+    if(p.team_id===mission.team_id||(mission.support_team_ids||[]).includes(p.team_id))fail(400,"Esta equipa já participa na operação");
+    const team=save.teams.find((t)=>t.id===p.team_id&&t.status==="idle");
+    if(!team)fail(400,"A equipa de apoio não está disponível");
+    if(!team.vehicle_id)fail(400,"A equipa de apoio não tem veículo");
+    const vehicle=save.vehicles.find((v)=>v.id===team.vehicle_id);
+    if(!vehicle||Number(vehicle.condition||0)<30)fail(400,"O veículo de apoio não está operacional");
+    const members=save.employees.filter((e)=>e.team_id===team.id&&e.status==="idle"&&Number(e.fatigue||0)<90);
+    if(!members.length)fail(400,"A equipa de apoio não tem operacionais disponíveis");
+    const effect=localReinforcementEffect(mission,team,members,vehicle);
+    team.status="supporting";
+    members.forEach((e)=>{e.status="on_mission";});
+    mission.support_team_ids ||= [];
+    mission.support_vehicle_ids ||= [];
+    mission.reinforcement_effects ||= [];
+    mission.support_team_ids.push(team.id);
+    mission.support_vehicle_ids.push(vehicle.id);
+    mission.reinforcement_effects.push({...effect,team_id:team.id,vehicle_id:vehicle.id,at:nowIso()});
+    mission.live_chance_delta=Number(mission.live_chance_delta||0)+Number(effect.chance_delta||0);
+    mission.live_log ||= [];
+    mission.live_log.push({at:nowIso(),speaker:"COMANDO",kind:"comp_good",text:`${team.name} entrou como reforço · +${Math.round(effect.chance_delta*100)}% chance.`,pct:effect.chance_delta});
+    if(mission.reinforcement_request){
+      mission.reinforcement_request.received=Number(mission.reinforcement_request.received||0)+1;
+      if(mission.reinforcement_request.received>=Number(mission.reinforcement_request.needed||0))mission.reinforcement_request.status="fulfilled";
+    }
+    addEvent(save,"team",`${team.name} enviada como apoio a ${mission.team_name}.`);
+    return {ok:true,effect};
+  }
+  if(path==="operations/presets/save"){
+    const rawKey=String(p.key||"").trim().toLowerCase().replace(/\s+/g,"_");
+    const key=rawKey.replace(/[^a-z0-9_]/g,"").slice(0,32);
+    if(key.length<2)fail(400,"Nome do plano inválido");
+    const allowed=["name","preferred_specs","min_chance","max_heat","min_vehicle_condition","prefer_discreet_vehicle","reserve_teams","supplies"];
+    const cfg={};
+    for(const field of allowed)if(Object.prototype.hasOwnProperty.call(p.config||{},field))cfg[field]=p.config[field];
+    cfg.name=String(cfg.name||p.key).slice(0,40);
+    save.player.dispatch_presets ||= {};
+    save.player.dispatch_presets[key]=cfg;
+    return {ok:true,key,config:cfg};
+  }
+  if(path==="operations/presets/delete"){
+    const key=String(p.key||"").trim().toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
+    if(save.player.dispatch_presets)delete save.player.dispatch_presets[key];
+    return {ok:true};
+  }
+  if(path==="operations/staging/create"){
+    const lat=Number(p.lat),lng=Number(p.lng);
+    if(!isValidHqLocation(lat,lng,60))fail(400,"O ponto de apoio tem de ficar em terra portuguesa");
+    const duration=clamp(Math.round(Number(p.duration_hours||4)),1,12);
+    const cost=1800+duration*350;
+    chargeClean(save,cost,"Ponto de apoio operacional");
+    const staging={id:uid("staging"),name:String(p.name||"Ponto de apoio").slice(0,40),lat,lng,created_at:nowIso(),expires_at:new Date(Date.now()+duration*3600000).toISOString(),capacity_teams:2+Math.min(2,Math.floor(Number(save.player.level||1)/5)),cost};
+    save.player.staging_areas ||= [];
+    save.player.staging_areas.push(staging);
+    addEvent(save,"system",`Ponto de apoio '${staging.name}' criado por ${duration}h.`);
+    return {ok:true,staging};
+  }
+  if(path==="operations/staging/delete"){
+    save.player.staging_areas=(save.player.staging_areas||[]).filter((area)=>area.id!==p.staging_id);
+    return {ok:true};
+  }
+  if(path==="operations/rules"){
+    const rules=p.rules||{};
+    save.player.operational_rules={
+      auto_low_risk:Boolean(rules.auto_low_risk),
+      max_auto_risk:clamp(Math.round(Number(rules.max_auto_risk||1)),1,3),
+      min_auto_chance:clamp(Number(rules.min_auto_chance||.75),.55,.95),
+      max_heat:clamp(Math.round(Number(rules.max_heat||65)),20,90),
+      reserve_teams:clamp(Math.round(Number(rules.reserve_teams??1)),0,3),
+      min_vehicle_condition:clamp(Math.round(Number(rules.min_vehicle_condition||65)),30,95),
+    };
+    return {ok:true,rules:clone(save.player.operational_rules)};
+  }
   if(path==="missions/recall"){
     const mission=save.missions.find(m=>m.id===p.mission_id);if(!mission)fail(404,"Missão não encontrada");
     const team=save.teams.find(t=>t.id===mission.team_id);if(team)team.status="idle";
