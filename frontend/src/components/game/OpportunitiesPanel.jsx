@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
-import { Target, Search, Clock, TrendingUp, AlertTriangle, Star, CheckCircle2, MapPin } from "lucide-react";
+import { Target, Search, Clock, TrendingUp, AlertTriangle, Star, CheckCircle2, MapPin, SlidersHorizontal, Scale, Loader2 } from "lucide-react";
 
 // Força competente (do backend, opp.police_force). Escalável: mais uma força =
 // mais uma entrada.
@@ -36,13 +36,18 @@ const useTick = (active) => {
 };
 
 export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
-  const { state, catalog, serverNow } = useGame();
+  const { state, catalog, serverNow, recommendTeamForOpportunity, previewDispatch } = useGame();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState("eta");
   const [catFilter, setCatFilter] = useState("all");
   const [forceFilter, setForceFilter] = useState("all");
   const [reachableOnly, setReachableOnly] = useState(false);
   const [favOnly, setFavOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareStrategy, setCompareStrategy] = useState("profit");
+  const [compareRows, setCompareRows] = useState([]);
+  const [compareBusy, setCompareBusy] = useState(false);
   useTick(open); // atualiza contagens de expiração enquanto o painel está aberto
 
   const level = state?.player?.level || 1;
@@ -95,6 +100,44 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
   }, [opps, state, catalog, search, sortKey, catFilter, forceFilter, reachableOnly, favOnly]);
 
   const reachableCount = rows.filter((r) => r.reachable).length;
+  const activeFilterCount = Number(Boolean(search)) + Number(catFilter !== "all") + Number(forceFilter !== "all") + Number(reachableOnly) + Number(favOnly) + Number(sortKey !== "eta");
+
+  const loadComparison = async (strategy = compareStrategy) => {
+    if (compareBusy) return;
+    setCompareBusy(true);
+    try {
+      const data = await Promise.all(opps.map(async (opp) => {
+        const recommendation = await recommendTeamForOpportunity(opp.id, strategy);
+        const teamId = recommendation.ok ? recommendation.data?.team_id : null;
+        if (!teamId) return { opp, available:false, reason:recommendation.data?.reason || "Sem equipa elegível." };
+        const preview = await previewDispatch(opp.id, teamId);
+        if (!preview.ok) return { opp, available:false, reason:preview.error || "Não foi possível calcular." };
+        const team = state.teams.find((item) => item.id === teamId);
+        const vehicle = state.vehicles.find((item) => item.id === team?.vehicle_id);
+        const fuelPrice = Number(state.fuel_prices?.[vehicle?.fuel_type] || catalog?.fuel_prices?.[vehicle?.fuel_type] || 1.8);
+        const fuelCost = Number(preview.data.fuel_needed || 0) * fuelPrice;
+        const totalDurationS = Math.max(1, Number(preview.data.eta_s || 0) * 2 + Number(preview.data.duration_s || 0));
+        const expectedProfit = Number(preview.data.reward || 0) * Number(preview.data.chance || 0) - fuelCost;
+        return {
+          opp, available:true, teamId, teamName:team?.name || "Equipa",
+          chance:Number(preview.data.chance || 0), reward:Number(preview.data.reward || 0),
+          fuelCost, totalDurationS, expectedProfit,
+          expectedProfitPerMin:expectedProfit / Math.max(.5, totalDurationS / 60),
+          reason:recommendation.data?.reason || "",
+        };
+      }));
+      data.sort((a,b) => {
+        if (a.available !== b.available) return a.available ? -1 : 1;
+        if (!a.available) return 0;
+        if (strategy === "safe") return b.chance - a.chance;
+        if (strategy === "fast") return a.totalDurationS - b.totalDurationS;
+        return b.expectedProfitPerMin - a.expectedProfitPerMin;
+      });
+      setCompareRows(data);
+    } finally {
+      setCompareBusy(false);
+    }
+  };
   const pulse = state?.retention?.world_pulse || null;
   const pulseEndsS = pulse?.ends_at
     ? Math.max(0, (Date.parse(pulse.ends_at) - serverNow()) / 1000)
@@ -152,72 +195,108 @@ export const OpportunitiesPanel = ({ open, onOpenChange, onSelectOpp }) => {
           <Kpi icon={CheckCircle2} label="Alcançáveis" value={`${reachableCount}`} color={reachableCount > 0 ? "#34D399" : "#EF4444"} />
         </SummaryStrip>
 
-        {/* Procura + ordenação */}
-        <div className="sub-operations-filters mt-3 space-y-2">
-          <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Pesquisar operações"
-              placeholder="Procurar por nome, zona ou tipo…"
-              size="compact" className="sub-operations-search pl-8 font-mono text-white"
-            />
-          </div>
-          <div className="sub-operations-selects grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            <Select value={sortKey} onValueChange={setSortKey}>
-              <SelectTrigger size="compact" className="gap-1 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(SORTS).map(([k, label]) => (
-                  <SelectItem key={k} value={k} className="font-mono text-xs">{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={catFilter} onValueChange={setCatFilter}>
-              <SelectTrigger className="h-9 w-full gap-1 border-white/10 bg-black/60 font-mono text-[11px] text-white">
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="font-mono text-xs">Todas as categorias</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c} className="font-mono text-xs">{SPEC_LABELS[c] || c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={forceFilter} onValueChange={setForceFilter}>
-              <SelectTrigger size="compact" className="col-span-2 gap-1 text-white sm:col-span-1">
-                <SelectValue placeholder="Força" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="font-mono text-xs">Toda a força</SelectItem>
-                <SelectItem value="PSP" className="font-mono text-xs">PSP · urbana</SelectItem>
-                <SelectItem value="GNR" className="font-mono text-xs">GNR · rural</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            <Button
-              variant="filter"
-              size="compact"
-              aria-pressed={reachableOnly}
-              onClick={() => setReachableOnly((v) => !v)}
-              className={`sub-filter-chip w-full gap-1 font-mono ${reachableOnly ? "is-active" : ""}`}
-            >
-              <CheckCircle2 size={11} /> Só alcançáveis
-            </Button>
-            <Button
-              variant="filter"
-              size="compact"
-              aria-pressed={favOnly}
-              onClick={() => setFavOnly((v) => !v)}
-              className={`sub-filter-chip w-full gap-1 font-mono ${favOnly ? "is-active" : ""}`}
-            >
-              <Star size={11} /> Favoritas
-            </Button>
-          </div>
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="compact"
+            data-testid="operations-filter-toggle"
+            onClick={() => setFiltersOpen((value) => !value)}
+            className="gap-1.5 font-mono text-[10px] font-bold uppercase text-zinc-300"
+          >
+            <SlidersHorizontal size={12} /> Filtrar{activeFilterCount ? ` · ${activeFilterCount}` : ""}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="compact"
+            data-testid="operations-compare-toggle"
+            onClick={() => {
+              const next=!compareOpen;
+              setCompareOpen(next);
+              if (next && compareRows.length === 0) loadComparison(compareStrategy);
+            }}
+            className="gap-1.5 font-mono text-[10px] font-bold uppercase text-cyan-300"
+          >
+            <Scale size={12} /> Comparar
+          </Button>
         </div>
+
+        {filtersOpen && (
+          <div className="sub-operations-filters mt-2 space-y-2 rounded-md border border-white/[0.07] bg-black/20 p-2">
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Pesquisar operações"
+                placeholder="Procurar por nome, zona ou tipo…"
+                size="compact" className="sub-operations-search pl-8 font-mono text-white"
+              />
+            </div>
+            <div className="sub-operations-selects grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              <Select value={sortKey} onValueChange={setSortKey}>
+                <SelectTrigger size="compact" className="gap-1 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(SORTS).map(([k,label])=><SelectItem key={k} value={k} className="font-mono text-xs">{label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={catFilter} onValueChange={setCatFilter}>
+                <SelectTrigger size="compact" className="gap-1 text-white"><SelectValue placeholder="Categoria" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="font-mono text-xs">Todas as categorias</SelectItem>
+                  {categories.map((item)=><SelectItem key={item} value={item} className="font-mono text-xs">{SPEC_LABELS[item] || item}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={forceFilter} onValueChange={setForceFilter}>
+                <SelectTrigger size="compact" className="col-span-2 gap-1 text-white sm:col-span-1"><SelectValue placeholder="Força" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="font-mono text-xs">Toda a força</SelectItem>
+                  <SelectItem value="PSP" className="font-mono text-xs">PSP · urbana</SelectItem>
+                  <SelectItem value="GNR" className="font-mono text-xs">GNR · rural</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button variant="filter" size="compact" aria-pressed={reachableOnly} onClick={()=>setReachableOnly((v)=>!v)} className={`sub-filter-chip w-full gap-1 font-mono ${reachableOnly?"is-active":""}`}><CheckCircle2 size={11}/> Só alcançáveis</Button>
+              <Button variant="filter" size="compact" aria-pressed={favOnly} onClick={()=>setFavOnly((v)=>!v)} className={`sub-filter-chip w-full gap-1 font-mono ${favOnly?"is-active":""}`}><Star size={11}/> Favoritas</Button>
+            </div>
+          </div>
+        )}
+
+        {compareOpen && (
+          <Card data-testid="operations-comparison" className="mt-2 border-cyan-500/15 bg-cyan-500/[0.025] p-2.5 shadow-none">
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">Comparador</p>
+              <Select value={compareStrategy} onValueChange={(value)=>{setCompareStrategy(value);loadComparison(value);}}>
+                <SelectTrigger size="compact" className="ml-auto w-[8.5rem] text-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="profit" className="font-mono text-xs">Rentabilidade</SelectItem>
+                  <SelectItem value="safe" className="font-mono text-xs">Segurança</SelectItem>
+                  <SelectItem value="fast" className="font-mono text-xs">Rapidez</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {compareBusy ? (
+              <p className="mt-3 flex items-center justify-center gap-2 py-4 font-mono text-[10px] text-zinc-500"><Loader2 size={12} className="animate-spin"/> A calcular rotas, risco e retorno...</p>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                {compareRows.map((row)=>(
+                  <Button variant="bare" size="bare" type="button" key={row.opp.id} disabled={!row.available} onClick={()=>row.available&&onSelectOpp(row.opp)} className="w-full rounded-md border border-white/[0.06] bg-black/25 p-2 text-left disabled:opacity-45">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-semibold text-white">{row.opp.name}</span>
+                      {row.available && <span className="shrink-0 font-mono text-[10px] font-bold text-emerald-300">{Math.round(row.expectedProfitPerMin)} €/min esp.</span>}
+                    </div>
+                    {row.available ? (
+                      <>
+                        <p className="mt-1 font-mono text-[10px] text-zinc-400">{row.teamName} · {Math.round(row.chance*100)}% · {fmtDuration(row.totalDurationS)} total · combustível {fmtMoney(row.fuelCost)}</p>
+                        <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{row.reason}</p>
+                      </>
+                    ) : <p className="mt-1 text-[10px] text-amber-400">{row.reason}</p>}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Lista */}
         <div className="sub-operations-list mt-3 space-y-1.5 pb-4">
