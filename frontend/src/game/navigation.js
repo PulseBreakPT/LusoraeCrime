@@ -22,12 +22,18 @@ export const GAME_AREAS = [
   { id:"intel", label:"Relatórios", hint:"Histórico, desempenho, recomendações e atenção", group:"utility", shortcut:null, minLevel:1, aliases:["relatorios","relatórios","histórico","historico","intel","desempenho"] },
   { id:"shop", label:"Loja", hint:"Extras e recursos meta da organização", group:"utility", shortcut:"9", minLevel:1, aliases:["loja","compras"] },
   { id:"settings", label:"Definições", hint:"Interface, jogabilidade, dados e notificações", group:"utility", shortcut:null, minLevel:1, aliases:["configurações","configuracoes","settings","definições","definicoes"] },
-
-  // Compatibilidade interna: estes destinos já não aparecem na navegação/pesquisa.
-  { id:"management", label:"Gestão avançada", hint:"Políticas, automação e auditoria organizacional", group:"utility", shortcut:null, minLevel:10, hidden:true, aliases:["gestão","gestao","políticas","politicas","automação","automacao"] },
-  { id:"organization", label:"Organização", hint:"Destino legado", group:"legacy", shortcut:null, minLevel:10, hidden:true, aliases:["organizacao","organização"] },
-  { id:"city", label:"Cidade", hint:"Destino legado", group:"legacy", shortcut:null, minLevel:5, hidden:true, aliases:["cidade"] },
 ];
+
+// Saves/eventos antigos podem continuar a referir destinos removidos da UI.
+// Canonicalizamos esses ids para uma única fonte de verdade sem voltar a
+// expor ecrãs duplicados na navegação ou pesquisa.
+export const LEGACY_PANEL_ALIASES = Object.freeze({
+  management: "hq",
+  organization: "hq",
+  city: "world",
+});
+
+export const canonicalGamePanel = (id) => LEGACY_PANEL_ALIASES[id] || id;
 
 export const GAME_PANEL_IDS = GAME_AREAS.map((area) => area.id);
 export const GAME_PANEL_SET = new Set(GAME_PANEL_IDS);
