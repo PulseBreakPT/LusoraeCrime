@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import { fmtMoney } from "../../lib/game";
 import {
   Kpi, SummaryStrip, MiniBar, PanelWatermark, SectionHeader,
-  InlineRename, PurchaseButton, ConfirmButton, EmptyState,
+  PurchaseButton, ConfirmButton, EmptyState,
 } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 const TABS = [
-  { key: "centro", label: "Centro", icon: Network },
+  { key: "centro", label: "Sistemas", icon: Network },
   { key: "crew", label: "Crew", icon: Users },
   { key: "frota", label: "Frota", icon: Car },
   { key: "arsenal", label: "Arsenal", icon: Swords },
@@ -60,19 +60,17 @@ export const OrganizationPanel = ({
   const {
     state, catalog, serverNow,
     buySupply, sellSupply,
-    renameTeam, setTeamDoctrine, setTeamPolicies, setTeamLoadout, applyTeamPreset, dissolveTeam,
+    setTeamDoctrine, setTeamPolicies, setTeamLoadout, applyTeamPreset, dissolveTeam,
     reloadWeapon, upgradeWeaponMod,
     serviceVehicle, replaceVehicleTires, insureVehicle, inspectVehicle,
     upgradePropertyModule, assignPropertyStaff, upgradeDepartment,
     claimTerritory, consolidateTerritory, defendTerritory,
-    buyPrestige, buyProtection, fetchFinanceSummary,
-    fetchOrganizationIntelligence, fetchOrganizationAudit,
+    buyPrestige, buyProtection,
+    fetchOrganizationIntelligence,
     setOrganizationPolicy, runOrganizationAutomation, resolveOrganizationEvent, updateAutomationSettings,
   } = useGame();
   const [tab, setTab] = useState(initialTab);
-  const [finance, setFinance] = useState(null);
   const [intelligence, setIntelligence] = useState(null);
-  const [audit, setAudit] = useState([]);
   const [policyDraft, setPolicyDraft] = useState(null);
   const [policyDirty, setPolicyDirty] = useState(false);
   const [weaponUpgrade, setWeaponUpgrade] = useState({});
@@ -95,27 +93,18 @@ export const OrganizationPanel = ({
   useEffect(() => {
     if (!open) return;
     let alive = true;
-    Promise.all([
-      fetchFinanceSummary(),
-      fetchOrganizationIntelligence(),
-      fetchOrganizationAudit(12),
-    ]).then(([financeRes, intelligenceRes, auditRes]) => {
+    fetchOrganizationIntelligence().then((intelligenceRes) => {
       if (!alive) return;
-      if (financeRes.ok) setFinance(financeRes.data);
       if (intelligenceRes.ok) {
         setIntelligence(intelligenceRes.data);
         if (!policyDirty) setPolicyDraft(intelligenceRes.data.policy);
       }
-      if (auditRes.ok) setAudit(auditRes.data?.items || []);
     });
     return () => { alive = false; };
   }, [
     open,
     state?.player?.clean_money,
-    state?.weekly_fixed_total,
-    fetchFinanceSummary,
     fetchOrganizationIntelligence,
-    fetchOrganizationAudit,
     policyDirty,
   ]);
 
@@ -287,83 +276,7 @@ export const OrganizationPanel = ({
 
         {tab === "centro" && (
           <div className="mt-3 space-y-4">
-            <SummaryStrip cols={3}>
-              <Kpi icon={Activity} label="Saúde" value={intelligence ? `${intelligence.health.score} · ${intelligence.health.grade}` : "—"} color={(intelligence?.health?.score || 0) >= 78 ? "#34D399" : "#F59E0B"} />
-              <Kpi icon={Wallet} label="Runway" value={intelligence ? `${intelligence.finance.runway_weeks} sem.` : "—"} color={(intelligence?.finance?.runway_weeks || 0) >= 3 ? "#34D399" : "#EF4444"} />
-              <Kpi icon={AlertTriangle} label="Urgentes" value={intelligence?.alert_counts?.critical || 0} color={(intelligence?.alert_counts?.critical || 0) ? "#EF4444" : "#34D399"} />
-            </SummaryStrip>
-
-            {intelligence && (
-              <Card className="sub-card p-3">
-                <SectionHeader
-                  icon={Activity}
-                  title="Inteligência operacional"
-                  meta={`Org N${intelligence.organization.level || 1} · ${intelligence.organization.score} poder`}
-                />
-                {intelligence.organization.progression && (
-                  <div className="mb-3">
-                    <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-zinc-500">
-                      <span>Progressão da organização</span>
-                      <span>{intelligence.organization.progression.progress_pct}%</span>
-                    </div>
-                    <MiniBar value={intelligence.organization.progression.progress_pct} color="#22D3EE" />
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {[
-                    ["Finanças", intelligence.health.finance],
-                    ["Crew", intelligence.health.crew],
-                    ["Frota", intelligence.health.fleet],
-                    ["Logística", intelligence.health.logistics],
-                    ["Imóveis", intelligence.health.properties],
-                    ["Território", intelligence.health.territory],
-                    ["Segurança", intelligence.health.security],
-                    ["Gestão", intelligence.organization.dimensions.management],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-zinc-500">
-                        <span>{label}</span><span>{Math.round(value)}%</span>
-                      </div>
-                      <MiniBar value={value} color={value >= 75 ? "#34D399" : value >= 55 ? "#F59E0B" : "#EF4444"} />
-                    </div>
-                  ))}
-                </div>
-                {(intelligence.recommendations || []).length > 0 && (
-                  <div className="mt-3 space-y-1.5">
-                    {(intelligence.recommendations || []).slice(0, 5).map((rec, index) => (
-                      <Button variant="bare" size="bare"
-                        type="button"
-                        key={`${rec.title}-${index}`}
-                        onClick={() => setTab(rec.tab || "centro")}
-                        className="w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-2.5 py-2 text-left"
-                      >
-                        <p className="text-[11px] font-semibold text-zinc-200">{rec.title}</p>
-                        <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-500">{rec.reason}</p>
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {(intelligence?.alerts || []).filter((item) => item.severity === "critical").slice(0, 3).map((alert) => (
-              <Button variant="bare" size="bare"
-                type="button"
-                key={alert.code}
-                onClick={() => setTab(alert.tab || "centro")}
-                className="w-full rounded-lg border border-red-500/20 bg-red-500/[0.06] p-3 text-left"
-              >
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-red-300" />
-                  <div>
-                    <p className="text-xs font-semibold text-red-100">{alert.title}</p>
-                    <p className="mt-0.5 text-[10px] text-red-200/60">{alert.detail}</p>
-                  </div>
-                </div>
-              </Button>
-            ))}
-
-            {intelligence?.event && (
+{intelligence?.event && (
               <Card className="sub-card border-amber-500/20 bg-amber-500/[0.04] p-3">
                 <SectionHeader
                   icon={AlertTriangle}
@@ -518,18 +431,7 @@ export const OrganizationPanel = ({
                 </label>
               </div>
             </Card>
-
-            <SummaryStrip cols={3}>
-              <Kpi icon={Wallet} label="Caixa" value={fmtMoney(state.player.clean_money)} color="#34D399" />
-              <Kpi icon={TrendingUp} label="Resultado 30d" value={finance ? fmtMoney(finance.net) : "—"} color={(finance?.net || 0) >= 0 ? "#34D399" : "#EF4444"} />
-              <Kpi icon={Banknote} label="Fixos/sem." value={fmtMoney(state.weekly_fixed_total || 0)} color="#F59E0B" />
-            </SummaryStrip>
-
-            {finance && (
-              <Card className="sub-card p-3">
-                <SectionHeader icon={Wallet} title="Centro Financeiro" meta="últimos 30 dias" />
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div><p className="font-mono text-[10px] uppercase text-zinc-500">Receitas</p><p className="font-mono text-xs font-bold text-emerald-300">{fmtMoney(finance.income)}</p></div>
+</p></div>
                   <div><p className="font-mono text-[10px] uppercase text-zinc-500">Despesas</p><p className="font-mono text-xs font-bold text-red-300">{fmtMoney(finance.expenses)}</p></div>
                   <div><p className="font-mono text-[10px] uppercase text-zinc-500">Património</p><p className="font-mono text-xs font-bold text-sky-300">{fmtMoney(finance.asset_value)}</p></div>
                 </div>
@@ -575,24 +477,6 @@ export const OrganizationPanel = ({
                 })}
               </div>
             </div>
-
-            {audit.length > 0 && (
-              <Card className="sub-card p-3">
-                <SectionHeader icon={History} title="Auditoria recente" meta={`${audit.length} eventos`} />
-                <div className="space-y-1.5">
-                  {audit.slice(0, 6).map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 border-b border-white/[0.05] py-1.5 last:border-0">
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-[10px] text-zinc-300">{String(item.action || "").replaceAll(".", " / ")}</p>
-                        <p className="text-[10px] text-zinc-600">{item.ts ? new Date(item.ts).toLocaleString("pt-PT") : ""}</p>
-                      </div>
-                      {item.result?.cost != null && <span className="font-mono text-[10px] text-amber-300">{fmtMoney(item.result.cost)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
             <div>
               <SectionHeader icon={Crown} title="Prestígio e late game" />
               <div className="space-y-2">
@@ -731,7 +615,7 @@ export const OrganizationPanel = ({
                 <Card key={team.id} className="sub-card space-y-3 p-3">
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <InlineRename value={team.name} onSave={(name) => renameTeam(team.id, name)} />
+                      <p className="truncate text-xs font-semibold text-white">{team.name}</p>
                       <p className="font-mono text-[10px] uppercase text-zinc-600">{team.spec} · {team.status}</p>
                     </div>
                     <ConfirmButton
