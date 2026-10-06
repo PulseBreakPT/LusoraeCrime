@@ -478,7 +478,7 @@ export default function GamePage() {
               label="Crew"
               color="text-cyan-400"
               alert={alerts.teams > 0 || hrAlertCount > 0 || fleetAlertCount > 0}
-              active={navGroup === "crew" || ["teams", "employees", "fleet", "weapons", "warehouse"].includes(openPanel)}
+              active={navGroup === "crew" || ["teams", "teamops", "employees", "fleet", "fleetcare", "weapons", "weaponworkshop", "warehouse"].includes(openPanel)}
               onClick={() => toggleNavGroup("crew")}
             />
             <GroupButton
@@ -495,7 +495,7 @@ export default function GamePage() {
               label="Império"
               color="text-red-400"
               alert={empireAlert || alerts.raidRisk}
-              active={navGroup === "empire" || ["empire", "properties", "businesses", "territory", "hq"].includes(openPanel)}
+              active={navGroup === "empire" || ["empire", "properties", "propertyinfra", "businesses", "territory", "hq", "hqsystems"].includes(openPanel)}
               onClick={() => toggleNavGroup("empire")}
             />
             <GroupButton
@@ -530,6 +530,56 @@ export default function GamePage() {
         />
       )}
       {openPanel === "shop" && <ShopPanel open onOpenChange={(o) => setOpenPanel(o ? "shop" : null)} />}
+      {openPanel === "teamops" && (
+        <OrganizationPanel
+          open
+          initialTab="crew"
+          visibleTabs={["crew"]}
+          title="Equipas · doutrinas e loadouts"
+          description="Políticas operacionais, presets, material e dissolução de equipas."
+          onOpenChange={(o) => setOpenPanel(o ? "teamops" : "teams")}
+        />
+      )}
+      {openPanel === "fleetcare" && (
+        <OrganizationPanel
+          open
+          initialTab="frota"
+          visibleTabs={["frota"]}
+          title="Frota · ciclo de vida"
+          description="Revisões, pneus, seguros, inspeções e estado de longo prazo."
+          onOpenChange={(o) => setOpenPanel(o ? "fleetcare" : "fleet")}
+        />
+      )}
+      {openPanel === "weaponworkshop" && (
+        <OrganizationPanel
+          open
+          initialTab="arsenal"
+          visibleTabs={["arsenal"]}
+          title="Armamento · munições e modificações"
+          description="Recarrega munições e gere modificações sem duplicar o inventário principal."
+          onOpenChange={(o) => setOpenPanel(o ? "weaponworkshop" : "weapons")}
+        />
+      )}
+      {openPanel === "propertyinfra" && (
+        <OrganizationPanel
+          open
+          initialTab="imoveis"
+          visibleTabs={["imoveis"]}
+          title="Imóveis · infraestrutura"
+          description="Módulos, capacidade e operacionais destacados nas propriedades."
+          onOpenChange={(o) => setOpenPanel(o ? "propertyinfra" : "properties")}
+        />
+      )}
+      {openPanel === "hqsystems" && (
+        <OrganizationPanel
+          open
+          initialTab="centro"
+          visibleTabs={["centro"]}
+          title="QG · sistemas"
+          description="Políticas, automação, departamentos, proteção e progressão avançada."
+          onOpenChange={(o) => setOpenPanel(o ? "hqsystems" : "hq")}
+        />
+      )}
       {openPanel === "warehouse" && unlocks.warehouse && (
         <OrganizationPanel
           open
