@@ -1635,7 +1635,7 @@ const mutateGame=(save,path,payload)=>{
     const mission={id:uid("mission"),opportunity_id:opp.id,team_id:team.id,team_name:team.name,vehicle_id:vehicle.id,
       member_ids:members.map(e=>e.id),category:opp.category,risk:opp.risk,reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),pays:opp.pays,
       repeat_type:repeatCount>0,repeat_count:repeatCount,operation_profile:profile.profile,
-      fuel_needed:missionFuelNeeded,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:baseChance,success_chance:baseChance,
+      fuel_needed:missionFuelNeeded,fuel_cost:Math.round(missionFuelNeeded*Number(LOCAL_CATALOG.fuel_prices?.[vehicle.fuel_type]||1.8)*100)/100,distance_km:roadRoundKm>0?roadRoundKm/2:opp.dist_km,chance:baseChance,success_chance:baseChance,
       live_chance_delta:0,decision_reward_mult:1,phase:"en_route",
       depart_at:departAt,started_at:departAt,arrive_at:arriveAt,finish_at:finishAt,return_at:returnAt,
       origin,origin_property_id:vehicle.property_id||null,target,
