@@ -528,6 +528,20 @@ export function GameProvider({ children }) {
     action("missions/recall", { mission_id: missionId }, "Equipa chamada de volta");
   const resolveMissionDecision = (missionId, optionId) =>
     action("missions/decision", { mission_id: missionId, option_id: optionId });
+  const reinforceMission = (missionId, teamId) =>
+    action("missions/reinforce", { mission_id: missionId, team_id: teamId }, "Reforço enviado");
+  const saveDispatchPreset = (key, config) =>
+    action("operations/presets/save", { key, config }, "Plano de despacho guardado");
+  const deleteDispatchPreset = (key) =>
+    action("operations/presets/delete", { key }, "Plano de despacho removido");
+  const createStagingArea = (name, lat, lng, durationHours = 4) =>
+    action("operations/staging/create", {
+      name, lat, lng, duration_hours: durationHours,
+    }, "Ponto de apoio criado");
+  const deleteStagingArea = (stagingId) =>
+    action("operations/staging/delete", { staging_id: stagingId }, "Ponto de apoio removido");
+  const saveOperationalRules = (rules) =>
+    action("operations/rules", { rules }, "Regras operacionais atualizadas");
   const previewDispatch = useCallback(async (opportunityId, teamId) => {
     try {
       const payload = { opportunity_id: opportunityId, team_id: teamId };
@@ -977,6 +991,12 @@ export function GameProvider({ children }) {
         createTeam,
         recallTeam,
         resolveMissionDecision,
+        reinforceMission,
+        saveDispatchPreset,
+        deleteDispatchPreset,
+        createStagingArea,
+        deleteStagingArea,
+        saveOperationalRules,
         recommendOpportunityForTeam,
         recommendTeamForOpportunity,
         recommendRepeatForTeam,
