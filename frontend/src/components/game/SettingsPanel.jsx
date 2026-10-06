@@ -14,8 +14,8 @@ import { Slider } from "../ui/slider";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/collapsible";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import {
-  Settings, UserCog, KeyRound, LogOut, Trash2, Monitor, Gamepad2, Cog, Bell, Info,
-  ChevronDown, Wrench, Fuel, BedDouble, Gift, ShieldCheck, Volume2, DatabaseBackup, Download, Upload, RotateCcw,
+  Settings, UserCog, KeyRound, LogOut, Trash2, Monitor, Gamepad2, Bell, Info,
+  ChevronDown, ShieldCheck, Volume2, DatabaseBackup, Download, Upload, RotateCcw,
 } from "lucide-react";
 import { audio } from "../../lib/audio";
 import { toast } from "sonner";
@@ -91,23 +91,6 @@ const VolumeSlider = ({ value, onChange, disabled, testId, ariaLabel }) => (
       className="w-20"
     />
     <span className="w-8 text-right font-mono text-[10px] text-zinc-500">{Math.round(value * 100)}%</span>
-  </div>
-);
-
-const ThresholdInput = ({ value, onChange, disabled, testId, ariaLabel }) => (
-  <div className="flex items-center gap-1">
-    <Input
-      data-testid={testId}
-      aria-label={ariaLabel}
-      type="number"
-      min="1"
-      max="99"
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)))}
-      className="h-auto w-14 border-white/10 bg-black/60 px-1.5 py-1 text-right font-mono text-[11px] text-white"
-    />
-    <span className="font-mono text-[10px] text-zinc-500">%</span>
   </div>
 );
 
@@ -355,7 +338,7 @@ const ABOUT_ITEMS = [
 ];
 
 export const SettingsPanel = ({ open, onOpenChange }) => {
-  const { state, updateAutomationSettings } = useGame();
+  const { state } = useGame();
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { logout, user } = useAuth();
   const {
@@ -376,8 +359,6 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
   } = useSettings();
 
   if (!state) return null;
-  const settings = state.player.settings || {};
-  const patchAutomation = (patch) => updateAutomationSettings(patch);
   const downloadGuestSave = (source="current") => {
     const raw=exportLocalGuestSave(source);
     if(!raw){ toast.error("Não existe uma cópia disponível."); return; }
@@ -582,68 +563,6 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
           <span>{advancedOpen ? "Ocultar avançado" : "Mostrar avançado"}</span>
           <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
         </Button>
-
-        <Section icon={Cog} title="Automatizações" testId="settings-section-automations" hidden={!advancedOpen}>
-          <Row label="Reparar veículos automaticamente" hint="Abaixo da durabilidade indicada" testId="settings-row-auto-repair">
-            <div className="flex items-center gap-2">
-              <ThresholdInput
-                testId="settings-auto-repair-threshold"
-                ariaLabel="Durabilidade mínima para reparação automática"
-                value={settings.auto_repair_threshold ?? 30}
-                disabled={!settings.auto_repair_enabled}
-                onChange={(v) => patchAutomation({ auto_repair_threshold: v })}
-              />
-              <ToggleSwitch
-                testId="settings-toggle-auto-repair"
-                checked={!!settings.auto_repair_enabled}
-                onChange={(v) => patchAutomation({ auto_repair_enabled: v })}
-              />
-            </div>
-          </Row>
-          <Row label="Abastecer veículos automaticamente" hint="Abaixo do combustível indicado" testId="settings-row-auto-refuel">
-            <div className="flex items-center gap-2">
-              <ThresholdInput
-                testId="settings-auto-refuel-threshold"
-                ariaLabel="Combustível mínimo para abastecimento automático"
-                value={settings.auto_refuel_threshold ?? 20}
-                disabled={!settings.auto_refuel_enabled}
-                onChange={(v) => patchAutomation({ auto_refuel_threshold: v })}
-              />
-              <ToggleSwitch
-                testId="settings-toggle-auto-refuel"
-                checked={!!settings.auto_refuel_enabled}
-                onChange={(v) => patchAutomation({ auto_refuel_enabled: v })}
-              />
-            </div>
-          </Row>
-          <Row label="Pôr operacionais a descansar automaticamente" hint="Abaixo da energia indicada" testId="settings-row-auto-rest">
-            <div className="flex items-center gap-2">
-              <ThresholdInput
-                testId="settings-auto-rest-threshold"
-                ariaLabel="Energia mínima para descanso automático"
-                value={settings.auto_rest_threshold ?? 20}
-                disabled={!settings.auto_rest_enabled}
-                onChange={(v) => patchAutomation({ auto_rest_threshold: v })}
-              />
-              <ToggleSwitch
-                testId="settings-toggle-auto-rest"
-                checked={!!settings.auto_rest_enabled}
-                onChange={(v) => patchAutomation({ auto_rest_enabled: v })}
-              />
-            </div>
-          </Row>
-          <Row label="Recolher automaticamente recompensas de missões concluídas" testId="settings-row-auto-claim">
-            <ToggleSwitch
-              testId="settings-toggle-auto-claim"
-              checked={!!settings.auto_claim_quests}
-              onChange={(v) => patchAutomation({ auto_claim_quests: v })}
-            />
-          </Row>
-          <p className="flex items-center gap-1.5 pt-1 text-[10px] text-zinc-600">
-            <Wrench size={9} /> <Fuel size={9} /> <BedDouble size={9} /> <Gift size={9} />
-            Corre mesmo com a app fechada — os custos são os mesmos das ações manuais.
-          </p>
-        </Section>
 
         <Section icon={UserCog} title="Conta" testId="settings-section-account" hidden={!advancedOpen}>
           <ChangePasswordForm />
