@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Checkbox } from "../components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, RotateCcw, Zap, ArrowLeft, Eye, Shield, Crown, User as UserIcon, Flag } from "lucide-react";
+import { Users, TrendingUp, Activity, Settings, AlertTriangle, Lock, Unlock, RotateCcw, Zap, ArrowLeft, Eye, Shield, Crown, User as UserIcon, Flag } from "lucide-react";
 import { toast } from "sonner";
 
 const ROLE_META = {
