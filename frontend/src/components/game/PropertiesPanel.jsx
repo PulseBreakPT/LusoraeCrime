@@ -7,7 +7,7 @@ import {
   propertyUpgradePaybackH,
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
-import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, InlineRename, MiniBar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader, EntityDetailBar, openEntityFromCard } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -53,10 +53,18 @@ const LevelDots = ({ level, max, color }) => (
 export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const { state, catalog, serverNow, sellProperty, upgradeProperty, renameProperty, startPlacement, optimizeProperties } = useGame();
   const [query, setQuery] = useState("");
+  const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   useTick(open);
   usePanelFocus(open, focusTarget);
   useEffect(() => {
-    if (open && focusTarget?.testId?.startsWith("property-card-")) setQuery("");
+    if (!open) {
+      setSelectedPropertyId(null);
+      return;
+    }
+    if (focusTarget?.testId?.startsWith("property-card-")) {
+      setQuery("");
+      setSelectedPropertyId(focusTarget.testId.slice("property-card-".length));
+    }
   }, [open, focusTarget?.token, focusTarget?.testId]);
   if (!state) return null;
 
@@ -82,10 +90,15 @@ export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget })
     matchesSearch(query, p.name, catalog?.property_types?.[p.type_key]?.name || p.type_key, p.district)
   );
   // Em obras para o fim — o jogador quer ver primeiro o que pode gerir já.
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = [...filtered]
+    .filter((property) => !selectedPropertyId || String(property.id) === String(selectedPropertyId))
+    .sort((a, b) => {
     const rank = (p) => (isUpgrading(p) ? 1 : 0);
     return rank(a) - rank(b);
   });
+  const selectedProperty = selectedPropertyId
+    ? props.find((property) => String(property.id) === String(selectedPropertyId))
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -99,7 +112,16 @@ export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget })
           <SheetDescription className="text-zinc-500">Cada esquina comprada é uma esquina controlada — expande o território.</SheetDescription>
         </SheetHeader>
 
-        <Button
+        {selectedProperty && (
+          <EntityDetailBar
+            testId="property-detail-bar"
+            title={selectedProperty.name}
+            meta="Ficha individual do imóvel/base"
+            onBack={() => setSelectedPropertyId(null)}
+          />
+        )}
+
+        {!selectedPropertyId && <Button
           type="button"
           variant="outline"
           size="compact"
@@ -109,7 +131,7 @@ export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget })
         >
           Módulos · pessoal destacado
           <Warehouse size={11} className="text-cyan-300" />
-        </Button>
+        </Button>}
 
         {state.player.heat >= 70 && props.some((p) => p.type_key === "laboratorio") && (
           <Alert variant="destructive" data-testid="raid-warning" className="mt-3 border-red-600/40 bg-red-600/10 py-2">
@@ -203,7 +225,17 @@ export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget })
             const stacks = stackRank > 0 && (pt.bonus_pct || pt.repair_discount_pct || pt.dirty_per_h || pt.launder_per_h);
             const paybackH = !maxed ? propertyUpgradePaybackH(pt, condition, upgradeCost) : null;
             return (
-              <Card key={p.id} data-testid={`property-card-${p.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
+              <Card
+                key={p.id}
+                data-testid={`property-card-${p.id}`}
+                data-entity-detail={selectedPropertyId && String(p.id) === String(selectedPropertyId) ? "open" : "closed"}
+                onClick={(event) => openEntityFromCard(event, () => setSelectedPropertyId(String(p.id)))}
+                className={cn(
+                  "h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none transition-colors",
+                  selectedPropertyId ? "cursor-default border-cyan-500/20" : "cursor-pointer hover:border-cyan-500/20"
+                )}
+                style={{ "--dtier": tier.color }}
+              >
                 {/* Cabeçalho: identidade do imóvel sem ilustração decorativa */}
                 <div className="relative z-[1]">
                   <div className="min-w-0">
@@ -321,7 +353,7 @@ export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget })
           })}
         </div>
 
-        <div className="mt-6">
+        {!selectedPropertyId && <div className="mt-6">
           <SectionHeader icon={Landmark} title="Mercado imobiliário" meta={catalog ? `${Object.keys(catalog.property_types || {}).length} tipos` : undefined} />
           <div className="flex flex-col gap-2">
             {catalog &&
@@ -412,7 +444,7 @@ export const PropertiesPanel = ({ open, onOpenChange, onNavigate, focusTarget })
                 );
               })}
           </div>
-        </div>
+        </div>}
       </SheetContent>
     </Sheet>
   );
