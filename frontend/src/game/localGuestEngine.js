@@ -1502,6 +1502,18 @@ const mutateGame=(save,path,payload)=>{
     if(!validGuestHqLocation(Number(p.lat),Number(p.lng))) fail(400,"Localização inválida para o Quartel-General");
     addStarterWorld(save,Number(p.lat),Number(p.lng));return {ok:true,hq:clone(save.player.hq)};
   }
+  if(path==="hq/relocate"){
+    if(!save.player.hq)fail(400,"Estabelece primeiro o Quartel-General");
+    if(Number(save.player.stats?.ops_dispatched||0)>0)fail(409,"O QG só pode ser mudado antes da primeira operação.");
+    if(!validGuestHqLocation(Number(p.lat),Number(p.lng)))fail(400,"Localização inválida para o Quartel-General");
+    const lat=Number(p.lat),lng=Number(p.lng);
+    save.player.hq={...save.player.hq,lat,lng,name:"Quartel-General"};
+    save.player.region=lat<34?"Madeira":lng<-20?"Açores":lat>40.7?"Norte":lat<38.0?"Algarve":"Centro";
+    save.player.districts=makeDistricts(lat,lng);
+    save.opportunities=makeOpportunities(save,5);
+    addEvent(save,"system","QG reposicionado durante o tutorial. As oportunidades foram recalculadas.");
+    return {ok:true,hq:clone(save.player.hq),region:save.player.region};
+  }
   if(path==="dispatch/preview"){
     const opp=save.opportunities.find(o=>o.id===p.opportunity_id),team=save.teams.find(t=>t.id===p.team_id);
     if(!opp||!team)fail(404,"Operação ou equipa não encontrada");
