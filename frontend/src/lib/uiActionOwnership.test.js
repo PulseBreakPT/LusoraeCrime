@@ -16,6 +16,11 @@ describe("UI action ownership", () => {
   const focusHook = read("hooks/usePanelFocus.js");
   const gameContext = read("context/GameContextV2.js");
   const localGuest = read("game/localGuestEngine.js");
+  const navigation = read("game/navigation.js");
+  const hq = read("components/game/HQPanel.jsx");
+  const forYou = read("components/game/ForYouPanel.jsx");
+  const city = read("components/game/CityPanel.jsx");
+  const opportunities = read("components/game/OpportunitiesPanel.jsx");
 
   test("team management does not duplicate recovery or fleet maintenance mutations", () => {
     for (const forbidden of [
@@ -122,19 +127,47 @@ describe("UI action ownership", () => {
   });
 
 
-  test("retention engine exposes decisions, world pulse and three-horizon roadmap", () => {
+  test("retention features have one canonical UI owner", () => {
     const liveOps = read("components/game/LiveOpsDock.jsx");
-    const opportunities = read("components/game/OpportunitiesPanel.jsx");
     const commandCenter = read("components/game/CommandCenter.jsx");
     expect(gameContext).toContain('action("missions/decision"');
     expect(liveOps).toContain('data-testid="liveops-decision"');
     expect(liveOps).toContain("Não escolher nada mantém o plano original sem penalização.");
-    expect(opportunities).toContain('data-testid="world-pulse-card"');
-    expect(intel).toContain('data-testid="retention-roadmap"');
+
+    // Para ti owns the three-horizon next-moves view.
+    expect(forYou).toContain("state.retention?.next_moves");
+    expect(forYou).toContain('title="Próximos movimentos"');
+    expect(intel).not.toContain('data-testid="retention-roadmap"');
+
+    // Mundo owns the pulse surface. Operations may use the pulse modifier
+    // contextually, but must not reproduce the full World card.
+    expect(city).toContain('["pulse", "Pulso"');
+    expect(opportunities).not.toContain('data-testid="world-pulse-card"');
+
     expect(intel).toContain('data-testid="organization-records"');
     expect(commandCenter).toContain('group: "Prioridades"');
     expect(localGuest).toContain('if(path==="missions/decision")');
     expect(localGuest).toContain("localWorldPulse");
+  });
+
+  test("navigation and panels do not expose duplicate legacy destinations", () => {
+    expect(navigation).not.toContain('{ id:"management"');
+    expect(navigation).not.toContain('{ id:"organization"');
+    expect(navigation).not.toContain('{ id:"city"');
+    expect(navigation).toContain('management: "hq"');
+    expect(navigation).toContain('organization: "hq"');
+    expect(navigation).toContain('city: "world"');
+
+    expect(gamePage).not.toContain('data-testid="open-management-button"');
+    expect(gamePage).not.toContain('openPanel === "management"');
+    expect(gamePage).not.toContain('openPanel === "organization"');
+    expect(gamePage).not.toContain('openPanel === "city"');
+
+    expect(hq).not.toContain("Recomendações do consultor");
+    expect(hq).not.toContain('onNavigate("organization")');
+    expect(hq).not.toContain("Gestão avançada");
+    expect(empire).not.toContain('data-testid="empire-level-card"');
+    expect(empire).not.toContain('title="Quartel-general"');
   });
 
 
