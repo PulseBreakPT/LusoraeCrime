@@ -323,7 +323,7 @@ const TipRow = ({ label, value, color = "#E4E4E7" }) => (
   </div>
 );
 
-const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, roster, showOperatorNames = true }) => {
+const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onToggleFollow, onSelectTeam, roster, showOperatorNames = true }) => {
   const map = useMap();
   const [route, setRoute] = useState(() => initialMissionRouteState(mission));
   const markerRef = useRef(null);
@@ -825,7 +825,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
         icon={icon}
         zIndexOffset={500}
         opacity={dim ? 0.25 : 1}
-        eventHandlers={{ click: () => onToggleFollow && onToggleFollow() }}
+        eventHandlers={{ click: () => { onToggleFollow?.(); onSelectTeam?.(mission.team_id); } }}
       >
         <LTooltip direction="top" offset={[0, -14]} opacity={1} className="sub-map-tip">
           <div className="min-w-[150px]">
@@ -871,7 +871,7 @@ const MissionUnit = ({ mission, serverNow, dim = false, followed = false, onTogg
 
 // Veículo a caminho de outra base (POST /vehicles/transfer) — mesmo padrão de
 // rota/animação do MissionUnit, mas mais simples (sem fases, sem perseguição).
-const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
+const VehicleTransferUnit = ({ vehicle, serverNow, dim = false, onSelectVehicle }) => {
   const tr = vehicle.transfer;
   const origin = tr.from;
   const target = tr.to;
@@ -970,7 +970,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
           />
         </>
       )}
-      <Marker ref={markerRef} position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={480} opacity={dim ? 0.25 : 1}>
+      <Marker ref={markerRef} position={[pos.lat, pos.lng]} icon={icon} zIndexOffset={480} opacity={dim ? 0.25 : 1} eventHandlers={{ click: () => onSelectVehicle?.(vehicle.id) }}>
         <LTooltip direction="top" offset={[0, -12]} opacity={1} className="sub-map-tip">
           <div className="min-w-[140px]">
             <p className="text-[11px] font-bold text-white">{vehicle.name}</p>
@@ -986,7 +986,7 @@ const VehicleTransferUnit = ({ vehicle, serverNow, dim = false }) => {
   );
 };
 
-export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, onSelectProperty, baseFilter = "all" }) {
+export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, onSelectHQ, onSelectProperty, onSelectTeam, onSelectVehicle, baseFilter = "all" }) {
   const { catalog, placement, updatePlacementPoint } = useGame();
   const hq = state?.player?.hq;
   const hqSkinColor = catalog?.shop?.hq_skins?.[state?.player?.hq_skin_key]?.color;
@@ -1160,9 +1160,11 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
             key={safeMission.id}
             mission={safeMission}
             serverNow={serverNow}
+            onSelectVehicle={onSelectVehicle}
             dim={baseFilter !== "all" && (safeMission.origin_property_id || "hq") !== baseFilter}
             followed={safeMission.id === followId}
             onToggleFollow={() => setFollowId((cur) => (cur === safeMission.id ? null : safeMission.id))}
+            onSelectTeam={onSelectTeam}
             roster={(safeMission.member_ids || [])
               .map((id) => empById[id])
               .filter(Boolean)
