@@ -112,3 +112,12 @@ def test_follow_up_never_exceeds_stage_cap():
         "target": {"lat": 38.72, "lng": -9.14},
     }
     assert build_follow_up_opportunity(mission, "success", datetime.now(timezone.utc)) is None
+
+
+if __name__ == "__main__":
+    test_requirements_scale_with_risk()
+    test_readiness_uses_real_capabilities()
+    test_district_profile_is_stable()
+    test_reinforcement_has_bounded_effect()
+    test_follow_up_never_exceeds_stage_cap()
+    print("Operational director checks passed.")
