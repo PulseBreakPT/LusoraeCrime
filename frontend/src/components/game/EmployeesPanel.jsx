@@ -3,7 +3,7 @@ import { useGame } from "../../context/GameContextV2";
 import {
   fmtMoney, fmtDuration, SPEC_LABELS, EMP_STATUS_LABELS, EMP_STATUS_COLORS, STATUS_LABELS,
   ATTR_LABELS, ATTR_FULL, RARITY_LABELS, RARITY_COLORS, RANK_LABELS, fatigueColor, goodBarColor,
-  matchesSearch, conditionBand, weaponCompatibility, employeeAdequacy,
+  matchesSearch, employeeAdequacy,
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
 import { usePreferenceState } from "../../lib/persist";
@@ -22,7 +22,7 @@ import {
   IdCard, GraduationCap, BedDouble, ChevronUp, Gift, UserX, Lock,
   Cross, Gavel, Sparkles, History, ChevronDown, RefreshCw, AlertTriangle,
   HeartPulse, ShieldCheck, BatteryMedium, UserCheck, Car, Leaf, Search, Eye, EyeOff,
-  Swords, ShieldAlert, Loader2, UserPlus, ArrowUpDown,
+  Swords, Loader2, UserPlus, ArrowUpDown,
 } from "lucide-react";
 
 const EMP_STATUS_TIPS = {
@@ -81,9 +81,9 @@ const ActionBtn = ({ testId, icon, label, onClick, disabled, title, blockedReaso
 
 const EmployeeCard = ({ e, onNavigate }) => {
   const {
-    state, catalog, serverNow, assignEmployee, trainEmployee, restEmployee,
+    state, catalog, serverNow, trainEmployee, restEmployee,
     promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
-    favoriteEmployeeIds, toggleFavoriteEmployee, unassignWeapon,
+    favoriteEmployeeIds, toggleFavoriteEmployee,
   } = useGame();
   const [manage, setManage] = useState(false);
   const [course, setCourse] = useState("");
@@ -108,8 +108,6 @@ const EmployeeCard = ({ e, onNavigate }) => {
   const vehicle = team?.vehicle_id ? state.vehicles.find((v) => v.id === team.vehicle_id) : null;
   const weapon = e.weapon_id ? (state.weapons || []).find((w) => w.id === e.weapon_id) : null;
   const weaponModel = weapon ? catalog?.weapon_models?.[weapon.model_key] : null;
-  const weaponCompat = weapon && weaponModel ? weaponCompatibility(e, weaponModel) : null;
-  const weaponProficiency = weaponModel ? (e.weapon_proficiency || {})[weaponModel.category] || 0 : 0;
   const mission = e.status === "on_mission" && team ? state.missions.find((m) => m.team_id === team.id) : null;
   let missionEtaS = null;
   let missionPhaseLabel = "";
@@ -320,24 +318,23 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
           <div>
             <SectionHeader icon={UserCheck} title="Alocação" />
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <Select
-                value={e.team_id || "__none__"}
-                disabled={!idle}
-                onValueChange={(teamId) => assignEmployee(e.id, teamId === "__none__" ? null : teamId)}
+            <div className="flex min-h-10 items-center justify-between gap-2 rounded-md border border-white/[0.07] bg-black/20 px-2.5 py-2">
+              <div className="min-w-0">
+                <p className="truncate font-mono text-[10px] text-zinc-300">
+                  {team ? team.name : "Sem equipa"}
+                </p>
+                <p className="mt-0.5 font-mono text-[10px] text-zinc-600">{fmtMoney(e.salary)}/semana</p>
+              </div>
+              <Button
+                variant="bare"
+                size="bare"
+                type="button"
+                data-testid={`emp-nav-team-${e.id}`}
+                onClick={() => onNavigate && onNavigate("teams", team ? { focusTestId: `team-card-${team.id}` } : undefined)}
+                className="shrink-0 font-mono text-[10px] text-cyan-300 underline-offset-2 hover:underline"
               >
-                <SelectTrigger data-testid={`emp-team-select-${e.id}`} className="min-h-10 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__" className="font-mono text-xs">Sem equipa</SelectItem>
-                  {state.teams.map((item) => {
-                    const memberCount = state.employees.filter((x) => x.team_id === item.id).length;
-                    return <SelectItem key={item.id} value={item.id} className="font-mono text-xs">{item.name} · {memberCount} membros</SelectItem>;
-                  })}
-                </SelectContent>
-              </Select>
-              <span className="flex min-h-10 items-center font-mono text-[10px] text-zinc-500">{fmtMoney(e.salary)}/semana</span>
+                Gerir em Equipas
+              </Button>
             </div>
             {vehicle && (
               <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-500">
@@ -348,39 +345,21 @@ const EmployeeCard = ({ e, onNavigate }) => {
 
           <div>
             <SectionHeader icon={Swords} title="Equipamento" />
-            {weapon && weaponModel ? (
-              <div className="rounded-md border border-white/[0.07] bg-black/20 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
-                    {weaponModel.name} · <span style={{ color: conditionBand(weapon.condition).color }}>{Math.round(weapon.condition)}%</span>
-                  </p>
-                  <Button variant="bare" size="bare"
-                    type="button"
-                    data-testid={`emp-unassign-weapon-${e.id}`}
-                    onClick={() => unassignWeapon(e.id)}
-                    disabled={!idle}
-                    className="shrink-0 font-mono text-[10px] text-red-400 disabled:opacity-40"
-                  >
-                    Desatribuir
-                  </Button>
-                </div>
-                {weaponProficiency > 0 && <p className="mt-1 font-mono text-[10px] text-zinc-500">Proficiência {Math.round(weaponProficiency)}%</p>}
-                {weaponCompat && !weaponCompat.compatible && (
-                  <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400">
-                    <ShieldAlert size={9} /> Compatibilidade baixa: {weaponCompat.missing.join(", ")}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <Button variant="bare" size="bare"
+            <div className="flex min-h-10 items-center justify-between gap-2 rounded-md border border-white/[0.07] bg-black/20 px-2.5 py-2">
+              <p className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
+                {weapon && weaponModel ? `${weaponModel.name} · ${Math.round(weapon.condition)}%` : "Sem arma equipada"}
+              </p>
+              <Button
+                variant="bare"
+                size="bare"
                 type="button"
                 data-testid={`emp-nav-weapons-${e.id}`}
-                onClick={() => onNavigate && onNavigate("weapons")}
-                className="min-h-10 w-full rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-2 text-left font-mono text-[10px] text-amber-300"
+                onClick={() => onNavigate && onNavigate("weapons", weapon ? { focusTestId: `weapon-card-${weapon.id}` } : undefined)}
+                className="shrink-0 font-mono text-[10px] text-amber-300 underline-offset-2 hover:underline"
               >
-                Sem arma equipada · abrir Armamento
+                Gerir em Armamento
               </Button>
-            )}
+            </div>
           </div>
 
           <div>
