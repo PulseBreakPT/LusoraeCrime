@@ -490,7 +490,7 @@ export const OrganizationPanel = ({
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-semibold text-zinc-300">{label}</p>
-                      <p className="font-mono text-[9px] uppercase text-zinc-600">{metric} abaixo do limite</p>
+                      <p className="font-mono text-[10px] uppercase text-zinc-600">{metric} abaixo do limite</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <Input
@@ -505,7 +505,7 @@ export const OrganizationPanel = ({
                         })}
                         className="h-8 w-14 bg-black/50 px-1.5 text-right font-mono text-[10px]"
                       />
-                      <span className="font-mono text-[9px] text-zinc-600">%</span>
+                      <span className="font-mono text-[10px] text-zinc-600">%</span>
                     </div>
                   </div>
                 ))}
