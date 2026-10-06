@@ -42,6 +42,7 @@ export const WorldPulseHud = ({ world, realtimeConnected, onOpen }) => {
         data-testid="world-pulse-hud"
         aria-label={`Abrir Mundo — ${summary}`}
         onClick={onOpen}
+        style={{ top: "calc(3.6rem + env(safe-area-inset-top, 0px))" }}
         className="sub-world-pulse-hud sub-optional-hud pointer-events-auto fixed right-2 z-[68] flex min-h-11 max-w-[min(19rem,calc(100vw-1rem))] items-center gap-2 rounded-xl border border-white/[0.08] bg-[#070709]/90 px-2.5 py-2 text-left shadow-[0_10px_28px_rgba(0,0,0,0.42)] backdrop-blur-sm transition-colors hover:bg-[#0d0d10]"
       >
         <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${eventDanger ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-cyan-500/20 bg-cyan-500/[0.07] text-cyan-300"}`}>
