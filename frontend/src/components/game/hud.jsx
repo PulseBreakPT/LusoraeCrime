@@ -177,7 +177,7 @@ export const EmptyState = ({ icon: Icon, title, sub, testId, className = "", chi
 
 // Nome de um item (veículo/operacional/propriedade) com um lápis ao lado que troca
 // para um input inline + guardar/cancelar. Substitui o <p>{item.name}</p> estático.
-export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassName = "" }) => {
+export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassName = "", truncateText = true }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -229,7 +229,7 @@ export const InlineRename = ({ value, onSave, testId, maxLength = 40, textClassN
 
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5">
-      <span className={`truncate ${textClassName}`}>{value}</span>
+      <span className={cn(truncateText ? "truncate" : "whitespace-normal break-words", textClassName)}>{value}</span>
       <Tip tip="Renomear">
         <Button variant="bare" size="bare"
           type="button"
