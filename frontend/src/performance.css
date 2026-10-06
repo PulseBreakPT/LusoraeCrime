@@ -237,3 +237,67 @@ html.sub-reduced-motion .sub-game-shell::after {
   animation: none !important;
   will-change: auto !important;
 }
+
+
+/* --------------------------------------------------------------------------
+   Mission dispatch modal — true viewport centering.
+   The old bottom-sheet positioning and slide-up transform could override
+   translate(-50%, -50%). These rules live in the final CSS layer.
+   -------------------------------------------------------------------------- */
+
+@keyframes sub-opp-card-center-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, calc(-50% + 14px), 0) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+}
+
+.sub-opp-card-centered {
+  position: fixed !important;
+  left: 50% !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  transform: translate3d(-50%, -50%, 0);
+  transform-origin: 50% 50%;
+  animation: sub-opp-card-center-enter 280ms cubic-bezier(.22,1,.36,1) both !important;
+}
+
+.sub-opp-card-centered[data-risk="4"],
+.sub-opp-card-centered[data-risk="5"] {
+  animation:
+    sub-opp-card-center-enter 280ms cubic-bezier(.22,1,.36,1) both,
+    sub-fx-risk-impact 760ms var(--sub-fx-ease) 80ms both !important;
+}
+
+.sub-opp-card-centered[data-hot="true"] {
+  animation:
+    sub-opp-card-center-enter 280ms cubic-bezier(.22,1,.36,1) both,
+    sub-fx-hot-impact 680ms var(--sub-fx-ease) 70ms both !important;
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  .sub-opp-card-centered,
+  .sub-opp-card-centered[data-risk="4"],
+  .sub-opp-card-centered[data-risk="5"],
+  .sub-opp-card-centered[data-hot="true"] {
+    animation: sub-opp-card-center-enter 240ms cubic-bezier(.22,1,.36,1) both !important;
+  }
+}
+
+html.sub-reduced-motion .sub-opp-card-centered {
+  animation: none !important;
+  transform: translate3d(-50%, -50%, 0) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-opp-card-centered {
+    animation: none !important;
+    transform: translate3d(-50%, -50%, 0) !important;
+  }
+}
