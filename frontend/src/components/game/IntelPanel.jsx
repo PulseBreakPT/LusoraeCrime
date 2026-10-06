@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
-import { BrainCircuit, Lightbulb, ArrowRight, Crosshair, Trophy } from "lucide-react";
+import { BrainCircuit, Lightbulb, ArrowRight, Crosshair, Trophy, Fuel, AlertTriangle } from "lucide-react";
 
 const OUTCOME_LABELS = { success: "Sucesso", partial: "Parcial", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
 const OUTCOME_COLORS = { success: "#34D399", partial: "#38BDF8", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
@@ -63,6 +63,67 @@ const RetentionRoadmap = ({ onNavigate }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+const LatestReturnSummary = ({ onNavigate }) => {
+  const { state } = useGame();
+  const latest=(state?.history || []).find((mission)=>["success","partial","failure","police"].includes(
+    mission.chase_outcome === "caught" ? "police" : mission.outcome
+  ));
+  if(!latest) return null;
+  const outcome=latest.chase_outcome === "caught" ? "police" : latest.outcome;
+  const reward=Number(latest.pending_reward || 0);
+  const fuelCost=Number(latest.fuel_cost || 0);
+  const critical=(latest.top_negatives || [])[0];
+  const eventCount=Array.isArray(latest.live_log) ? latest.live_log.length : 0;
+  const nextMove=state?.retention?.next_moves?.[0] || null;
+  return (
+    <div className="mt-3" data-testid="latest-return-summary">
+      <SectionHeader icon={ArrowRight} title="Último regresso" meta={OUTCOME_LABELS[outcome] || outcome} />
+      <Card className="sub-card p-3 shadow-none">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">{latest.opportunity?.name || "Operação"}</p>
+            <p className="mt-0.5 font-mono text-[10px] text-zinc-500">{latest.team_name || "Equipa"} · {latest.opportunity?.district || "zona desconhecida"}</p>
+          </div>
+          <span className="shrink-0 font-mono text-[10px] font-bold uppercase" style={{color:OUTCOME_COLORS[outcome] || "#8E8E93"}}>
+            {OUTCOME_LABELS[outcome] || outcome}
+          </span>
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          <div className="rounded-md border border-white/[0.06] bg-black/25 p-2">
+            <p className="font-mono text-[9px] uppercase text-zinc-600">Ganho</p>
+            <p className="mt-0.5 font-mono text-[11px] font-bold text-emerald-300">{reward>0?`+${fmtMoney(reward)}`:"0 €"}</p>
+          </div>
+          <div className="rounded-md border border-white/[0.06] bg-black/25 p-2">
+            <p className="flex items-center gap-1 font-mono text-[9px] uppercase text-zinc-600"><Fuel size={9}/> Combustível</p>
+            <p className="mt-0.5 font-mono text-[11px] font-bold text-amber-300">{fuelCost>0?`−${fmtMoney(fuelCost)}`:"—"}</p>
+          </div>
+          <div className="rounded-md border border-white/[0.06] bg-black/25 p-2">
+            <p className="font-mono text-[9px] uppercase text-zinc-600">Chance inicial</p>
+            <p className="mt-0.5 font-mono text-[11px] font-bold text-cyan-300">{latest.success_chance!=null?`${Math.round(Number(latest.success_chance)*100)}%`:"—"}</p>
+          </div>
+        </div>
+        <div className="mt-2 rounded-md border border-white/[0.06] bg-black/20 p-2 text-[10px] leading-relaxed text-zinc-400">
+          <p className="flex items-start gap-1.5"><AlertTriangle size={10} className="mt-0.5 shrink-0 text-zinc-500"/>
+            <span>{critical ? `Fator crítico: ${critical.label} (${Math.round(Number(critical.pct||0)*100)}%).` : "Sem fator crítico negativo dominante no despacho."} {eventCount ? `Foram registados ${eventCount} eventos durante a operação.` : "Sem eventos adicionais registados."}</span>
+          </p>
+        </div>
+        {nextMove && (
+          <Button variant="bare" size="bare" type="button"
+            onClick={()=>onNavigate && onNavigate(nextMove.panel, nextMove.focus_test_id ? {focusTestId:nextMove.focus_test_id} : undefined)}
+            className="mt-2 flex w-full items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.025] px-2.5 py-2 text-left hover:bg-white/[0.05]"
+          >
+            <span>
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-600">Próximo passo</span>
+              <span className="mt-0.5 block text-[10px] font-semibold text-zinc-200">{nextMove.title}</span>
+            </span>
+            <ArrowRight size={12} className="shrink-0 text-zinc-500"/>
+          </Button>
+        )}
+      </Card>
     </div>
   );
 };
@@ -300,6 +361,8 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
         </SheetHeader>
 
         <RecommendedActions onNavigate={onNavigate} />
+
+        <LatestReturnSummary onNavigate={onNavigate} />
 
         <Section title="Resumo de operações" testId="intel-operations">
           <Grid>
