@@ -50,7 +50,7 @@ export default function GamePage() {
   const gameReady = Boolean(state);
   const playerLevel = Number(state?.player?.level || 1);
   const unlocks = {
-    world: playerLevel >= 5,
+    world: true,
     businesses: playerLevel >= 5,
     warehouse: playerLevel >= 10,
     territory: playerLevel >= 10,
@@ -156,6 +156,8 @@ export default function GamePage() {
     setFocusTarget(null);
     setNavGroup(null);
     setMapLegendOpen(false);
+    setCommandOpen(false);
+    setSelectedOpp(null);
     setOpenPanel(canonicalGamePanel(panel));
   };
 
@@ -169,7 +171,11 @@ export default function GamePage() {
   };
 
   const toggleNavGroup = (group) => {
+    setFocusTarget(null);
     setMapLegendOpen(false);
+    setCommandOpen(false);
+    setSelectedOpp(null);
+    setOpenPanel(null);
     setNavGroup((current) => (current === group ? null : group));
   };
 
@@ -351,7 +357,7 @@ export default function GamePage() {
 
       {!placement && !focusMode && (
         <div
-          className="sub-bottom-nav-shell pointer-events-auto absolute left-1/2 z-40"
+          className="sub-bottom-nav-shell pointer-events-auto absolute left-1/2 z-[70]"
           style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
         >
           {navGroup && (
@@ -492,7 +498,7 @@ export default function GamePage() {
               alert={wantedStars >= 3}
               active={openPanel === "world"}
               expandable={false}
-              onClick={() => unlocks.world ? openFromNav("world") : null}
+              onClick={() => openFromNav("world")}
             />
           </div>
         </div>
