@@ -27,6 +27,7 @@ import HQOnboarding from "../components/game/HQOnboarding";
 import { DisclaimerModal } from "../components/game/DisclaimerModal";
 import { GuestSaveRecovery } from "../components/game/GuestSaveRecovery";
 import { FpsMeter } from "../components/game/FpsMeter";
+import { WorldPulseHud } from "../components/game/WorldPulseHud";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../components/ui/select";
@@ -36,7 +37,7 @@ import { areaLabel, canonicalGamePanel } from "../game/navigation";
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, RadioTower, Focus } from "lucide-react";
 
 export default function GamePage() {
-  const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
+  const { state, stateError, catalog, refresh, serverNow, lastSyncAt, realtimeConnected, autoOpenReportSignal, placement } = useGame();
   const settings = useSettings();
   const { hideImpossibleMissions, showFps, focusMode } = settings;
   const [selectedOpp, setSelectedOpp] = useState(null);
@@ -286,6 +287,13 @@ export default function GamePage() {
       )}
 
       {!focusMode && <ResourceBar />}
+      {!focusMode && !placement && !selectedOpp && !openPanel && !navGroup && (
+        <WorldPulseHud
+          world={state.operational?.world}
+          realtimeConnected={realtimeConnected}
+          onOpen={() => openFromNav("world")}
+        />
+      )}
       {focusMode && !placement && (
         <Button
           type="button"

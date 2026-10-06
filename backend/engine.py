@@ -556,19 +556,59 @@ async def resolve_mission_origin(db, player, vehicle):
 
 
 async def add_event(db, player_id, kind, message):
+    """Persiste um acontecimento e acorda imediatamente os clientes ligados.
+
+    MongoDB continua a ser a fonte de verdade. O WebSocket apenas transporta
+    o sinal de que existe estado novo, permitindo ao cliente sincronizar sem
+    esperar pelo próximo poll.
+    """
+    ts = now_utc().isoformat()
     await db.events.insert_one({
         "player_id": player_id, "kind": kind, "message": message,
-        "ts": now_utc().isoformat(),
+        "ts": ts,
     })
+    try:
+        # Import tardio evita acoplamento/ciclo durante o arranque do servidor.
+        from realtime import publish_realtime_event
+        await publish_realtime_event(
+            "game.event",
+            {"kind": kind, "message": message, "ts": ts},
+            scope="player",
+            target=str(player_id),
+            channel="world",
+        )
+    except Exception:
+        # Realtime é um acelerador, nunca pode tornar uma mutação autoritativa
+        # inválida. O polling continua a ser o fallback.
+        logger.debug("Realtime event publish failed", exc_info=True)
 
 
 async def record_tx(db, player_id, kind, amount, currency, balance_after, note):
     """Regista uma transação no extrato — todo o dinheiro que entra ou sai
     fica com um registo consultável, mesmo que o evento em si já exista."""
+    ts = now_utc().isoformat()
     await db.transactions.insert_one({
         "player_id": player_id, "kind": kind, "amount": amount, "currency": currency,
-        "balance_after": balance_after, "note": note, "ts": now_utc().isoformat(),
+        "balance_after": balance_after, "note": note, "ts": ts,
     })
+    try:
+        from realtime import publish_realtime_event
+        await publish_realtime_event(
+            "economy.changed",
+            {
+                "kind": kind,
+                "amount": amount,
+                "currency": currency,
+                "balance_after": balance_after,
+                "note": note,
+                "ts": ts,
+            },
+            scope="player",
+            target=str(player_id),
+            channel="world",
+        )
+    except Exception:
+        logger.debug("Realtime economy publish failed", exc_info=True)
 
 
 async def _unlink_employee_weapon(db, emp_id):

@@ -10,6 +10,7 @@ import { audio } from "../lib/audio";
 import { isOnLand, isValidHqLocation } from "../lib/land";
 import { fetchRoute } from "../lib/routing";
 import { isLocalGuestMode } from "../game/localGuestEngine";
+import { realtime } from "../lib/realtime";
 
 // Som temático por ação — o prefixo mais específico ganha. Ações fora desta
 // lista ficam em silêncio (o toast e o toque de interface já dão feedback).
@@ -80,6 +81,7 @@ export function GameProvider({ children }) {
   const consecutiveFailuresRef = useRef(0);
   const connectionLostWarnedRef = useRef(false);
   const [lastSyncAt, setLastSyncAt] = useState(0);  // ms da última sincronização com sucesso
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const prevTeamsRef = useRef(null);
   const prevEmployeesRef = useRef(null);
@@ -91,11 +93,13 @@ export function GameProvider({ children }) {
   const prevChaseIdsRef = useRef(new Set());
   const returnedTimersRef = useRef(new Set());  // timeouts pendentes de justReturnedTeamIds
   const pendingActionsRef = useRef(new Set());   // dedupe de duplo toque enquanto a mutação está em curso
+  const realtimeRefreshTimerRef = useRef(null);
 
   // Cancela quaisquer timeouts pendentes ao desmontar (evita setState-após-unmount).
   useEffect(() => () => {
     for (const id of returnedTimersRef.current) clearTimeout(id);
     returnedTimersRef.current.clear();
+    if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
   }, []);
 
   const [justReturnedTeamIds, setJustReturnedTeamIds] = useState([]);
@@ -372,6 +376,45 @@ export function GameProvider({ children }) {
   // pelo listener de visibilidade, sem re-subscrever efeitos).
   refreshRef.current = refresh;
 
+  // O backend já expõe WebSocket autoritativo para notificações. Os frames
+  // não transportam mutations: apenas acordam o cliente para puxar o /state
+  // canónico. Assim o mapa reage quase imediatamente sem depender de polling
+  // agressivo, mantendo um fallback seguro se o socket cair.
+  useEffect(() => {
+    if (!user || isLocalGuestMode()) {
+      setRealtimeConnected(false);
+      realtime.disconnect();
+      return undefined;
+    }
+
+    const scheduleRealtimeRefresh = () => {
+      if (document.visibilityState === "hidden") return;
+      if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+      realtimeRefreshTimerRef.current = setTimeout(() => {
+        realtimeRefreshTimerRef.current = null;
+        refreshRef.current?.();
+      }, 120);
+    };
+    const onStatus = (event) => setRealtimeConnected(Boolean(event.detail?.connected));
+
+    realtime.addEventListener("status", onStatus);
+    realtime.addEventListener("game.event", scheduleRealtimeRefresh);
+    realtime.addEventListener("economy.changed", scheduleRealtimeRefresh);
+    realtime.connect();
+
+    return () => {
+      realtime.removeEventListener("status", onStatus);
+      realtime.removeEventListener("game.event", scheduleRealtimeRefresh);
+      realtime.removeEventListener("economy.changed", scheduleRealtimeRefresh);
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
+      realtime.disconnect();
+      setRealtimeConnected(false);
+    };
+  }, [user]);
+
   // Polling — arranca sempre que há utilizador. Se o boot não entregou
   // estado inicial (fallback/timeout), o primeiro fetch é imediato para
   // nunca deixar o GamePage preso em "A ligar à rede...".
@@ -391,9 +434,10 @@ export function GameProvider({ children }) {
       const fails = consecutiveFailuresRef.current;
       // Backoff exponencial quando o backend está em baixo (até 30s); cadência
       // normal ~4s caso contrário.
+      const normalCadence = realtimeConnected ? 15000 : 4000;
       const delay = fails > 0
         ? Math.min(30000, 4000 * 2 ** fails)
-        : Math.max(2000, 4000 - elapsed);
+        : Math.max(2000, normalCadence - elapsed);
       if (isRunning && document.visibilityState === "visible") {
         pollTimeout = setTimeout(schedulePoll, delay);
       }
@@ -407,14 +451,14 @@ export function GameProvider({ children }) {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    pollTimeout = setTimeout(schedulePoll, hasLoadedRef.current ? 4000 : 0);
+    pollTimeout = setTimeout(schedulePoll, hasLoadedRef.current ? (realtimeConnected ? 15000 : 4000) : 0);
 
     return () => {
       isRunning = false;
       if (pollTimeout) clearTimeout(pollTimeout);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user, refresh]);
+  }, [user, refresh, realtimeConnected]);
 
   const serverNow = useCallback(() => Date.now() + offsetRef.current, []);
 
@@ -989,6 +1033,7 @@ export function GameProvider({ children }) {
         state,
         stateError,
         lastSyncAt,
+        realtimeConnected,
         catalog,
         refresh,
         serverNow,

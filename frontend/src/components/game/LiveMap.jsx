@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, Marker, Polyline, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -1045,6 +1045,45 @@ export default function LiveMap({ state, serverNow, selectedOppId, onSelectOpp, 
       <FollowManager onCancel={() => setFollowId(null)} />
       {followedMission && <FollowChip name={followedMission.team_name} onStop={() => setFollowId(null)} />}
       {placement && <PlacementPreview placement={placement} onPick={updatePlacementPoint} />}
+      {!placement && zoom <= 14.5 && (state.operational?.coverage || []).map((area) => {
+        if (!Number.isFinite(Number(area.lat)) || !Number.isFinite(Number(area.lng))) return null;
+        const attention = Math.max(0, Math.min(100, Number(area.attention || 0)));
+        const pressure = Math.max(0, Math.min(100, Number(area.pressure || 0)));
+        const controlled = Number(area.territory_tier || 0) > 0;
+        const color = attention >= 70 ? "#EF4444" : pressure >= 60 ? "#F59E0B" : controlled ? "#22D3EE" : "#64748B";
+        const radius = Math.max(500, Math.min(1450, 650 + Number(area.active_operations || 0) * 90 + pressure * 4));
+        return (
+          <Circle
+            key={`district-coverage-${area.district}`}
+            center={[Number(area.lat), Number(area.lng)]}
+            radius={radius}
+            pathOptions={{
+              color,
+              weight: controlled ? 1.25 : 0.8,
+              opacity: 0.38,
+              fillColor: color,
+              fillOpacity: controlled ? 0.055 : 0.028,
+              dashArray: controlled ? undefined : "4 7",
+            }}
+          >
+            <LTooltip direction="top" opacity={1} className="sub-map-tip">
+              <div className="min-w-[155px]">
+                <p className="text-[11px] font-bold text-white">{area.district}</p>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                  {area.profile?.name || area.profile?.key || "Zona operacional"}
+                </p>
+                <div className="mt-1 space-y-0.5">
+                  <TipRow label="operações" value={String(area.active_operations || 0)} color="#67E8F9" />
+                  <TipRow label="atenção" value={`${Math.round(attention)}%`} color={attention >= 70 ? "#EF4444" : "#A1A1AA"} />
+                  <TipRow label="pressão" value={`${Math.round(pressure)}%`} color={pressure >= 60 ? "#F59E0B" : "#A1A1AA"} />
+                  <TipRow label="território" value={controlled ? `Tier ${area.territory_tier}` : "Sem controlo"} color={controlled ? "#22D3EE" : "#71717A"} />
+                  {Number(area.patrols || 0) > 0 && <TipRow label="patrulhas" value={String(area.patrols)} color="#34D399" />}
+                </div>
+              </div>
+            </LTooltip>
+          </Circle>
+        );
+      })}
       <Marker
         position={[hq.lat, hq.lng]}
         icon={hqMarkerIcon}
