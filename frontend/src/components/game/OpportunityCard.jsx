@@ -270,9 +270,11 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
       data-hot={opp.hot ? "true" : "false"}
       style={{
         "--mk": color,
+        width: "min(calc(100vw - 1rem), 24rem)",
+        maxWidth: "calc(100vw - 1rem)",
         maxHeight: "min(calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 40rem)",
       }}
-      className="sub-opp-card sub-opp-card-centered pointer-events-auto fixed left-1/2 top-1/2 z-[60] flex w-[min(calc(100vw-1rem),24rem)] max-w-sm flex-col sub-panel p-4 shadow-2xl"
+      className="sub-opp-card sub-opp-card-centered pointer-events-auto fixed left-1/2 top-1/2 z-[60] flex min-w-0 max-w-sm flex-col overflow-x-hidden sub-panel p-4 shadow-2xl"
     >
       <div className="flex shrink-0 items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
