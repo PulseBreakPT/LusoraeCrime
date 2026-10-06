@@ -17,7 +17,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from ".
 import {
   Users, Car, UserRound, Undo2, X, Fuel, Wrench, Zap, IdCard, CheckCircle2,
   AlertTriangle, Activity, Target, Clock, PartyPopper, Crown, Gauge, Stethoscope, Scale,
-  Brain, Flame, TrendingDown, Link2, FlaskConical,
+  Brain, Flame, TrendingDown, Link2, FlaskConical, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
