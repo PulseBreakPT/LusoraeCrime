@@ -195,7 +195,7 @@ export const HQPanel = ({ open, onOpenChange }) => {
                 ))}
               </div>
               <p className="mt-1.5 font-mono text-[10px] text-zinc-600">
-                Influencia as recomendações do consultor e o desempate das sugestões automáticas de equipa/oportunidade.
+                Influencia o desempate das sugestões automáticas de equipa e oportunidade.
               </p>
             </div>
 
