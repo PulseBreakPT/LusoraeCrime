@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, Download, RotateCcw, Trash2 } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
+import { useAuth } from "../../context/AuthContextV2";
 import { Button } from "../ui/button";
 import {
   exportLocalGuestSave,
@@ -20,9 +21,10 @@ const downloadText = (text,name) => {
 
 export function GuestSaveRecovery() {
   const { state }=useGame();
+  const { user }=useAuth();
   const [confirmFresh,setConfirmFresh]=useState(false);
   const recovery=state?.local_recovery;
-  if (!recovery?.detected || !isLocalGuestMode()) return null;
+  if (!recovery?.detected || !isLocalGuestMode() || (user && !user.disclaimer_accepted)) return null;
 
   const reload=()=>window.location.reload();
   const restore=()=>{
