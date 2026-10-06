@@ -1315,15 +1315,16 @@ export const MapLegend = ({ open: controlledOpen, onOpenChange, hideTrigger = fa
   );
 };
 
-// Painel flutuante do modo de colocação de propriedades — quando ativo, a
+// Painel flutuante do modo de colocação de propriedades ou reposicionamento do QG — quando ativo, a
 // GamePage esconde o dock e restantes widgets do fundo, por isso este painel
 // tem sempre o centro-fundo livre (z-40 garante topo da pilha). Mostra o tipo
 // de propriedade, o estado do ponto escolhido e botões grandes e clicáveis.
 export const PlacementControls = () => {
   const { state, placement, confirmPlacement, cancelPlacement, catalog } = useGame();
   if (!placement) return null;
-  const propertyType = catalog?.property_types?.[placement.typeKey];
-  const typeName = propertyType?.name || "Propriedade";
+  const isHqRelocation = placement.kind === "hq";
+  const propertyType = isHqRelocation ? null : catalog?.property_types?.[placement.typeKey];
+  const typeName = isHqRelocation ? "Quartel-General" : (propertyType?.name || "Propriedade");
   const invalid = placement.point && !placement.checking && placement.valid === false;
   const rawMarket = placement.point && placement.valid && propertyType?.price
     ? propertyMarketPrice(propertyType.price, placement.point.lat, placement.point.lng)
@@ -1354,6 +1355,8 @@ export const PlacementControls = () => {
             ? "a validar a localização em Portugal…"
             : invalid
             ? (placement.reason || "local inválido: escolhe um ponto em terra firme.")
+            : isHqRelocation
+            ? "localização válida · podes confirmar a mudança do QG."
             : `localização válida · ${placement.district || market?.zone || "Portugal"} · ${market?.price?.toLocaleString("pt-PT") || "—"} €.`}
         </p>
         {market && (
