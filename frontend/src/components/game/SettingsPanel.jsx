@@ -15,10 +15,16 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/colla
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import {
   Settings, UserCog, KeyRound, LogOut, Trash2, Monitor, Gamepad2, Cog, Bell, Info,
-  ChevronDown, Wrench, Fuel, BedDouble, Gift, ShieldCheck, Volume2,
+  ChevronDown, Wrench, Fuel, BedDouble, Gift, ShieldCheck, Volume2, DatabaseBackup, Download, Upload, RotateCcw,
 } from "lucide-react";
 import { audio } from "../../lib/audio";
 import { toast } from "sonner";
+import {
+  exportLocalGuestSave,
+  importLocalGuestSave,
+  restoreLocalGuestBackup,
+  startFreshLocalGuestGame,
+} from "../../game/localGuestEngine";
 
 const GAME_VERSION = "1.4.0";
 
@@ -351,7 +357,7 @@ const ABOUT_ITEMS = [
 export const SettingsPanel = ({ open, onOpenChange }) => {
   const { state, updateAutomationSettings } = useGame();
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const {
     showSeconds, setShowSeconds, compactNumbers, setCompactNumbers,
     showTooltips, setShowTooltips, hapticFeedback, setHapticFeedback,
@@ -372,6 +378,38 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
   if (!state) return null;
   const settings = state.player.settings || {};
   const patchAutomation = (patch) => updateAutomationSettings(patch);
+  const downloadGuestSave = (source="current") => {
+    const raw=exportLocalGuestSave(source);
+    if(!raw){ toast.error("Não existe uma cópia disponível."); return; }
+    const blob=new Blob([raw],{type:"application/json;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=`submundo-save-${source}-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    toast.success("Save exportado.");
+  };
+  const importGuestFile = async (event) => {
+    const file=event.target.files?.[0];
+    event.target.value="";
+    if(!file)return;
+    try {
+      importLocalGuestSave(await file.text());
+      toast.success("Save importado. A recarregar...");
+      window.location.reload();
+    } catch (_e) {
+      toast.error("O ficheiro não contém um save SUBMUNDO válido.");
+    }
+  };
+  const restoreGuestBackup = () => {
+    try {
+      if(!restoreLocalGuestBackup()){ toast.error("Ainda não existe uma cópia anterior."); return; }
+      toast.success("Cópia anterior restaurada.");
+      window.location.reload();
+    } catch (_e) {
+      toast.error("A cópia anterior também está danificada.");
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -619,6 +657,34 @@ export const SettingsPanel = ({ open, onOpenChange }) => {
             <LogOut size={14} className="mr-1.5" /> Terminar sessão
           </Button>
           <DeleteAccountForm />
+        </Section>
+
+        <Section icon={DatabaseBackup} title="Dados locais" testId="settings-section-local-data" hidden={!advancedOpen || !user?.is_guest}>
+          <Row label="Backup manual" hint="Exporta o progresso atual para poderes guardá-lo fora deste dispositivo.">
+            <Button type="button" variant="outline" size="compact" onClick={()=>downloadGuestSave("current")} className="w-full gap-1.5 sm:w-auto">
+              <Download size={12}/> Exportar save
+            </Button>
+          </Row>
+          <Row label="Importar save" hint="Valido o ficheiro antes de substituir o progresso e guardo a versão atual como cópia anterior.">
+            <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-white/10 bg-black/30 px-3 font-mono text-[10px] font-bold uppercase text-zinc-300 hover:bg-white/[0.06]">
+              <Upload size={12}/> Importar ficheiro
+              <Input type="file" accept=".json,application/json" onChange={importGuestFile} className="sr-only" />
+            </label>
+          </Row>
+          <Row label="Cópia anterior" hint="Restaura a versão válida guardada imediatamente antes da última gravação.">
+            <Button type="button" variant="outline" size="compact" onClick={restoreGuestBackup} className="w-full gap-1.5 sm:w-auto">
+              <RotateCcw size={12}/> Restaurar
+            </Button>
+          </Row>
+          <ConfirmButton
+            testId="settings-new-guest-game"
+            icon={Trash2}
+            label="Começar de novo"
+            confirmLabel="Apagar progresso atual? Clica outra vez."
+            onConfirm={()=>{startFreshLocalGuestGame();window.location.reload();}}
+            className="m-3 mt-2"
+            tip="Cria um jogo novo, mantendo uma cópia do progresso atual para recuperação."
+          />
         </Section>
 
         <Section icon={Info} title="Sobre" testId="settings-section-about" hidden={!advancedOpen}>

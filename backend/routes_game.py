@@ -216,10 +216,12 @@ class DispatchInput(MutationInput):
 
 class TeamIdInput(MutationInput):
     team_id: str
+    strategy: Optional[str] = None
 
 
 class OpportunityIdInput(MutationInput):
     opportunity_id: str
+    strategy: Optional[str] = None
 
 
 class TypeKeyInput(MutationInput):
@@ -849,19 +851,20 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
     travel_s = max(20, travel_s * float(city_fx["travel_mult"]))
     return_travel_s = max(20, return_travel_s * float(city_fx["travel_mult"]))
 
-    mult = 1.0
+    property_bonus = 0.0
     prop_ranks = property_stack_ranks(props)
     for pr in props:
         if not property_active(pr, now):
             continue
         pt = PROPERTY_TYPES[pr["type_key"]]
         if pt.get("bonus_pct") and (pt.get("bonus_category") == "all" or pt.get("bonus_category") == opp["category"]):
-            mult += pt["bonus_pct"] * pr["level"] * property_condition_factor(pr) * property_stack_mult(prop_ranks[pr["_id"]])
+            property_bonus += pt["bonus_pct"] * pr["level"] * property_condition_factor(pr) * property_stack_mult(prop_ranks[pr["_id"]])
     tb = player.get("temp_bonus")
+    temp_reward_bonus = 0.0
     if tb and tb.get("kind") == "reward_boost" and parse_dt(tb["until"]) > now_utc():
-        mult += tb["pct"]
-    # Conquistas permanentes (marcos de missões bem-sucedidas) dão um bónus fixo.
-    mult += player.get("achievement_bonus_pct", 0.0)
+        temp_reward_bonus = float(tb["pct"])
+    achievement_reward_bonus = float(player.get("achievement_bonus_pct", 0.0) or 0.0)
+    mult = 1.0 + property_bonus + temp_reward_bonus + achievement_reward_bonus
     # Recompensa diminui quanto mais tempo a oportunidade ficar por reclamar, e
     # levar mais membros do que o exigido divide o saque.
     age_s = (now - parse_dt(opp["created_at"])).total_seconds()
@@ -960,11 +963,23 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
         })
         chance = max(0.02, min(0.97, chance + profile_delta))
 
+    # A explicação e o número final têm uma única verdade. Modificadores tardios
+    # podem bater nos limites 2–97%; esse efeito aparece explicitamente.
+    explained = sum(float(item.get("pct", 0) or 0) for item in breakdown)
+    limit_adjustment = chance - explained
+    if abs(limit_adjustment) >= 0.00005:
+        breakdown.append({
+            "key": "limite_probabilidade",
+            "label": "Limite da probabilidade",
+            "pct": round(limit_adjustment, 6),
+            "tip": "A probabilidade final é limitada para nunca chegar a 0% nem a 100%.",
+        })
+
     # Forense pré-falha (SSS v4): os 3 fatores mais negativos do despacho, para
     # o relatório de falha explicar PORQUÊ ("Fator crítico: ...").
     top_negatives = [
         {"key": i["key"], "label": i["label"], "pct": i["pct"]}
-        for i in sorted((i for i in breakdown if i["pct"] < 0 and i["key"] != "rendimentos_decrescentes"),
+        for i in sorted((i for i in breakdown if i["pct"] < 0 and i["key"] not in {"rendimentos_decrescentes", "limite_probabilidade"}),
                         key=lambda i: i["pct"])[:3]
     ]
     weapon_loud = any(
@@ -1066,6 +1081,17 @@ async def _prepare_dispatch(player, opp, team, *, resolve_routes=False):
         "repeat_count": repeat_count, "operation_profile": operation_profile, "operation_profile_label": profile_label,
         "reward": reward,
         "reward_mult": mult * pulse_reward_mult * float(city_fx["reward_mult"]) * float(doctrine.get("reward", 1.0)) * (1.0 + territory_bonus + prestige_reward),
+        "reward_breakdown": [
+            *([{"key": "imoveis", "label": "Imóveis", "pct": round(property_bonus * 100, 2)}] if property_bonus else []),
+            *([{"key": "bonus_temporario", "label": "Bónus temporário", "pct": round(temp_reward_bonus * 100, 2)}] if temp_reward_bonus else []),
+            *([{"key": "conquistas", "label": "Conquistas", "pct": round(achievement_reward_bonus * 100, 2)}] if achievement_reward_bonus else []),
+            *([{"key": "evento", "label": f"Evento: {pulse.get('name', 'pulso do mundo')}", "pct": round((pulse_reward_mult - 1) * 100, 2)}] if pulse_reward_mult != 1 else []),
+            *([{"key": "cidade", "label": f"Cidade: {city_fx['label']}", "pct": round((float(city_fx["reward_mult"]) - 1) * 100, 2)}] if float(city_fx["reward_mult"]) != 1 else []),
+            *([{"key": "doutrina", "label": f"Doutrina: {doctrine['name']}", "pct": round((float(doctrine.get("reward", 1.0)) - 1) * 100, 2)}] if float(doctrine.get("reward", 1.0)) != 1 else []),
+            *([{"key": "territorio", "label": "Território", "pct": round(territory_bonus * 100, 2)}] if territory_bonus else []),
+            *([{"key": "prestigio", "label": "Prestígio", "pct": round(prestige_reward * 100, 2)}] if prestige_reward else []),
+        ],
+        "operation_duration_s": int(duration_avg),
         "age_mult": age_mult, "split_mult": split_mult,
         "world_pulse": mission_pulse,
         "city_world": city_fx["context"],
@@ -1143,6 +1169,7 @@ async def dispatch_preview(body: DispatchInput, user: dict = Depends(get_current
         "fuel_needed": round(prep["fuel_needed"], 1),
         "reward": prep["reward"],
         "reward_bonus_pct": round((prep["reward_mult"] - 1) * 100, 1),
+        "reward_breakdown": prep.get("reward_breakdown", []),
         "age_decay_pct": round((prep["age_mult"] - 1) * 100, 1),
         "split_penalty_pct": round((prep["split_mult"] - 1) * 100, 1),
         "repeat_count": prep.get("repeat_count", 0),
@@ -1255,6 +1282,8 @@ async def dispatch(body: DispatchInput, user: dict = Depends(get_current_user)):
         "member_ids": member_ids, "vehicle_id": str(vehicle["_id"]),
         "vehicle_name": vehicle_name,
         "vehicle_luxury": VEHICLE_MODELS.get(vehicle["model_key"], {}).get("luxury", False),
+        "fuel_needed": round(float(prep.get("fuel_needed", 0) or 0), 2),
+        "fuel_cost": round(float(prep.get("fuel_needed", 0) or 0) * FUEL_PRICES.get(vehicle.get("fuel_type"), 1.8), 2),
         "weapon_loud": prep.get("weapon_loud", False),
         "repeat_type": repeat_type,
         "repeat_count": prep.get("repeat_count", 0),
@@ -1398,6 +1427,42 @@ def _expected_value(prep):
     return chance * reward + partial_ev - fail_prob * reward * EV_FAILURE_LOSS_FRAC - fuel_cost
 
 
+def _recommendation_metrics(prep):
+    expected_profit = _expected_value(prep)
+    total_s = max(1.0, float(prep.get("travel_s", 0) or 0) + float(prep.get("return_travel_s", 0) or 0) + float(prep.get("operation_duration_s", 0) or 0))
+    fuel_type = (prep.get("vehicle") or {}).get("fuel_type")
+    fuel_cost = float(prep.get("fuel_needed", 0) or 0) * FUEL_PRICES.get(fuel_type, 1.8)
+    return {
+        "chance": round(float(prep["chance"]), 4),
+        "reward": int(prep["reward"]),
+        "fuel_cost": round(fuel_cost, 2),
+        "duration_total_s": round(total_s),
+        "expected_profit": round(expected_profit),
+        "expected_profit_per_min": round(expected_profit / max(0.5, total_s / 60.0)),
+    }
+
+
+def _recommendation_reason(metrics, strategy):
+    if strategy == "profit":
+        return f"Melhor retorno esperado por minuto (~{metrics['expected_profit_per_min']} €/min), já descontando combustível."
+    if strategy == "fast":
+        return f"Menor duração total estimada (~{max(1, round(metrics['duration_total_s'] / 60))} min)."
+    if strategy == "safe":
+        return f"Maior probabilidade de sucesso ({round(metrics['chance'] * 100)}%)."
+    return "Melhor opção para a prioridade atual da organização."
+
+
+def _recommend_rank_key(prep, strategy, priority):
+    metrics = _recommendation_metrics(prep)
+    if strategy == "profit":
+        return (-metrics["expected_profit_per_min"], -prep["chance"], prep["travel_s"])
+    if strategy == "fast":
+        return (metrics["duration_total_s"], -prep["chance"], -metrics["expected_profit"])
+    if strategy == "safe":
+        return (-prep["chance"], -metrics["expected_profit"], prep["travel_s"])
+    return _rank_key(prep, priority)
+
+
 def _rank_key(prep, priority=HQ_DEFAULT_PRIORITY):
     # Critério principal depende da prioridade global da organização; os
     # restantes campos servem de desempate. SSS v4: o valor esperado real
@@ -1432,6 +1497,7 @@ async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_curr
     if player["heat"] >= 90:
         return {"opportunity_id": None}
     priority = player["priorities"]["active"]
+    strategy = body.strategy if body.strategy in {"safe", "profit", "fast"} else None
     now = now_utc()
     opps = await db.opportunities.find({
         "player_id": pid, "status": "active", "expires_at": {"$gt": now.isoformat()},
@@ -1443,16 +1509,21 @@ async def recommend_opportunity(body: TeamIdInput, user: dict = Depends(get_curr
         if not prep:
             continue
         if len(prep["members"]) >= prep["min_members"]:
-            if best_prep is None or _rank_key(prep, priority) < _rank_key(best_prep, priority):
+            if best_prep is None or _recommend_rank_key(prep, strategy, priority) < _recommend_rank_key(best_prep, strategy, priority):
                 best_opp, best_prep = opp, prep
     if not best_opp:
         return {"opportunity_id": None}
+    metrics = _recommendation_metrics(best_prep)
+    effective_strategy = strategy or "organization"
     return {
         "opportunity_id": str(best_opp["_id"]),
         "chance": round(best_prep["chance"], 3),
         "reward": best_prep["reward"],
         "eta_s": round(best_prep["travel_s"]),
         "dist_km": round(best_prep["dist"] / 1000, 2),
+        "strategy": effective_strategy,
+        "reason": _recommendation_reason(metrics, effective_strategy),
+        "metrics": metrics,
     }
 
 
@@ -1469,22 +1540,28 @@ async def recommend_team(body: OpportunityIdInput, user: dict = Depends(get_curr
     if player["heat"] >= 90 or player["level"] < opp["min_level"]:
         return {"team_id": None}
     priority = player["priorities"]["active"]
+    strategy = body.strategy if body.strategy in {"safe", "profit", "fast"} else None
     teams = await db.teams.find({"player_id": pid, "status": "idle"}).to_list(50)
     best_team, best_prep = None, None
     for team in teams:
         prep = await _try_prepare_dispatch(player, opp, team)
         if not prep or len(prep["members"]) < prep["min_members"]:
             continue
-        if best_prep is None or _rank_key(prep, priority) < _rank_key(best_prep, priority):
+        if best_prep is None or _recommend_rank_key(prep, strategy, priority) < _recommend_rank_key(best_prep, strategy, priority):
             best_team, best_prep = team, prep
     if not best_team:
         return {"team_id": None}
+    metrics = _recommendation_metrics(best_prep)
+    effective_strategy = strategy or "organization"
     return {
         "team_id": str(best_team["_id"]),
         "chance": round(best_prep["chance"], 3),
         "reward": best_prep["reward"],
         "eta_s": round(best_prep["travel_s"]),
         "dist_km": round(best_prep["dist"] / 1000, 2),
+        "strategy": effective_strategy,
+        "reason": _recommendation_reason(metrics, effective_strategy),
+        "metrics": metrics,
     }
 
 
@@ -3334,6 +3411,58 @@ async def place_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
     await add_event(db, pid, "system",
                     f"Quartel-General estabelecido em {where}{suffix}. A rede está a mapear as zonas de operação em redor.")
     # Batismo das zonas com moradas reais em background (Nominatim ~1 req/s).
+    asyncio.create_task(name_districts_task(db, player["_id"]))
+    return {"ok": True, "hq": hq, "region": region, "districts": len(districts)}
+
+
+@router.post("/hq/relocate")
+@idempotent("hq.relocate")
+async def relocate_hq(body: HqPlaceInput, user: dict = Depends(get_current_user)):
+    """Durante o tutorial, antes do primeiro despacho, o jogador pode corrigir
+    a localização do QG. Depois da primeira operação a decisão fica bloqueada."""
+    player = await get_player(user)
+    if int((player.get("stats") or {}).get("ops_dispatched", 0) or 0) > 0:
+        raise HTTPException(status_code=409, detail="O QG só pode ser mudado antes da primeira operação.")
+    valid, reason = _hq_location_verdict(body.lat, body.lng)
+    if not valid or not is_valid_hq_location(body.lat, body.lng, min_inland_m=HQ_MIN_INLAND_M):
+        raise HTTPException(status_code=422, detail=reason or "Localização inválida para o Quartel-General.")
+    lat, lng = round(float(body.lat), 6), round(float(body.lng), 6)
+    g = await reverse_geocode(db, lat, lng, zoom=16)
+    label = street_label(g)
+    region = locality_label(g) or ""
+    current_hq = dict(player.get("hq") or {})
+    hq = {
+        **current_hq,
+        "name": f"QG · {label}" if label else "Quartel-General",
+        "lat": lat,
+        "lng": lng,
+    }
+    districts = generate_district_points(lat, lng)
+    pid = str(player["_id"])
+    claimed = await db.players.find_one_and_update(
+        {
+            "_id": player["_id"],
+            "$or": [
+                {"stats.ops_dispatched": 0},
+                {"stats.ops_dispatched": None},
+                {"stats.ops_dispatched": {"$exists": False}},
+            ],
+        },
+        {"$set": {
+            "hq": hq,
+            "districts": districts,
+            "region": region,
+            "hq_relocated_at": now_utc().isoformat(),
+        }},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="O primeiro despacho acabou de começar — o QG já não pode ser mudado.")
+    # Antes do primeiro despacho não há oportunidades ocupadas; substituir as
+    # ativas evita manter alvos gerados à volta da localização antiga.
+    await db.opportunities.delete_many({"player_id": pid, "status": "active"})
+    where = label or f"{lat:.4f}, {lng:.4f}"
+    await add_event(db, pid, "system", f"QG reposicionado durante o tutorial para {where}. As zonas estão a ser recalculadas.")
     asyncio.create_task(name_districts_task(db, player["_id"]))
     return {"ok": True, "hq": hq, "region": region, "districts": len(districts)}
 

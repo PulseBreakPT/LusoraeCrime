@@ -5,11 +5,12 @@ import {
   Search, Crosshair, Target, Building2, Users, IdCard, Car, Warehouse,
   Swords, ShoppingBag, Landmark, BrainCircuit, Settings, RefreshCw,
   ClipboardCopy, Download, BedDouble, Fuel, Wrench, Sparkles, Focus,
-  Clock3, CornerDownLeft, Vault,
+  Clock3, CornerDownLeft, Vault, Network, RadioTower,
 } from "lucide-react";
 import { useGame } from "../../context/GameContextV2";
 import { useSettings } from "../../context/SettingsContext";
 import { fmtMoney, orgAlerts, teamsReadiness } from "../../lib/game";
+import { GAME_AREAS, gameAreaSearchText, gameAreaUnlocked } from "../../game/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
@@ -40,21 +41,13 @@ const fuzzyScore = (query, text) => {
   return qi === q.length ? Math.max(5, 30 - gap) : 0;
 };
 
-const PANEL_COMMANDS = [
-  ["operations", "Operações", "Lista e despacho de oportunidades", Crosshair, "1"],
-  ["quests", "Missões", "História, diárias, semanais e recompensas", Target, "2"],
-  ["empire", "Império", "Tesouraria, lavagem e polícia", Building2, "3"],
-  ["teams", "Equipas", "Composição, veículos e despacho", Users, "4"],
-  ["employees", "Operacionais", "Efetivo, formação, saúde e salários", IdCard, "5"],
-  ["fleet", "Frota", "Veículos, combustível e manutenção", Car, "6"],
-  ["properties", "Imóveis", "Propriedades, rendimento e capacidade", Warehouse, "7"],
-  ["weapons", "Armamento", "Inventário, atribuição e manutenção", Swords, "8"],
-  ["shop", "Loja", "Acelerações, cosméticos, VIP e slots", ShoppingBag, "9"],
-  ["mastermind", "Mastermind", "Grandes golpes, mercado negro, caçadores e sinais", Vault, null],
-  ["hq", "Quartel-General", "Estratégia, melhorias e desempenho", Landmark, null],
-  ["intel", "Relatórios", "Alertas e histórico", BrainCircuit, null],
-  ["settings", "Definições", "Interface, jogabilidade e notificações", Settings, null],
-];
+const PANEL_ICONS = {
+  operations: Crosshair, quests: Target, mastermind: Vault,
+  teams: Users, employees: IdCard, fleet: Car, weapons: Swords,
+  empire: Building2, properties: Warehouse, hq: Landmark,
+  organization: Network, city: RadioTower, intel: BrainCircuit,
+  shop: ShoppingBag, settings: Settings,
+};
 
 const csvCell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
 
@@ -129,18 +122,17 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
 
   const commands = useMemo(() => {
     if (!state) return [];
-    const panelMinLevel = { mastermind: 10 };
-    const panelCommands = PANEL_COMMANDS
-      .filter(([panel]) => Number(state.player?.level || 1) >= Number(panelMinLevel[panel] || 1))
-      .map(([panel, label, hint, Icon, shortcut]) => ({
-        id: `panel:${panel}`,
-        label,
-        hint,
-        Icon,
-        shortcut,
+    const panelCommands = GAME_AREAS
+      .filter((area) => gameAreaUnlocked(area.id, state.player?.level))
+      .map((area) => ({
+        id: `panel:${area.id}`,
+        label: area.label,
+        hint: area.hint,
+        Icon: PANEL_ICONS[area.id] || Search,
+        shortcut: area.shortcut,
         group: "Navegação",
-        keywords: `${panel} painel menu`,
-        run: () => onNavigate(panel),
+        keywords: `${gameAreaSearchText(area)} painel menu`,
+        run: () => onNavigate(area.id),
       }));
 
     const priorities = (state.retention?.next_moves || []).map((move) => ({
@@ -213,25 +205,25 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
     const entities = [
       ...(state.teams || []).map((item) => ({
         id: `team:${item.id}`, label: item.name, hint: "Equipa", Icon: Users,
-        group: "Resultados", keywords: `${item.spec || ""} equipa`, run: () => onNavigate("teams"),
+        group: "Resultados", keywords: `${item.spec || ""} equipa`, run: () => onNavigate("teams", { focusTestId: `team-card-${item.id}` }),
       })),
       ...(state.employees || []).map((item) => ({
         id: `employee:${item.id}`, label: item.name, hint: "Operacional", Icon: IdCard,
         group: "Resultados", keywords: `${item.role_key || ""} ${item.spec || ""} funcionário`,
-        run: () => onNavigate("employees"),
+        run: () => onNavigate("employees", { focusTestId: `employee-card-${item.id}` }),
       })),
       ...(state.vehicles || []).map((item) => ({
         id: `vehicle:${item.id}`, label: item.name, hint: "Veículo", Icon: Car,
-        group: "Resultados", keywords: `${item.model_key || ""} frota carro`, run: () => onNavigate("fleet"),
+        group: "Resultados", keywords: `${item.model_key || ""} frota carro`, run: () => onNavigate("fleet", { focusTestId: `vehicle-card-${item.id}` }),
       })),
       ...(state.properties || []).map((item) => ({
         id: `property:${item.id}`, label: item.name, hint: "Imóvel", Icon: Warehouse,
         group: "Resultados", keywords: `${item.type_key || ""} ${item.district || ""} propriedade`,
-        run: () => onNavigate("properties"),
+        run: () => onNavigate("properties", { focusTestId: `property-card-${item.id}` }),
       })),
       ...(state.weapons || []).map((item) => ({
         id: `weapon:${item.id}`, label: item.name, hint: "Arma", Icon: Swords,
-        group: "Resultados", keywords: `${item.model_key || ""} arsenal`, run: () => onNavigate("weapons"),
+        group: "Resultados", keywords: `${item.model_key || ""} arsenal`, run: () => onNavigate("weapons", { focusTestId: `weapon-card-${item.id}` }),
       })),
       ...(state.opportunities || []).map((item) => ({
         id: `opp:${item.id}`, label: item.name, hint: `Operação · ${fmtMoney(item.reward ?? 0)}`,

@@ -7,7 +7,7 @@ import { formatApiErrorDetail, fmtMoney } from "../lib/game";
 import { usePersistedState } from "../lib/persist";
 import { haptics } from "../lib/haptics";
 import { audio } from "../lib/audio";
-import { isOnLand } from "../lib/land";
+import { isOnLand, isValidHqLocation } from "../lib/land";
 import { fetchRoute } from "../lib/routing";
 import { isLocalGuestMode } from "../game/localGuestEngine";
 
@@ -69,6 +69,7 @@ export function GameProvider({ children }) {
   // fica null até o jogador tocar/clicar pela primeira vez no mapa.
   const [placement, setPlacement] = useState(null);
   const placementValidationRef = useRef(0);
+  const placementKindRef = useRef("property");
 
   const offsetRef = useRef(0);
   const fetchingRef = useRef(false);
@@ -559,27 +560,28 @@ export function GameProvider({ children }) {
       };
     }
   }, [state]);
-  const recommendOpportunityForTeam = useCallback(async (teamId) => {
+  const recommendOpportunityForTeam = useCallback(async (teamId, strategy = null) => {
     try {
-      const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId });
+      const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId, ...(strategy ? { strategy } : {}) });
       return { ok: true, data };
     } catch (_e) {
       return { ok: false };
     }
   }, []);
-  const recommendTeamForOpportunity = useCallback(async (opportunityId) => {
+  const recommendTeamForOpportunity = useCallback(async (opportunityId, strategy = null) => {
     try {
       const { data } = await api.post("/game/dispatch/recommend_team", {
         opportunity_id: opportunityId,
+        ...(strategy ? { strategy } : {}),
       });
       return { ok: true, data };
     } catch (_e) {
       return { ok: false };
     }
   }, []);
-  const recommendRepeatForTeam = useCallback(async (teamId) => {
+  const recommendRepeatForTeam = useCallback(async (teamId, strategy = null) => {
     try {
-      const { data } = await api.post("/game/dispatch/recommend_repeat", { team_id: teamId });
+      const { data } = await api.post("/game/dispatch/recommend_repeat", { team_id: teamId, ...(strategy ? { strategy } : {}) });
       return { ok: true, data };
     } catch (_e) {
       return { ok: false };
@@ -869,7 +871,13 @@ export function GameProvider({ children }) {
   // chega a fazer essa chamada, por isso não precisa de rollback.
   const startPlacement = (typeKey) => {
     placementValidationRef.current += 1;
-    setPlacement({ typeKey, point: null, valid: false, checking: false, reason: null });
+    placementKindRef.current = "property";
+    setPlacement({ kind:"property", typeKey, point: null, valid: false, checking: false, reason: null });
+  };
+  const startHqRelocation = () => {
+    placementValidationRef.current += 1;
+    placementKindRef.current = "hq";
+    setPlacement({ kind:"hq", typeKey:"__hq_relocate__", point:null, valid:false, checking:false, reason:null });
   };
   const updatePlacementPoint = useCallback(async (lat, lng) => {
     const point = { lat: Number(lat), lng: Number(lng) };
@@ -878,7 +886,9 @@ export function GameProvider({ children }) {
     const validationId = ++placementValidationRef.current;
 
     if (isLocalGuestMode()) {
-      const valid = isOnLand(point.lat, point.lng);
+      const valid = placementKindRef.current === "hq"
+        ? isValidHqLocation(point.lat, point.lng, 120)
+        : isOnLand(point.lat, point.lng);
       setPlacement((p) => (p ? {
         ...p, point, valid, checking: false,
         reason: valid ? null : "Escolhe um ponto em terra firme em Portugal.",
@@ -890,7 +900,8 @@ export function GameProvider({ children }) {
     // continua visível e pode ser movido novamente sem bloquear o mapa.
     setPlacement((p) => (p ? { ...p, point, valid: null, checking: true, reason: null } : p));
     try {
-      const { data } = await api.post("/game/properties/validate-location", point, { timeout: 8000 });
+      const endpoint = placementKindRef.current === "hq" ? "/game/hq/validate" : "/game/properties/validate-location";
+      const { data } = await api.post(endpoint, point, { timeout: 8000 });
       if (validationId !== placementValidationRef.current) return;
       setPlacement((p) => (p ? {
         ...p,
@@ -904,7 +915,9 @@ export function GameProvider({ children }) {
       if (validationId !== placementValidationRef.current) return;
       // Compatibilidade com um backend ainda sem o endpoint novo: usa a
       // validação local Portugal-wide; /properties/buy continua autoritativo.
-      const fallbackValid = isOnLand(point.lat, point.lng);
+      const fallbackValid = placementKindRef.current === "hq"
+        ? isValidHqLocation(point.lat, point.lng, 120)
+        : isOnLand(point.lat, point.lng);
       setPlacement((p) => (p ? {
         ...p,
         point,
@@ -920,7 +933,9 @@ export function GameProvider({ children }) {
   };
   const confirmPlacement = async () => {
     if (!placement?.point || placement.checking || !placement.valid) return { ok: false };
-    const r = await buyProperty(placement.typeKey, placement.point.lat, placement.point.lng);
+    const r = placement.kind === "hq"
+      ? await action("hq/relocate", { lat:placement.point.lat, lng:placement.point.lng }, "Quartel-General reposicionado")
+      : await buyProperty(placement.typeKey, placement.point.lat, placement.point.lng);
     if (r.ok) {
       placementValidationRef.current += 1;
       setPlacement(null);
@@ -1010,6 +1025,7 @@ export function GameProvider({ children }) {
         renameProperty,
         placement,
         startPlacement,
+        startHqRelocation,
         updatePlacementPoint,
         cancelPlacement,
         confirmPlacement,

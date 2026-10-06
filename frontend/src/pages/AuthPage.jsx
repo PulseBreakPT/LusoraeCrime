@@ -113,7 +113,12 @@ export default function AuthPage() {
                 </p>
               </div>
 
-              <div className="mt-7 space-y-3">
+              <div className="mt-5 rounded-lg border border-white/8 bg-white/[0.025] p-3 text-left lg:hidden">
+                <p className="text-xs font-semibold text-zinc-200">Escolhe operações, prepara equipas e faz crescer a organização.</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">O mapa é o centro do jogo: mostra oportunidades, deslocações e o que está a acontecer agora.</p>
+              </div>
+
+              <div className="mt-5 space-y-3">
                 <Button
                   type="button"
                   data-testid="google-sign-in-button"

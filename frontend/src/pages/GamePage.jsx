@@ -23,13 +23,15 @@ import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
 import { DisclaimerModal } from "../components/game/DisclaimerModal";
+import { GuestSaveRecovery } from "../components/game/GuestSaveRecovery";
 import { FpsMeter } from "../components/game/FpsMeter";
 import { Tip } from "../components/game/hud";
 import { Button } from "../components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../components/ui/select";
 import { orgAlerts, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, Network, RadioTower } from "lucide-react";
+import { areaLabel } from "../game/navigation";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, Network, RadioTower, Focus } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -262,6 +264,18 @@ export default function GamePage() {
       )}
 
       {!focusMode && <ResourceBar />}
+      {focusMode && !placement && (
+        <Button
+          type="button"
+          data-testid="focus-mode-exit"
+          variant="outline"
+          onClick={() => settings.setFocusMode(false)}
+          className="pointer-events-auto absolute right-3 top-3 z-[80] h-10 gap-2 border-white/15 bg-black/80 px-3 text-xs font-bold text-white shadow-lg backdrop-blur-md hover:bg-zinc-900"
+        >
+          <Focus size={15} className="text-cyan-300" />
+          <span>Sair do modo focado</span>
+        </Button>
+      )}
       {!focusMode && showFps && <FpsMeter />}
       {!focusMode && availableMissions.length > 0 && (
         <Button variant="bare" size="bare"
@@ -331,9 +345,9 @@ export default function GamePage() {
               {navGroup === "operations" && (
                 <div className={`grid ${unlocks.mastermind ? "grid-cols-3" : "grid-cols-2"} gap-1`}>
                   <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
-                  <NavAction testId="open-quests-button" icon={Target} label="Objetivos" color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
+                  <NavAction testId="open-quests-button" icon={Target} label={areaLabel("quests")} color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
                   {unlocks.mastermind && (
-                    <NavAction testId="open-mastermind-button" icon={Vault} label="Golpes" color="text-sky-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
+                    <NavAction testId="open-mastermind-button" icon={Vault} label={areaLabel("mastermind")} color="text-sky-300" alert={state.mastermind?.active_heist?.finale?.status === "ready" || state.mastermind?.bounty?.tier >= 3} onClick={() => openFromNav("mastermind")} />
                   )}
                 </div>
               )}
@@ -368,10 +382,10 @@ export default function GamePage() {
                     <NavAction testId="open-command-center" icon={Search} label="Pesquisar" color="text-sky-300" onClick={() => { setNavGroup(null); setCommandOpen(true); }} />
                     <NavAction testId="map-legend-toggle" icon={MapIcon} label="Legenda" color="text-zinc-300" active={mapLegendOpen} onClick={() => { setNavGroup(null); setMapLegendOpen((value) => !value); }} />
                     {unlocks.organization && (
-                      <NavAction testId="open-organization-button" icon={Network} label="Organização" color="text-cyan-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("organization")} />
+                      <NavAction testId="open-organization-button" icon={Network} label={areaLabel("organization")} color="text-cyan-300" alert={(state.organization?.inventory_used || 0) >= (state.organization?.inventory_capacity || Infinity) * 0.9} onClick={() => openFromNav("organization")} />
                     )}
                     {unlocks.city && (
-                      <NavAction testId="open-city-button" icon={RadioTower} label="Cidade" color="text-red-300" onClick={() => openFromNav("city")} />
+                      <NavAction testId="open-city-button" icon={RadioTower} label={areaLabel("city")} color="text-red-300" onClick={() => openFromNav("city")} />
                     )}
                     <NavAction testId="open-settings-button" icon={Settings} label="Definições" color="text-zinc-400" onClick={() => openFromNav("settings")} />
                   </div>
@@ -497,6 +511,7 @@ export default function GamePage() {
           entrada; fonte de verdade: user.disclaimer_accepted no servidor),
           por cima de toda a UI (z-[130]); "Sim" regista o compromisso e
           liberta o jogo, "Não" leva a um ecrã de recusa com logout seguro. */}
+      <GuestSaveRecovery />
       <DisclaimerModal />
     </div>
   );
@@ -510,9 +525,10 @@ const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick 
       onClick={onClick}
       aria-label={label}
       aria-expanded={active}
-      className={`sub-hud-btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl p-0 ${active ? "sub-hud-btn-active" : ""}`}
+      className={`sub-hud-btn relative flex h-12 min-w-[3.45rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 ${active ? "sub-hud-btn-active" : ""}`}
     >
-      <Icon size={19} className={color} />
+      <Icon size={18} className={color} />
+      <span className="max-w-[3.1rem] truncate text-[10px] font-semibold leading-none tracking-tight text-zinc-400">{label}</span>
       {alert && (
         <span
           className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full"

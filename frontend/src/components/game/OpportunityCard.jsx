@@ -39,6 +39,8 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const { autoSelectBestTeam, lowSuccessThreshold } = useSettings();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [recommendedTeamId, setRecommendedTeamId] = useState(null);
+  const [recommendStrategy, setRecommendStrategy] = useState("safe");
+  const [recommendationReason, setRecommendationReason] = useState("");
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -133,9 +135,10 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     setRecommendedTeamId(null);
     if (inProgress) return;
     let cancelled = false;
-    recommendTeamForOpportunity(opp.id).then((r) => {
+    recommendTeamForOpportunity(opp.id, recommendStrategy).then((r) => {
       if (cancelled) return;
       let best = r.ok && r.data?.team_id ? r.data.team_id : null;
+      setRecommendationReason(r.ok ? (r.data?.reason || "") : "");
       // Fallback local quando o servidor não recomenda: melhor equipa pronta por
       // ETA (proxy antes de as chances chegarem).
       if (!best) {
@@ -152,7 +155,7 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opp.id, inProgress, recommendTeamForOpportunity, autoSelectBestTeam]);
+  }, [opp.id, inProgress, recommendTeamForOpportunity, autoSelectBestTeam, recommendStrategy]);
 
   // Chances de sucesso por equipa pronta (comparação lado-a-lado sem clicar cada
   // uma). Limitado a ~6 previews em paralelo; refaz-se só quando muda o conjunto.
@@ -475,7 +478,23 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             </Button>
           </Card>
 
-          <div className={`mt-2 max-h-36 overflow-y-auto overscroll-contain ${showAdvancedSetup ? "" : "hidden"}`}>
+          <div className={`mt-2 max-h-48 overflow-y-auto overscroll-contain ${showAdvancedSetup ? "" : "hidden"}`}>
+            <div className="mb-2 rounded-md border border-white/[0.07] bg-black/25 p-2" data-testid="recommendation-strategy">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Recomendação</span>
+                <Select value={recommendStrategy} onValueChange={setRecommendStrategy}>
+                  <SelectTrigger size="compact" className="ml-auto w-[8.5rem] text-white" aria-label="Critério da recomendação">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="safe" className="font-mono text-xs">Mais segura</SelectItem>
+                    <SelectItem value="profit" className="font-mono text-xs">Mais rentável</SelectItem>
+                    <SelectItem value="fast" className="font-mono text-xs">Mais rápida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {recommendationReason && <p className="mt-1.5 text-[10px] leading-snug text-zinc-400">{recommendationReason}</p>}
+            </div>
             <div className="space-y-1 pr-1.5">
               {/* Equipas prontas primeiro (a recomendada sempre à cabeça) — o
                   jogador não precisa de percorrer bloqueadas para achar a boa. */}
@@ -639,7 +658,16 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
 
                 <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                   <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
-                  {preview.reward_bonus_pct > 0 && <span className="text-cyan-400"> (+{preview.reward_bonus_pct}% imóveis)</span>}
+                  {(preview.reward_breakdown || []).map((source) => (
+                    <span key={source.key} className={Number(source.pct) >= 0 ? "text-cyan-400" : "text-amber-400"}>
+                      {" "}({Number(source.pct) >= 0 ? "+" : ""}{Math.round(Number(source.pct) * 10) / 10}% {source.label})
+                    </span>
+                  ))}
+                  {!(preview.reward_breakdown || []).length && preview.reward_bonus_pct !== 0 && (
+                    <span className={preview.reward_bonus_pct > 0 ? "text-cyan-400" : "text-amber-400"}>
+                      {" "}({preview.reward_bonus_pct > 0 ? "+" : ""}{preview.reward_bonus_pct}% bónus)
+                    </span>
+                  )}
                   {preview.age_decay_pct < 0 && (
                     <Tip tip="Esta oportunidade está disponível há algum tempo — a recompensa vai encolhendo quanto mais tempo ficar por reclamar.">
                       <span className="text-amber-400"> ({preview.age_decay_pct}% tempo)</span>

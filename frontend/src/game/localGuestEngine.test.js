@@ -91,6 +91,62 @@ describe("offline guest engine", () => {
     expect(state.teams[0].status).toBe("on_mission");
   });
 
+  test("probability breakdown explains the final chance exactly", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", { lat: 38.7223, lng: -9.1393 });
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    const team = state.teams[0];
+    const opportunity = state.opportunities.find((o) => o.min_level <= state.player.level);
+
+    const preview = await localGuestRequest("post", "/game/dispatch/preview", {
+      team_id: team.id,
+      opportunity_id: opportunity.id,
+    });
+
+    const explained = preview.data.breakdown.reduce((sum, item) => sum + Number(item.pct || 0), 0);
+    expect(explained).toBeCloseTo(preview.data.chance, 8);
+  });
+
+  test("never recommends a team whose vehicle cannot dispatch", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", { lat: 38.7223, lng: -9.1393 });
+    const state = (await localGuestRequest("get", "/game/state")).data;
+    const raw = JSON.parse(localStorage.getItem("submundo_guest_save_v2"));
+    raw.vehicles[0].condition = 0;
+    localStorage.setItem("submundo_guest_save_v2", JSON.stringify(raw));
+
+    const recommendation = await localGuestRequest("post", "/game/dispatch/recommend_team", {
+      opportunity_id: state.opportunities[0].id,
+      strategy: "safe",
+    });
+
+    expect(recommendation.data.team_id).toBeNull();
+    expect(recommendation.data.reason).toMatch(/Nenhuma equipa/i);
+  });
+
+  test("rejects ocean coordinates for guest HQ placement", async () => {
+    enableLocalGuestMode();
+    const validation = await localGuestRequest("post", "/game/hq/validate", {
+      lat: 38.7,
+      lng: -9.6,
+    });
+    expect(validation.data.valid).toBe(false);
+  });
+
+  test("preserves corrupt guest saves and restores the previous valid copy", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", { lat: 38.7223, lng: -9.1393 });
+    // A read persists the current valid career as the rolling previous copy.
+    await localGuestRequest("get", "/game/state");
+    localStorage.setItem("submundo_guest_save_v2", "{not-valid-json");
+
+    const recovered = (await localGuestRequest("get", "/game/state")).data;
+    expect(recovered.player.hq).toBeTruthy();
+    expect(recovered.local_recovery?.detected).toBe(true);
+    expect(recovered.local_recovery?.restored_from_backup).toBe(true);
+    expect(localStorage.getItem("submundo_guest_save_corrupt_v2")).toBe("{not-valid-json");
+  });
+
   test("persists pre-routed mission geometry before movement starts", async () => {
     enableLocalGuestMode();
     await localGuestRequest("post", "/game/hq/place", { lat: 38.7223, lng: -9.1393 });
