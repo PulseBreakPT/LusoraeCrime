@@ -472,6 +472,7 @@ export default function GamePage() {
               label="Mapa"
               color="text-white"
               active={!openPanel && !selectedOpp && !navGroup}
+              expandable={false}
               onClick={returnToMap}
             />
             <GroupButton
@@ -490,6 +491,7 @@ export default function GamePage() {
               color="text-red-300"
               alert={wantedStars >= 3}
               active={openPanel === "world"}
+              expandable={false}
               onClick={() => unlocks.world ? openFromNav("world") : null}
             />
           </div>
@@ -642,14 +644,15 @@ export default function GamePage() {
   );
 }
 
-const GroupButton = ({ testId, icon: Icon, label, color, alert, active, onClick }) => (
+const GroupButton = ({ testId, icon: Icon, label, color, alert, active, expandable = true, onClick }) => (
   <Tip tip={label} side="top">
     <Button
       data-testid={testId}
       variant="outline"
       onClick={onClick}
       aria-label={label}
-      aria-expanded={active}
+      aria-expanded={expandable ? active : undefined}
+      aria-current={!expandable && active ? "page" : undefined}
       className={`sub-hud-btn relative flex h-12 min-w-[3.45rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 ${active ? "sub-hud-btn-active" : ""}`}
     >
       <Icon size={18} className={color} />
