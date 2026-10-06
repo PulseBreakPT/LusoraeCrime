@@ -1,4 +1,6 @@
-export const LOCAL_GUEST_SAVE_VERSION = 9;
+import { LOCAL_CERTIFICATIONS, LOCAL_DISPATCH_PRESETS } from "./operationalDirector";
+
+export const LOCAL_GUEST_SAVE_VERSION = 10;
 
 export const LOCAL_LEVEL_THRESHOLDS = [
   0, 400, 1200, 2800, 5500, 9500, 15000, 22000, 31000, 42000,
@@ -78,6 +80,8 @@ export const LOCAL_CATALOG = {
     logistica:{name:"Logística",cost:650,duration_s:45}, gestao:{name:"Gestão",cost:1100,duration_s:50},
     lideranca:{name:"Liderança",cost:1200,duration_s:55}, treino_fisico:{name:"Treino Físico",cost:500,duration_s:100},
   },
+  certifications: LOCAL_CERTIFICATIONS,
+  dispatch_presets: LOCAL_DISPATCH_PRESETS,
   vehicle_models: {
     usado:{name:"Sedan Usado",min_level:1,price:12500,speed:9,fuel_type:"gasolina",tank_l:45,cons:8.0,seats:4,discretion:75,best_for:["logistica","influencia"],luxury:false},
     moto:{name:"Moto Rápida",min_level:1,price:9000,speed:15,fuel_type:"gasolina",tank_l:15,cons:4.5,seats:2,discretion:70,best_for:["assalto","tecnica"],luxury:false},
