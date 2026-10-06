@@ -681,7 +681,7 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const missionOf = (team) => state.missions.find((m) => m.team_id === team.id);
   const freeEmployees = state.employees.filter((e) => !e.team_id && e.status === "idle");
   const freeVehicles = state.vehicles.filter((v) => !v.team_id && !v.transfer);
-  const nav = (p) => onNavigate && onNavigate(p);
+  const nav = (p, opts) => onNavigate && onNavigate(p, opts);
   const selectedTeam = selectedTeamId
     ? state.teams.find((team) => String(team.id) === String(selectedTeamId))
     : null;
@@ -979,7 +979,17 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                       <div className="flex flex-wrap items-center gap-1">
                         {members.map((m) => (
                           <span key={m.id} className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
-                            {m.name.split(" ")[0]} <span style={{ color: fatigueColor(m.fatigue) }}>{Math.round(m.fatigue)}%</span>
+                            <Button
+                              variant="bare"
+                              size="bare"
+                              type="button"
+                              data-testid={`team-member-open-${m.id}`}
+                              onClick={() => nav("employees", { focusTestId: `employee-card-${m.id}` })}
+                              className="font-mono text-[10px] text-zinc-200 underline-offset-2 hover:text-cyan-300 hover:underline"
+                            >
+                              {m.name.split(" ")[0]}
+                            </Button>
+                            <span style={{ color: fatigueColor(m.fatigue) }}>{Math.round(m.fatigue)}%</span>
                             {m.status === "idle" && (
                               <Button variant="bare" size="bare" type="button"
                                 data-testid={`team-member-remove-${m.id}`}
