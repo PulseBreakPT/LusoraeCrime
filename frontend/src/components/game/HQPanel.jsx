@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "../ui/alert";
 import {
   Landmark, ArrowUpCircle, Clock, Lock, Users, Car, Lightbulb, ChevronRight,
   SlidersHorizontal, CheckCircle2, Wallet, UserCog, Truck, Fingerprint, Radio, History,
-  Sparkles, AlertTriangle,
+  Sparkles, AlertTriangle, MapPin,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -117,7 +117,7 @@ const CategoryChart = ({ data }) => (
 );
 
 export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
-  const { state, catalog, serverNow, upgradeHQ, setOrgPriority, fetchTransactions } = useGame();
+  const { state, catalog, serverNow, upgradeHQ, setOrgPriority, fetchTransactions, startHqRelocation } = useGame();
   const [tab, setTab] = useState("geral");
   const [transactions, setTransactions] = useState([]);
   useTick(open);
@@ -162,6 +162,7 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   }, new Map()).values());
   const perf = hqPerformanceMetrics(state);
   const priority = state.player.priorities?.active || catalog.hq_default_priority || "equilibrio";
+  const tutorialRelocatable = Number(state.player.stats?.ops_dispatched || 0) === 0;
 
   const nav = (panel) => {
     onNavigate && onNavigate(panel);
@@ -199,6 +200,29 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
 
         {tab === "geral" && (
           <div className="mt-3 space-y-3" data-testid="hq-tab-geral-content">
+            {tutorialRelocatable && (
+              <Card data-testid="hq-tutorial-relocation" className="border-cyan-500/20 bg-cyan-500/[0.04] p-3 shadow-none">
+                <div className="flex items-start gap-2.5">
+                  <MapPin size={15} className="mt-0.5 shrink-0 text-cyan-300" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-white">Ainda podes mudar o QG</p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-zinc-400">
+                      Durante o tutorial, até despachares a primeira operação, podes corrigir a localização sem custo. Não há um bónus secreto por cidade: a consequência principal é geográfica, porque as zonas e deslocações são recalculadas à volta do QG.
+                    </p>
+                    <Button
+                      type="button"
+                      data-testid="hq-relocate-tutorial"
+                      variant="outline"
+                      size="compact"
+                      onClick={()=>{startHqRelocation();onOpenChange(false);}}
+                      className="mt-2 gap-1.5 font-mono text-[10px] font-bold uppercase text-cyan-300"
+                    >
+                      <MapPin size={12}/> Escolher outro local no mapa
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
             <div>
               <SectionHeader icon={Lightbulb} title="Recomendações do consultor" />
               {tips.length === 0 ? (
