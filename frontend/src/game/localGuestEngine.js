@@ -1616,6 +1616,9 @@ const mutateGame=(save,path,payload)=>{
     if(!eligibility.ok)fail(400,eligibility.reasons[0]);
     const members=eligibility.members;
     const vehicle=eligibility.vehicle;
+    const requirements=localOperationRequirements(opp);
+    const crewMissing=localMissingTeamRequirements(requirements,members);
+    if(crewMissing.length) fail(400,`Equipa sem requisitos operacionais: ${crewMissing.slice(0,4).map((item)=>item.label).join(", ")}`);
     const start=Date.now();
     const origin=vehicleOriginFor(save,vehicle) || {lat:Number(opp.lat),lng:Number(opp.lng)};
     const target={lat:Number(opp.lat),lng:Number(opp.lng)};
@@ -1661,10 +1664,20 @@ const mutateGame=(save,path,payload)=>{
       road_outward:roadOutward,road_inward:roadInward,
       live_log:[],
       decision:localMissionDecision(opp.category,opp.risk,arriveAt,finishAt),
+      requirements,
+      support_team_ids:[],support_vehicle_ids:[],reinforcement_effects:[],
+      reinforcement_request:requirements.support_teams>0?{
+        status:"pending",title:`Reforço recomendado · ${requirements.support_teams} equipa(s)`,
+        description:"Podes enviar equipas adicionais para melhorar a margem operacional e reduzir consequências.",
+        needed:requirements.support_teams,received:0,opens_at:departAt,expires_at:finishAt,
+      }:null,
+      chain_id:opp.chain_id||opp.id,parent_mission_id:opp.parent_mission_id||null,
+      chain_stage:Number(opp.chain_stage||0),chain_kind:opp.chain_kind||null,
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       city_world:cityWorld,city_heat_mult:Number(cityWorld.modifiers?.heat_mult||1),
       opportunity:{id:opp.id,name:opp.name,type_key:opp.type_key,category:opp.category,district:opp.district,
-        reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),risk:opp.risk,heat:Number(opp.heat||0)*Number(cityWorld.modifiers?.heat_mult||1),pays:opp.pays,profile:profile.profile}};
+        reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),risk:opp.risk,heat:Number(opp.heat||0)*Number(cityWorld.modifiers?.heat_mult||1),pays:opp.pays,profile:profile.profile,
+        min_level:opp.min_level,min_members:opp.min_members,required_models:[...(opp.required_models||[])],distance_km:opp.dist_km}};
     team.status="on_mission";team.last_type_key=opp.type_key;team.last_type_at=new Date(start).toISOString();team.repeat_type_count=repeatCount;members.forEach(e=>e.status="on_mission");opp.status="taken";save.missions.push(mission);
     normalizeSavedStats(save);
     save.player.stats.ops_dispatched=(save.player.stats.ops_dispatched||0)+1;
