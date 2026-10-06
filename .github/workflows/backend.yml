@@ -49,7 +49,7 @@ jobs:
         run: python backend/tests/test_retention_engine.py
 
       - name: Test operational director
-        run: PYTHONPATH=backend python -m pytest -q backend/tests/test_operational_director.py
+        run: PYTHONPATH=backend python backend/tests/test_operational_director.py
 
       - name: Test living city systems
         run: PYTHONPATH=backend python backend/tests/test_city_systems.py
