@@ -293,6 +293,37 @@ def capability_snapshot(
     }
 
 
+def missing_team_requirements(requirements: dict, members: list[dict]) -> list[dict]:
+    """Requisitos que têm de coexistir na equipa principal."""
+    roles = {m.get("role_key") for m in members if m.get("role_key")}
+    certs = set()
+    for member in members:
+        certs |= certifications_for_employee(member)
+
+    missing = []
+    if len(members) < int(requirements.get("min_members", 1) or 1):
+        missing.append({
+            "kind": "members",
+            "key": "min_members",
+            "label": f"Mínimo de {requirements.get('min_members', 1)} operacionais",
+        })
+    for role in requirements.get("required_roles") or []:
+        if role not in roles:
+            missing.append({
+                "kind": "role",
+                "key": role,
+                "label": f"Falta na equipa: {role.replace('_', ' ')}",
+            })
+    for cert in requirements.get("required_certifications") or []:
+        if cert not in certs:
+            missing.append({
+                "kind": "certification",
+                "key": cert,
+                "label": f"Falta certificação: {cert.replace('_', ' ')}",
+            })
+    return missing
+
+
 def classify_opportunity_readiness(opportunity: dict, capabilities: dict) -> dict:
     req = operation_requirements(opportunity)
     missing = []
@@ -313,12 +344,24 @@ def classify_opportunity_readiness(opportunity: dict, capabilities: dict) -> dic
 
     if capabilities["idle_team_count"] <= 0:
         missing.append({"kind": "team", "key": "idle_team", "label": "Não há equipa pronta"})
-    elif req["support_teams"] and capabilities["idle_team_count"] < 1 + req["support_teams"]:
-        weak.append({
-            "kind": "support",
-            "key": "support_teams",
-            "label": f"Recomendado: {req['support_teams']} equipa(s) de apoio",
-        })
+    else:
+        team_map = capabilities.get("team_employee_map") or {}
+        primary_ready = any(
+            not missing_team_requirements(req, members)
+            for members in team_map.values()
+        )
+        if not primary_ready and not missing:
+            weak.append({
+                "kind": "composition",
+                "key": "reorganize_primary",
+                "label": "Os recursos existem, mas tens de reorganizar uma equipa principal",
+            })
+        if req["support_teams"] and capabilities["idle_team_count"] < 1 + req["support_teams"]:
+            weak.append({
+                "kind": "support",
+                "key": "support_teams",
+                "label": f"Recomendado: {req['support_teams']} equipa(s) de apoio",
+            })
 
     for stock in req["recommended_stock"]:
         if int(capabilities["inventory"].get(stock, 0) or 0) <= 0:
