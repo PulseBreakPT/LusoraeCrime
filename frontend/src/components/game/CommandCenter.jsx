@@ -43,9 +43,9 @@ const fuzzyScore = (query, text) => {
 
 const PANEL_ICONS = {
   opscenter: RadioTower, operations: Crosshair, quests: Target, mastermind: Vault,
-  teams: Users, employees: IdCard, fleet: Car, weapons: Swords,
-  empire: Building2, properties: Warehouse, hq: Landmark,
-  organization: Network, city: RadioTower, intel: BrainCircuit,
+  teams: Users, employees: IdCard, fleet: Car, weapons: Swords, warehouse: Warehouse,
+  empire: Building2, properties: Warehouse, businesses: Building2, territory: Network, hq: Landmark,
+  world: RadioTower, management: Network, intel: BrainCircuit,
   shop: ShoppingBag, settings: Settings,
 };
 
@@ -123,7 +123,7 @@ export const CommandCenter = ({ open, onOpenChange, onNavigate, onSelectOpp }) =
   const commands = useMemo(() => {
     if (!state) return [];
     const panelCommands = GAME_AREAS
-      .filter((area) => gameAreaUnlocked(area.id, state.player?.level))
+      .filter((area) => !area.hidden && gameAreaUnlocked(area.id, state.player?.level))
       .map((area) => ({
         id: `panel:${area.id}`,
         label: area.label,

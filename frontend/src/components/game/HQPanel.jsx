@@ -33,6 +33,7 @@ const TABS = [
   { key: "geral", label: "Geral" },
   { key: "melhorias", label: "Melhorias" },
   { key: "prioridades", label: "Prioridades" },
+  { key: "desempenho", label: "Desempenho" },
 ];
 
 const SEVERITY_COLOR = { danger: "#EF4444", warn: "#F59E0B", opportunity: "#34D399", info: "#22D3EE" };
@@ -263,6 +264,18 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
             <p className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.04] px-2.5 py-2 font-mono text-[10px] text-emerald-400">
               {hqBenefitDesc(currentTier)}
             </p>
+
+            {state.player.level >= 10 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => nav("management")}
+                className="w-full justify-between border-white/10 bg-black/20 text-xs text-zinc-300"
+              >
+                Gestão avançada
+                <ChevronRight size={12} />
+              </Button>
+            )}
 
           </div>
         )}
