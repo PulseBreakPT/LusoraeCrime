@@ -9,7 +9,7 @@ import { cn } from "../../lib/utils";
 import { usePreferenceState } from "../../lib/persist";
 import { useSettings } from "../../context/SettingsContext";
 import { usePanelFocus } from "../../hooks/usePanelFocus";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, EmptyState, SectionHeader, ActionGrid } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, EmptyState, SectionHeader, ActionGrid, EntityDetailBar, openEntityFromCard } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -79,7 +79,7 @@ const ActionBtn = ({ testId, icon, label, onClick, disabled, title, blockedReaso
   />
 );
 
-const EmployeeCard = ({ e, onNavigate }) => {
+const EmployeeCard = ({ e, onNavigate, onOpenDetail }) => {
   const {
     state, catalog, serverNow, trainEmployee, restEmployee,
     promoteEmployee, bonusEmployee, healEmployee, releaseEmployee, fireEmployee, renameEmployee,
@@ -142,7 +142,8 @@ const EmployeeCard = ({ e, onNavigate }) => {
   return (
     <Card
       data-testid={`employee-card-${e.id}`}
-      className="min-w-0 sub-card sub-doss-card p-3 shadow-none"
+      onClick={(event) => openEntityFromCard(event, onOpenDetail)}
+      className="min-w-0 cursor-pointer sub-card sub-doss-card p-3 shadow-none transition-colors hover:border-cyan-500/20"
       style={{ "--dtier": RARITY_COLORS[e.rarity] || "#A1A1AA" }}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -608,14 +609,20 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
   const [rosterSort, setRosterSort] = usePreferenceState("empRosterSort", "priority", rememberSort);
   const [recruitSort, setRecruitSort] = usePreferenceState("empRecruitSort", "recommended", rememberSort);
   const [restAllBusy, setRestAllBusy] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [hideUnavailable, setHideUnavailable] = usePreferenceState("empHideUnavailable", true, rememberFilters);
   useTick(open);
   usePanelFocus(open, focusTarget);
   useEffect(() => {
-    if (!open || !focusTarget?.testId?.startsWith("employee-card-")) return;
+    if (!open) {
+      setSelectedEmployeeId(null);
+      return;
+    }
+    if (!focusTarget?.testId?.startsWith("employee-card-")) return;
     setQuery("");
     setTab("roster");
     setHideUnavailable(false);
+    setSelectedEmployeeId(focusTarget.testId.slice("employee-card-".length));
   }, [open, focusTarget?.token, focusTarget?.testId, setHideUnavailable, setTab]);
   if (!state || !catalog) return null;
 
@@ -649,7 +656,9 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
   const unavailableHidden = hideUnavailable
     ? searched.filter((e) => e.status === "idle" || favoriteEmployeeIds.includes(e.id))
     : searched;
-  const sortedEmployees = [...unavailableHidden].sort((a, b) => {
+  const sortedEmployees = [...unavailableHidden]
+    .filter((employee) => !selectedEmployeeId || String(employee.id) === String(selectedEmployeeId))
+    .sort((a, b) => {
     const favA = favoriteEmployeeIds.includes(a.id) ? 0 : 1;
     const favB = favoriteEmployeeIds.includes(b.id) ? 0 : 1;
     if (favA !== favB) return favA - favB;
@@ -666,6 +675,9 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
     return b.fatigue - a.fatigue;
   });
   const hiddenCount = searched.length - unavailableHidden.length;
+  const selectedEmployee = selectedEmployeeId
+    ? state.employees.find((employee) => String(employee.id) === String(selectedEmployeeId))
+    : null;
 
   const rarityOrder = { comum: 0, raro: 1, elite: 2, lendario: 3 };
   const candidateRows = (state.candidates || []).map((candidate) => ({
@@ -693,6 +705,15 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
             O coração da organização — recruta bem, paga a horas e vigia a lealdade.
           </SheetDescription>
         </SheetHeader>
+
+        {selectedEmployee && (
+          <EntityDetailBar
+            testId="employee-detail-bar"
+            title={selectedEmployee.name}
+            meta="Ficha individual do operacional"
+            onBack={() => setSelectedEmployeeId(null)}
+          />
+        )}
 
         {state.player.clean_money < weeklyFixed && weeklyFixed > 0 && (
           <Alert variant="destructive" data-testid="payroll-warning" className="mt-3 border-red-600/40 bg-red-600/10 py-2">
@@ -767,7 +788,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
           </Card>
         )}
 
-        <Tabs value={tab} onValueChange={setTab} className="mt-3">
+        {!selectedEmployeeId && <Tabs value={tab} onValueChange={setTab} className="mt-3">
           <TabsList className="grid w-full grid-cols-2 gap-1">
             <TabsTrigger data-testid="tab-roster" value="roster" className="font-mono text-[10px] font-bold uppercase tracking-wider">
               Efetivo ({state.employees.length})
@@ -776,7 +797,7 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
               Recrutar ({(state.candidates || []).length})
             </TabsTrigger>
           </TabsList>
-        </Tabs>
+        </Tabs>}
 
         {tab === "roster" && (
           <div className="mt-3">
@@ -863,7 +884,12 @@ export const EmployeesPanel = ({ open, onOpenChange, onNavigate, focusTarget }) 
                     </Card>
                   )}
                   {sortedEmployees.map((employee) => (
-                    <EmployeeCard key={employee.id} e={employee} onNavigate={onNavigate} />
+                    <EmployeeCard
+                      key={employee.id}
+                      e={employee}
+                      onNavigate={onNavigate}
+                      onOpenDetail={() => setSelectedEmployeeId(String(employee.id))}
+                    />
                   ))}
                 </div>
               </>
