@@ -435,7 +435,9 @@ def operational_snapshot(
         "active_missions": len(active),
         "coverage": sorted(coverage, key=lambda row: (-row["active_operations"], -row["attention"]))[:12],
         "world": world or {},
-        "presets": DEFAULT_DISPATCH_PRESETS,
+        "presets": {**DEFAULT_DISPATCH_PRESETS, **dict(player.get("dispatch_presets") or {})},
+        "staging_areas": list(player.get("staging_areas") or []),
+        "operational_rules": dict(player.get("operational_rules") or {}),
     }
 
 
