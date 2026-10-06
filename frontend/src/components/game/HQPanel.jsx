@@ -7,8 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import {
-  Landmark, ArrowUpCircle, Clock, Lock, SlidersHorizontal, Wallet,
-  UserCog, Truck, Fingerprint, Radio, History, MapPin,
+  Landmark, ArrowUpCircle, Clock, Lock, SlidersHorizontal, History, MapPin,
 } from "lucide-react";
 
 const useTick = (active) => {
@@ -26,7 +25,6 @@ const TABS = [
   { key: "prioridades", label: "Prioridades" },
 ];
 
-const DEPARTMENT_ICONS = { financeiro: Wallet, rh: UserCog, logistica: Truck, investigacao: Fingerprint, comunicacoes: Radio };
 
 export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
   const { state, catalog, serverNow, upgradeHQ, setOrgPriority, startHqRelocation } = useGame();
@@ -213,35 +211,17 @@ export const HQPanel = ({ open, onOpenChange, onNavigate }) => {
               </p>
             </div>
 
-            <div>
-              <SectionHeader icon={UserCog} title="Departamentos" />
-              <div className="space-y-2" data-testid="hq-departments">
-                {Object.entries(catalog.hq_departments || {}).map(([key, dept]) => {
-                  const unlockTier = (catalog.hq_level_benefits || []).find((t) => (t.unlocks || []).includes(key));
-                  const unlockLevel = unlockTier?.level || 1;
-                  const unlocked = hq.level >= unlockLevel;
-                  const Icon = DEPARTMENT_ICONS[key] || Lock;
-                  const deptLevel = Number(state.organization?.departments?.[key] || 0);
-                  const maxLevel = Number(catalog.organization?.departments?.[key]?.max_level || 3);
-                  return (
-                    <Card key={key} data-testid={`hq-dept-${key}`} className="flex items-center gap-2 sub-card p-2.5 shadow-none">
-                      <Icon size={16} className={unlocked ? "text-cyan-400" : "text-zinc-600"} />
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-[12px] font-semibold ${unlocked ? "text-white" : "text-zinc-500"}`}>{dept.name}</p>
-                        <p className="text-[10px] text-zinc-600">{dept.desc}</p>
-                      </div>
-                      {unlocked ? (
-                        <span className="shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[0.06] px-2 py-1 font-mono text-[10px] uppercase text-emerald-400">
-                          N{deptLevel}/{maxLevel}
-                        </span>
-                      ) : (
-                        <span className="shrink-0 font-mono text-[10px] uppercase text-zinc-600">Nível {unlockLevel}</span>
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="compact"
+              data-testid="hq-priorities-open-systems"
+              onClick={() => onNavigate && onNavigate("hqsystems")}
+              className="w-full justify-between font-mono text-[10px] text-zinc-300"
+            >
+              Gerir departamentos e automatizações
+              <SlidersHorizontal size={11} className="text-cyan-300" />
+            </Button>
           </div>
         )}
       </SheetContent>
