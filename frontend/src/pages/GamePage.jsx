@@ -32,8 +32,8 @@ import { Button } from "../components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../components/ui/select";
 import { orgAlerts, opportunityReachable, NOTIFY_COLOR } from "../lib/game";
 import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
-import { areaLabel } from "../game/navigation";
-import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, Network, RadioTower, Focus } from "lucide-react";
+import { areaLabel, canonicalGamePanel } from "../game/navigation";
+import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, RadioTower, Focus } from "lucide-react";
 
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, autoOpenReportSignal, placement } = useGame();
@@ -142,22 +142,23 @@ export default function GamePage() {
   // abrir e, se o evento apontar para uma aba específica (ex.: uma decisão
   // pendente nas Missões), abre já nessa aba em vez da última usada.
   const navigateTo = (panel, opts) => {
-    if (opts?.tab && panel === "quests") setQuestsFocusTab(opts.tab);
+    const targetPanel = canonicalGamePanel(panel);
+    if (opts?.tab && targetPanel === "quests") setQuestsFocusTab(opts.tab);
     setFocusTarget(
       opts?.focusTestId
-        ? { panel, testId: opts.focusTestId, token: `${Date.now()}-${Math.random()}` }
+        ? { panel: targetPanel, testId: opts.focusTestId, token: `${Date.now()}-${Math.random()}` }
         : null
     );
     setNavGroup(null);
     setMapLegendOpen(false);
-    setOpenPanel(panel);
+    setOpenPanel(targetPanel);
   };
 
   const openFromNav = (panel) => {
     setFocusTarget(null);
     setNavGroup(null);
     setMapLegendOpen(false);
-    setOpenPanel(panel);
+    setOpenPanel(canonicalGamePanel(panel));
   };
 
   const openWorldTab = (tab) => {
@@ -399,19 +400,6 @@ export default function GamePage() {
                     )}
                     <NavAction testId="open-hq-button" icon={Landmark} label="QG" color="text-zinc-200" onClick={() => openFromNav("hq")} />
                   </div>
-                  {unlocks.management && (
-                    <Button
-                      type="button"
-                      variant="bare"
-                      size="bare"
-                      data-testid="open-management-button"
-                      onClick={() => openFromNav("management")}
-                      className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-                    >
-                      <span className="flex items-center gap-2"><Network size={12} /> Gestão avançada</span>
-                      <span>Políticas · automação</span>
-                    </Button>
-                  )}
                 </>
               )}
 
@@ -508,7 +496,7 @@ export default function GamePage() {
               label="Império"
               color="text-red-400"
               alert={empireAlert || alerts.raidRisk}
-              active={navGroup === "empire" || ["empire", "properties", "businesses", "territory", "hq", "management"].includes(openPanel)}
+              active={navGroup === "empire" || ["empire", "properties", "businesses", "territory", "hq"].includes(openPanel)}
               onClick={() => toggleNavGroup("empire")}
             />
             <GroupButton
@@ -592,8 +580,6 @@ export default function GamePage() {
           onOpenChange={(o) => setOpenPanel(o ? "world" : null)}
         />
       )}
-      {openPanel === "organization" && unlocks.management && <OrganizationPanel open title="Gestão avançada" onOpenChange={(o) => setOpenPanel(o ? "organization" : null)} />}
-      {openPanel === "city" && unlocks.world && <CityPanel open visibleTabs={["pulse", "news", "rivals", "social"]} title="Mundo" onOpenChange={(o) => setOpenPanel(o ? "city" : null)} />}
       {openPanel === "operations" && (
         <OpportunitiesPanel
           open
