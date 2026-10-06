@@ -6,7 +6,7 @@ import {
   LARGE_PURCHASE_THRESHOLD, vehicleTier, vehicleAdequacy, vehicleSpeedFactor, vehicleMissionScore, SPEC_LABELS,
 } from "../../lib/game";
 import { cn } from "../../lib/utils";
-import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader } from "./hud";
+import { Tip, Kpi, SummaryStrip, MiniBar, InlineRename, FavoriteStar, ConfirmButton, PurchaseButton, PanelWatermark, SectionHeader, EntityDetailBar, openEntityFromCard } from "./hud";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../ui/sheet";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -77,10 +77,18 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
   const [query, setQuery] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
   useTick(open);
   usePanelFocus(open, focusTarget);
   useEffect(() => {
-    if (open && focusTarget?.testId?.startsWith("vehicle-card-")) setQuery("");
+    if (!open) {
+      setSelectedVehicleId(null);
+      return;
+    }
+    if (focusTarget?.testId?.startsWith("vehicle-card-")) {
+      setQuery("");
+      setSelectedVehicleId(focusTarget.testId.slice("vehicle-card-".length));
+    }
   }, [open, focusTarget?.token, focusTarget?.testId]);
   if (!state) return null;
   const caps = state.caps.vehicles;
@@ -116,7 +124,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
     matchesSearch(query, v.name, catalog?.vehicle_models?.[v.model_key]?.name || v.model_key)
   );
   // Disponibilidade primeiro: favoritos, depois operacionais, depois em operação, por fim os que precisam de atenção.
-  const sortedVehicles = [...filteredVehicles].sort((a, b) => {
+  const sortedVehicles = [...filteredVehicles]
+    .filter((vehicle) => !selectedVehicleId || String(vehicle.id) === String(selectedVehicleId))
+    .sort((a, b) => {
     const favA = favoriteVehicleIds.includes(a.id) ? 0 : 1;
     const favB = favoriteVehicleIds.includes(b.id) ? 0 : 1;
     if (favA !== favB) return favA - favB;
@@ -127,6 +137,9 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
     };
     return rank(a) - rank(b);
   });
+  const selectedVehicle = selectedVehicleId
+    ? state.vehicles.find((vehicle) => String(vehicle.id) === String(selectedVehicleId))
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -140,7 +153,16 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           <SheetDescription className="text-zinc-500">Sem rodas não há golpes — abastece, repara e mantém tudo pronto a sair.</SheetDescription>
         </SheetHeader>
 
-        <Button
+        {selectedVehicle && (
+          <EntityDetailBar
+            testId="vehicle-detail-bar"
+            title={selectedVehicle.name}
+            meta="Ficha individual do veículo"
+            onBack={() => setSelectedVehicleId(null)}
+          />
+        )}
+
+        {!selectedVehicleId && <Button
           type="button"
           variant="outline"
           size="compact"
@@ -150,7 +172,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
         >
           Pneus · seguros · IPO · revisões
           <Sparkles size={11} className="text-cyan-300" />
-        </Button>
+        </Button>}
 
         {(() => {
           const vs = state.vehicles;
@@ -243,7 +265,17 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               missionPhaseLabel = STATUS_LABELS[mission.phase] || mission.phase;
             }
             return (
-              <Card key={v.id} data-testid={`vehicle-card-${v.id}`} className="h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none" style={{ "--dtier": tier.color }}>
+              <Card
+                key={v.id}
+                data-testid={`vehicle-card-${v.id}`}
+                data-entity-detail={selectedVehicleId && String(v.id) === String(selectedVehicleId) ? "open" : "closed"}
+                onClick={(event) => openEntityFromCard(event, () => setSelectedVehicleId(String(v.id)))}
+                className={cn(
+                  "h-full min-w-0 sub-card sub-doss-card p-2.5 shadow-none transition-colors",
+                  selectedVehicleId ? "cursor-default border-cyan-500/20" : "cursor-pointer hover:border-cyan-500/20"
+                )}
+                style={{ "--dtier": tier.color }}
+              >
                 <div className="relative z-[1] min-w-0">
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="flex min-w-0 items-center gap-1.5">
@@ -483,7 +515,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
           })}
         </div>
 
-        <div className="mt-6">
+        {!selectedVehicleId && <div className="mt-6">
           <SectionHeader icon={ShoppingCart} title="Stand de veículos" meta={catalog ? `${Object.keys(catalog.vehicle_models || {}).length} modelos` : undefined} />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {catalog &&
@@ -574,7 +606,7 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
               </Card>
             );
           })()}
-        </div>
+        </div>}
       </SheetContent>
     </Sheet>
   );
