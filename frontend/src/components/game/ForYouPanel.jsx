@@ -69,17 +69,17 @@ export const ForYouPanel = ({ open, onOpenChange, onNavigate, onSelectOpp }) => 
           <Card className="sub-card p-3 text-center shadow-none">
             <Users size={13} className="mx-auto text-cyan-300" />
             <p className="mt-1 text-lg font-bold text-white">{readyTeams}</p>
-            <p className="font-mono text-[9px] uppercase text-zinc-600">equipas prontas</p>
+            <p className="font-mono text-[10px] uppercase text-zinc-600">equipas prontas</p>
           </Card>
           <Card className="sub-card p-3 text-center shadow-none">
             <Route size={13} className="mx-auto text-red-300" />
             <p className="mt-1 text-lg font-bold text-white">{activeOps}</p>
-            <p className="font-mono text-[9px] uppercase text-zinc-600">em curso</p>
+            <p className="font-mono text-[10px] uppercase text-zinc-600">em curso</p>
           </Card>
           <Card className="sub-card p-3 text-center shadow-none">
             <Crosshair size={13} className="mx-auto text-amber-300" />
             <p className="mt-1 text-lg font-bold text-white">{suggestions.length}</p>
-            <p className="font-mono text-[9px] uppercase text-zinc-600">sugeridas</p>
+            <p className="font-mono text-[10px] uppercase text-zinc-600">sugeridas</p>
           </Card>
         </div>
 
@@ -100,7 +100,7 @@ export const ForYouPanel = ({ open, onOpenChange, onNavigate, onSelectOpp }) => 
                   className="flex min-h-16 w-full items-center gap-3 rounded-lg border border-white/[0.07] bg-black/20 px-3 py-2.5 text-left hover:bg-white/[0.04]"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-600">
                       {horizonLabel[move.horizon] || move.horizon}
                     </p>
                     <p className="mt-0.5 truncate text-[11px] font-bold text-white">{move.title}</p>
@@ -133,7 +133,7 @@ export const ForYouPanel = ({ open, onOpenChange, onNavigate, onSelectOpp }) => 
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[11px] font-bold text-white">{opp.name}</p>
-                    <p className="mt-0.5 truncate font-mono text-[9px] uppercase text-zinc-600">
+                    <p className="mt-0.5 truncate font-mono text-[10px] uppercase text-zinc-600">
                       {opp.district || "Zona desconhecida"} · risco {opp.risk || "—"}
                     </p>
                   </div>
@@ -151,12 +151,12 @@ export const ForYouPanel = ({ open, onOpenChange, onNavigate, onSelectOpp }) => 
             <div className="flex items-start gap-2">
               <LockKeyhole size={14} className="mt-0.5 shrink-0 text-cyan-300" />
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-cyan-300/70">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-300/70">
                   Próximo marco · nível {nextUnlockLevel}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {nextUnlocks.map((area) => (
-                    <Badge key={area.id} variant="outline" className="border-white/10 text-[9px] text-zinc-300">
+                    <Badge key={area.id} variant="outline" className="border-white/10 text-[10px] text-zinc-300">
                       {area.label}
                     </Badge>
                   ))}
