@@ -559,27 +559,28 @@ export function GameProvider({ children }) {
       };
     }
   }, [state]);
-  const recommendOpportunityForTeam = useCallback(async (teamId) => {
+  const recommendOpportunityForTeam = useCallback(async (teamId, strategy = null) => {
     try {
-      const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId });
+      const { data } = await api.post("/game/dispatch/recommend_opportunity", { team_id: teamId, ...(strategy ? { strategy } : {}) });
       return { ok: true, data };
     } catch (_e) {
       return { ok: false };
     }
   }, []);
-  const recommendTeamForOpportunity = useCallback(async (opportunityId) => {
+  const recommendTeamForOpportunity = useCallback(async (opportunityId, strategy = null) => {
     try {
       const { data } = await api.post("/game/dispatch/recommend_team", {
         opportunity_id: opportunityId,
+        ...(strategy ? { strategy } : {}),
       });
       return { ok: true, data };
     } catch (_e) {
       return { ok: false };
     }
   }, []);
-  const recommendRepeatForTeam = useCallback(async (teamId) => {
+  const recommendRepeatForTeam = useCallback(async (teamId, strategy = null) => {
     try {
-      const { data } = await api.post("/game/dispatch/recommend_repeat", { team_id: teamId });
+      const { data } = await api.post("/game/dispatch/recommend_repeat", { team_id: teamId, ...(strategy ? { strategy } : {}) });
       return { ok: true, data };
     } catch (_e) {
       return { ok: false };
