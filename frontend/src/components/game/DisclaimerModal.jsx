@@ -6,21 +6,11 @@ import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTit
 import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2, Hourglass } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Tempo de leitura obrigatório — o botão "aceitar" só desbloqueia depois de o
-// jogador ter tido tempo real para ler o aviso (prática de consentimento
-// informado). O tempo é DERIVADO do próprio texto: contagem de palavras a
-// ~200 ppm (leitura atenta em pt-PT), limitado a [8s, 20s] para nunca ser
-// absurdo se o texto mudar. O botão "Não concordo" fica sempre clicável.
+// O compromisso continua explícito e auditável, mas não existe uma espera
+// artificial antes de o jogador poder aceitar. O texto fica integralmente
+// visível e "Não concordo" continua sempre disponível.
 // ---------------------------------------------------------------------------
-const NOTICE_PLAIN_TEXT = [
-  "O SUBMUNDO é uma obra de ficção. Todos os crimes, esquemas, personagens e organizações que aqui existem são inteiramente fictícios e vivem apenas dentro deste universo virtual.",
-  "Nada do que acontece no jogo deve ser repetido, imitado ou servir de inspiração na vida real. Atividades criminosas reais causam danos a pessoas e comunidades e têm consequências legais graves.",
-  "Ao continuar, comprometes-te a tratar tudo isto como puro entretenimento e a nunca replicar na vida real o que vês ou fazes no jogo.",
-  "Assumes este compromisso?",
-].join(" ");
-const WORD_COUNT = NOTICE_PLAIN_TEXT.trim().split(/\s+/).length;
-const WORDS_PER_MINUTE = 200;
-export const READ_SECONDS = Math.min(20, Math.max(8, Math.ceil((WORD_COUNT / WORDS_PER_MINUTE) * 60)));
+export const READ_SECONDS = 0;
 
 /**
  * Disclaimer de ficção — mostrado UMA única vez por conta, na primeira
