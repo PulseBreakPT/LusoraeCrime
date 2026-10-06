@@ -772,6 +772,49 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
                   </div>
                 )}
 
+                <div
+                  data-testid="dispatch-decision-brief"
+                  className="mt-2 rounded-lg border border-white/[0.07] bg-black/25 p-2"
+                >
+                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                    <div className="min-w-0">
+                      <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Valor esperado</p>
+                      <p className={`mt-0.5 truncate font-mono text-[11px] font-bold ${Number(preview.expected_profit || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {fmtMoney(preview.expected_profit || 0)}
+                      </p>
+                    </div>
+                    <div className="min-w-0 border-x border-white/[0.06] px-1">
+                      <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Eficiência</p>
+                      <p className="mt-0.5 truncate font-mono text-[11px] font-bold text-cyan-300">
+                        {fmtMoney(preview.expected_profit_per_min || 0)}/min
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Tempo total</p>
+                      <p className="mt-0.5 truncate font-mono text-[11px] font-bold text-zinc-200">
+                        {fmtDuration(preview.duration_total_s || 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {preview.weak_link?.label && (
+                    <div className="mt-2 flex items-start gap-1.5 border-t border-white/[0.06] pt-2">
+                      <AlertTriangle size={11} className="mt-0.5 shrink-0 text-amber-400" aria-hidden="true" />
+                      <p className="min-w-0 text-[10px] leading-snug text-zinc-400">
+                        <span className="font-semibold text-zinc-200">Ponto fraco: </span>
+                        {preview.weak_link.label}
+                        <span className="ml-1 font-mono font-bold text-red-400">{pctSigned(preview.weak_link.pct)}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  {preview.city_world?.weather?.name && (
+                    <p className="mt-1.5 truncate font-mono text-[9px] text-zinc-600">
+                      Mundo agora · {preview.city_world.daypart?.name} · {preview.city_world.weather.name} · {preview.city_world.event?.name}
+                    </p>
+                  )}
+                </div>
+
                 <p className="mt-1.5 font-mono text-[10px] text-zinc-400">
                   <span className="text-emerald-400">{fmtMoney(preview.reward)}</span>
                   {(preview.reward_breakdown || []).map((source) => (
