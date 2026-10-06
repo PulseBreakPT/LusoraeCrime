@@ -72,7 +72,7 @@ const AdequacyRow = ({ model, catalog, testId }) => {
 
 export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
   const {
-    state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle, assignVehicle,
+    state, catalog, serverNow, buyVehicle, sellVehicle, refuelVehicle, repairVehicle,
     transferVehicle, renameVehicle, favoriteVehicleIds, toggleFavoriteVehicle, optimizeVehicles, repairFleetAll,
   } = useGame();
   const [statsOpen, setStatsOpen] = useState(null);
@@ -88,7 +88,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
 
   const teamOf = (v) => state.teams.find((t) => t.id === v.team_id);
   const teamMembersList = (teamId) => state.employees.filter((e) => e.team_id === teamId);
-  const teamMembers = (teamId) => teamMembersList(teamId).length;
   const vehicleBusy = (v) => {
     const t = teamOf(v);
     return t && t.status !== "idle";
@@ -380,22 +379,21 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                   </div>
                 )}
 
-                <Select
-                  value={v.team_id || "__none__"}
-                  disabled={locked}
-                  onValueChange={(tid) => assignVehicle(v.id, tid === "__none__" ? null : tid)}
-                >
-                  <SelectTrigger data-testid={`vehicle-team-select-${v.id}`} className="relative z-[1] mt-2 w-full border-white/10 bg-black/60 font-mono text-[11px] text-white disabled:opacity-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__" className="font-mono text-xs">Na garagem (sem equipa)</SelectItem>
-                    {state.teams.map((t) => {
-                      const label = t.name + " · " + teamMembers(t.id) + " membros";
-                      return <SelectItem key={t.id} value={t.id} className="font-mono text-xs">{label}</SelectItem>;
-                    })}
-                  </SelectContent>
-                </Select>
+                <div className="relative z-[1] mt-2 flex min-h-10 items-center justify-between gap-2 rounded-md border border-white/[0.07] bg-black/20 px-2.5 py-2">
+                  <p className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
+                    {team ? `Atribuído a ${team.name}` : "Na garagem · sem equipa"}
+                  </p>
+                  <Button
+                    variant="bare"
+                    size="bare"
+                    type="button"
+                    data-testid={`vehicle-nav-team-${v.id}`}
+                    onClick={() => onNavigate && onNavigate("teams", team ? { focusTestId: `team-card-${team.id}` } : undefined)}
+                    className="shrink-0 font-mono text-[10px] text-cyan-300 underline-offset-2 hover:underline"
+                  >
+                    Gerir em Equipas
+                  </Button>
+                </div>
                 <Select
                   value={v.property_id || "__hq__"}
                   disabled={locked}
@@ -411,15 +409,6 @@ export const FleetPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                     ))}
                   </SelectContent>
                 </Select>
-                {v.team_id && teamMembers(v.team_id) === 0 && (
-                  <Button variant="bare" size="bare" type="button"
-                    data-testid={`vehicle-team-empty-${v.id}`}
-                    onClick={() => onNavigate && onNavigate("employees")}
-                    className="relative z-[1] mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-400 underline-offset-2 hover:underline"
-                  >
-                    <UserRound size={10} /> Equipa sem membros — atribuir em Operacionais
-                  </Button>
-                )}
 
                 <div className="relative z-[1] mt-2 flex gap-1.5">
                   {refueling ? (
