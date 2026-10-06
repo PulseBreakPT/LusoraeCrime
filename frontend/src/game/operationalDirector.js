@@ -36,13 +36,23 @@ const PROFILE_REQ = {
 };
 
 const DISTRICT_ARCHETYPES = {
-  residencial:{name:"Residencial",tags:["residencial","local"]},
-  comercial:{name:"Comercial",tags:["comercial","serviços","movimento"]},
-  industrial:{name:"Industrial",tags:["industrial","armazéns","logística"]},
-  turistico:{name:"Turístico",tags:["turismo","hotelaria","movimento"]},
-  portuario:{name:"Portuário",tags:["porto","carga","costeiro"]},
-  rural:{name:"Rural",tags:["rural","baixa densidade"]},
-  empresarial:{name:"Empresarial",tags:["empresas","escritórios","tecnologia"]},
+  residencial:{name:"Residencial",tags:["residencial","local"],category_weights:{assalto:1.05,influencia:1.10,logistica:.90}},
+  comercial:{name:"Comercial",tags:["comercial","serviços","movimento"],category_weights:{influencia:1.18,tecnica:1.10,assalto:1.02}},
+  industrial:{name:"Industrial",tags:["industrial","armazéns","logística"],category_weights:{logistica:1.25,assalto:1.08,tecnica:.95}},
+  turistico:{name:"Turístico",tags:["turismo","hotelaria","movimento"],category_weights:{influencia:1.16,especial:1.10,assalto:.95}},
+  portuario:{name:"Portuário",tags:["porto","carga","costeiro"],category_weights:{logistica:1.32,especial:1.12,assalto:1.05}},
+  rural:{name:"Rural",tags:["rural","baixa densidade"],category_weights:{logistica:1.12,assalto:1.05,tecnica:.88}},
+  empresarial:{name:"Empresarial",tags:["empresas","escritórios","tecnologia"],category_weights:{tecnica:1.25,influencia:1.18,assalto:.88}},
+};
+
+const LOCAL_POIS = {
+  residencial:["Bairro residencial","Condomínio","Rua secundária","Garagem privada"],
+  comercial:["Zona comercial","Mercado","Centro de serviços","Parque de estacionamento"],
+  industrial:["Armazém logístico","Parque industrial","Zona de cargas","Oficina"],
+  turistico:["Zona hoteleira","Frente turística","Área de entretenimento","Parque público"],
+  portuario:["Terminal de carga","Marina","Cais","Zona portuária"],
+  rural:["Estrada rural","Quinta isolada","Zona florestal","Armazém periférico"],
+  empresarial:["Centro empresarial","Escritórios","Nó tecnológico","Parque corporativo"],
 };
 
 const hash = (value) => {
@@ -76,6 +86,32 @@ export const localDistrictProfile = (district = {}) => {
     chosen = pool[hash(key + ":" + name + ":" + ring) % pool.length];
   }
   return {key:chosen,ring,...DISTRICT_ARCHETYPES[chosen]};
+};
+
+export const localDistrictCategoryMultiplier = (district, category) =>
+  Number(localDistrictProfile(district).category_weights?.[category] || 1);
+
+const localPoiForOperation = (district, opp) => {
+  const profile=localDistrictProfile(district);
+  const pool=LOCAL_POIS[profile.key]||["Ponto operacional"];
+  const seed=`${profile.key}:${opp.type_key}:${opp.district}:${opp.lat}:${opp.lng}`;
+  return {key:`${profile.key}_${hash(seed+":poi")%9999}`,name:pool[hash(seed)%pool.length],profile:profile.key,tags:[...(profile.tags||[])]};
+};
+
+const localRecommendedPreset = (opp) => {
+  if(opp.category==="logistica")return "logistica_segura";
+  if(["tecnica","influencia"].includes(opp.category)||opp.profile==="stealth")return "baixo_perfil";
+  if(opp.category==="assalto"||Number(opp.risk||1)>=4)return "assalto_pesado";
+  return "baixo_perfil";
+};
+
+const localIntelProfile = (opp, save) => {
+  const roles=new Set((save.employees||[]).filter((e)=>["idle","resting"].includes(e.status)).map((e)=>e.role_key));
+  const hasSpecialist=["informador","espiao","hacker","engenheiro_social"].some((role)=>roles.has(role));
+  const score=clamp(5-clamp(Number(opp.risk||1),1,5)+(hasSpecialist?1:0),1,5);
+  const labels={1:"Fragmentária",2:"Baixa",3:"Razoável",4:"Boa",5:"Excelente"};
+  const confidence={1:.48,2:.60,3:.72,4:.84,5:.93}[score];
+  return {score,label:labels[score],confidence,chance_uncertainty:Number(((1-confidence)*.22).toFixed(3)),exact_after_preview:score>=4};
 };
 
 export const localOperationRequirements = (opp = {}) => {
@@ -160,6 +196,9 @@ export const enrichLocalOpportunities = (save) => {
     for(const role of req.recommended_roles) if(!globalRoles.has(role)) warnings.push({kind:"role",key:role,label:`Recomendado: ${role.replaceAll("_"," ")}`});
     const readiness = missing.length?"locked":warnings.length?"stretch":"playable";
     opp.requirements=req;
+    opp.poi=localPoiForOperation(districtMap[String(opp.district)] || String(opp.district || "Zona"),opp);
+    opp.dispatch_preset=localRecommendedPreset(opp);
+    opp.intel=localIntelProfile(opp,save);
     opp.readiness={
       state:readiness,requirements:req,missing,warnings:warnings.slice(0,6),
       summary:readiness==="playable"?"Pronta com os recursos atuais":readiness==="stretch"?"Executável, mas abaixo da preparação ideal":"A organização ainda não tem capacidade mínima",
