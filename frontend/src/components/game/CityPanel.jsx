@@ -11,7 +11,7 @@ import { Input } from "../ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Badge } from "../ui/badge";
-import { PanelWatermark } from "./hud";
+import { PanelWatermark, EntityDetailBar, openEntityFromCard } from "./hud";
 import {
   RadioTower, CloudRain, Newspaper, Skull, Building2, Users, Trophy, Clock3,
   ShieldAlert, Eye, Bomb, Handshake, TrendingUp, Coins, Dices, MessageCircle,
@@ -66,11 +66,22 @@ export const CityPanel = ({
   const [allianceCode, setAllianceCode] = useState("");
   const [rouletteChoice, setRouletteChoice] = useState("red");
   const [bet, setBet] = useState(500);
+  const [selectedRivalId, setSelectedRivalId] = useState(null);
+  const [selectedBusinessId, setSelectedBusinessId] = useState(null);
   const scopedTabs = visibleTabs?.length ? TABS.filter(([key]) => visibleTabs.includes(key)) : TABS;
 
   useEffect(() => {
     if (open) setTab(initialTab);
+    else {
+      setSelectedRivalId(null);
+      setSelectedBusinessId(null);
+    }
   }, [open, initialTab]);
+
+  useEffect(() => {
+    if (tab !== "rivals") setSelectedRivalId(null);
+    if (tab !== "business") setSelectedBusinessId(null);
+  }, [tab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -283,8 +294,27 @@ export const CityPanel = ({
 
             {tab === "rivals" && (
               <div className="mt-3 space-y-2">
-                {(city.rivals || []).map((rival) => (
-                  <Card key={rival.id} className="sub-card p-3 shadow-none">
+                {selectedRivalId && (() => {
+                  const rival = (city.rivals || []).find((item) => String(item.id) === String(selectedRivalId));
+                  return rival ? (
+                    <EntityDetailBar
+                      testId="rival-detail-bar"
+                      title={rival.name}
+                      meta="Ficha individual do rival"
+                      onBack={() => setSelectedRivalId(null)}
+                    />
+                  ) : null;
+                })()}
+                {(city.rivals || [])
+                  .filter((rival) => !selectedRivalId || String(rival.id) === String(selectedRivalId))
+                  .map((rival) => (
+                  <Card
+                    key={rival.id}
+                    data-testid={`rival-card-${rival.id}`}
+                    data-entity-detail={selectedRivalId && String(rival.id) === String(selectedRivalId) ? "open" : "closed"}
+                    onClick={(event) => openEntityFromCard(event, () => setSelectedRivalId(String(rival.id)))}
+                    className={`sub-card p-3 shadow-none transition-colors ${selectedRivalId ? "cursor-default border-cyan-500/20" : "cursor-pointer hover:border-cyan-500/20"}`}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-white">{rival.name}</p>
@@ -313,7 +343,18 @@ export const CityPanel = ({
 
             {tab === "business" && (
               <div className="mt-3 space-y-3">
-                <Card className="sub-card p-3 shadow-none">
+                {selectedBusinessId && (() => {
+                  const business = businesses.find((item) => String(item.id) === String(selectedBusinessId));
+                  return business ? (
+                    <EntityDetailBar
+                      testId="business-detail-bar"
+                      title={business.name}
+                      meta="Ficha individual do negócio"
+                      onBack={() => setSelectedBusinessId(null)}
+                    />
+                  ) : null;
+                })()}
+                {!selectedBusinessId && <Card className="sub-card p-3 shadow-none">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="flex items-center gap-1.5 text-xs font-bold text-white"><Coins size={13} className="text-emerald-400" /> Caixa empresarial</p>
@@ -325,12 +366,20 @@ export const CityPanel = ({
                       Recolher
                     </ActionButton>
                   </div>
-                </Card>
+                </Card>}
 
                 {businesses.length > 0 && (
                   <div className="space-y-1.5">
-                    {businesses.map((b) => (
-                      <Card key={b.id} className="sub-card p-3 shadow-none">
+                    {businesses
+                      .filter((business) => !selectedBusinessId || String(business.id) === String(selectedBusinessId))
+                      .map((b) => (
+                      <Card
+                        key={b.id}
+                        data-testid={`business-card-${b.id}`}
+                        data-entity-detail={selectedBusinessId && String(b.id) === String(selectedBusinessId) ? "open" : "closed"}
+                        onClick={(event) => openEntityFromCard(event, () => setSelectedBusinessId(String(b.id)))}
+                        className={`sub-card p-3 shadow-none transition-colors ${selectedBusinessId ? "cursor-default border-cyan-500/20" : "cursor-pointer hover:border-cyan-500/20"}`}
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="text-xs font-bold text-white">{b.name} <span className="font-mono text-[10px] text-zinc-500">LV {b.level}</span></p>
@@ -354,7 +403,7 @@ export const CityPanel = ({
                   </div>
                 )}
 
-                <div>
+                {!selectedBusinessId && <div>
                   <p className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Expandir rede</p>
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                     {Object.entries(catalog).map(([key, cfg]) => {
@@ -377,7 +426,7 @@ export const CityPanel = ({
                       );
                     })}
                   </div>
-                </div>
+                </div>}
               </div>
             )}
 
