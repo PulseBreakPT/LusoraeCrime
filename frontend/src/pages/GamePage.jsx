@@ -19,6 +19,7 @@ import { OrganizationPanel } from "../components/game/OrganizationPanel";
 import { CityPanel } from "../components/game/CityPanel";
 import { SettingsPanel } from "../components/game/SettingsPanel";
 import { MastermindPanel } from "../components/game/MastermindPanel";
+import { OperationalCenterPanel } from "../components/game/OperationalCenterPanel";
 import { CommandCenter } from "../components/game/CommandCenter";
 import { ActivityFeedMobile } from "../components/game/ActivityFeed";
 import HQOnboarding from "../components/game/HQOnboarding";
@@ -343,7 +344,8 @@ export default function GamePage() {
           {navGroup && (
             <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2.5 w-[min(92vw,26rem)] -translate-x-1/2">
               {navGroup === "operations" && (
-                <div className={`grid ${unlocks.mastermind ? "grid-cols-3" : "grid-cols-2"} gap-1`}>
+                <div className={`grid ${unlocks.mastermind ? "grid-cols-4" : "grid-cols-3"} gap-1`}>
+                  <NavAction testId="open-opscenter-button" icon={RadioTower} label={areaLabel("opscenter")} color="text-cyan-300" alert={(state.operational?.requires_action || []).length > 0} onClick={() => openFromNav("opscenter")} />
                   <NavAction testId="open-operations-button" icon={Crosshair} label="Operações" color="text-sky-400" onClick={() => openFromNav("operations")} />
                   <NavAction testId="open-quests-button" icon={Target} label={areaLabel("quests")} color="text-rose-400" alert={alerts.claimable > 0} onClick={() => openFromNav("quests")} />
                   {unlocks.mastermind && (
@@ -425,7 +427,7 @@ export default function GamePage() {
               label="Operações"
               color="text-sky-400"
               alert={alerts.claimable > 0 || state.mastermind?.active_heist?.finale?.status === "ready"}
-              active={navGroup === "operations" || ["operations", "quests", "mastermind"].includes(openPanel)}
+              active={navGroup === "operations" || ["opscenter", "operations", "quests", "mastermind"].includes(openPanel)}
               onClick={() => toggleNavGroup("operations")}
             />
             <GroupButton
@@ -468,6 +470,7 @@ export default function GamePage() {
         </div>
       )}
 
+      {openPanel === "opscenter" && <OperationalCenterPanel open onOpenChange={(o) => setOpenPanel(o ? "opscenter" : null)} onNavigate={navigateTo} />}
       {openPanel === "mastermind" && unlocks.mastermind && <MastermindPanel open onOpenChange={(o) => setOpenPanel(o ? "mastermind" : null)} />}
       {commandOpen && (
         <CommandCenter
