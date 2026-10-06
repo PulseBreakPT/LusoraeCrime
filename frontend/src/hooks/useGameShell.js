@@ -1,23 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { parseActivityMessage } from "../lib/game";
+import { GAME_PANEL_IDS, GAME_PANEL_SET, GAME_PANEL_SHORTCUTS } from "../game/navigation";
 
-export const GAME_PANELS = [
-  "operations", "quests", "empire", "teams", "employees",
-  "fleet", "properties", "weapons", "shop", "mastermind", "hq", "intel", "settings",
-];
-
-const PANEL_SET = new Set(GAME_PANELS);
-const PANEL_SHORTCUTS = {
-  "1": "operations",
-  "2": "quests",
-  "3": "empire",
-  "4": "teams",
-  "5": "employees",
-  "6": "fleet",
-  "7": "properties",
-  "8": "weapons",
-  "9": "shop",
-};
+export const GAME_PANELS = GAME_PANEL_IDS;
+const PANEL_SET = GAME_PANEL_SET;
+const PANEL_SHORTCUTS = GAME_PANEL_SHORTCUTS;
 const LAST_PANEL_KEY = "submundo.last-panel";
 
 export function initialGamePanel() {
@@ -75,16 +62,26 @@ export function useGameShell({
 
   const stale = Boolean(online && lastSyncAt && clock - lastSyncAt > 15000);
 
-  // Mantém o painel atual partilhável por URL e memoriza o último painel real.
+  // Cada mudança real de painel cria uma entrada de histórico. Assim, Voltar
+  // funciona como o jogador espera em mobile e desktop. Durante popstate a URL
+  // já contém o destino, por isso este efeito não cria uma entrada duplicada.
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (openPanel && PANEL_SET.has(openPanel)) {
-      url.searchParams.set("panel", openPanel);
-      try { window.localStorage.setItem(LAST_PANEL_KEY, openPanel); } catch { /* noop */ }
+    const desired = openPanel && PANEL_SET.has(openPanel) ? openPanel : null;
+    const current = url.searchParams.get("panel");
+    if (current === desired) {
+      if (desired) {
+        try { window.localStorage.setItem(LAST_PANEL_KEY, desired); } catch { /* noop */ }
+      }
+      return;
+    }
+    if (desired) {
+      url.searchParams.set("panel", desired);
+      try { window.localStorage.setItem(LAST_PANEL_KEY, desired); } catch { /* noop */ }
     } else {
       url.searchParams.delete("panel");
     }
-    window.history.replaceState(window.history.state, "", url);
+    window.history.pushState({ ...(window.history.state || {}), submundoPanel: desired }, "", url);
   }, [openPanel]);
 
   // Back/forward também restaura o painel indicado na URL.
