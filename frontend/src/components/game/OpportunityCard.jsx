@@ -12,7 +12,7 @@ import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
-import { X, Clock, TrendingUp, AlertTriangle, Siren, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown } from "lucide-react";
+import { X, Clock, TrendingUp, AlertTriangle, Siren, Car, IdCard, MapPin, Timer, Trophy, Flame, Lock, Users, Sparkles, Star, ChevronDown, Plus } from "lucide-react";
 import { audio } from "../../lib/audio";
 
 // Força de segurança competente pela zona (do backend, opp.police_force) — diz
@@ -34,7 +34,7 @@ const POLICE_FORCE_INFO = {
 export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const {
     state, catalog, dispatchTeam, previewDispatch, serverNow, assignVehicle, recallTeam,
-    recommendTeamForOpportunity, toggleFavoriteType,
+    reinforceMission, recommendTeamForOpportunity, toggleFavoriteType,
   } = useGame();
   const { autoSelectBestTeam, lowSuccessThreshold } = useSettings();
   const [selectedTeamId, setSelectedTeamId] = useState(null);
@@ -51,6 +51,20 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
   const previewRef = useRef(null);
   const inProgress = opp.status === "taken";
   const activeMission = inProgress && state ? state.missions.find((m) => m.opportunity_id === opp.id) : null;
+  const operationalReadiness = opp.readiness || {};
+  const readinessState = operationalReadiness.state || "playable";
+  const readinessMeta = {
+    playable: { label: "Pronta", color: "#34D399" },
+    stretch: { label: "No limite", color: "#F59E0B" },
+    locked: { label: "Capacidade em falta", color: "#EF4444" },
+  }[readinessState] || { label: "Pronta", color: "#34D399" };
+  const supportCandidates = (state?.teams || []).filter(
+    (team) =>
+      team.status === "idle"
+      && team.vehicle_id
+      && team.id !== activeMission?.team_id
+      && !(activeMission?.support_team_ids || []).includes(team.id)
+  );
   // Nunca devolve vazio — QG é sempre o fallback quando a missão não tem propriedade de origem.
   const baseNameOf = (propertyId) => {
     if (!propertyId) return "Quartel-General";
@@ -349,7 +363,37 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
             tip="Esta operação exige obrigatoriamente um destes veículos — a equipa não pode ser despachada com outro."
           />
         )}
+        {!inProgress && (
+          <Chip
+            icon={readinessState === "locked" ? Lock : readinessState === "stretch" ? AlertTriangle : Sparkles}
+            value={readinessMeta.label}
+            color={readinessMeta.color}
+            tip={operationalReadiness.summary || "Prontidão calculada pelos recursos reais da organização."}
+          />
+        )}
+        {opp.district_profile?.name && (
+          <Chip
+            icon={MapPin}
+            value={opp.district_profile.name}
+            color="#94A3B8"
+            tip={"Perfil da zona: " + ((opp.district_profile.tags || []).join(", ") || "misto") + ". Este perfil influencia a lógica operacional e a cobertura."}
+          />
+        )}
       </div>
+
+      {!inProgress && readinessState !== "playable" && (
+        <Card data-testid="opportunity-readiness" className="mt-2 border-white/10 bg-black/20 p-2.5 shadow-none">
+          <p className="text-xs font-semibold" style={{ color: readinessMeta.color }}>{readinessMeta.label}</p>
+          <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
+            {operationalReadiness.summary || "A preparação desta operação precisa de atenção."}
+          </p>
+          {[...(operationalReadiness.missing || []), ...(operationalReadiness.warnings || [])].slice(0, 4).map((item, index) => (
+            <p key={(item.kind || "req") + "-" + (item.key || index)} className="mt-1 flex items-center gap-1 font-mono text-[10px] text-zinc-400">
+              <span aria-hidden="true">•</span> {item.label}
+            </p>
+          ))}
+        </Card>
+      )}
 
       <div className="mt-2 grid grid-cols-3 gap-2">
         <Metric icon={TrendingUp} label={opp.pays === "clean" ? "€ Limpos" : "€ Sujos"} value={fmtMoney(opp.reward)} color="#10B981"
@@ -416,6 +460,45 @@ export const OpportunityCard = ({ opp, onClose, onNavigate }) => {
               ? "Um carro-patrulha segue a equipa. Se apanhados antes do QG, perdem toda a carga."
               : "A operação está em curso — a recompensa só cai na conta quando a equipa chegar ao QG."}
           </p>
+
+          {activeMission.reinforcement_request?.status === "pending" && ["en_route", "operating"].includes(activeMission.phase) && (
+            <div data-testid="mission-reinforcement-request" className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] p-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                {activeMission.reinforcement_request.title || "Reforço recomendado"}
+              </p>
+              <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{activeMission.reinforcement_request.description}</p>
+              <p className="mt-1 font-mono text-[9px] text-zinc-600">
+                {activeMission.reinforcement_request.received || 0}/{activeMission.reinforcement_request.needed || 0} reforços
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {supportCandidates.slice(0, 4).map((team) => (
+                  <Button
+                    key={team.id}
+                    size="compact"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      await reinforceMission(activeMission.id, team.id);
+                      setBusy(false);
+                    }}
+                  >
+                    <Plus size={11} /> {team.name}
+                  </Button>
+                ))}
+                {!supportCandidates.length && (
+                  <span className="font-mono text-[9px] text-zinc-600">Sem equipas de reserva disponíveis.</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {(activeMission.support_team_ids || []).length > 0 && (
+            <p className="mt-2 font-mono text-[10px] text-cyan-300">
+              Apoio no terreno: {(activeMission.support_team_ids || []).length} equipa(s)
+            </p>
+          )}
+
           {activeMission.phase === "en_route" && (
             <Button
               data-testid="recall-team-button"
