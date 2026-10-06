@@ -127,7 +127,7 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                 ["locked", "Bloqueadas", counts.locked || 0],
               ].map(([key, label, value]) => (
                 <Card key={key} className="sub-card p-3 text-center shadow-none">
-                  <p className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
                   <p className={`mt-1 text-xl font-bold ${readinessTone[key]}`}>{value}</p>
                 </Card>
               ))}
@@ -135,13 +135,13 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
 
             <div className="grid grid-cols-2 gap-2">
               <Card className="sub-card p-3 shadow-none">
-                <p className="flex items-center gap-1.5 font-mono text-[9px] uppercase text-zinc-500">
+                <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase text-zinc-500">
                   <Users size={11} /> Equipas prontas
                 </p>
                 <p className="mt-1 text-lg font-bold text-white">{operational.available_teams || 0}</p>
               </Card>
               <Card className="sub-card p-3 shadow-none">
-                <p className="flex items-center gap-1.5 font-mono text-[9px] uppercase text-zinc-500">
+                <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase text-zinc-500">
                   <Car size={11} /> Viaturas úteis
                 </p>
                 <p className="mt-1 text-lg font-bold text-white">{operational.usable_vehicles || 0}</p>
@@ -159,7 +159,7 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-xs font-semibold text-zinc-100">{item.title}</p>
-                          <p className="mt-0.5 font-mono text-[9px] text-zinc-500">
+                          <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
                             {item.team}{item.expires_at ? ` · ${secondsLeft(item.expires_at)}` : ""}
                           </p>
                         </div>
@@ -183,7 +183,7 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                             </Button>
                           ))}
                           {!idleTeams.length && (
-                            <span className="font-mono text-[9px] text-zinc-600">Sem equipas de reserva.</span>
+                            <span className="font-mono text-[10px] text-zinc-600">Sem equipas de reserva.</span>
                           )}
                         </div>
                       )}
@@ -235,7 +235,7 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                     <div key={area.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] px-2 py-2">
                       <div>
                         <p className="text-xs font-semibold text-zinc-200">{area.name}</p>
-                        <p className="font-mono text-[9px] text-zinc-600">{secondsLeft(area.expires_at)} restantes · cap. {area.capacity_teams}</p>
+                        <p className="font-mono text-[10px] text-zinc-600">{secondsLeft(area.expires_at)} restantes · cap. {area.capacity_teams}</p>
                       </div>
                       <Button
                         size="iconCompact"
@@ -257,7 +257,7 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-xs font-bold text-white">{row.district}</p>
-                    <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
                       {row.profile?.name || "Zona"} · anel {Number(row.profile?.ring || 0) + 1}
                     </p>
                   </div>
@@ -272,15 +272,15 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                   <div>
-                    <p className="font-mono text-[9px] text-zinc-600">Operações</p>
+                    <p className="font-mono text-[10px] text-zinc-600">Operações</p>
                     <p className="text-xs font-bold text-zinc-200">{row.active_operations}</p>
                   </div>
                   <div>
-                    <p className="font-mono text-[9px] text-zinc-600">Atenção</p>
+                    <p className="font-mono text-[10px] text-zinc-600">Atenção</p>
                     <p className="text-xs font-bold text-zinc-200">{Math.round(row.attention || 0)}%</p>
                   </div>
                   <div>
-                    <p className="font-mono text-[9px] text-zinc-600">Pressão</p>
+                    <p className="font-mono text-[10px] text-zinc-600">Pressão</p>
                     <p className="text-xs font-bold text-zinc-200">{Math.round(row.pressure || 0)}%</p>
                   </div>
                 </div>
@@ -368,7 +368,7 @@ export const OperationalCenterPanel = ({ open, onOpenChange, onNavigate }) => {
                 {Object.entries(operational.presets || {}).map(([key, preset]) => (
                   <div key={key} className="rounded-lg border border-white/[0.06] px-2.5 py-2">
                     <p className="text-xs font-semibold text-zinc-200">{preset.name || key}</p>
-                    <p className="mt-0.5 font-mono text-[9px] text-zinc-600">
+                    <p className="mt-0.5 font-mono text-[10px] text-zinc-600">
                       chance ≥ {Math.round(Number(preset.min_chance || 0) * 100)}% · calor ≤ {preset.max_heat ?? "—"} · reserva {preset.reserve_teams ?? 0}
                     </p>
                   </div>
