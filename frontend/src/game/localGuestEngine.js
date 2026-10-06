@@ -2,10 +2,14 @@ import { LOCAL_CATALOG, LOCAL_GUEST_SAVE_VERSION } from "./localGuestCatalog";
 import { propertyMarketPrice } from "../lib/propertyMarket";
 import { ensureLocalCity, advanceLocalCity, handleLocalCityRequest, localCityWorld, localBusinessChance, localBossLeadership } from "./livingCity";
 import { guardReward, passivePortfolioScale } from "./economyDirector";
+import { isValidHqLocation } from "../lib/land";
 
 const MODE_KEY = "submundo_guest_mode_v2";
 const SAVE_KEY = "submundo_guest_save_v2";
 const SESSION_KEY = "submundo_guest_session_v2";
+const BACKUP_KEY = "submundo_guest_save_backup_v2";
+const CORRUPT_KEY = "submundo_guest_save_corrupt_v2";
+const RECOVERY_KEY = "submundo_guest_save_recovery_v2";
 const OFFLINE_SIMULATION_MAX_S = 28 * 24 * 3600;
 const OFFLINE_PAYROLL_MAX_CYCLES = 5;
 
@@ -608,40 +612,98 @@ const guestOrgIntelligence=(save)=>{
   };
 };
 
-const loadSave = () => {
+const hydrateSave = (input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Save local inválido");
+  }
+  const save=input;
+  if (!save.player || !Array.isArray(save.teams) || !Array.isArray(save.vehicles) || !Array.isArray(save.employees)) {
+    throw new Error("Save local incompleto");
+  }
+  if (!save.version) save.version=1;
+  save.mastermind ||= initialMastermind();
+  save.transactions ||= [];
+  save.events ||= [];
+  save.history ||= [];
+  save.quests ||= [];
+  normalizeSavedRisk(save);
+  normalizeSavedEvents(save);
+  normalizeSavedStats(save);
+  normalizeSavedEconomy(save);
+  ensureOrganizationSave(save);
+  ensureLocalCity(save);
+  save.version=LOCAL_GUEST_SAVE_VERSION;
+  return save;
+};
+
+const readRecovery = () => {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return ensureOrganizationSave(createInitialSave());
-    const save = JSON.parse(raw);
-    if (!save || typeof save !== "object") return createInitialSave();
-    if (!save.version) save.version = 1;
-    save.mastermind ||= initialMastermind();
-    save.transactions ||= [];
-    save.events ||= [];
-    save.history ||= [];
-    save.quests ||= [];
-    normalizeSavedRisk(save);
-    normalizeSavedEvents(save);
-    normalizeSavedStats(save);
-    normalizeSavedEconomy(save);
-    ensureOrganizationSave(save);
-    ensureLocalCity(save);
-    save.version = LOCAL_GUEST_SAVE_VERSION;
-    // Normalization/migration must not consume offline time. Persist the
-    // migrated shape while preserving last_tick; tick() owns elapsed-time
-    // simulation and only the post-tick save advances the clock.
-    persist(save, false);
-    return save;
+    return JSON.parse(localStorage.getItem(RECOVERY_KEY) || "null");
   } catch (_e) {
-    return createInitialSave();
+    return null;
   }
 };
 
-const persist = (save, touchTick = true) => {
-  if (touchTick) save.last_tick = Date.now();
-  localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+const persist = (save, touchTick = true, { backup = true } = {}) => {
+  if (touchTick) save.last_tick=Date.now();
+  if (backup) {
+    const previous=localStorage.getItem(SAVE_KEY);
+    if (previous) {
+      try {
+        const parsed=JSON.parse(previous);
+        if (parsed && typeof parsed === "object" && parsed.player) {
+          localStorage.setItem(BACKUP_KEY,previous);
+        }
+      } catch (_e) {
+        // O conteúdo inválido é preservado separadamente pelo fluxo de recuperação.
+      }
+    }
+  }
+  localStorage.setItem(SAVE_KEY,JSON.stringify(save));
 };
 
+const loadSave = () => {
+  const raw=localStorage.getItem(SAVE_KEY);
+  if (!raw) {
+    const initial=ensureOrganizationSave(createInitialSave());
+    persist(initial,false,{backup:false});
+    return initial;
+  }
+  try {
+    const save=hydrateSave(JSON.parse(raw));
+    // Migração não consome tempo offline nem destrói o backup anterior.
+    persist(save,false,{backup:false});
+    return save;
+  } catch (error) {
+    // Nunca transformar silenciosamente um erro recuperável em "novo jogo".
+    localStorage.setItem(CORRUPT_KEY,raw);
+    const recovery={
+      detected:true,
+      detected_at:nowIso(),
+      message:error?.message || "Não foi possível ler o save local.",
+      has_corrupt:true,
+      has_backup:false,
+      restored_from_backup:false,
+    };
+    const backupRaw=localStorage.getItem(BACKUP_KEY);
+    if (backupRaw) {
+      try {
+        const restored=hydrateSave(JSON.parse(backupRaw));
+        localStorage.setItem(SAVE_KEY,JSON.stringify(restored));
+        recovery.has_backup=true;
+        recovery.restored_from_backup=true;
+        localStorage.setItem(RECOVERY_KEY,JSON.stringify(recovery));
+        return restored;
+      } catch (_backupError) {
+        recovery.has_backup=false;
+      }
+    }
+    const fresh=ensureOrganizationSave(createInitialSave());
+    localStorage.setItem(SAVE_KEY,JSON.stringify(fresh));
+    localStorage.setItem(RECOVERY_KEY,JSON.stringify(recovery));
+    return fresh;
+  }
+};
 const addEvent = (save, kind, message) => {
   save.events.unshift({ id:uid("evt"), kind, message, ts:nowIso() });
   save.events = save.events.slice(0, 40);
@@ -912,25 +974,66 @@ const consecutiveRepeatCount = (team, opp, nowMs = Date.now()) => {
   return Number(team.repeat_type_count || 0) + 1;
 };
 
-const missionChance = (save, opp, team) => {
-  const members = save.employees.filter((e)=>e.team_id===team.id && e.status==="idle" && e.fatigue < 90);
-  const skill = members.length ? members.reduce((sum,e)=>{
-    const a=e.attrs||{}; return sum + ((a.forca||0)+(a.inteligencia||0)+(a.discricao||0)+(a.tiro||0)+(a.hack||0)+(a.negociacao||0))/6;
+const missionChanceBreakdown = (save, opp, team) => {
+  const members=save.employees.filter((e)=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90);
+  const skill=members.length ? members.reduce((sum,e)=>{
+    const a=e.attrs||{};
+    return sum+((a.forca||0)+(a.inteligencia||0)+(a.discricao||0)+(a.tiro||0)+(a.hack||0)+(a.negociacao||0))/6;
   },0)/members.length : 0;
-  const vehicle = save.vehicles.find((v)=>v.id===team.vehicle_id);
-  const risk = normalizeRisk(opp.risk);
-  let chance = 0.54 + skill * 0.035 - risk * 0.045 - save.player.heat * 0.0015;
-  if (team.spec === opp.category) chance += 0.08;
-  if (members.length >= (opp.min_members || 1)) chance += 0.04;
-  if (vehicle) chance += clamp((vehicle.condition-50)/500, -0.1, 0.1);
-  chance += operationProfileEffect(save,opp,members,vehicle).delta;
+  const vehicle=save.vehicles.find((v)=>v.id===team.vehicle_id);
+  const risk=normalizeRisk(opp.risk);
+  const profile=operationProfileEffect(save,opp,members,vehicle);
   const cityWorld=localCityWorld(save);
-  chance += Number(cityWorld.modifiers?.chance?.[opp.category]||0);
-  chance += localBusinessChance(save,opp.category);
-  chance += Number(localBossLeadership(save).chance_delta||0);
-  return clamp(chance,0.08,0.95);
+  const businessChance=localBusinessChance(save,opp.category);
+  const bossLeadership=localBossLeadership(save);
+  const items=[
+    {key:"base",label:"Base da operação",pct:.54},
+    {key:"competencia",label:"Competência da equipa",pct:skill*.035},
+    {key:"risco",label:"Risco da operação",pct:-risk*.045},
+    {key:"calor",label:"Nível de procurado",pct:-Number(save.player.heat||0)*.0015},
+  ];
+  if(team.spec===opp.category)items.push({key:"especializacao",label:"Especialização da equipa",pct:.08});
+  if(members.length>=(opp.min_members||1))items.push({key:"efetivo",label:"Efetivo mínimo cumprido",pct:.04});
+  if(vehicle)items.push({key:"condicao_veiculo",label:"Condição do veículo",pct:clamp((vehicle.condition-50)/500,-.1,.1)});
+  if(profile.delta)items.push({key:`perfil_${profile.profile}`,label:`Perfil da operação: ${profile.label}`,pct:profile.delta});
+  const cityChance=Number(cityWorld.modifiers?.chance?.[opp.category]||0);
+  if(cityChance)items.push({key:"cidade_viva",label:`Cidade Viva: ${cityWorld.weather.name} · ${cityWorld.event.name}`,pct:cityChance});
+  if(businessChance)items.push({key:"rede_empresarial",label:"Rede empresarial ativa",pct:businessChance});
+  if(bossLeadership.chance_delta)items.push({key:"chefia",label:`Chefia: ${bossLeadership.label}`,pct:Number(bossLeadership.chance_delta)});
+  const raw=items.reduce((sum,item)=>sum+Number(item.pct||0),0);
+  const chance=clamp(raw,.08,.95);
+  const adjustment=chance-raw;
+  if(Math.abs(adjustment)>1e-10){
+    items.push({
+      key:adjustment>0?"limite_minimo":"limite_maximo",
+      label:adjustment>0?"Limite mínimo de probabilidade":"Limite máximo de probabilidade",
+      pct:adjustment,
+    });
+  }
+  return {chance,raw_chance:raw,breakdown:items,members,vehicle,profile,cityWorld,businessChance,bossLeadership};
 };
 
+const missionChance = (save,opp,team) => missionChanceBreakdown(save,opp,team).chance;
+
+const dispatchEligibility = (save,opp,team,{checkExpiry=true}={}) => {
+  const reasons=[];
+  if(!opp||opp.status!=="active")reasons.push("Operação indisponível");
+  if(checkExpiry&&opp?.expires_at&&Date.parse(opp.expires_at)<=Date.now())reasons.push("Operação expirada");
+  if(Number(save.player.heat||0)>=90)reasons.push("Polícia em alerta máximo");
+  if(opp&&Number(save.player.level||1)<Number(opp.min_level||1))reasons.push(`Requer nível ${opp.min_level}`);
+  if(!team||team.status!=="idle")reasons.push("Equipa indisponível");
+  const members=team ? save.employees.filter((e)=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90) : [];
+  const minMembers=Number(opp?.min_members||1);
+  if(team&&members.length<minMembers)reasons.push(`Faltam operacionais (${members.length}/${minMembers})`);
+  const vehicle=team ? save.vehicles.find((v)=>v.id===team.vehicle_id) : null;
+  if(team&&!vehicle)reasons.push("Sem veículo atribuído");
+  if(vehicle&&Number(vehicle.condition||0)<30)reasons.push("Veículo precisa de reparação");
+  if(vehicle?.transfer)reasons.push("Veículo em transferência");
+  if(vehicle?.refueling_until&&Date.parse(vehicle.refueling_until)>Date.now())reasons.push("Veículo a abastecer");
+  const fuelNeeded=vehicle&&opp ? Math.max(1,Number(opp.dist_km||0)*2*Number(vehicle.cons||0)/100) : 0;
+  if(vehicle&&Number(vehicle.fuel_l||0)<fuelNeeded)reasons.push("Combustível insuficiente");
+  return {ok:reasons.length===0,reasons,members,vehicle,fuelNeeded,minMembers};
+};
 const finalizeMission = (save, mission) => {
   const team = save.teams.find((t)=>t.id===mission.team_id);
   const vehicle = save.vehicles.find((v)=>v.id===mission.vehicle_id);
@@ -1364,15 +1467,11 @@ const publicState=(save)=>{
       protection_cost:orgProtectionCost(save),
     },
     hot_category:"assalto",
+    local_recovery:readRecovery(),
   };
 };
 
-const approximatePortugalLand=(lat,lng)=>{
-  const mainland=lat>=36.85&&lat<=42.20&&lng>=-9.65&&lng<=-6.00;
-  const madeira=lat>=32.55&&lat<=33.20&&lng>=-17.35&&lng<=-16.05;
-  const azores=lat>=36.75&&lat<=40.05&&lng>=-31.40&&lng<=-24.60;
-  return mainland||madeira||azores;
-};
+const validGuestHqLocation=(lat,lng)=>isValidHqLocation(Number(lat),Number(lng),120);
 
 const addStarterWorld=(save,lat,lng)=>{
   save.player.hq={lat,lng,name:"Quartel-General",level:1,upgrading_until:null,upgrade_history:[]};
@@ -1395,68 +1494,97 @@ const mutateGame=(save,path,payload)=>{
   const caps=calcCaps(save);
 
   if(path==="hq/validate"){
-    const valid=approximatePortugalLand(Number(p.lat),Number(p.lng));
+    const valid=validGuestHqLocation(Number(p.lat),Number(p.lng));
     return {valid,label:valid?"Portugal · terra firme":null,locality:valid?"Local selecionado":null,reason:valid?null:"Escolhe um ponto em Portugal continental, Madeira ou Açores."};
   }
   if(path==="hq/place"){
     if(save.player.hq) fail(409,"O Quartel-General já foi estabelecido");
-    if(!approximatePortugalLand(Number(p.lat),Number(p.lng))) fail(400,"Localização inválida para o Quartel-General");
+    if(!validGuestHqLocation(Number(p.lat),Number(p.lng))) fail(400,"Localização inválida para o Quartel-General");
     addStarterWorld(save,Number(p.lat),Number(p.lng));return {ok:true,hq:clone(save.player.hq)};
   }
   if(path==="dispatch/preview"){
     const opp=save.opportunities.find(o=>o.id===p.opportunity_id),team=save.teams.find(t=>t.id===p.team_id);
     if(!opp||!team)fail(404,"Operação ou equipa não encontrada");
-    const members=save.employees.filter(e=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90);
-    const vehicle=save.vehicles.find(v=>v.id===team.vehicle_id);
-    const chance=missionChance(save,opp,team);
-    const cityWorld=localCityWorld(save);
+    const eligibility=dispatchEligibility(save,opp,team);
+    if(!eligibility.ok)fail(400,eligibility.reasons[0]);
+    const calc=missionChanceBreakdown(save,opp,team);
+    const {chance,members,vehicle,profile,cityWorld,businessChance,bossLeadership}=calc;
     const cityRewardMult=Number(cityWorld.modifiers?.reward_mult||1);
     const cityTravelMult=Number(cityWorld.modifiers?.travel_mult||1);
-    const businessChance=localBusinessChance(save,opp.category);
-    const bossLeadership=localBossLeadership(save);
     const pulse=localWorldPulse();
     const pulseActive=pulse.category===opp.category;
     const pulseRewardMult=pulseActive?pulse.reward_mult:1;
     const repeatCount=consecutiveRepeatCount(team,opp);
     const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
-    const profile=operationProfileEffect(save,opp,members,vehicle);
-    return {chance,reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult*cityRewardMult-1)*100),age_decay_pct:0,split_penalty_pct:0,
+    const rewardBreakdown=[
+      ...(pulseActive&&pulseRewardMult!==1?[{key:"evento",label:`Evento: ${pulse.name||"pulso do mundo"}`,pct:(pulseRewardMult-1)*100}]:[]),
+      ...(cityRewardMult!==1?[{key:"cidade",label:`Cidade: ${cityWorld.event.name}`,pct:(cityRewardMult-1)*100}]:[]),
+    ];
+    return {chance,reward:Math.round(opp.reward*pulseRewardMult*cityRewardMult*repeatMult),reward_bonus_pct:Math.round((pulseRewardMult*cityRewardMult-1)*100),reward_breakdown:rewardBreakdown,age_decay_pct:0,split_penalty_pct:0,
       repeat_count:repeatCount,repeat_penalty_pct:Math.round((repeatMult-1)*1000)/10,operation_profile:profile.profile,operation_profile_label:profile.label,distance_km:Math.round(opp.dist_km*2*10)/10,
       world_pulse:{...pulse,active_for_mission:pulseActive,applied_reward_mult:pulseRewardMult,applied_heat_mult:pulseActive?pulse.heat_mult:1},
       city_world:cityWorld,business_chance_bonus:businessChance,boss_leadership:bossLeadership,
       fuel_needed:vehicle?Math.max(1,Math.round((opp.dist_km*2*vehicle.cons/100)*10)/10):0,
       eta_s:Math.round((10+opp.dist_km*2)*cityTravelMult),duration_s:opp.duration_s||24,
-      breakdown:[
-        {key:"base",label:"Base",pct:.5},{key:"team",label:"Competência",pct:(chance-.5)/2},
-        {key:"risk",label:"Risco",pct:-(opp.risk||0)/500},{key:"heat",label:"Calor",pct:-save.player.heat/1000},
-        {key:"cidade_viva",label:`Cidade Viva: ${cityWorld.weather.name} · ${cityWorld.event.name}`,pct:Number(cityWorld.modifiers?.chance?.[opp.category]||0)},
-        ...(businessChance?[{key:"rede_empresarial",label:"Rede empresarial ativa",pct:businessChance}]:[]),
-        ...(bossLeadership.chance_delta?[{key:"chefia",label:`Chefia: ${bossLeadership.label}`,pct:bossLeadership.chance_delta}]:[]),
-      ],members:members.length};
+      chance_floor:.08,chance_ceiling:.95,breakdown:calc.breakdown,members:members.length};
   }
+  const recommendationMetrics=(opp,team)=>{
+    const eligibility=dispatchEligibility(save,opp,team);
+    if(!eligibility.ok)return {eligible:false,reasons:eligibility.reasons};
+    const chance=missionChance(save,opp,team);
+    const cityWorld=localCityWorld(save);
+    const cityRewardMult=Number(cityWorld.modifiers?.reward_mult||1);
+    const pulse=localWorldPulse();
+    const pulseRewardMult=pulse.category===opp.category?Number(pulse.reward_mult||1):1;
+    const repeatCount=consecutiveRepeatCount(team,opp);
+    const repeatMult=Math.pow(Number(LOCAL_CATALOG.economy_meta?.mission_rewards?.repeat_mult||.88),repeatCount);
+    const reward=Math.round(Number(opp.reward||0)*pulseRewardMult*cityRewardMult*repeatMult);
+    const fuelCost=eligibility.vehicle
+      ? eligibility.fuelNeeded*Number(LOCAL_CATALOG.fuel_prices?.[eligibility.vehicle.fuel_type]||1.8)
+      : 0;
+    const oneWay=Math.max(20,(10+Number(opp.dist_km||0)*2)*Number(cityWorld.modifiers?.travel_mult||1));
+    const totalDurationS=Math.round(oneWay*2+Number(opp.duration_s||24));
+    const expectedProfit=chance*reward-fuelCost;
+    const expectedProfitPerMin=expectedProfit/Math.max(.5,totalDurationS/60);
+    return {eligible:true,chance,reward,fuel_cost:Math.round(fuelCost*100)/100,duration_total_s:totalDurationS,
+      expected_profit:Math.round(expectedProfit),expected_profit_per_min:Math.round(expectedProfitPerMin)};
+  };
+  const strategyOf=()=>["safe","profit","fast"].includes(p.strategy)?p.strategy:"safe";
+  const sortRecommendation=(rows,strategy)=>{
+    const key=strategy==="profit"?"expected_profit_per_min":strategy==="fast"?"duration_total_s":"chance";
+    return rows.sort((a,b)=>strategy==="fast"?a.metrics[key]-b.metrics[key]:b.metrics[key]-a.metrics[key]);
+  };
+  const recommendationReason=(metrics,strategy)=>{
+    if(strategy==="profit")return `Melhor retorno esperado por minuto (~${Math.round(metrics.expected_profit_per_min)} €/min), já descontando combustível.`;
+    if(strategy==="fast")return `Menor duração total estimada (~${Math.max(1,Math.round(metrics.duration_total_s/60))} min).`;
+    return `Maior probabilidade de sucesso (${Math.round(metrics.chance*100)}%).`;
+  };
   if(path==="dispatch/recommend_team"){
     const opp=save.opportunities.find(o=>o.id===p.opportunity_id);
-    const ready=save.teams.filter(t=>t.status==="idle"&&t.vehicle_id&&save.employees.some(e=>e.team_id===t.id&&e.status==="idle"&&e.fatigue<90));
-    ready.sort((a,b)=>missionChance(save,opp,b)-missionChance(save,opp,a));
-    return {team_id:ready[0]?.id||null,chance:ready[0]?missionChance(save,opp,ready[0]):null};
+    if(!opp)return {team_id:null,reason:"Operação indisponível."};
+    const strategy=strategyOf();
+    const rows=save.teams.map(team=>({team,metrics:recommendationMetrics(opp,team)})).filter(row=>row.metrics.eligible);
+    sortRecommendation(rows,strategy);
+    const best=rows[0];
+    return best?{team_id:best.team.id,chance:best.metrics.chance,strategy,reason:recommendationReason(best.metrics,strategy),metrics:best.metrics}:{team_id:null,strategy,reason:"Nenhuma equipa consegue partir agora."};
   }
   if(path==="dispatch/recommend_opportunity"||path==="dispatch/recommend_repeat"){
     const team=save.teams.find(t=>t.id===p.team_id);
-    const active=save.opportunities.filter(o=>o.status==="active"&&save.player.level>=o.min_level);
-    active.sort((a,b)=>missionChance(save,b,team)-missionChance(save,a,team));
-    return {opportunity_id:active[0]?.id||null};
+    if(!team)return {opportunity_id:null,reason:"Equipa indisponível."};
+    const strategy=strategyOf();
+    const active=save.opportunities.filter(o=>o.status==="active"&&save.player.level>=o.min_level&&(path!=="dispatch/recommend_repeat"||!team.last_type_key||o.type_key===team.last_type_key));
+    const rows=active.map(opp=>({opp,metrics:recommendationMetrics(opp,team)})).filter(row=>row.metrics.eligible);
+    sortRecommendation(rows,strategy);
+    const best=rows[0];
+    return best?{opportunity_id:best.opp.id,chance:best.metrics.chance,strategy,reason:recommendationReason(best.metrics,strategy),metrics:best.metrics}:{opportunity_id:null,strategy,reason:"Nenhuma operação é executável por esta equipa agora."};
   }
   if(path==="dispatch"){
     const opp=save.opportunities.find(o=>o.id===p.opportunity_id),team=save.teams.find(t=>t.id===p.team_id);
-    if(!opp||opp.status!=="active")fail(404,"Oportunidade indisponível");
-    if(!team||team.status!=="idle")fail(400,"Equipa indisponível");
-    const members=save.employees.filter(e=>e.team_id===team.id&&e.status==="idle"&&e.fatigue<90);
-    if(!members.length)fail(400,"A equipa não tem membros disponíveis");
-    const vehicle=save.vehicles.find(v=>v.id===team.vehicle_id);
-    if(!vehicle)fail(400,"A equipa não tem veículo atribuído");
-    if(vehicle.condition<30)fail(400,"O veículo precisa de reparação");
-    const fuelNeeded=Math.max(1,opp.dist_km*2*vehicle.cons/100);
-    if(vehicle.fuel_l<fuelNeeded)fail(400,"Combustível insuficiente para a viagem");
+    if(!opp||!team)fail(404,"Operação ou equipa não encontrada");
+    const eligibility=dispatchEligibility(save,opp,team);
+    if(!eligibility.ok)fail(400,eligibility.reasons[0]);
+    const members=eligibility.members;
+    const vehicle=eligibility.vehicle;
     const start=Date.now();
     const origin=vehicleOriginFor(save,vehicle) || {lat:Number(opp.lat),lng:Number(opp.lng)};
     const target={lat:Number(opp.lat),lng:Number(opp.lng)};
@@ -1996,10 +2124,43 @@ export const disableLocalGuestMode = () => {
   localStorage.removeItem(SESSION_KEY);
 };
 
+export const getLocalGuestRecoveryState = () => readRecovery();
+
+export const exportLocalGuestSave = (source="current") => {
+  const key=source==="backup"?BACKUP_KEY:source==="corrupt"?CORRUPT_KEY:SAVE_KEY;
+  return localStorage.getItem(key);
+};
+
+export const importLocalGuestSave = (raw) => {
+  const save=hydrateSave(JSON.parse(String(raw||"")));
+  persist(save,false,{backup:true});
+  localStorage.removeItem(CORRUPT_KEY);
+  localStorage.removeItem(RECOVERY_KEY);
+  return clone(save);
+};
+
+export const restoreLocalGuestBackup = () => {
+  const raw=localStorage.getItem(BACKUP_KEY);
+  if(!raw)return false;
+  const save=hydrateSave(JSON.parse(raw));
+  localStorage.setItem(SAVE_KEY,JSON.stringify(save));
+  localStorage.removeItem(RECOVERY_KEY);
+  return true;
+};
+
+export const startFreshLocalGuestGame = () => {
+  const current=localStorage.getItem(SAVE_KEY);
+  if(current){
+    try{JSON.parse(current);localStorage.setItem(BACKUP_KEY,current);}catch(_e){localStorage.setItem(CORRUPT_KEY,current);}
+  }
+  const fresh=ensureOrganizationSave(createInitialSave());
+  localStorage.setItem(SAVE_KEY,JSON.stringify(fresh));
+  localStorage.removeItem(RECOVERY_KEY);
+  return clone(fresh);
+};
+
 export const resetLocalGuestGame = () => {
-  localStorage.removeItem(SAVE_KEY);
-  localStorage.removeItem(MODE_KEY);
-  localStorage.removeItem(SESSION_KEY);
+  [SAVE_KEY,BACKUP_KEY,CORRUPT_KEY,RECOVERY_KEY,MODE_KEY,SESSION_KEY].forEach((key)=>localStorage.removeItem(key));
 };
 
 export const getLocalGuestUser = () => {
