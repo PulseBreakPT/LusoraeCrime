@@ -213,5 +213,17 @@ describe("UI action ownership", () => {
     expect(organization).not.toContain("Gestão do Império");
   });
 
+  test("World has one navigation surface", () => {
+    expect(gamePage).not.toContain('data-testid="open-world-pulse"');
+    expect(gamePage).not.toContain('data-testid="open-world-news"');
+    expect(gamePage).not.toContain('data-testid="open-world-rivals"');
+    expect(gamePage).not.toContain('data-testid="open-world-social"');
+    expect(gamePage).toContain('testId="nav-group-world"');
+    expect(city).toContain('["pulse", "Pulso"');
+    expect(city).toContain('["news", "Notícias"');
+    expect(city).toContain('["rivals", "Rivais"');
+    expect(city).toContain('["social", "Rede"');
+  });
+
 
 });
