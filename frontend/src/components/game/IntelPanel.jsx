@@ -94,15 +94,15 @@ const LatestReturnSummary = ({ onNavigate }) => {
         </div>
         <div className="mt-2 grid grid-cols-3 gap-1.5">
           <div className="rounded-md border border-white/[0.06] bg-black/25 p-2">
-            <p className="font-mono text-[9px] uppercase text-zinc-600">Ganho</p>
+            <p className="font-mono text-[10px] uppercase text-zinc-600">Ganho</p>
             <p className="mt-0.5 font-mono text-[11px] font-bold text-emerald-300">{reward>0?`+${fmtMoney(reward)}`:"0 €"}</p>
           </div>
           <div className="rounded-md border border-white/[0.06] bg-black/25 p-2">
-            <p className="flex items-center gap-1 font-mono text-[9px] uppercase text-zinc-600"><Fuel size={9}/> Combustível</p>
+            <p className="flex items-center gap-1 font-mono text-[10px] uppercase text-zinc-600"><Fuel size={9}/> Combustível</p>
             <p className="mt-0.5 font-mono text-[11px] font-bold text-amber-300">{fuelCost>0?`−${fmtMoney(fuelCost)}`:"—"}</p>
           </div>
           <div className="rounded-md border border-white/[0.06] bg-black/25 p-2">
-            <p className="font-mono text-[9px] uppercase text-zinc-600">Chance inicial</p>
+            <p className="font-mono text-[10px] uppercase text-zinc-600">Chance inicial</p>
             <p className="mt-0.5 font-mono text-[11px] font-bold text-cyan-300">{latest.success_chance!=null?`${Math.round(Number(latest.success_chance)*100)}%`:"—"}</p>
           </div>
         </div>
@@ -117,7 +117,7 @@ const LatestReturnSummary = ({ onNavigate }) => {
             className="mt-2 flex w-full items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.025] px-2.5 py-2 text-left hover:bg-white/[0.05]"
           >
             <span>
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-600">Próximo passo</span>
+              <span className="block font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600">Próximo passo</span>
               <span className="mt-0.5 block text-[10px] font-semibold text-zinc-200">{nextMove.title}</span>
             </span>
             <ArrowRight size={12} className="shrink-0 text-zinc-500"/>
