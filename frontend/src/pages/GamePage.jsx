@@ -120,7 +120,6 @@ export default function GamePage() {
   }, [gameReady, settings.reducedMotion]);
 
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
-  const [worldFocusTab, setWorldFocusTab] = useState("pulse");
   const [baseFilter, setBaseFilter] = useState("all");
   const [stamp, setStamp] = useState(null);
   // Carimbo de confirmação de despacho — celebração breve (1.7s) no centro do
@@ -158,11 +157,6 @@ export default function GamePage() {
     setNavGroup(null);
     setMapLegendOpen(false);
     setOpenPanel(canonicalGamePanel(panel));
-  };
-
-  const openWorldTab = (tab) => {
-    setWorldFocusTab(tab);
-    openFromNav("world");
   };
 
   const returnToMap = () => {
@@ -402,15 +396,6 @@ export default function GamePage() {
                 </>
               )}
 
-              {navGroup === "world" && unlocks.world && (
-                <div className="grid grid-cols-4 gap-1">
-                  <NavAction testId="open-world-pulse" icon={RadioTower} label="Pulso" color="text-red-300" onClick={() => openWorldTab("pulse")} />
-                  <NavAction testId="open-world-news" icon={BrainCircuit} label="Notícias" color="text-zinc-300" onClick={() => openWorldTab("news")} />
-                  <NavAction testId="open-world-rivals" icon={Crosshair} label="Rivais" color="text-amber-300" onClick={() => openWorldTab("rivals")} />
-                  <NavAction testId="open-world-social" icon={Users} label="Rede" color="text-cyan-300" onClick={() => openWorldTab("social")} />
-                </div>
-              )}
-
               {navGroup === "utilities" && (
                 <>
                   <div className="grid grid-cols-5 gap-1">
@@ -504,8 +489,8 @@ export default function GamePage() {
               label="Mundo"
               color="text-red-300"
               alert={wantedStars >= 3}
-              active={navGroup === "world" || openPanel === "world"}
-              onClick={() => unlocks.world ? toggleNavGroup("world") : null}
+              active={openPanel === "world"}
+              onClick={() => unlocks.world ? openFromNav("world") : null}
             />
           </div>
         </div>
@@ -613,7 +598,7 @@ export default function GamePage() {
       {openPanel === "world" && unlocks.world && (
         <CityPanel
           open
-          initialTab={worldFocusTab}
+          initialTab="pulse"
           visibleTabs={["pulse", "news", "rivals", "social"]}
           title="Mundo"
           description="Pulso urbano, notícias, rivais e rede local."
