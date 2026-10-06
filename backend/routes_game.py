@@ -1733,6 +1733,13 @@ async def recall_mission(body: MissionIdInput, user: dict = Depends(get_current_
         {"$set": {"phrase_memory": update_memory(player.get("phrase_memory"), recall_used)}},
     )
     await db.teams.update_one({"_id": ObjectId(m["team_id"])}, {"$set": {"status": "returning"}})
+    support_team_ids = [tid for tid in (m.get("support_team_ids") or []) if ObjectId.is_valid(str(tid))]
+    if support_team_ids:
+        support_oids = [ObjectId(str(tid)) for tid in support_team_ids]
+        await db.teams.update_many(
+            {"_id": {"$in": support_oids}, "player_id": pid},
+            {"$set": {"status": "returning"}},
+        )
     if m.get("opportunity_id"):
         await db.opportunities.update_one(
             {"_id": ObjectId(m["opportunity_id"]), "status": "taken", "expires_at": {"$gt": now.isoformat()}},
