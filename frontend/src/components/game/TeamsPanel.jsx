@@ -1077,9 +1077,21 @@ export const TeamsPanel = ({ open, onOpenChange, onNavigate, focusTarget }) => {
                   )}
                 </div>
                 {vehicle && (
-                  <p className="relative z-[1] mt-1 pl-5 font-mono text-[10px] text-zinc-500">
-                    Base: {vehicle.property_id ? (state.properties.find((p) => p.id === vehicle.property_id)?.name || "Quartel-General") : "Quartel-General"}
-                  </p>
+                  <div className="relative z-[1] mt-1 flex items-center justify-between gap-2 pl-5">
+                    <p className="min-w-0 truncate font-mono text-[10px] text-zinc-500">
+                      Base: {vehicle.property_id ? (state.properties.find((p) => p.id === vehicle.property_id)?.name || "Quartel-General") : "Quartel-General"}
+                    </p>
+                    <Button
+                      variant="bare"
+                      size="bare"
+                      type="button"
+                      data-testid={`team-vehicle-open-${vehicle.id}`}
+                      onClick={() => nav("fleet", { focusTestId: `vehicle-card-${vehicle.id}` })}
+                      className="shrink-0 font-mono text-[10px] text-cyan-300 underline-offset-2 hover:underline"
+                    >
+                      Abrir ficha
+                    </Button>
+                  </div>
                 )}
 
                 {vehicle && t.status === "idle" && (
