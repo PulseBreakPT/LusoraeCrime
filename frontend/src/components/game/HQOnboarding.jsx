@@ -10,6 +10,7 @@ import { useGame } from "../../context/GameContextV2";
 import { formatApiErrorDetail, fmtMoney } from "../../lib/game";
 import { Button } from "../ui/button";
 import { DisclaimerModal } from "./DisclaimerModal";
+import { GuestSaveRecovery } from "./GuestSaveRecovery";
 import MapBaseLayer from "./MapBaseLayer";
 
 // -----------------------------------------------------------------------------
@@ -222,6 +223,7 @@ export default function HQOnboarding() {
           jogador estabelecer o QG (primeiro ecrã real do jogo). Aceite UMA
           única vez por conta (user.disclaimer_accepted, registado no servidor
           via POST /legal/disclaimer-ack) — depois nunca mais reaparece. */}
+      <GuestSaveRecovery />
       <DisclaimerModal />
     </div>
   );
