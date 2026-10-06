@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
-import { BrainCircuit, Lightbulb, ArrowRight, Crosshair, Trophy, Fuel, AlertTriangle } from "lucide-react";
+import { BrainCircuit, Lightbulb, ArrowRight, Trophy, Fuel, AlertTriangle } from "lucide-react";
 
 const OUTCOME_LABELS = { success: "Sucesso", partial: "Parcial", failure: "Falhou", police: "Polícia", recalled: "Cancelada" };
 const OUTCOME_COLORS = { success: "#34D399", partial: "#38BDF8", failure: "#F59E0B", police: "#EF4444", recalled: "#8E8E93" };
@@ -16,55 +16,6 @@ const questTabFor = (quest) => {
   if (quest?.type === "diaria") return "diarias";
   if (quest?.type === "semanal") return "semanais";
   return "alertas";
-};
-
-const RetentionRoadmap = ({ onNavigate }) => {
-  const { state } = useGame();
-  const moves = state?.retention?.next_moves || [];
-  if (!moves.length) return null;
-
-  const horizonLabel = {
-    agora: "AGORA",
-    sessao: "ESTA SESSÃO",
-    plano: "PRÓXIMO PASSO",
-  };
-
-  return (
-    <div className="mt-4" data-testid="retention-roadmap">
-      <SectionHeader icon={Crosshair} title="Próximos movimentos" meta="3 horizontes" />
-      <div className="space-y-1.5">
-        {moves.map((move) => {
-          const pct = Math.max(0, Math.min(100, Number(move.progress?.pct || 0)));
-          return (
-            <Button variant="bare" size="bare"
-              key={move.id}
-              type="button"
-              data-testid={`retention-move-${move.id}`}
-              onClick={() => onNavigate && onNavigate(move.panel, move.focus_test_id ? { focusTestId: move.focus_test_id } : undefined)}
-              className="block min-h-16 w-full rounded-lg border border-white/[0.07] bg-black/20 p-2.5 text-left transition-colors hover:border-white/15 hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
-                  {horizonLabel[move.horizon] || move.horizon}
-                </span>
-                <span className="font-mono text-[10px] tabular-nums text-zinc-600">
-                  {Math.round(pct)}%
-                </span>
-              </span>
-              <span className="mt-1 block text-[11px] font-bold text-white">{move.title}</span>
-              <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">{move.description}</span>
-              <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/[0.06]" aria-hidden="true">
-                <span
-                  className="block h-full rounded-full bg-red-500/75 transition-[width]"
-                  style={{ width: `${pct}%` }}
-                />
-              </span>
-            </Button>
-          );
-        })}
-      </div>
-    </div>
-  );
 };
 
 const LatestReturnSummary = ({ onNavigate }) => {
@@ -422,14 +373,6 @@ export const IntelPanel = ({ open, onOpenChange, onNavigate }) => {
             <Cell label="Salários/semana" value={fmtMoney(state.salary_total || 0)} color="#F59E0B" tip="Salários brutos atuais. O fecho de custos fixos acontece à segunda-feira, às 20:00." />
           </Grid>
         </Section>
-
-        
-
-        
-
-        
-
-        <RetentionRoadmap onNavigate={onNavigate} />
         <OrganizationRecords />
 
         <Section title="Histórico" testId="intel-history">
