@@ -3,7 +3,7 @@
 // a plataforma partilhe a mesma base visual, mantendo a estética escura/mono do SUBMUNDO.
 
 import { useEffect, useRef, useState } from "react";
-import { Pencil, Check, X, Star, Loader2 } from "lucide-react";
+import { Pencil, Check, X, Star, Loader2, ChevronLeft } from "lucide-react";
 import { getDisplayPrefs } from "../../lib/game";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
@@ -14,6 +14,36 @@ import { Input } from "../ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
 const SIDE_ALIGN_OFFSET = { top: 6, bottom: 6, left: 6, right: 6 };
+
+const ENTITY_INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, [role="button"], [role="option"], [data-radix-collection-item]';
+
+export const openEntityFromCard = (event, open) => {
+  if (event?.defaultPrevented) return;
+  const target = event?.target;
+  if (target && typeof target.closest === "function" && target.closest(ENTITY_INTERACTIVE_SELECTOR)) return;
+  open?.();
+};
+
+export const EntityDetailBar = ({ title, meta, onBack, testId }) => (
+  <div
+    data-testid={testId}
+    className="mt-3 flex items-center gap-2 rounded-xl border border-cyan-500/15 bg-cyan-500/[0.035] px-2.5 py-2"
+  >
+    <Button
+      type="button"
+      variant="bare"
+      size="bare"
+      onClick={onBack}
+      className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-2 font-mono text-[10px] font-bold uppercase text-cyan-300 hover:bg-cyan-500/10"
+    >
+      <ChevronLeft size={13} /> Voltar à lista
+    </Button>
+    <div className="min-w-0 border-l border-white/[0.07] pl-2">
+      <p className="truncate text-[11px] font-semibold text-white">{title}</p>
+      {meta && <p className="truncate font-mono text-[10px] uppercase tracking-wide text-zinc-600">{meta}</p>}
+    </div>
+  </div>
+);
 
 // Deteção de ambiente com rato real (hover + ponteiro fino). Em ecrãs táteis o
 // browser emula mouseenter/click no toque, o que fazia os tooltips abrirem e
