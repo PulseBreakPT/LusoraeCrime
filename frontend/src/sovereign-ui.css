@@ -1,0 +1,489 @@
+/* SUBMUNDO · Sovereign UI
+ * Single final-layer design contract for gameplay, overlays and shared controls.
+ * Order matters: loaded after legacy presentation layers in App.js.
+ * The map remains the hero. Strong hierarchy, quiet surfaces, semantic colour.
+ */
+
+:root {
+  --so-canvas: #050609;
+  --so-surface: #0b0e13;
+  --so-raised: #121720;
+  --so-hover: #1a222d;
+  --so-border: rgba(184, 200, 218, .12);
+  --so-border-strong: rgba(184, 200, 218, .22);
+  --so-text: #f3f5f7;
+  --so-secondary: #b1bdc9;
+  --so-muted: #8592a1;
+  --so-danger: #f05256;
+  --so-info: #65c5d9;
+  --so-success: #5fd0a4;
+  --so-warning: #e7b46b;
+  --so-radius: 14px;
+  --so-ease: cubic-bezier(.2,.8,.2,1);
+  --so-shadow: 0 24px 76px rgba(0,0,0,.64), 0 4px 18px rgba(0,0,0,.35);
+  --sub-canvas: var(--so-canvas);
+  --sub-surface: var(--so-surface);
+  --sub-raised: var(--so-raised);
+  --sub-raised-hover: var(--so-hover);
+  --sub-text: var(--so-text);
+  --sub-text-secondary: var(--so-secondary);
+  --sub-text-muted: var(--so-muted);
+  --sub-border: var(--so-border);
+}
+
+html {
+  color-scheme: dark;
+  scrollbar-color: #3b4653 #0b0e13;
+}
+
+/* One typographic hierarchy across the game, not independent panel styles. */
+.sub-game-shell,
+.sub-sheet-panel,
+.sub-menu-modal,
+.sub-opp-card,
+.sub-toast {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  color: var(--so-text);
+  -webkit-font-smoothing: antialiased;
+}
+.sub-sheet-panel :is(.sub-sheet-title, .sub-modal-title),
+.sub-menu-modal .sub-modal-title,
+.sub-game-shell .sub-title {
+  font-family: "Rajdhani", "IBM Plex Sans", sans-serif;
+  font-weight: 700;
+  letter-spacing: .035em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.sub-sheet-panel :is(.sub-sheet-description, .sub-settings-row p),
+.sub-menu-modal :is(.text-zinc-500, .text-zinc-400) {
+  line-height: 1.5;
+}
+.sub-sheet-panel :is(.sub-sheet-description, .sub-settings-row p.text-zinc-500) {
+  color: var(--so-secondary);
+}
+.sub-game-shell :is(.sub-resource-value, .sub-feed-unread, .sub-fps-value),
+.sub-sheet-panel :is(.sub-kpi, .tabular-nums) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Only the essential overlay remains on the world layer. */
+.sub-game-shell .sub-vignette {
+  background:
+    radial-gradient(ellipse 86% 73% at 50% 46%, transparent 47%, rgba(0,0,0,.26) 100%),
+    linear-gradient(180deg, rgba(0,0,0,.18), transparent 14%, transparent 78%, rgba(0,0,0,.22));
+}
+.sub-game-shell[data-heat-tier="3"] .sub-vignette,
+.sub-game-shell[data-heat-tier="4"] .sub-vignette {
+  background:
+    radial-gradient(ellipse 86% 73% at 50% 46%, transparent 47%, rgba(0,0,0,.3) 100%),
+    linear-gradient(180deg, rgba(0,0,0,.2), transparent 16%, transparent 78%, rgba(0,0,0,.2));
+}
+
+/* The command bar reads as one connected instrument; no glowing boxes. */
+.sub-game-shell .sub-topbar {
+  background: rgba(8,11,16,.97) !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: var(--so-radius) !important;
+  box-shadow: 0 12px 36px rgba(0,0,0,.53), inset 0 1px rgba(255,255,255,.045) !important;
+}
+.sub-game-shell .sub-topbar::before {
+  background: none !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  border: 0 !important;
+}
+.sub-game-shell .sub-topbar::after {
+  left: 18%;
+  right: 18%;
+  background: linear-gradient(90deg, transparent, rgba(240,82,86,.48), transparent) !important;
+  box-shadow: none !important;
+}
+.sub-game-shell .sub-resource-grid > * + * {
+  border-left: 1px solid var(--so-border);
+}
+.sub-game-shell .sub-resource-grid .sub-minimal-stat {
+  gap: 4px !important;
+  padding: 7px 12px !important;
+  min-height: 49px;
+}
+.sub-game-shell .sub-resource-grid .sub-resource-heading {
+  gap: 5px !important;
+}
+.sub-game-shell .sub-resource-grid .sub-resource-label {
+  color: var(--so-secondary) !important;
+  font-size: 10px !important;
+  letter-spacing: .075em !important;
+}
+.sub-game-shell .sub-resource-grid .sub-resource-value {
+  color: var(--so-text) !important;
+  font-size: clamp(12px, 1.5vw, 15px) !important;
+  font-weight: 700;
+  letter-spacing: -.025em !important;
+}
+
+/* Bottom navigation is deliberately icon-led and quiet, like a game HUD. */
+.sub-game-shell .sub-dock {
+  position: relative;
+  gap: 3px !important;
+  padding: 5px 7px !important;
+  background: rgba(8,11,16,.98) !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 17px !important;
+  box-shadow: 0 18px 45px rgba(0,0,0,.55), inset 0 1px rgba(255,255,255,.04) !important;
+}
+.sub-game-shell .sub-dock::before {
+  background: none !important;
+  border: 0 !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+}
+.sub-game-shell .sub-dock::after {
+  left: 15%;
+  right: 15%;
+  background: linear-gradient(90deg, transparent, rgba(240,82,86,.35), transparent) !important;
+  box-shadow: none !important;
+}
+.sub-game-shell .sub-dock .sub-hud-btn {
+  position: relative;
+  border: 0 !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-width: 54px;
+  transition: color 160ms var(--so-ease), background-color 160ms var(--so-ease) !important;
+}
+.sub-game-shell .sub-dock .sub-hud-btn:hover {
+  transform: none !important;
+  background: rgba(184,200,218,.07) !important;
+}
+.sub-game-shell .sub-dock .sub-hud-btn-active {
+  background: rgba(184,200,218,.085) !important;
+}
+.sub-game-shell .sub-dock .sub-hud-btn-active::before {
+  background: var(--so-danger) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+.sub-game-shell .sub-dock .sub-hud-btn > span {
+  color: var(--so-secondary) !important;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 11px !important;
+  font-weight: 700;
+  letter-spacing: .035em;
+}
+.sub-game-shell .sub-dock .sub-hud-btn-active > span {
+  color: #fff !important;
+}
+.sub-game-shell .sub-dock [data-testid="nav-map"] svg {
+  color: var(--so-text) !important;
+}
+.sub-game-shell .sub-dock [data-testid="nav-map"].sub-hud-btn-active {
+  background: rgba(240,82,86,.095) !important;
+}
+.sub-game-shell .sub-bottom-nav-shell > .sub-hud-btn {
+  background: rgba(8,11,16,.96) !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 9px 25px rgba(0,0,0,.46) !important;
+}
+
+/* Popover navigation is a focused directory, not five unrelated buttons. */
+.sub-game-shell .sub-nav-tray {
+  overflow: hidden;
+  background: #0b0f15 !important;
+  border: 1px solid var(--so-border-strong) !important;
+  border-radius: 16px !important;
+  padding: 7px !important;
+  box-shadow: var(--so-shadow) !important;
+  animation: so-tray-enter 180ms var(--so-ease) both;
+}
+.sub-game-shell .sub-nav-tray::before,
+.sub-game-shell .sub-nav-tray::after {
+  content: none !important;
+}
+.sub-nav-tray-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 11px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--so-border);
+}
+.sub-nav-tray-heading h2 {
+  font: 700 18px/1 "Rajdhani", sans-serif;
+  color: #f6f7f9;
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+.sub-nav-tray-heading p {
+  max-width: 31ch;
+  font-size: 11px;
+  color: var(--so-muted);
+  line-height: 1.4;
+}
+.sub-nav-tray-heading .sub-nav-tray-index {
+  font: 700 10px/1 "JetBrains Mono", monospace;
+  color: var(--so-info);
+  border: 1px solid rgba(101,197,217,.22);
+  border-radius: 6px;
+  padding: 7px;
+  flex-shrink: 0;
+}
+.sub-game-shell .sub-nav-action {
+  min-height: 62px;
+  padding: 10px 5px !important;
+  background: transparent;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  transition: background-color 150ms var(--so-ease), border-color 150ms var(--so-ease) !important;
+}
+.sub-game-shell .sub-nav-action:hover,
+.sub-game-shell .sub-nav-action:focus-visible,
+.sub-game-shell .sub-nav-action.is-active {
+  background: rgba(184,200,218,.065) !important;
+  border-color: rgba(184,200,218,.14) !important;
+}
+.sub-game-shell .sub-nav-action svg { filter: none !important; }
+.sub-game-shell .sub-nav-action span {
+  color: var(--so-secondary) !important;
+  font-size: 11px !important;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+/* Consistent material for every independently implemented game module. */
+.sub-sheet-panel,
+.sub-menu-modal {
+  background: var(--so-surface) !important;
+  border: 1px solid var(--so-border-strong) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--so-shadow) !important;
+  color: var(--so-text);
+}
+.sub-sheet-panel::before,
+.sub-sheet-panel::after,
+.sub-menu-modal::before,
+.sub-menu-modal::after {
+  animation: none !important;
+  box-shadow: none !important;
+}
+.sub-sheet-panel::before,
+.sub-menu-modal::before {
+  background: none !important;
+  border-color: transparent !important;
+}
+.sub-sheet-panel::after,
+.sub-menu-modal::after { opacity: 0 !important; }
+.sub-sheet-panel .sub-modal-header,
+.sub-sheet-panel .sub-operations-head,
+.sub-menu-modal .sub-menu-modal-header {
+  background: #0e1218 !important;
+  border-bottom: 1px solid var(--so-border-strong) !important;
+  box-shadow: none !important;
+}
+.sub-sheet-panel .sub-sheet-title,
+.sub-menu-modal .sub-modal-title {
+  color: #f9fafb !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+.sub-sheet-panel .sub-sheet-title svg,
+.sub-menu-modal .sub-modal-title svg { filter: none !important; }
+.sub-sheet-panel .sub-sheet-close,
+.sub-menu-modal > button[data-state],
+.sub-menu-modal > .sub-shad-dialog-close {
+  color: var(--so-secondary) !important;
+  background: #171d25 !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 10px !important;
+}
+.sub-sheet-panel .sub-sheet-close:hover,
+.sub-menu-modal > .sub-shad-dialog-close:hover {
+  color: #fff !important;
+  background: #222b35 !important;
+}
+.sub-modal-overlay {
+  background: rgba(2,4,7,.76) !important;
+}
+.sub-sheet-panel .sub-card,
+.sub-menu-modal .sub-card,
+.sub-game-shell .sub-card {
+  background: #121820 !important;
+  background-image: none !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 12px;
+  box-shadow: inset 0 1px rgba(255,255,255,.025) !important;
+}
+.sub-sheet-panel .sub-card:hover,
+.sub-menu-modal .sub-card:hover,
+.sub-game-shell .sub-card:hover {
+  transform: none !important;
+  border-color: rgba(184,200,218,.27) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.04) !important;
+}
+.sub-sheet-panel .sub-section-header {
+  border: 0;
+  padding: 0;
+  margin-top: 4px;
+}
+.sub-sheet-panel .sub-section-header h3 {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 14px !important;
+  font-weight: 700;
+  letter-spacing: .09em !important;
+  color: #dce5ed !important;
+}
+.sub-sheet-panel .sub-summary-strip,
+.sub-sheet-panel .sub-kpi-grid { gap: 6px !important; }
+.sub-sheet-panel .sub-kpi,
+.sub-sheet-panel .sub-kpi-cell {
+  background: #111720 !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+.sub-sheet-panel .sub-settings-section {
+  background: #111720 !important;
+  border-radius: 12px !important;
+}
+.sub-sheet-panel .sub-settings-row + .sub-settings-row {
+  border-top: 1px solid var(--so-border);
+}
+.sub-sheet-panel .sub-operation-row {
+  background: #121820 !important;
+}
+.sub-sheet-panel .sub-operation-row:hover {
+  background: #1a222d !important;
+}
+.sub-sheet-panel .sub-empty {
+  background: rgba(184,200,218,.025);
+  border-color: var(--so-border-strong);
+}
+
+/* Components: actions are sharp, semantically coloured and touch-friendly. */
+.sub-game-shell .sub-btn:not(.sub-hud-btn):not(.sub-nav-action),
+.sub-sheet-panel .sub-btn,
+.sub-menu-modal .sub-btn {
+  border-radius: 10px;
+  box-shadow: none;
+}
+.sub-sheet-panel .sub-btn-primary,
+.sub-menu-modal .sub-btn-primary,
+.sub-game-shell .sub-btn-primary {
+  background: #a82731 !important;
+  border-color: #cc4851 !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.1) !important;
+}
+.sub-sheet-panel .sub-btn-primary:hover:not(:disabled),
+.sub-menu-modal .sub-btn-primary:hover:not(:disabled) {
+  background: #bb343f !important;
+}
+.sub-sheet-panel :is(.sub-btn-glass,.sub-btn-soft,.sub-btn-filter),
+.sub-menu-modal :is(.sub-btn-glass,.sub-btn-soft,.sub-btn-filter) {
+  background: #171e27 !important;
+  background-image: none !important;
+  border-color: var(--so-border-strong) !important;
+  box-shadow: none !important;
+}
+.sub-sheet-panel :is(.sub-btn-glass,.sub-btn-soft,.sub-btn-filter):hover:not(:disabled),
+.sub-menu-modal :is(.sub-btn-glass,.sub-btn-soft,.sub-btn-filter):hover:not(:disabled) {
+  background: #242d38 !important;
+}
+.sub-sheet-panel :is(input:not([type="range"]), textarea, select, [role="combobox"]),
+.sub-menu-modal :is(input:not([type="range"]), textarea, [role="combobox"]) {
+  background: #080c12 !important;
+  border-color: var(--so-border-strong) !important;
+  color: var(--so-text) !important;
+  border-radius: 9px;
+}
+.sub-sheet-panel :is(input:not([type="range"]), textarea, select):focus-visible,
+.sub-menu-modal :is(input:not([type="range"]), textarea):focus-visible {
+  outline: 2px solid var(--so-info) !important;
+  outline-offset: 2px;
+}
+.sub-sheet-panel :is([role="tab"][data-state="active"], [role="tab"][aria-selected="true"]) {
+  color: #fff !important;
+  border-color: rgba(240,82,86,.5) !important;
+}
+.sub-sheet-panel :is([role="progressbar"], .sub-summary-strip) {
+  overflow: hidden;
+}
+.sub-sheet-panel [role="progressbar"] {
+  background: rgba(184,200,218,.13) !important;
+  border-radius: 5px;
+}
+.sub-sheet-panel .sub-watermark {
+  opacity: .055 !important;
+  filter: none !important;
+}
+
+/* Contextual cards, notifications and map labels share the same finish. */
+.sub-game-shell .sub-opp-card,
+.sub-game-shell .sub-notification-panel,
+.sub-game-shell .sub-map-tip,
+.sub-game-shell .sub-world-pulse-hud {
+  background: #0d1219 !important;
+  background-image: none !important;
+  border: 1px solid var(--so-border-strong) !important;
+  border-radius: 13px !important;
+  box-shadow: 0 14px 38px rgba(0,0,0,.56) !important;
+}
+.sub-game-shell .sub-opp-card::before,
+.sub-game-shell .sub-opp-card::after,
+.sub-game-shell .sub-notification-panel::before { content: none !important; }
+.sub-game-shell .sub-feed-row:hover,
+.sub-game-shell .sub-activity-ticker:hover { background-color: rgba(184,200,218,.05); }
+.sub-game-shell .sub-wanted-hud { background: rgba(8,11,16,.64) !important; }
+.sub-game-shell .sub-wanted-hud svg.fill-red-600 { filter: none; }
+.sub-game-shell .sub-map-tip { color: #f3f5f7; }
+.sub-game-shell .sub-available-missions-hud,
+.sub-game-shell .sub-fps-label,
+.sub-game-shell .sub-fps-value { filter: none; }
+
+/* Accessible gamepad, keyboard and reduced-motion treatments. */
+:is(.sub-game-shell,.sub-sheet-panel,.sub-menu-modal) :is(button, a, [role="button"], [role="tab"], [role="option"], input, select, textarea):focus-visible {
+  outline: 2px solid #8bdff0 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 5px rgba(4,9,13,.8) !important;
+}
+@keyframes so-tray-enter {
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (max-width: 639px) {
+  .sub-game-shell .sub-dock { gap: 0 !important; padding: 4px !important; }
+  .sub-game-shell .sub-dock .sub-hud-btn { min-width: 48px !important; }
+  .sub-game-shell .sub-resource-grid .sub-minimal-stat { padding: 7px 4px !important; }
+  .sub-game-shell .sub-resource-grid .sub-resource-value { font-size: 12px !important; }
+  .sub-game-shell .sub-resource-grid .sub-resource-label { font-size: 9px !important; }
+  .sub-game-shell .sub-nav-action { min-height: 55px; padding: 8px 3px !important; }
+  .sub-nav-tray-heading { padding: 6px 8px 9px; }
+  .sub-nav-tray-heading h2 { font-size: 16px; }
+  .sub-nav-tray-heading p { font-size: 10px; }
+  .sub-sheet-panel,
+  .sub-menu-modal { border-radius: 16px !important; }
+}
+@media (min-width: 1920px) and (min-height: 960px) {
+  .sub-game-shell .sub-resource-grid .sub-resource-value { font-size: var(--sub-tv-label, 18px) !important; }
+  .sub-game-shell .sub-resource-grid .sub-resource-label { font-size: var(--sub-tv-small, 15px) !important; }
+  .sub-game-shell .sub-dock .sub-hud-btn { min-width: var(--sub-tv-control, 64px) !important; }
+}
+@media (pointer: coarse) {
+  .sub-game-shell .sub-nav-tray { animation: none; }
+  .sub-game-shell .sub-nav-action:hover { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sub-game-shell .sub-nav-tray { animation: none !important; }
+  .sub-game-shell .sub-nav-action,
+  .sub-game-shell .sub-dock .sub-hud-btn { transition: none !important; }
+}
+html.sub-reduced-motion .sub-game-shell .sub-nav-tray { animation: none !important; }
+html.sub-high-contrast :is(.sub-sheet-panel,.sub-menu-modal,.sub-nav-tray) {
+  border-color: rgba(255,255,255,.65) !important;
+}
+html.sub-high-contrast .sub-sheet-panel .sub-sheet-description {
+  color: #f3f5f7 !important;
+}
