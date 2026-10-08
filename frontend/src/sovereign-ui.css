@@ -487,3 +487,108 @@ html.sub-high-contrast :is(.sub-sheet-panel,.sub-menu-modal,.sub-nav-tray) {
 html.sub-high-contrast .sub-sheet-panel .sub-sheet-description {
   color: #f3f5f7 !important;
 }
+
+
+/* Entry screen: cinematic, legible and aligned with in-game materials. */
+.sub-auth-shell {
+  isolation: isolate;
+  background: #050609;
+}
+.sub-auth-shell > img {
+  opacity: .22 !important;
+  filter: saturate(.42) contrast(1.12);
+}
+.sub-auth-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 48% 46% at 26% 46%, rgba(179,43,50,.1), transparent),
+    linear-gradient(90deg, rgba(3,5,8,.54), rgba(3,5,8,.13) 60%, rgba(3,5,8,.72));
+  z-index: 1;
+  pointer-events: none;
+}
+.sub-auth-shell .sub-auth-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  font: 700 11px/1.3 "JetBrains Mono", monospace;
+  color: #b1bdc9;
+  letter-spacing: .14em;
+}
+.sub-auth-shell .sub-auth-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f05256;
+  box-shadow: 0 0 0 4px rgba(240,82,86,.11);
+}
+.sub-auth-shell .sub-auth-hero h1 {
+  font-size: clamp(58px, 5.4vw, 92px);
+  line-height: .92;
+  color: #f5f7fa;
+  text-wrap: balance;
+}
+.sub-auth-shell .sub-auth-hero h1 span { color: #f05256; }
+.sub-auth-shell .sub-auth-hero > p:not(.sub-auth-eyebrow) {
+  color: #aab7c5;
+  max-width: 50ch;
+}
+.sub-auth-shell .sub-auth-hero .sub-card {
+  background: #0f141b !important;
+  border: 1px solid var(--so-border) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  transition: border-color 170ms var(--so-ease) !important;
+}
+.sub-auth-shell .sub-auth-hero .sub-card:hover {
+  transform: none !important;
+  border-color: var(--so-border-strong) !important;
+}
+.sub-auth-shell .sub-auth-gate {
+  background: rgba(9,13,19,.96) !important;
+  border: 1px solid var(--so-border-strong) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 30px 90px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.045) !important;
+  backdrop-filter: none !important;
+}
+.sub-auth-shell .sub-auth-brand h2 {
+  font-family: "Rajdhani", "IBM Plex Sans", sans-serif;
+  font-size: clamp(42px, 4vw, 52px);
+  line-height: .95;
+  letter-spacing: .095em;
+  color: #f5f7fa;
+}
+.sub-auth-shell .sub-auth-brand > p {
+  color: #f18e94;
+  font-size: 10px;
+  letter-spacing: .18em;
+}
+.sub-auth-shell .sub-auth-gate .sub-auth-google {
+  background: #f5f7fa !important;
+  border-color: #f5f7fa !important;
+  color: #091018 !important;
+  box-shadow: none !important;
+}
+.sub-auth-shell .sub-auth-gate .sub-auth-google:hover:not(:disabled) {
+  background: #d9e1ea !important;
+}
+.sub-auth-shell .sub-auth-gate .sub-auth-guest {
+  background: #a82731 !important;
+  border-color: #dc5058 !important;
+  box-shadow: none !important;
+}
+.sub-auth-shell .sub-auth-gate .sub-auth-guest:hover:not(:disabled) {
+  background: #bd3641 !important;
+}
+.sub-auth-shell :is(button, a):focus-visible {
+  outline: 2px solid #8bdff0 !important;
+  outline-offset: 3px !important;
+}
+@media (max-width: 1023px) {
+  .sub-auth-shell::before {
+    background: linear-gradient(180deg, rgba(3,5,8,.58), rgba(3,5,8,.88));
+  }
+  .sub-auth-shell .sub-auth-gate { border-radius: 18px !important; }
+}
