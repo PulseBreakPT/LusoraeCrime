@@ -29,22 +29,25 @@ Nunca deixar quatro ou cinco elementos permanentes a disputar o primeiro nível 
 
 ## 3. Cor
 
-### Superfícies
+### Superfícies (Sovereign UI)
 
-- Canvas: `#050506`
-- Modal: `#0A0A0D`
-- Raised: `#101014`
-- Hover/selected neutral: `#141419`
-- Border subtil: `rgba(255,255,255,.08)`
-- Border forte/focus neutral: `rgba(255,255,255,.16)`
+- Canvas: `#050609`
+- Modal: `#0b0e13`
+- Raised: `#121720`
+- Hover/selected neutral: `#1a222d`
+- Border subtil: `rgba(184,200,218,.12)`
+- Border forte/focus neutral: `rgba(184,200,218,.22)`
 
 ### Texto
 
-- Primary: `#F4F4F5`
-- Secondary: `#A1A1AA`
-- Muted: `#71717A`
+- Primary: `#f3f5f7`
+- Secondary: `#b1bdc9`
+- Muted: `#8592a1`
 
-Evitar texto essencial em tons mais escuros do que `#71717A` sobre as superfícies principais.
+As cores vivem em tokens `--so-*` definidos em `frontend/src/sovereign-ui.css`.
+Esse é o último ficheiro importado por `App.js` e constitui a camada final de
+apresentação. Evitar regras concorrentes nos ficheiros históricos `App.css`,
+`cinematic.css` e `lighting.css`. Não usar texto essencial abaixo de 10px.
 
 ### Semântica
 
