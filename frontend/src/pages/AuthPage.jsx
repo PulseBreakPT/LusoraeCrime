@@ -59,7 +59,7 @@ export default function AuthPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050506] text-white">
+    <main className="sub-auth-shell relative min-h-screen overflow-hidden bg-[#050506] text-white">
       <img
         src={BG}
         alt=""
@@ -71,7 +71,11 @@ export default function AuthPage() {
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-10 sm:px-6">
         <div className="grid w-full gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <section className="hidden lg:block">
+          <section className="sub-auth-hero hidden lg:block">
+            <p className="sub-auth-eyebrow">
+              <span aria-hidden="true" className="sub-auth-live-dot" />
+              UNIVERSO CRIMINAL · PORTUGAL
+            </p>
             <h1 className="max-w-2xl font-display text-6xl font-black uppercase leading-[0.9] tracking-tight xl:text-7xl">
               Constrói o teu
               <span className="block text-red-500">império.</span>
@@ -101,15 +105,15 @@ export default function AuthPage() {
             </div>
           </section>
 
-          <section className="mx-auto w-full max-w-md">
-            <Card className="sub-card rounded-2xl border-white/10 bg-black/70 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-              <div className="text-center">
+          <section className="sub-auth-entry mx-auto w-full max-w-md">
+            <Card className="sub-auth-gate sub-card rounded-2xl border-white/10 bg-black/70 p-6 shadow-2xl sm:p-8">
+              <div className="sub-auth-brand text-center">
                 <ShieldCheck className="mx-auto h-9 w-9 text-red-500" />
                 <h2 className="mt-4 font-display text-4xl font-black uppercase tracking-tight">
                   SUBMUNDO
                 </h2>
                 <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-red-400">
-                  Escolhe como entrar
+                  O TEU IMPÉRIO COMEÇA AQUI
                 </p>
               </div>
 
@@ -124,7 +128,7 @@ export default function AuthPage() {
                   data-testid="google-sign-in-button"
                   onClick={handleGoogle}
                   disabled={Boolean(busy) || !googleSignInEnabled}
-                  className="h-12 w-full bg-white font-semibold text-zinc-950 hover:bg-zinc-100"
+                  className="sub-auth-google h-12 w-full bg-white font-semibold text-zinc-950 hover:bg-zinc-100"
                 >
                   {busy === "google" ? (
                     <Loader2 size={18} className="mr-2 animate-spin" />
@@ -139,7 +143,7 @@ export default function AuthPage() {
                   data-testid="guest-play-button"
                   onClick={handleGuest}
                   disabled={Boolean(busy)}
-                  className="h-12 w-full border border-red-500/30 bg-red-600 font-semibold text-white hover:bg-red-500"
+                  className="sub-auth-guest h-12 w-full border border-red-500/30 bg-red-600 font-semibold text-white hover:bg-red-500"
                 >
                   {busy === "guest" ? (
                     <Loader2 size={18} className="mr-2 animate-spin" />
