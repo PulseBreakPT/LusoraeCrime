@@ -36,6 +36,13 @@ import { initialGamePanel, useGameShell } from "../hooks/useGameShell";
 import { areaLabel, canonicalGamePanel } from "../game/navigation";
 import { Building2, Users, IdCard, Car, Warehouse, BrainCircuit, Target, Loader2, Settings, AlertTriangle, Swords, Crosshair, ShoppingBag, Search, WifiOff, RefreshCw, Star, Vault, Landmark, Map as MapIcon, Menu as MenuIcon, RadioTower, Focus } from "lucide-react";
 
+const NAV_GROUP_COPY = Object.freeze({
+  operations: { title: "Operações", description: "Missões, objetivos e golpes em curso", index: "01 / 04" },
+  crew: { title: "Organização", description: "Equipas, frota, operacionais e equipamento", index: "02 / 04" },
+  empire: { title: "Império", description: "Recursos, propriedades e expansão", index: "03 / 04" },
+  utilities: { title: "Comando", description: "Pesquisa, relatórios e definições", index: "04 / 04" },
+});
+
 export default function GamePage() {
   const { state, stateError, catalog, refresh, serverNow, lastSyncAt, realtimeConnected, autoOpenReportSignal, placement } = useGame();
   const settings = useSettings();
@@ -119,6 +126,24 @@ export default function GamePage() {
       shell.style.removeProperty("--sub-parallax-y");
     };
   }, [gameReady, settings.reducedMotion]);
+
+  // Um único submenu no ecrã: clicar no mapa ou premir Escape fecha-o.
+  // Os destinos existentes continuam a ser abertos pelos botões do dock.
+  useEffect(() => {
+    if (!navGroup) return undefined;
+    const handlePointer = (event) => {
+      if (!event.target?.closest?.(".sub-bottom-nav-shell")) setNavGroup(null);
+    };
+    const handleKey = (event) => {
+      if (event.key === "Escape") setNavGroup(null);
+    };
+    document.addEventListener("pointerdown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [navGroup]);
 
   const [questsFocusTab, setQuestsFocusTab] = useState(null);
   const [baseFilter, setBaseFilter] = useState("all");
@@ -371,7 +396,17 @@ export default function GamePage() {
           style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
         >
           {navGroup && (
-            <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2.5 w-[min(94vw,31rem)] -translate-x-1/2">
+            <div className="sub-nav-tray absolute bottom-full left-1/2 mb-2.5 w-[min(94vw,31rem)] -translate-x-1/2"
+               role="region"
+               aria-label={`Menu de ${NAV_GROUP_COPY[navGroup].title}`}
+             >
+               <div className="sub-nav-tray-heading">
+                 <div className="min-w-0">
+                   <h2>{NAV_GROUP_COPY[navGroup].title}</h2>
+                   <p>{NAV_GROUP_COPY[navGroup].description}</p>
+                 </div>
+                 <span className="sub-nav-tray-index" aria-hidden="true">{NAV_GROUP_COPY[navGroup].index}</span>
+               </div>
               {navGroup === "operations" && (
                 <div className={`grid ${unlocks.mastermind ? "grid-cols-5" : "grid-cols-4"} gap-1`}>
                   <NavAction testId="open-for-you-button" icon={Target} label="Para ti" color="text-cyan-300" onClick={() => openFromNav("foryou")} />
@@ -470,7 +505,8 @@ export default function GamePage() {
               label="Operações"
               color="text-sky-400"
               alert={alerts.claimable > 0 || state.mastermind?.active_heist?.finale?.status === "ready"}
-              active={navGroup === "operations" || ["foryou", "opscenter", "operations", "quests", "mastermind"].includes(openPanel)}
+              expanded={navGroup === "operations"}
+               active={navGroup === "operations" || ["foryou", "opscenter", "operations", "quests", "mastermind"].includes(openPanel)}
               onClick={() => toggleNavGroup("operations")}
             />
             <GroupButton
@@ -479,7 +515,8 @@ export default function GamePage() {
               label="Crew"
               color="text-cyan-400"
               alert={alerts.teams > 0 || hrAlertCount > 0 || fleetAlertCount > 0}
-              active={navGroup === "crew" || ["teams", "teamops", "employees", "fleet", "fleetcare", "weapons", "weaponworkshop", "warehouse"].includes(openPanel)}
+              expanded={navGroup === "crew"}
+               active={navGroup === "crew" || ["teams", "teamops", "employees", "fleet", "fleetcare", "weapons", "weaponworkshop", "warehouse"].includes(openPanel)}
               onClick={() => toggleNavGroup("crew")}
             />
             <GroupButton
@@ -497,7 +534,8 @@ export default function GamePage() {
               label="Império"
               color="text-red-400"
               alert={empireAlert || alerts.raidRisk}
-              active={navGroup === "empire" || ["empire", "properties", "propertyinfra", "businesses", "territory", "hq", "hqsystems"].includes(openPanel)}
+              expanded={navGroup === "empire"}
+               active={navGroup === "empire" || ["empire", "properties", "propertyinfra", "businesses", "territory", "hq", "hqsystems"].includes(openPanel)}
               onClick={() => toggleNavGroup("empire")}
             />
             <GroupButton
@@ -660,14 +698,14 @@ export default function GamePage() {
   );
 }
 
-const GroupButton = ({ testId, icon: Icon, label, color, alert, active, expandable = true, onClick }) => (
+const GroupButton = ({ testId, icon: Icon, label, color, alert, active, expanded = false, expandable = true, onClick }) => (
   <Tip tip={label} side="top">
     <Button
       data-testid={testId}
       variant="outline"
       onClick={onClick}
       aria-label={label}
-      aria-expanded={expandable ? active : undefined}
+      aria-expanded={expandable ? expanded : undefined}
       aria-current={!expandable && active ? "page" : undefined}
       className={`sub-hud-btn relative flex h-12 min-w-[3.45rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 ${active ? "sub-hud-btn-active" : ""}`}
     >
