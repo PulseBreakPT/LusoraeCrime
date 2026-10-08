@@ -458,7 +458,7 @@ html {
   .sub-game-shell .sub-dock .sub-hud-btn { min-width: 48px !important; }
   .sub-game-shell .sub-resource-grid .sub-minimal-stat { padding: 7px 4px !important; }
   .sub-game-shell .sub-resource-grid .sub-resource-value { font-size: 12px !important; }
-  .sub-game-shell .sub-resource-grid .sub-resource-label { font-size: 9px !important; }
+  .sub-game-shell .sub-resource-grid .sub-resource-label { font-size: 10px !important; }
   .sub-game-shell .sub-nav-action { min-height: 55px; padding: 8px 3px !important; }
   .sub-nav-tray-heading { padding: 6px 8px 9px; }
   .sub-nav-tray-heading h2 { font-size: 16px; }
