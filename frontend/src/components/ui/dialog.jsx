@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import {
   Sheet as Dialog, SheetTrigger as DialogTrigger,
   SheetPortal as DialogPortal, SheetOverlay as DialogOverlay,
