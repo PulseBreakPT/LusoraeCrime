@@ -1,88 +1,20 @@
 import { useLoading } from "../context/LoadingContext";
-import { AlertTriangle } from "lucide-react";
-import {
-  LoadingBackdrop,
-  TacticalFrame,
-  TacticalRadar,
-  BootWordmark,
-  UplinkProgress,
-  TerminalLog,
-  FlavorRotator,
-} from "./loading/LoadingChrome";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
-const STAGE_LABELS = {
-  auth: "Verificação de acesso",
-  teams: "Equipas",
-  employees: "Operacionais",
-  vehicles: "Frota",
-  properties: "Imóveis",
-  opportunities: "Oportunidades",
-  missions: "Operações em curso",
-  events: "Registo de atividade",
-  quests: "Missões",
-  catalogo: "Catálogo",
-  processamento: "Finalizar",
-};
-
-const getStageLabel = (key) => STAGE_LABELS[key] || key;
-
-const STATUS_MAP = { done: "done", error: "error", in_progress: "active" };
-
+/**
+ * No cinematic gateway: progress is a small, non-blocking status indicator.
+ * GamePage and the authenticated shell can render immediately.
+ */
 export function LoadingScreen() {
-  const { loading, progress, currentStage, stages, error } = useLoading();
-
+  const { loading, currentStage, error } = useLoading();
   if (!loading && !error) return null;
-
-  if (error) {
-    return (
-      <LoadingBackdrop>
-        <TacticalFrame header="Erro de ligação" status="Interrompido" tone="error">
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <span className="sub-alert-icon">
-                <AlertTriangle className="h-8 w-8 flex-shrink-0 text-destructive" />
-              </span>
-              <div>
-                <p className="font-display font-bold uppercase tracking-wide text-white">Não foi possível carregar o jogo</p>
-                <p className="mt-1 font-mono text-xs text-zinc-400">{getStageLabel(error.stage)}</p>
-              </div>
-            </div>
-            <div className="rounded border border-red-800/50 bg-red-950/30 p-3">
-              <p className="break-words font-mono text-xs text-red-200">{error.message}</p>
-            </div>
-            <p className="text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
-              Tenta recarregar a página. Se persistir, contacta o suporte.
-            </p>
-          </div>
-        </TacticalFrame>
-      </LoadingBackdrop>
-    );
-  }
-
-  const rows = stages.map((s) => ({
-    key: s.key,
-    label: getStageLabel(s.key),
-    status: STATUS_MAP[s.status] || "pending",
-  }));
-  const doneCount = stages.filter((s) => s.status === "done").length;
-
   return (
-    <LoadingBackdrop>
-      <TacticalFrame>
-        <div className="space-y-5">
-          <TacticalRadar />
-          <BootWordmark
-            statusText={currentStage ? getStageLabel(currentStage.key) : "A carregar…"}
-          />
-          <UplinkProgress
-            progress={progress}
-            label="A carregar"
-            meta={`${String(doneCount).padStart(2, "0")}/${String(stages.length).padStart(2, "0")} etapas`}
-          />
-          <TerminalLog rows={rows} />
-          <FlavorRotator />
-        </div>
-      </TacticalFrame>
-    </LoadingBackdrop>
+    <div className={`noir-inline-loading ${error ? "is-error" : ""}`}
+      role="status" aria-live="polite" data-testid="inline-loading-status">
+      {error ? <AlertTriangle size={16} /> : <Loader2 size={16} className="animate-spin" />}
+      <span>{error ? (error.message || "Erro ao carregar dados do jogo") : (
+        currentStage?.label || "A sincronizar a organização"
+      )}</span>
+    </div>
   );
 }
