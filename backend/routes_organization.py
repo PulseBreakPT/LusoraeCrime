@@ -644,11 +644,16 @@ async def apply_team_preset(body: TeamPresetInput, user: dict = Depends(get_curr
         else:
             skipped.append(key)
     policies = {**default_team_policies(), **(preset.get("policies") or {})}
-    await db.teams.update_one({"_id": team["_id"]}, {"$set": {
-        "doctrine": preset["doctrine"],
-        "policies": policies,
-        "loadout": loadout,
-    }})
+    updated = await db.teams.update_one(
+        {"_id": team["_id"], "player_id": pid, "status": "idle"},
+        {"$set": {
+            "doctrine": preset["doctrine"],
+            "policies": policies,
+            "loadout": loadout,
+        }},
+    )
+    if updated.matched_count != 1:
+        raise HTTPException(status_code=409, detail="A equipa iniciou uma operação; preset não aplicado")
     return {
         "ok": True,
         "preset_key": body.preset_key,
@@ -704,8 +709,19 @@ async def reload_weapon(body: EntityIdInput, user: dict = Depends(get_current_us
     used = min(need, available)
     if used <= 0:
         raise HTTPException(status_code=400, detail=f"Sem {SUPPLY_CATALOG[ammo_key]['name']} em stock")
-    await db.players.update_one({"_id": player["_id"]}, {"$inc": {f"inventory.{ammo_key}": -used}})
-    await db.weapons.update_one({"_id": weapon["_id"]}, {"$set": {"ammo_loaded": loaded + used}})
+    debit = await db.players.update_one(
+        {"_id": player["_id"], f"inventory.{ammo_key}": {"$gte": used}},
+        {"$inc": {f"inventory.{ammo_key}": -used}},
+    )
+    if debit.modified_count != 1:
+        raise HTTPException(status_code=409, detail="O stock mudou; tenta novamente")
+    updated = await db.weapons.update_one(
+        {"_id": weapon["_id"], "player_id": pid, "ammo_loaded": loaded},
+        {"$set": {"ammo_loaded": loaded + used}},
+    )
+    if updated.modified_count != 1:
+        await db.players.update_one({"_id": player["_id"]}, {"$inc": {f"inventory.{ammo_key}": used}})
+        raise HTTPException(status_code=409, detail="A arma mudou; as munições foram devolvidas")
     return {"ok": True, "ammo_loaded": loaded + used, "used": used}
 
 
