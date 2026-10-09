@@ -1,0 +1,431 @@
+/* SUBMUNDO / BLACKLIST — PAGE MENUS, NOT MODALS
+   Loaded after noir-empire.css. The game rail remains interactive on desktop;
+   every module becomes a responsive workspace with a proper back action. */
+:root {
+  --noir-workspace-rail:258px;
+  --noir-workspace-top:#08070a;
+  --noir-workspace-card:#131115;
+  --noir-workspace-edge:rgba(255,255,255,.105);
+}
+.noir-workspace-menu,
+.noir-workspace-menu.sub-sheet-panel,
+.noir-workspace-menu.sub-menu-modal {
+  position:fixed !important;
+  top:0 !important;
+  bottom:0 !important;
+  left:var(--noir-workspace-rail) !important;
+  right:0 !important;
+  width:calc(100% - var(--noir-workspace-rail)) !important;
+  max-width:none !important;
+  min-width:0 !important;
+  max-height:none !important;
+  height:100dvh !important;
+  transform:none !important;
+  translate:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  overflow:hidden !important;
+  isolation:isolate;
+  z-index:82 !important;
+  background:
+    radial-gradient(ellipse 53% 43% at 83% -11%,rgba(152,16,33,.18),transparent 80%),
+    radial-gradient(ellipse 36% 46% at -8% 103%,rgba(124,15,29,.11),transparent 86%),
+    linear-gradient(180deg,#0b0a0d,#060609 88%) !important;
+  box-shadow:none !important;
+  animation:noir-workspace-enter .24s cubic-bezier(.16,1,.3,1) both !important;
+}
+.noir-workspace-menu::before,
+.noir-workspace-menu::after {
+  content:none !important;
+}
+.noir-workspace-chrome {
+  display:flex;
+  flex-shrink:0;
+  align-items:center;
+  gap:14px;
+  height:64px;
+  padding:0 clamp(15px,3.3vw,48px);
+  background:linear-gradient(90deg,#1c1016,#0b0a0d 70%);
+  border-bottom:1px solid rgba(226,55,74,.20);
+}
+.noir-workspace-back,
+.noir-workspace-map {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  flex-shrink:0;
+  height:38px;
+  border:1px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.025);
+  color:#f1e3e5;
+  padding:0 13px;
+  font:800 10px "JetBrains Mono",monospace;
+  letter-spacing:.08em;
+  cursor:pointer;
+  transition:background-color .16s,border-color .16s;
+}
+.noir-workspace-back:hover,.noir-workspace-map:hover {
+  background:rgba(218,32,50,.17);
+  border-color:rgba(250,67,87,.5);
+}
+.noir-workspace-back svg,
+.noir-workspace-map svg {
+  color:#fa5264;
+}
+.noir-workspace-brand {
+  font:900 20px/1 "Barlow Condensed",Impact,sans-serif;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:#f3eaeb;
+  margin-left:10px;
+}
+.noir-workspace-brand > span {color:#f34055;}
+.noir-workspace-brand > small {
+  display:inline-block;
+  margin-left:12px;
+  font:700 10px "JetBrains Mono",monospace;
+  color:#836871;
+  letter-spacing:.06em;
+}
+.noir-workspace-map {margin-left:auto;}
+.noir-workspace-tabs {
+  display:flex;
+  align-items:stretch;
+  flex-shrink:0;
+  min-height:48px;
+  gap:5px;
+  padding:6px clamp(15px,3.3vw,48px);
+  overflow-x:auto;
+  scrollbar-width:thin;
+  background:rgba(19,14,19,.89);
+  border-bottom:1px solid rgba(255,255,255,.075);
+}
+.noir-workspace-tabs button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-width:94px;
+  padding:6px 11px;
+  white-space:nowrap;
+  background:transparent;
+  border:1px solid transparent;
+  color:#ab989e;
+  cursor:pointer;
+  font:750 10px "JetBrains Mono",monospace;
+  letter-spacing:.055em;
+}
+.noir-workspace-tabs button svg {color:#bc5564;}
+.noir-workspace-tabs button:hover,
+.noir-workspace-tabs button:focus-visible {
+  background:rgba(204,33,52,.11);
+  color:white;
+  border-color:rgba(236,60,76,.19);
+}
+.noir-workspace-scroll,
+.noir-workspace-menu .sub-sheet-scroll {
+  display:block !important;
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  width:100% !important;
+  height:auto !important;
+  max-width:none !important;
+  max-height:none !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  scroll-behavior:smooth;
+  scrollbar-width:thin;
+  scrollbar-color:#57313b transparent;
+  padding:clamp(14px,2.5vw,31px) clamp(16px,3.5vw,55px) 50px !important;
+}
+.noir-workspace-menu .sub-modal-header,
+.noir-workspace-menu .sub-operations-head,
+.noir-workspace-menu .sub-menu-modal-header,
+.noir-workspace-menu .noir-workspace-section-head {
+  position:relative !important;
+  top:auto !important;
+  margin:0 0 20px !important;
+  padding:4px 0 18px !important;
+  border:0 !important;
+  border-bottom:1px solid rgba(255,255,255,.09) !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  min-height:72px;
+}
+.noir-workspace-menu .sub-modal-header::before,
+.noir-workspace-menu .sub-modal-header::after {content:none !important;}
+.noir-workspace-menu .sub-modal-header .sub-watermark {opacity:.045 !important;}
+.noir-workspace-menu .sub-sheet-title,
+.noir-workspace-menu .sub-modal-title {
+  font:900 clamp(32px,3.8vw,55px)/.98 "Barlow Condensed",Impact,sans-serif !important;
+  letter-spacing:.065em !important;
+  text-transform:uppercase !important;
+  color:#f7f0f0 !important;
+}
+.noir-workspace-menu .sub-sheet-title > svg,
+.noir-workspace-menu .sub-modal-title > svg {
+  width:23px;
+  height:23px;
+  color:#ef354b !important;
+  stroke-width:1.8px;
+}
+.noir-workspace-menu .sub-sheet-description {
+  font-size:12px !important;
+  color:#b7a8ae !important;
+  max-width:80ch !important;
+  line-height:1.65 !important;
+}
+.noir-workspace-menu :is(.sub-card,.sub-settings-section,.sub-operation-row) {
+  background:linear-gradient(150deg,#19151b,#0e0d10 80%) !important;
+  border:1px solid var(--noir-workspace-edge) !important;
+  border-radius:10px !important;
+  box-shadow:0 12px 34px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.035) !important;
+}
+.noir-workspace-menu :is(.sub-card,.sub-operation-row):hover {
+  border-color:rgba(243,67,83,.27) !important;
+}
+.noir-workspace-menu .sub-kpi,
+.noir-workspace-menu .sub-kpi-cell {
+  background:linear-gradient(160deg,#1c151c,#0d0c10) !important;
+  border:1px solid rgba(255,255,255,.11) !important;
+  border-radius:7px !important;
+  box-shadow:none !important;
+}
+.noir-workspace-menu .sub-section-header {
+  padding-left:10px !important;
+  border-left:2px solid #e42b43 !important;
+  margin-top:20px !important;
+}
+.noir-workspace-menu .sub-section-header h3 {
+  font:850 22px "Barlow Condensed",sans-serif !important;
+  letter-spacing:.09em !important;
+  color:#efe5e7 !important;
+}
+.noir-workspace-menu .sub-btn-primary,
+.noir-workspace-menu .sub-shad-button-primary {
+  border:1px solid rgba(248,112,123,.35) !important;
+  background:linear-gradient(117deg,#831021,#d71d34) !important;
+  color:#fff !important;
+  box-shadow:0 8px 24px rgba(156,15,35,.15),inset 0 1px rgba(255,255,255,.15) !important;
+}
+.noir-workspace-menu :is(.sub-btn-soft,.sub-btn-glass,.sub-btn-filter) {
+  background:#1f181d !important;
+  border-color:rgba(255,255,255,.12) !important;
+}
+.noir-workspace-menu [data-state="active"][role="tab"] {
+  background:linear-gradient(120deg,rgba(218,35,54,.24),rgba(163,20,39,.09)) !important;
+  border-color:rgba(235,56,74,.39) !important;
+  color:#fff !important;
+}
+.noir-workspace-menu :is(input,textarea,[role="combobox"]):focus-visible {
+  outline:2px solid #ff586b !important;
+  outline-offset:2px !important;
+}
+.noir-workspace-menu :is(.text-cyan-300,.text-cyan-400,.text-sky-300,.text-sky-400,.text-blue-300,.text-blue-400) {
+  color:#f08b98 !important;
+}
+.noir-workspace-menu :is(.border-cyan-500\/20,.border-cyan-500\/30,.border-cyan-500\/15) {
+  border-color:rgba(228,55,73,.22) !important;
+}
+.noir-workspace-menu .sub-panel-watermark {
+  opacity:.04 !important;
+}
+.noir-workspace-footnote {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-shrink:0;
+  min-height:29px;
+  padding:0 clamp(15px,3.3vw,48px);
+  border-top:1px solid rgba(255,255,255,.055);
+  background:#080709;
+  color:#7c6972;
+  font:700 10px "JetBrains Mono",monospace;
+  letter-spacing:.06em;
+}
+/* Search has a full-height result menu; no centered dialog. */
+.noir-workspace-search .noir-workspace-scroll {
+  display:flex !important;
+  flex-direction:column;
+  padding:0 !important;
+}
+.noir-workspace-search .sub-menu-modal-header {
+  min-height:72px;
+  padding:18px 30px !important;
+  margin-bottom:0 !important;
+}
+.noir-workspace-search [data-testid="command-search"] {
+  height:62px;
+  border-radius:0 !important;
+  font-size:15px !important;
+}
+.noir-workspace-search [role="listbox"] {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,315px),1fr));
+  gap:9px;
+  padding:22px clamp(15px,3.3vw,48px) !important;
+  align-content:start;
+}
+.noir-workspace-search [role="option"] {
+  border:1px solid rgba(255,255,255,.1);
+  background:#171219 !important;
+  min-height:72px;
+  border-radius:8px;
+}
+.noir-workspace-search [role="option"]:hover,
+.noir-workspace-search [role="option"][aria-selected=true] {
+  border-color:rgba(243,69,85,.44) !important;
+  background:rgba(171,27,43,.2) !important;
+}
+.noir-workspace-search :is(.text-cyan-300,.text-sky-300,.text-zinc-500) {
+  color:#c5979e !important;
+}
+/* Opportunity details are another workspace screen, no floating centered card. */
+.noir-operation-menu.sub-opp-card,
+.noir-game-shell .noir-operation-menu.sub-opp-card {
+  position:fixed !important;
+  inset:0 0 0 var(--noir-workspace-rail) !important;
+  left:var(--noir-workspace-rail) !important;
+  top:0 !important;
+  bottom:0 !important;
+  right:0 !important;
+  width:calc(100% - var(--noir-workspace-rail)) !important;
+  max-width:none !important;
+  height:100dvh !important;
+  max-height:none !important;
+  margin:0 !important;
+  padding:21px clamp(16px,4vw,60px) 30px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:radial-gradient(ellipse at 87% 0,rgba(173,27,46,.17),transparent 61%),#09080b !important;
+  transform:none !important;
+  translate:none !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  z-index:81 !important;
+  box-shadow:none !important;
+}
+.noir-game-shell .noir-operation-menu > div {
+  width:100%;
+  max-width:1050px;
+  margin-left:auto;
+  margin-right:auto;
+}
+.noir-game-shell .noir-operation-menu .sub-card {
+  border:1px solid rgba(255,255,255,.10) !important;
+  background:linear-gradient(130deg,#1a1319,#100e11) !important;
+}
+.noir-game-shell .noir-operation-menu .sub-opp-title {
+  font-family:"Barlow Condensed",sans-serif;
+  text-transform:uppercase;
+}
+.noir-game-shell .noir-operation-menu :is(.text-cyan-300,.text-cyan-400,.text-sky-300,.text-blue-400) {color:#ef9ba5 !important;}
+.noir-game-shell .noir-operation-menu [data-testid="dispatch-team-button"] {
+  position:sticky;bottom:0;z-index:5;
+  min-height:48px;
+  box-shadow:0 -14px 24px rgba(7,5,8,.8) !important;
+}
+.noir-legal-screen {
+  position:fixed;inset:0;z-index:190;
+  overflow:auto;
+  background:
+    radial-gradient(circle at 75% 0%,rgba(213,25,46,.22),transparent 45%),
+    repeating-linear-gradient(90deg,transparent,transparent 99px,rgba(255,255,255,.012) 100px),
+    #060508;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:calc(20px + env(safe-area-inset-top,0px)) 15px calc(20px + env(safe-area-inset-bottom,0px));
+}
+.noir-legal-brand {
+  width:min(100%,880px);
+  display:flex;align-items:center;justify-content:space-between;gap:15px;
+  margin:0 0 18px;
+  font:850 11px "JetBrains Mono",monospace;letter-spacing:.12em;color:#ee465b;
+}
+.noir-legal-brand > span:last-child {color:#92757e;font-size:10px;}
+.noir-legal-content {
+  width:min(100%,880px);
+  max-height:none !important;
+  padding:0 !important;
+  border:1px solid rgba(243,69,84,.29);
+  border-top:3px solid #e82c42;
+  background:linear-gradient(145deg,#1e1119,#0c0a0d 77%);
+  color:#f1e7e9;
+  box-shadow:0 35px 95px rgba(0,0,0,.65);
+  overflow:visible;
+}
+.noir-legal-content h2 {font:900 clamp(30px,5vw,56px) "Barlow Condensed",sans-serif;}
+.noir-recovery-screen {
+  position:fixed !important;
+  inset:0 !important;
+  transform:none !important;
+  width:100% !important;
+  z-index:200 !important;
+  display:flex !important;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  padding:25px !important;
+  border:0 !important;border-radius:0 !important;
+  background:#09070b !important;
+}
+.noir-recovery-screen > div {width:min(100%,780px);}
+@keyframes noir-workspace-enter {
+  from {opacity:.88;translate:0 9px;}
+  to {opacity:1;translate:0 0;}
+}
+@media (min-width:1024px) and (max-width:1330px) {
+  :root {--noir-workspace-rail:218px;}
+}
+@media (max-width:1023px) {
+  :root {--noir-workspace-rail:0px;}
+  .noir-workspace-menu,.noir-workspace-menu.sub-sheet-panel,.noir-workspace-menu.sub-menu-modal {
+    top:0 !important;left:0 !important;right:0 !important;width:100% !important;
+  }
+  .noir-workspace-chrome {
+    height:calc(61px + env(safe-area-inset-top,0px));
+    padding:env(safe-area-inset-top,0px) 15px 0;
+  }
+  .noir-workspace-brand {margin-left:0;font-size:17px;}
+  .noir-workspace-map {margin-left:auto;}
+  .noir-workspace-tabs {padding:5px 9px;min-height:47px;}
+  .noir-workspace-tabs button {min-width:100px;font-size:10px;}
+  .noir-workspace-scroll,.noir-workspace-menu .sub-sheet-scroll {
+    padding:16px 15px calc(35px + env(safe-area-inset-bottom,0px)) !important;
+  }
+  .noir-workspace-menu .sub-sheet-title {font-size:34px !important;}
+  .noir-workspace-footnote {display:none;}
+  .noir-game-shell .noir-operation-menu.sub-opp-card {
+    inset:0 !important;
+    width:100% !important;
+    padding:calc(14px + env(safe-area-inset-top,0px)) 14px calc(30px + env(safe-area-inset-bottom,0px)) !important;
+  }
+}
+@media (max-width:450px) {
+  .noir-workspace-chrome {gap:8px;}
+  .noir-workspace-back {padding:0 10px;}
+  .noir-workspace-brand {font-size:15px;letter-spacing:.09em;}
+  .noir-workspace-brand > small {display:none;}
+  .noir-workspace-map {padding:0 9px;}
+  .noir-workspace-map > span {display:none;}
+  .noir-workspace-menu .sub-sheet-title {font-size:29px !important;}
+  .noir-workspace-menu .sub-modal-header {min-height:56px;}
+  .noir-workspace-scroll {scroll-padding-top:20px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .noir-workspace-menu {animation:none !important;}
+  .noir-workspace-scroll {scroll-behavior:auto;}
+}
+html.sub-reduced-motion .noir-workspace-menu {animation:none !important;}
+html.sub-high-contrast .noir-workspace-menu :is(.sub-card,.sub-kpi,.sub-settings-row) {
+  border-color:rgba(255,255,255,.53) !important;
+}
