@@ -8,6 +8,8 @@ from db import db
 from auth import get_current_user, VALID_ROLES, STAFF_ROLES, root_admin_email
 from engine import now_utc, default_stats
 from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
+from state_lease import acquire_player_state_lease, release_player_state_lease
+from uuid import uuid4
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -194,28 +196,44 @@ async def grant_resources(user_id: str, body: GrantResourcesInput, admin: dict =
     if not player:
         raise HTTPException(status_code=404, detail="Jogador não encontrado")
 
-    updates = {}
-    if body.clean_money != 0:
-        updates["clean_money"] = player.get("clean_money", 0) + body.clean_money
-    if body.dirty_money != 0:
-        updates["dirty_money"] = player.get("dirty_money", 0) + body.dirty_money
-    if body.respect != 0:
-        updates["respect"] = player.get("respect", 0) + body.respect
+    lease_owner = f"admin-grant:{admin['_id']}:{uuid4().hex}"
+    locked = await acquire_player_state_lease(
+        db, player["_id"], lease_owner, ttl_s=120, wait_s=5,
+    )
+    if not locked:
+        raise HTTPException(status_code=409, detail="O jogador está a atualizar o estado; tenta novamente")
+    try:
+        # Never write balances computed from a stale snapshot: a simultaneous
+        # mission payout or purchase could otherwise be overwritten.
+        increments = {
+            key: amount for key, amount in (
+                ("clean_money", body.clean_money),
+                ("dirty_money", body.dirty_money),
+                ("respect", body.respect),
+            ) if amount
+        }
+        if increments:
+            query = {"_id": player["_id"]}
+            for key, amount in increments.items():
+                if amount < 0:
+                    query[key] = {"$gte": -amount}
+            applied = await db.players.update_one(query, {"$inc": increments})
+            if applied.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Saldo alterado ou insuficiente; repete a operação")
 
-    if updates:
-        await db.players.update_one({"_id": player["_id"]}, {"$set": updates})
+        # Log da ação
+        await db.admin_logs.insert_one({
+            "admin_id": admin["_id"],
+            "admin_email": admin["email"],
+            "action": "grant_resources",
+            "target_player_id": str(player["_id"]),
+            "details": body.model_dump(),
+            "ts": now_utc().isoformat(),
+        })
 
-    # Log da ação
-    await db.admin_logs.insert_one({
-        "admin_id": admin["_id"],
-        "admin_email": admin["email"],
-        "action": "grant_resources",
-        "target_player_id": str(player["_id"]),
-        "details": body.model_dump(),
-        "ts": now_utc().isoformat(),
-    })
-
-    return {"ok": True, "message": "Recursos concedidos com sucesso"}
+        return {"ok": True, "message": "Recursos concedidos com sucesso"}
+    finally:
+        await release_player_state_lease(db, player["_id"], lease_owner)
 
 
 @router.post("/user/{user_id}/reset-progress")
@@ -598,7 +616,9 @@ async def get_server_stats(admin: dict = Depends(require_staff)):
 
     # Utilizadores ativos (login nos últimos 7 dias)
     seven_days_ago = (now - __import__('datetime').timedelta(days=7)).isoformat()
-    active_users = await db.users.count_documents({"created_at": {"$gt": seven_days_ago}})
+    # Registration date is not a measure of activity. Until the application
+    # records last_seen_at consistently, do not publish a fabricated active count.
+    active_users = await db.users.count_documents({"last_seen_at": {"$gt": seven_days_ago}})
 
     # Missões por categoria
     missions_pipeline = [

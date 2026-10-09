@@ -176,7 +176,20 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.users.create_index("google_sub", unique=True, sparse=True)
     await db.login_attempts.create_index("identifier")
-    await db.players.create_index("user_id")
+    # Migrate legacy non-unique indexes only when existing data is clean.
+    # Never guess which duplicate player/alliance owns the legitimate progress.
+    player_duplicates = await db.players.aggregate([
+        {"$group": {"_id": "$user_id", "n": {"$sum": 1}}},
+        {"$match": {"n": {"$gt": 1}}},
+        {"$limit": 1},
+    ]).to_list(1)
+    player_indexes = await db.players.index_information()
+    if player_duplicates:
+        logger.error("Duplicate player user_ids found; manual reconciliation required before unique index")
+    else:
+        if "user_id_1" in player_indexes and not player_indexes["user_id_1"].get("unique"):
+            await db.players.drop_index("user_id_1")
+        await db.players.create_index("user_id", unique=True)
     await db.teams.create_index("player_id")
     await db.employees.create_index("player_id")
     await db.candidates.create_index("player_id")
@@ -197,7 +210,19 @@ async def startup():
     await db.city_season_scores.create_index([("player_id", 1), ("season_id", 1)], unique=True)
     await db.city_chat.create_index([("ts", -1)])
     await db.city_alliances.create_index("code", unique=True)
-    await db.city_alliances.create_index("member_ids")
+    member_duplicates = await db.city_alliances.aggregate([
+        {"$unwind": "$member_ids"},
+        {"$group": {"_id": "$member_ids", "n": {"$sum": 1}}},
+        {"$match": {"n": {"$gt": 1}}},
+        {"$limit": 1},
+    ]).to_list(1)
+    member_indexes = await db.city_alliances.index_information()
+    if member_duplicates:
+        logger.error("A player belongs to multiple alliances; repair membership before enforcing uniqueness")
+    else:
+        if "member_ids_1" in member_indexes and not member_indexes["member_ids_1"].get("unique"):
+            await db.city_alliances.drop_index("member_ids_1")
+        await db.city_alliances.create_index("member_ids", unique=True)
     await db.city_pvp_challenges.create_index([("defender_id", 1), ("status", 1)])
     await db.quests.create_index([("player_id", 1), ("status", 1)])
     await db.road_routes.create_index("key", unique=True)

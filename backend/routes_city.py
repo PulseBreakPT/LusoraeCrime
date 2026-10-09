@@ -7,6 +7,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from auth import get_current_user
 from db import db
@@ -370,6 +371,8 @@ async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_us
         raise HTTPException(status_code=400, detail="Jogo de casino inválido")
     if int(player.get("clean_money", 0)) < bet:
         raise HTTPException(status_code=400, detail="Saldo insuficiente")
+    if body.game == "roulette" and (body.choice or "red").lower() not in {"red", "black", "green"}:
+        raise HTTPException(status_code=400, detail="Escolha inválida para a roleta")
     rng = random.SystemRandom()
     await _change_clean(player, -bet, f"Aposta: {body.game}", "city_casino_bet")
     payout = 0
@@ -537,7 +540,21 @@ async def join_alliance(body: AllianceJoinInput, user: dict = Depends(get_curren
         raise HTTPException(status_code=404, detail="Código de aliança inválido")
     if len(alliance.get("member_ids", [])) >= 20:
         raise HTTPException(status_code=400, detail="Aliança cheia")
-    await db.city_alliances.update_one({"_id": alliance["_id"]}, {"$addToSet": {"member_ids": pid}})
+    # Capacity is checked in the same atomic update as the membership change.
+    # A separate check is not safe when multiple players join simultaneously.
+    try:
+        joined = await db.city_alliances.update_one(
+            {
+                "_id": alliance["_id"],
+                "member_ids": {"$ne": pid},
+                "$expr": {"$lt": [{"$size": "$member_ids"}, 20]},
+            },
+            {"$addToSet": {"member_ids": pid}},
+        )
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Já pertences a outra aliança")
+    if joined.modified_count != 1:
+        raise HTTPException(status_code=409, detail="Aliança cheia ou alterada; tenta novamente")
     return {"ok": True, "name": alliance["name"]}
 
 
@@ -668,108 +685,196 @@ async def challenge_pvp(body: PvpChallengeInput, user: dict = Depends(get_curren
 @router.post("/social/pvp/accept")
 @idempotent("city_pvp_accept")
 async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user)):
+    """Recoverable PvP settlement: every point and consequence has a receipt."""
     defender = await get_player(user)
+    defender_id = str(defender["_id"])
+    challenge_id = _oid(body.challenge_id, "Desafio")
     challenge = await db.city_pvp_challenges.find_one({
-        "_id": _oid(body.challenge_id, "Desafio"),
-        "defender_id": str(defender["_id"]),
-        "status": "pending",
+        "_id": challenge_id,
+        "defender_id": defender_id,
+        "status": {"$in": ["pending", "settling"]},
     })
     if not challenge:
-        raise HTTPException(status_code=404, detail="Desafio PvP não encontrado")
-    attacker = await db.players.find_one({"_id": _oid(challenge["attacker_id"], "Atacante")})
-    if not attacker or not attacker.get("pvp_opt_in") or not defender.get("pvp_opt_in"):
-        raise HTTPException(status_code=400, detail="PvP já não está ativo para ambos")
-    rng = random.SystemRandom()
-    def score(p):
-        stats = p.get("stats") or {}
-        return (
-            int(p.get("level", 1)) * 12
-            + int(p.get("respect", 0)) / 350
-            + int(stats.get("missions_success", 0)) * 0.7
-            + rng.uniform(0, 22)
-        )
-    a_score, d_score = score(attacker), score(defender)
-    winner = attacker if a_score >= d_score else defender
-    loser = defender if winner["_id"] == attacker["_id"] else attacker
-    season = season_info()
-    now = now_utc()
-    pair_query = {"$or": [
-        {"attacker_id": str(attacker["_id"]), "defender_id": str(defender["_id"])},
-        {"attacker_id": str(defender["_id"]), "defender_id": str(attacker["_id"])},
-    ]}
-    recent_count = await db.city_pvp_challenges.count_documents({
-        **pair_query, "status": "resolved",
-        "resolved_at": {"$gte": (now - timedelta(days=7)).isoformat()},
+        raise HTTPException(status_code=404, detail="Desafio PvP indisponível")
+    cid = str(challenge["_id"])
+    attacker = await db.players.find_one({
+        "_id": _oid(challenge["attacker_id"], "Atacante"),
     })
-    farm_mult = [1.0, 0.5, 0.25][recent_count] if recent_count < 3 else 0.10
-    winner_points = max(8, int(round(80 * farm_mult)))
-    loser_points = max(2, int(round(20 * farm_mult)))
-    await db.city_season_scores.update_one(
-        {"player_id": str(winner["_id"]), "season_id": season["id"]},
-        {"$inc": {"points": winner_points}, "$set": {"updated_at": now.isoformat()}},
-        upsert=True,
-    )
-    await db.city_season_scores.update_one(
-        {"player_id": str(loser["_id"]), "season_id": season["id"]},
-        {"$inc": {"points": loser_points}, "$set": {"updated_at": now.isoformat()}},
-        upsert=True,
+    if not attacker:
+        raise HTTPException(status_code=404, detail="Atacante não encontrado")
+
+    settlement = challenge.get("settlement")
+    if challenge["status"] == "pending":
+        now = now_utc()
+        if challenge.get("expires_at", "") <= now.isoformat():
+            raise HTTPException(status_code=409, detail="Este desafio PvP expirou")
+        if not attacker.get("pvp_opt_in") or not defender.get("pvp_opt_in"):
+            raise HTTPException(status_code=400, detail="PvP já não está ativo para ambos")
+        rng = random.SystemRandom()
+
+        def score(p):
+            stats = p.get("stats") or {}
+            return (
+                int(p.get("level", 1)) * 12
+                + int(p.get("respect", 0)) / 350
+                + int(stats.get("missions_success", 0)) * 0.7
+                + rng.uniform(0, 22)
+            )
+
+        winner = attacker if score(attacker) >= score(defender) else defender
+        loser = defender if winner["_id"] == attacker["_id"] else attacker
+        season = season_info()
+        pair_query = {"$or": [
+            {"attacker_id": str(attacker["_id"]), "defender_id": defender_id},
+            {"attacker_id": defender_id, "defender_id": str(attacker["_id"])},
+        ]}
+        recent_count = await db.city_pvp_challenges.count_documents({
+            **pair_query,
+            "status": "resolved",
+            "resolved_at": {"$gte": (now - timedelta(days=7)).isoformat()},
+        })
+        multiplier = [1.0, 0.5, 0.25][recent_count] if recent_count < 3 else 0.10
+        consequence = None
+        consequence_fields = {}
+        if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:
+            consequence = "sentence"
+            consequence_fields["boss_sentence_until"] = (
+                now + timedelta(minutes=rng.randint(15, 45))
+            ).isoformat()
+        elif rng.random() < 0.08:
+            consequence = "hospital"
+            consequence_fields["boss_hospital_until"] = (
+                now + timedelta(minutes=rng.randint(10, 30))
+            ).isoformat()
+            consequence_fields["boss_health"] = rng.randint(55, 80)
+
+        affiliations = {}
+        for participant in (winner, loser):
+            pid = str(participant["_id"])
+            alliance = await db.city_alliances.find_one({"member_ids": pid})
+            affiliations[pid] = str(alliance["_id"]) if alliance else None
+
+        settlement = {
+            "winner_id": str(winner["_id"]),
+            "loser_id": str(loser["_id"]),
+            "winner_name": winner.get("org_name"),
+            "loser_name": loser.get("org_name"),
+            "winner_points": max(8, int(round(80 * multiplier))),
+            "loser_points": max(2, int(round(20 * multiplier))),
+            "season_id": season["id"],
+            "resolved_at": now.isoformat(),
+            "consequence": consequence,
+            "consequence_fields": consequence_fields,
+            "affiliations": affiliations,
+        }
+        reserved = await db.city_pvp_challenges.update_one(
+            {
+                "_id": challenge_id, "defender_id": defender_id,
+                "status": "pending", "expires_at": {"$gt": now.isoformat()},
+            },
+            {"$set": {"status": "settling", "settlement": settlement}},
+        )
+        if reserved.modified_count != 1:
+            raise HTTPException(status_code=409, detail="Desafio alterado noutra sessão")
+    elif not settlement:
+        raise HTTPException(status_code=409, detail="Liquidação PvP antiga sem recibo; requer reconciliação")
+
+    sid = settlement["season_id"]
+    resolved_at = settlement["resolved_at"]
+    for role in ("winner", "loser"):
+        pid = settlement[f"{role}_id"]
+        points = int(settlement[f"{role}_points"])
+        base_query = {"player_id": pid, "season_id": sid}
+        # Bootstrap the unique season row separately, then conditionally add
+        # this particular challenge. Both stages are safe on a replay.
+        await db.city_season_scores.update_one(
+            base_query,
+            {"$setOnInsert": {
+                "player_id": pid, "season_id": sid,
+                "points": 0, "updated_at": resolved_at,
+            }},
+            upsert=True,
+        )
+        await db.city_season_scores.update_one(
+            {**base_query, "pvp_awards": {"$ne": cid}},
+            {
+                "$inc": {"points": points},
+                "$addToSet": {"pvp_awards": cid},
+                "$set": {"updated_at": resolved_at},
+            },
+        )
+
+        alliance_id = (settlement.get("affiliations") or {}).get(pid)
+        if alliance_id:
+            # Different participants of the same alliance must receive their
+            # own receipt; two awards from one challenge are legitimate.
+            receipt = f"{cid}:{pid}"
+            await db.city_alliances.update_one(
+                {
+                    "_id": _oid(alliance_id, "Aliança"),
+                    "pvp_awards": {"$ne": receipt},
+                },
+                [{"$set": {
+                    "season_points": {"$add": [
+                        {"$cond": [
+                            {"$eq": ["$season_id", sid]},
+                            {"$ifNull": ["$season_points", 0]}, 0,
+                        ]},
+                        points,
+                    ]},
+                    "season_id": sid,
+                    "pvp_awards": {"$concatArrays": [
+                        {"$ifNull": ["$pvp_awards", []]}, [receipt],
+                    ]},
+                }}],
+            )
+
+    loser_fields = settlement.get("consequence_fields") or {}
+    await db.players.update_one(
+        {
+            "_id": _oid(settlement["loser_id"], "Jogador"),
+            "pvp_consequences": {"$ne": cid},
+        },
+        [{"$set": {
+            "boss_stress": {"$min": [
+                100, {"$add": [{"$ifNull": ["$boss_stress", 0]}, 8]},
+            ]},
+            "pvp_consequences": {"$concatArrays": [
+                {"$ifNull": ["$pvp_consequences", []]}, [cid],
+            ]},
+            **loser_fields,
+        }}],
     )
 
-    # As alianças têm a mesma época dos jogadores. Ao mudar de época, os
-    # pontos antigos são arquivados implicitamente pelo season_id e a tabela
-    # começa novamente em zero antes de aplicar o resultado atual.
-    for member_id, points in (
-        (str(winner["_id"]), winner_points),
-        (str(loser["_id"]), loser_points),
-    ):
-        alliance = await db.city_alliances.find_one({"member_ids": member_id})
-        if alliance:
-            if alliance.get("season_id") != season["id"]:
-                await db.city_alliances.update_one(
-                    {"_id": alliance["_id"]},
-                    {"$set": {"season_id": season["id"], "season_points": points}},
-                )
-            else:
-                await db.city_alliances.update_one(
-                    {"_id": alliance["_id"]},
-                    {"$inc": {"season_points": points}},
-                )
-    consequence = None
-    loser_fields = {"boss_stress": min(100, int(loser.get("boss_stress", 0) or 0) + 8)}
-    if float(loser.get("heat", 0) or 0) >= 75 and rng.random() < 0.06:
-        loser_fields["boss_sentence_until"] = (now_utc() + timedelta(minutes=rng.randint(15, 45))).isoformat()
-        consequence = "sentence"
-    elif rng.random() < 0.08:
-        loser_fields["boss_hospital_until"] = (now_utc() + timedelta(minutes=rng.randint(10, 30))).isoformat()
-        loser_fields["boss_health"] = rng.randint(55, 80)
-        consequence = "hospital"
-    await db.players.update_one({"_id": loser["_id"]}, {"$set": loser_fields})
     await db.city_pvp_challenges.update_one(
-        {"_id": challenge["_id"]},
+        {"_id": challenge_id, "status": "settling"},
         {"$set": {
             "status": "resolved",
-            "winner_id": str(winner["_id"]),
-            "resolved_at": now_utc().isoformat(),
-            "consequence": consequence,
+            "winner_id": settlement["winner_id"],
+            "resolved_at": resolved_at,
+            "consequence": settlement.get("consequence"),
         }},
     )
-    await add_event(db, str(winner["_id"]), "system", f"Conflito PvP vencido contra {loser.get('org_name', 'rival')}.")
-    await add_event(db, str(loser["_id"]), "warning", f"Conflito PvP perdido contra {winner.get('org_name', 'rival')}.")
-    result_payload = {
-        "challenge_id": str(challenge["_id"]),
-        "winner_id": str(winner["_id"]),
-        "winner_name": winner.get("org_name"),
-        "consequence": consequence,
+    await add_event(
+        db, settlement["winner_id"], "system",
+        f"Conflito PvP vencido contra {settlement.get('loser_name') or 'rival'}.",
+    )
+    await add_event(
+        db, settlement["loser_id"], "warning",
+        f"Conflito PvP perdido contra {settlement.get('winner_name') or 'rival'}.",
+    )
+    payload = {
+        "challenge_id": cid,
+        "winner_id": settlement["winner_id"],
+        "winner_name": settlement.get("winner_name"),
+        "consequence": settlement.get("consequence"),
     }
-    for participant_id in (str(attacker["_id"]), str(defender["_id"])):
+    for participant_id in (str(attacker["_id"]), defender_id):
         await publish_realtime_event(
-            "city.pvp.resolved",
-            result_payload,
-            scope="player",
-            target=participant_id,
-            channel="pvp",
+            "city.pvp.resolved", payload,
+            scope="player", target=participant_id, channel="pvp",
         )
-    return {"ok": True, **result_payload}
+    return {"ok": True, **payload}
 
 
 @router.post("/social/pvp/decline")

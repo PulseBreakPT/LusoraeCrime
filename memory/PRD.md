@@ -88,37 +88,4 @@ MMORPG de estratégia criminal para Web/Android/iOS, inspirado em MissionChief, 
 3. Refactoring de rotas por módulo
 
 ## Credenciais
-Ver /app/memory/test_credentials.md (admin@lusorae.com / LusoraeAdmin2026!)
-
-### Patrulhas PSP/GNR à volta dos ativos do jogador (12/07/2026)
-- Zonas de patrulhamento 100% dinâmicas: uma zona junto de cada ativo (QG + imóveis), onde quer que o jogador se instale — fix principal: PoliceLayer.jsx passa ctx.assets ao police.js (a ligação que faltava da sessão anterior)
-- Divisão real portuguesa: PSP_CITIES (25 centros urbanos c/ raio) classifica cada ativo → PSP (urbano: azul, zona 620m, 2 viaturas, resposta 63 km/h, + agentes) vs GNR (rural/vilas: verde, zona 1250m, 1 viatura, resposta 54 km/h, cruzeiro de estrada + desvios entre zonas)
-- Perímetros de patrulhamento no mapa: Circles tracejados com a cor da força (interactive=false); reforços por calor vão primeiro a zonas PSP
-- Identidade visual: viatura GNR c/ faixa verde (police-force-gnr), agente verde (police-op-gnr), luzes de emergência azuis em ambas (realista); tooltips "PSP · urbana"/"GNR · rural" + copy própria; legenda do mapa atualizada
-- Robustez multi-cidade: edgePointNear entra pela periferia LOCAL da zona (2.5 raios) quando os BOUNDS globais esticam (Lisboa+Porto); nearestFreePatrol c/ raio máx 15 km (viatura do Porto não responde em Lisboa)
-- Validado: admin (Cais do Sodré) → 2 PSP; gnr.teste@lusorae.com (QG Mafra) → 1 GNR verde; snapshot sessionStorage invalidado por assinatura de ativos
-- Futuro (ideias do utilizador, não implementado): patrulhas a pé PSP, fiscalização rodoviária/postos territoriais GNR
-- NOTA infra: fork 12/07 — .env recriados (preview c3baec4c-7bfe-4277-937b-58977a0d3545), credenciais em /app/memory/test_credentials.md
-
-### UI Uniformization Pass (07/07/2026)
-- Design system CSS: `.sub-panel` (shell vidro escuro de todos os Sheets + OpportunityCard), `.sub-card` (cartão interno standard, substituiu `border-white/10 bg-white/[0.03]` em 11 ficheiros), `.sub-topbar` (ResourceBar)
-- sheet.jsx: overlay c/ blur, header c/ barra vermelha de destaque + border-b, título uppercase display, close button circular — afeta os 10 painéis
-- button.jsx: default/success c/ glow + border, outline elevado, active:scale press effect — afeta todos os botões
-- hud.jsx: Kpi (sub-card, labels 9px, valores 12px), Chip (10px) — afeta todos os summary strips
-- ResourceBar: sub-topbar, labels 9px, valores 12-13px; GamePage: HudButton c/ estado ativo (glow vermelho no painel aberto)
-
-### Central da rede + fix de sobreposições (10/07/2026)
-- Fusão "Em direto" + "Últimos registos" num só painel: ActivityFeed é agora a "Central da rede" com separadores EM DIRETO (transmissão: fases, chance ao vivo, rádio — LiveOpsPanel embutível, ex-LiveOpsDock) e REGISTOS (filtros/não lidos); auto-switch para EM DIRETO ao despachar; mobile: barra única com estado ao vivo + popover com as mesmas tabs
-- Fix crítico: botão Confirmar da colocação de imóveis era tapado pelo dock (mesma âncora centro-fundo z-30) — modo de colocação agora é focado (GamePage esconde dock/consola/legenda/filtro/OpportunityCard), PlacementControls redesenhado (z-40, cartão com tipo+estado+botões grandes)
-- MapBaseFilter movido para topo-esquerdo sob a ResourceBar (colidia com o dock no mobile); consola suprimida (<xl) quando OpportunityCard aberto — regra: nenhuma UI sobreposta/inclicável
-
-### Botão Otimizar no painel Equipas (10/07/2026)
-- TeamsPanel: botão "Otimizar equipas" (teams-optimize) entre o SummaryStrip e a lista — a lógica optimizeTeams/canOptimize já existia mas nunca era renderizada; um clique compõe /employees/optimize (preenche vagas por aptidão) + /vehicles/optimize (redistribui frota), tooltip dinâmico com contagens, desativado com razão quando nada há para otimizar
-- NOTA infra: fork 10/07 — .env recriados (preview 3aa9b74b-e9aa-4239-b583-92d6420afc1b), credenciais em /app/memory/test_credentials.md
-
-### SSS Ronda 8 — Cockpit Cinemático + Voz Noir (08/07/2026)
-- Mapa: radar tático CSS a emanar do QG (marcador não-interativo 170px), grelha tática visível nas bordas (mask radial), moldura HUD com 4 cantos vermelhos no viewport
-- Topbar: relógio da rede (hora do servidor + "Lisboa · 38.72N 9.14W"), flashes âmbar (dinheiro sujo) e azul (respeito) quando os valores sobem
-- Juice: toasts sonner redesenhados (.sub-toast — vidro escuro, barra lateral por tipo success/error/warning/info, mono), flash vermelho no registo mais recente do feed (sub-feed-new, desktop+mobile), carimbo de celebração "EQUIPA DESTACADA" (sub-stamp, CustomEvent sub:dispatch-stamp disparado pelo OpportunityCard, GamePage renderiza 1.7s)
-- Textos/Títulos: PanelKicker (micro-etiqueta laser vermelha) + PanelWatermark (ícone marca de água) em todos os 10 painéis, títulos com gradiente metálico (sub-sheet-title), taglines noir reescritas (ex. Império: "O dinheiro não dorme — lava-o, investe-o e mantém a polícia longe."), EmptyState tático partilhado (hud.jsx), copy noir em empty states (feed "Silêncio na rede. Por agora.", quests "Contratos diários esgotados — novos ao nascer do dia.") e AuthPage
-- NOTA infra: fork 08/07 — .env recriados (preview 881ea282-260f-4851-99f8-c7e53f1369fd), credenciais em /app/memory/test_credentials.md
+As credenciais são geridas exclusivamente por secrets de ambiente. Nunca colocar passwords ou tokens neste documento.

@@ -114,7 +114,7 @@ from economy_calendar import next_weekly_settlement, is_weekly_settlement
 from game_data import operation_profile_of
 from time_rules import portugal_hour_allowed
 from economy_director import passive_portfolio_scale
-from state_lease import acquire_player_state_lease
+from state_lease import acquire_player_state_lease, release_player_state_lease
 
 from organization_automation import run_organization_automation
 from organization_events import maybe_spawn_organization_event
@@ -2197,38 +2197,55 @@ async def _resolve_chase(db, player, m):
 
 
 async def _pay_pending_reward(db, player, m):
+    """Pay a returning mission at most once, even after a failed tick/retry.
+
+    The credit and its receipt live in the *same player document* to guarantee
+    atomicity on a standalone MongoDB deployment (no replica-set required).
+    """
     reward = int(m.get("pending_reward", 0) or 0)
     if reward <= 0:
         return
     pays = m.get("pending_pays") or m.get("opportunity", {}).get("pays", "dirty")
-    stats = player.setdefault("stats", default_stats())
+    mission_id = str(m["_id"])
     wasted = 0
-    if pays == "clean":
-        player["clean_money"] += reward
-        stats["earned_clean"] = stats.get("earned_clean", 0) + reward
-    else:
-        cap = dirty_money_cap(player.get("level", 1)) + prestige.get("dirty_cap_increase", 0) + prestige_effects(player)["dirty_cap_increase"]
-        room = max(0, cap - player["dirty_money"])
+    credited = reward
+    if pays != "clean":
+        cap = dirty_money_cap(player.get("level", 1)) + int(
+            prestige_effects(player).get("dirty_cap_increase", 0) or 0
+        )
+        room = max(0, cap - int(player.get("dirty_money", 0) or 0))
         credited = min(reward, room)
         wasted = reward - credited
-        player["dirty_money"] += credited
-        stats["earned_dirty"] = stats.get("earned_dirty", 0) + credited
-    # Persist money & stats immediately.
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
-        "stats": stats,
-    }})
-    kind = "success"
+    currency = "clean_money" if pays == "clean" else "dirty_money"
+    earned = "earned_clean" if pays == "clean" else "earned_dirty"
+    result = await db.players.update_one(
+        {"_id": player["_id"], "mission_rewards_paid": {"$ne": mission_id}},
+        {
+            "$inc": {currency: credited, f"stats.{earned}": credited},
+            "$addToSet": {"mission_rewards_paid": mission_id},
+        },
+    )
+    if result.modified_count != 1:
+        # A previous tick committed the reward but failed before finishing the
+        # mission. Never award it again, even with a new request_id.
+        return
+    player[currency] = int(player.get(currency, 0) or 0) + credited
+    stats = player.setdefault("stats", default_stats())
+    stats[earned] = int(stats.get(earned, 0) or 0) + credited
     label = "limpos" if pays == "clean" else "sujos"
-    await add_event(db, m["player_id"], kind,
-                    f"{m['team_name']} entregou {reward:,} € {label} no QG.")
-    await record_tx(db, m["player_id"], "mission_reward", reward - wasted, pays,
-                     player["clean_money"] if pays == "clean" else player["dirty_money"],
-                     f"Recompensa de {m['team_name']}: {m['opportunity']['name']}")
+    await add_event(
+        db, m["player_id"], "success",
+        f"{m['team_name']} entregou {credited:,} € {label} no QG.",
+    )
+    await record_tx(
+        db, m["player_id"], "mission_reward", credited, pays,
+        player[currency], f"Recompensa de {m['team_name']}: {m['opportunity']['name']}",
+    )
     if wasted > 0:
-        await add_event(db, m["player_id"], "police",
-                        f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.")
-
+        await add_event(
+            db, m["player_id"], "police",
+            f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.",
+        )
 
 def _failure_cause_suffix(m):
     """Forense pós-operação (SSS v3): aponta o fator negativo mais pesado do
@@ -3077,10 +3094,17 @@ async def _refresh_recruitment_pool(db, player, now):
     player["pool_refresh_at"] = (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()
 
 
-async def grant_quest_rewards(db, player, rw):
+async def grant_quest_rewards(db, player, rw, claim_id=None, claim_progress=None):
+    """Apply a quest reward once, including after interrupted claims.
+
+    The player balance and the quest payment marker are updated atomically in
+    one document. Asset rewards carry the source quest id, allowing an
+    interrupted claim to resume without spawning a second asset.
+    """
     pid = str(player["_id"])
     now_iso = now_utc().isoformat()
     parts, inc, sets = [], {}, {}
+
     if rw.get("dirty"):
         inc["dirty_money"] = rw["dirty"]
         parts.append(f"+{rw['dirty']:,} € sujos")
@@ -3093,60 +3117,97 @@ async def grant_quest_rewards(db, player, rw):
     if rw.get("heat"):
         sets["heat"] = max(0.0, min(100.0, player["heat"] + rw["heat"]))
         parts.append(f"{rw['heat']} calor")
+
     if rw.get("vehicle"):
-        m = VEHICLE_MODELS[rw["vehicle"]]
-        caps, _ = await get_caps(db, pid, player["hq"]["level"])
-        used = await db.vehicles.count_documents({"player_id": pid})
-        if used < caps["vehicles"]:
-            await db.vehicles.insert_one(vehicle_doc(pid, rw["vehicle"], now_iso))
-            parts.append(f"{m['name']} novo na garagem")
+        model_key = rw["vehicle"]
+        model = VEHICLE_MODELS[model_key]
+        existing = (
+            await db.vehicles.find_one({"player_id": pid, "reward_quest_id": claim_id})
+            if claim_id else None
+        )
+        if existing:
+            parts.append(f"{model['name']} novo na garagem")
         else:
-            inc["clean_money"] = inc.get("clean_money", 0) + m["price"]
-            parts.append(f"+{m['price']:,} € limpos (garagem cheia)")
+            caps, _ = await get_caps(db, pid, player["hq"]["level"])
+            used = await db.vehicles.count_documents({"player_id": pid})
+            if used < caps["vehicles"]:
+                asset = vehicle_doc(pid, model_key, now_iso)
+                if claim_id:
+                    asset["reward_quest_id"] = claim_id
+                await db.vehicles.insert_one(asset)
+                parts.append(f"{model['name']} novo na garagem")
+            else:
+                inc["clean_money"] = inc.get("clean_money", 0) + model["price"]
+                parts.append(f"+{model['price']:,} € limpos (garagem cheia)")
+
     if rw.get("employee"):
         er = rw["employee"]
         role, rarity = er["role"], er["rarity"]
-        caps, _ = await get_caps(db, pid, player["hq"]["level"])
-        used = await db.employees.count_documents({"player_id": pid})
-        if used < caps["employees"]:
-            sp = SPECIALIZATIONS[role]
-            await db.employees.insert_one({
-                "player_id": pid, "name": random_employee_name(), "age": random.randint(20, 50),
-                "role_key": role, "spec": sp["spec"], "rarity": rarity,
-                "rank": "recruta", "level": 1, "xp": 0,
-                "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
-                "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
-                "attrs": gen_attrs(role, rarity), "talents": gen_talents(role, rarity),
-                "status": "idle", "status_until": None, "team_id": None, "training": None,
-                "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
-                "hired_at": now_iso,
-            })
+        sp = SPECIALIZATIONS[role]
+        existing = (
+            await db.employees.find_one({"player_id": pid, "reward_quest_id": claim_id})
+            if claim_id else None
+        )
+        if existing:
             parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
         else:
-            fb = er.get("fallback_clean", 10000)
-            inc["clean_money"] = inc.get("clean_money", 0) + fb
-            parts.append(f"+{fb:,} € limpos (sem espaço no esconderijo)")
+            caps, _ = await get_caps(db, pid, player["hq"]["level"])
+            used = await db.employees.count_documents({"player_id": pid})
+            if used < caps["employees"]:
+                asset = {
+                    "player_id": pid, "name": random_employee_name(),
+                    "age": random.randint(20, 50),
+                    "role_key": role, "spec": sp["spec"], "rarity": rarity,
+                    "rank": "recruta", "level": 1, "xp": 0,
+                    "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
+                    "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
+                    "attrs": gen_attrs(role, rarity),
+                    "talents": gen_talents(role, rarity),
+                    "status": "idle", "status_until": None,
+                    "team_id": None, "training": None,
+                    "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
+                    "hired_at": now_iso,
+                }
+                if claim_id:
+                    asset["reward_quest_id"] = claim_id
+                await db.employees.insert_one(asset)
+                parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
+            else:
+                fallback = er.get("fallback_clean", 10000)
+                inc["clean_money"] = inc.get("clean_money", 0) + fallback
+                parts.append(f"+{fallback:,} € limpos (sem espaço no esconderijo)")
+
     if rw.get("temp_bonus"):
         tb = rw["temp_bonus"]
-        sets["temp_bonus"] = {"kind": tb["kind"], "pct": tb["pct"],
-                              "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat()}
+        sets["temp_bonus"] = {
+            "kind": tb["kind"], "pct": tb["pct"],
+            "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat(),
+        }
         parts.append(f"+{int(tb['pct'] * 100)}% recompensas durante {tb['duration_s'] // 60} min")
+
+    if claim_progress is not None:
+        sets["quest_streak"] = claim_progress["quest_streak"]
+        sets["quest_perf"] = claim_progress["quest_perf"]
     update = {}
     if inc:
         update["$inc"] = inc
     if sets:
         update["$set"] = sets
+    query = {"_id": player["_id"]}
+    if claim_id:
+        query["quest_rewards_paid"] = {"$ne": str(claim_id)}
+        update["$addToSet"] = {"quest_rewards_paid": str(claim_id)}
+
     if update:
-        await db.players.update_one({"_id": player["_id"]}, update)
-    # Reflete as alterações também no objeto em memória — necessário quando esta
-    # função é chamada a partir do advance() (auto-reclamar missões), que faz um
-    # persist final do estado inteiro do jogador a partir deste dicionário, o que
-    # apagaria silenciosamente o $inc/$set feito diretamente na base de dados.
-    for k, v in inc.items():
-        player[k] = player.get(k, 0) + v
+        result = await db.players.update_one(query, update)
+        if result.modified_count != 1:
+            # Already paid. This is the recoverable replay of an interrupted
+            # claim, not a second opportunity to earn the reward.
+            return parts
+    for key, value in inc.items():
+        player[key] = player.get(key, 0) + value
     player.update(sets)
     return parts
-
 
 # ---------------- Automatizações ----------------
 
@@ -3232,26 +3293,101 @@ async def _auto_rest_employees(db, player, employees, settings, now):
         await add_event(db, pid, "team", f"{e['name']} foi descansar automaticamente.")
 
 
+async def settle_quest_reward(db, player, quest, definition, now):
+    """Resume a quest claim safely after a server failure.
+
+    Persist the calculated rewards and streak snapshot in the quest BEFORE
+    applying any reward. Replays use this snapshot, never reroll rewards or
+    increment the streak a second time.
+    """
+    qid = str(quest["_id"])
+    pid = str(player["_id"])
+    status = quest.get("status")
+    if status == "completed":
+        rewards, mult_note = effective_quest_rewards(player, quest, definition, now)
+        progress = {
+            "quest_streak": player.get("quest_streak", {}),
+            "quest_perf": player.get("quest_perf", {}),
+        }
+        reserved = await db.quests.update_one(
+            {"_id": quest["_id"], "player_id": pid, "status": "completed"},
+            {"$set": {
+                "status": "claiming",
+                "claim_rewards": rewards,
+                "claim_mult_note": mult_note,
+                "claim_progress": progress,
+            }},
+        )
+        if reserved.modified_count != 1:
+            raise ValueError("Quest claim was concurrently reserved")
+    elif status == "claiming":
+        rewards = quest.get("claim_rewards")
+        mult_note = quest.get("claim_mult_note")
+        progress = quest.get("claim_progress")
+        if rewards is None or progress is None:
+            # Compatibility with older claims that were left half-finished.
+            rewards, mult_note = effective_quest_rewards(player, quest, definition, now)
+            progress = {
+                "quest_streak": player.get("quest_streak", {}),
+                "quest_perf": player.get("quest_perf", {}),
+            }
+            await db.quests.update_one(
+                {"_id": quest["_id"], "status": "claiming"},
+                {"$set": {
+                    "claim_rewards": rewards,
+                    "claim_mult_note": mult_note,
+                    "claim_progress": progress,
+                }},
+            )
+    else:
+        raise ValueError("Quest is not ready for claim")
+
+    parts = await grant_quest_rewards(
+        db, player, rewards, claim_id=qid, claim_progress=progress,
+    )
+    if mult_note:
+        parts.append(mult_note)
+
+    # Unlock side effects must precede the terminal status, so retries can
+    # repair an interruption. The provenance key prevents a duplicate unlock.
+    if quest["quest_key"] == "c2_front":
+        existing = await db.quests.find_one(
+            {"player_id": pid, "source_claim_id": qid},
+        )
+        if not existing:
+            follow = make_instance(
+                pid, "dec_informador", now, player.get("stats", {}), expires_s=3600,
+            )
+            follow["source_claim_id"] = qid
+            await db.quests.insert_one(follow)
+            await add_event(
+                db, pid, "intel",
+                "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.",
+            )
+
+    await db.quests.update_one(
+        {"_id": quest["_id"], "player_id": pid, "status": "claiming"},
+        {"$set": {"status": "claimed", "claimed_at": now.isoformat()}},
+    )
+    return parts, mult_note
+
+
 async def _auto_claim_quests(db, player, now):
     pid = str(player["_id"])
-    completed = await db.quests.find({"player_id": pid, "status": "completed"}).to_list(50)
+    completed = await db.quests.find({
+        "player_id": pid, "status": {"$in": ["completed", "claiming"]},
+    }).to_list(50)
     for q in completed:
-        d = QUEST_DEFS.get(q["quest_key"])
-        if not d:
+        definition = QUEST_DEFS.get(q["quest_key"])
+        if not definition:
             continue
-        # Recompensas dinâmicas (SSS v3): nível × dificuldade × tier adaptativo
-        # × streak — o mesmo cálculo do claim manual, para consistência total.
-        rewards, streak_note = effective_quest_rewards(player, q, d, now)
-        parts = await grant_quest_rewards(db, player, rewards)
-        if streak_note:
-            parts.append(streak_note)
-        await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
-        if q["quest_key"] == "c2_front":
-            await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
-            await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
-        msg = f"Recompensa reclamada automaticamente — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada automaticamente."
+        parts, _ = await settle_quest_reward(db, player, q, definition, now)
+        msg = (
+            f"Recompensa reclamada automaticamente — {definition['name']}: "
+            + ", ".join(parts) + "."
+            if parts else f"Missão {definition['name']} reclamada automaticamente."
+        )
         await add_event(db, pid, "success", msg)
-
 
 async def process_automations(db, player, employees, vehicles, props, bonuses, now):
     settings = {**DEFAULT_SETTINGS, **(player.get("settings") or {})}
@@ -3478,273 +3614,275 @@ async def advance(db, player):
         return await db.players.find_one({"_id": player["_id"]}) or player
     player = locked_player
 
-    ensure_stats(player)
-    await reconcile_mission_stats(db, player)
+    try:
+        ensure_stats(player)
+        await reconcile_mission_stats(db, player)
 
-    await db.opportunities.update_many(
-        {"player_id": pid, "status": "active", "expires_at": {"$lte": now.isoformat()}},
-        {"$set": {"status": "expired"}},
-    )
-
-    missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(200)
-    for m in missions:
-        try:
-            await _progress_mission(db, player, m, now)
-        except Exception:
-            # Uma missão com dados inesperados nunca deve derrubar o
-            # /game/state inteiro (dinheiro, equipas, tudo) — regista o erro
-            # e avança para a próxima missão; esta fica por resolver neste
-            # tick e tenta-se de novo no próximo.
-            logger.exception("Falha ao processar missão %s (player %s)", m.get("_id"), pid)
-
-    await _complete_trainings(db, player, now)
-    await _process_statuses(db, pid, now)
-    await _complete_patrols(db, player, now)
-
-    last = parse_dt(player["last_tick"])
-    raw_minutes = max(0.0, (now - last).total_seconds() / 60)
-    minutes = min(raw_minutes, float(OFFLINE_SIMULATION_MAX_MINUTES))
-
-    # When an account returns after a very long absence, simulate one bounded
-    # window consistently. Old passive income and old fixed costs are both
-    # forgiven, instead of paying months of one side and only weeks of the other.
-    if raw_minutes > OFFLINE_SIMULATION_MAX_MINUTES:
-        window_start = now - timedelta(minutes=OFFLINE_SIMULATION_MAX_MINUTES)
-        scheduled = player.get("next_payroll_at")
-        try:
-            scheduled_dt = parse_dt(scheduled) if scheduled else None
-        except (TypeError, ValueError):
-            scheduled_dt = None
-        if scheduled_dt and scheduled_dt < window_start:
-            player["next_payroll_at"] = next_weekly_settlement(
-                window_start - timedelta(seconds=1)
-            ).isoformat()
-
-    if minutes > 0:
-        rec = minutes * 0.6
-        await db.employees.update_many(
-            {"player_id": pid, "status": "idle", "fatigue": {"$gt": 0}},
-            {"$inc": {"fatigue": -rec}},
-        )
-        await db.employees.update_many(
-            {"player_id": pid, "fatigue": {"$lt": 0}},
-            {"$set": {"fatigue": 0.0}},
+        await db.opportunities.update_many(
+            {"player_id": pid, "status": "active", "expires_at": {"$lte": now.isoformat()}},
+            {"$set": {"status": "expired"}},
         )
 
-    employees = await db.employees.find({"player_id": pid}).to_list(300)
-    bonuses = org_bonuses(employees)
+        missions = await db.missions.find({"player_id": pid, "phase": {"$ne": "done"}}).to_list(200)
+        for m in missions:
+            try:
+                await _progress_mission(db, player, m, now)
+            except Exception:
+                # Uma missão com dados inesperados nunca deve derrubar o
+                # /game/state inteiro (dinheiro, equipas, tudo) — regista o erro
+                # e avança para a próxima missão; esta fica por resolver neste
+                # tick e tenta-se de novo no próximo.
+                logger.exception("Falha ao processar missão %s (player %s)", m.get("_id"), pid)
 
-    await _process_payroll(db, player, employees, now)
-    await _maybe_grant_bailout(db, player, employees)
-    await _process_betrayals(db, player, employees, minutes)
-    await _process_absences(db, player, employees, minutes, now)
-    await _process_xp_decay(db, player, employees, minutes, now)
-    await _refresh_recruitment_pool(db, player, now)
+        await _complete_trainings(db, player, now)
+        await _process_statuses(db, pid, now)
+        await _complete_patrols(db, player, now)
 
-    props = await db.properties.find({"player_id": pid}).to_list(200)
+        last = parse_dt(player["last_tick"])
+        raw_minutes = max(0.0, (now - last).total_seconds() / 60)
+        minutes = min(raw_minutes, float(OFFLINE_SIMULATION_MAX_MINUTES))
 
-    # A aptidão do staff é recalculada a partir do estado vivo dos operacionais
-    # (nível, atributos, moral, fadiga e ferimentos), não fica congelada no
-    # momento em que foram destacados.
-    employee_by_id = {str(emp["_id"]): emp for emp in employees}
-    for prop in props:
-        staff_ids = list(prop.get("staff_employee_ids") or [])
-        if not staff_ids:
-            continue
-        staff = [employee_by_id[eid] for eid in staff_ids if eid in employee_by_id]
-        roles, effectiveness = property_staff_profile(staff)
-        if roles != (prop.get("staff_roles") or {}) or abs(effectiveness - float(prop.get("staff_effectiveness", 0) or 0)) >= 0.005:
-            prop["staff_roles"] = roles
-            prop["staff_effectiveness"] = effectiveness
-            await db.properties.update_one(
-                {"_id": prop["_id"]},
-                {"$set": {"staff_roles": roles, "staff_effectiveness": effectiveness}},
+        # When an account returns after a very long absence, simulate one bounded
+        # window consistently. Old passive income and old fixed costs are both
+        # forgiven, instead of paying months of one side and only weeks of the other.
+        if raw_minutes > OFFLINE_SIMULATION_MAX_MINUTES:
+            window_start = now - timedelta(minutes=OFFLINE_SIMULATION_MAX_MINUTES)
+            scheduled = player.get("next_payroll_at")
+            try:
+                scheduled_dt = parse_dt(scheduled) if scheduled else None
+            except (TypeError, ValueError):
+                scheduled_dt = None
+            if scheduled_dt and scheduled_dt < window_start:
+                player["next_payroll_at"] = next_weekly_settlement(
+                    window_start - timedelta(seconds=1)
+                ).isoformat()
+
+        if minutes > 0:
+            rec = minutes * 0.6
+            await db.employees.update_many(
+                {"player_id": pid, "status": "idle", "fatigue": {"$gt": 0}},
+                {"$inc": {"fatigue": -rec}},
+            )
+            await db.employees.update_many(
+                {"player_id": pid, "fatigue": {"$lt": 0}},
+                {"$set": {"fatigue": 0.0}},
             )
 
-    previous_event_id = (player.get("organization_event") or {}).get("id")
-    event = maybe_spawn_organization_event(
-        player,
-        now=now,
-        employee_count=len(employees),
-        property_count=len(props),
-        territory_count=len(player.get("territories") or {}),
-    )
-    if event and event.get("id") != previous_event_id:
-        await add_event(db, pid, "system", f"Decisão da organização: {event['title']}.")
-    territory_rate = territory_income_per_hour(player)
-    passive_income_scale = await _apply_passive_income(
-        db, player, props, minutes / 60, bonuses, now,
-        territory_rate=territory_rate,
-    )
-    territory_rate *= passive_income_scale
-    await _complete_property_upgrades(db, player, props, now)
-    await _complete_hq_upgrade(db, player, now)
-    await _maybe_raid(db, player, props, minutes, now)
+        employees = await db.employees.find({"player_id": pid}).to_list(300)
+        bonuses = org_bonuses(employees)
 
-    vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
-    await _complete_refuels(db, player, vehicles, now)
-    await _complete_vehicle_transfers(db, player, vehicles, {str(p["_id"]): p for p in props}, now)
-    await process_quests(db, player, {"employees": employees, "props": props,
-                                      "vehicles": vehicles, "minutes": minutes,
-                                      "dirty_cap": dirty_money_cap(player["level"])})
-    await process_automations(db, player, employees, vehicles, props, bonuses, now)
-    try:
-        await run_organization_automation(
-            db, player, now=now, add_event=add_event, record_tx=record_tx, force=False,
+        await _process_payroll(db, player, employees, now)
+        await _maybe_grant_bailout(db, player, employees)
+        await _process_betrayals(db, player, employees, minutes)
+        await _process_absences(db, player, employees, minutes, now)
+        await _process_xp_decay(db, player, employees, minutes, now)
+        await _refresh_recruitment_pool(db, player, now)
+
+        props = await db.properties.find({"player_id": pid}).to_list(200)
+
+        # A aptidão do staff é recalculada a partir do estado vivo dos operacionais
+        # (nível, atributos, moral, fadiga e ferimentos), não fica congelada no
+        # momento em que foram destacados.
+        employee_by_id = {str(emp["_id"]): emp for emp in employees}
+        for prop in props:
+            staff_ids = list(prop.get("staff_employee_ids") or [])
+            if not staff_ids:
+                continue
+            staff = [employee_by_id[eid] for eid in staff_ids if eid in employee_by_id]
+            roles, effectiveness = property_staff_profile(staff)
+            if roles != (prop.get("staff_roles") or {}) or abs(effectiveness - float(prop.get("staff_effectiveness", 0) or 0)) >= 0.005:
+                prop["staff_roles"] = roles
+                prop["staff_effectiveness"] = effectiveness
+                await db.properties.update_one(
+                    {"_id": prop["_id"]},
+                    {"$set": {"staff_roles": roles, "staff_effectiveness": effectiveness}},
+                )
+
+        previous_event_id = (player.get("organization_event") or {}).get("id")
+        event = maybe_spawn_organization_event(
+            player,
+            now=now,
+            employee_count=len(employees),
+            property_count=len(props),
+            territory_count=len(player.get("territories") or {}),
         )
-    except Exception:
-        # Automação é uma conveniência: nunca pode derrubar o tick principal.
-        logger.exception("Falha na automação da organização (player %s)", pid)
+        if event and event.get("id") != previous_event_id:
+            await add_event(db, pid, "system", f"Decisão da organização: {event['title']}.")
+        territory_rate = territory_income_per_hour(player)
+        passive_income_scale = await _apply_passive_income(
+            db, player, props, minutes / 60, bonuses, now,
+            territory_rate=territory_rate,
+        )
+        territory_rate *= passive_income_scale
+        await _complete_property_upgrades(db, player, props, now)
+        await _complete_hq_upgrade(db, player, now)
+        await _maybe_raid(db, player, props, minutes, now)
 
-    # Territórios e Cidade Viva partilham a mesma rede rival persistente.
-    # Saves antigos sem city_key continuam a usar o rival determinístico local.
-    city_rival_docs = await db.city_rivals.find({"player_id": pid}).to_list(20)
-    city_rivals_by_key = {str(r.get("key")): r for r in city_rival_docs if r.get("key")}
+        vehicles = await db.vehicles.find({"player_id": pid}).to_list(100)
+        await _complete_refuels(db, player, vehicles, now)
+        await _complete_vehicle_transfers(db, player, vehicles, {str(p["_id"]): p for p in props}, now)
+        await process_quests(db, player, {"employees": employees, "props": props,
+                                          "vehicles": vehicles, "minutes": minutes,
+                                          "dirty_cap": dirty_money_cap(player["level"])})
+        await process_automations(db, player, employees, vehicles, props, bonuses, now)
+        try:
+            await run_organization_automation(
+                db, player, now=now, add_event=add_event, record_tx=record_tx, force=False,
+            )
+        except Exception:
+            # Automação é uma conveniência: nunca pode derrubar o tick principal.
+            logger.exception("Falha na automação da organização (player %s)", pid)
 
-    # Territórios: rendimento passivo com pressão rival crescente e defesa que
-    # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
-    # territory_rate já partilha o envelope passivo com a produção dos imóveis.
-    if minutes > 0 and territory_rate > 0:
-        ft = float(player.get("frac_territory", 0.0) or 0.0) + territory_rate * (minutes / 60.0)
-        territory_gain = int(ft)
-        player["frac_territory"] = ft - territory_gain
-        player["clean_money"] += territory_gain
-        territories = dict(player.get("territories") or {})
-        investigation_level = department_level(player, "investigacao")
-        lost = []
-        downgraded = []
-        for district, info in list(territories.items()):
-            data = dict(info or {})
-            tier = max(1, int(data.get("tier", 1) or 1))
-            pressure = float(data.get("pressure", 0) or 0)
-            defense = float(data.get("defense", 100) or 0)
-            rival = dict(data.get("rival") or rival_profile(district))
-            city_rival = city_rivals_by_key.get(str(rival.get("city_key") or rival.get("key") or ""))
-            if city_rival:
-                power = float(city_rival.get("power", rival.get("strength", 50)) or 50)
-                hostility = float(city_rival.get("hostility", 40) or 40)
-                rival.update({
-                    "city_key": city_rival.get("key"),
-                    "key": city_rival.get("key"),
-                    "name": city_rival.get("name", rival.get("name")),
-                    "style": city_rival.get("style", rival.get("style")),
-                    "strength": max(20, min(100, round(power * 0.72 + hostility * 0.28))),
-                    "relation": city_rival.get("relation", "neutral"),
-                })
-            data["rival"] = {
-                "key": rival.get("key"), "city_key": rival.get("city_key"),
-                "name": rival.get("name"), "style": rival.get("style"),
-                "strength": max(20, min(100, int(rival.get("strength", 50) or 50))),
-                "relation": rival.get("relation", "neutral"),
-                "pressure_mult": float(rival.get("pressure_mult", 1.0) or 1.0),
-                "defense_mult": float(rival.get("defense_mult", 1.0) or 1.0),
-            }
-            rival_strength = float(data["rival"]["strength"])
-            rival_pressure_mult = float(rival.get("pressure_mult", 1.0) or 1.0)
-            rival_defense_mult = float(rival.get("defense_mult", 1.0) or 1.0)
-            relation = rival.get("relation", "neutral")
-            if relation == "allied":
-                rival_pressure_mult *= 0.25
-                rival_defense_mult *= 0.65
-            elif relation == "truce":
-                rival_pressure_mult *= 0.50
-                rival_defense_mult *= 0.80
-            pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
-            pressure_gain *= (0.72 + rival_strength / 180.0) * rival_pressure_mult
-            pressure_gain *= float(organization_specialization_effects(player).get("territory_pressure_mult", 1.0) or 1.0)
-            pressure_gain *= 1.0 + max(0.0, 55.0 - defense) / 140.0
-            defense_loss = minutes * 0.018 * (1.0 + pressure / 140.0) * rival_defense_mult
-            pressure = min(100.0, pressure + pressure_gain)
-            defense = max(0.0, defense - defense_loss)
-            if pressure >= 96 and defense <= 8:
-                if tier > 1:
-                    data["tier"] = tier - 1
-                    data["pressure"] = 62.0
-                    data["defense"] = 38.0
-                    data["last_rival_breach_at"] = now.isoformat()
-                    downgraded.append((district, tier - 1))
+        # Territórios e Cidade Viva partilham a mesma rede rival persistente.
+        # Saves antigos sem city_key continuam a usar o rival determinístico local.
+        city_rival_docs = await db.city_rivals.find({"player_id": pid}).to_list(20)
+        city_rivals_by_key = {str(r.get("key")): r for r in city_rival_docs if r.get("key")}
+
+        # Territórios: rendimento passivo com pressão rival crescente e defesa que
+        # se degrada lentamente. O jogador pode restaurá-la no centro de organização.
+        # territory_rate já partilha o envelope passivo com a produção dos imóveis.
+        if minutes > 0 and territory_rate > 0:
+            ft = float(player.get("frac_territory", 0.0) or 0.0) + territory_rate * (minutes / 60.0)
+            territory_gain = int(ft)
+            player["frac_territory"] = ft - territory_gain
+            player["clean_money"] += territory_gain
+            territories = dict(player.get("territories") or {})
+            investigation_level = department_level(player, "investigacao")
+            lost = []
+            downgraded = []
+            for district, info in list(territories.items()):
+                data = dict(info or {})
+                tier = max(1, int(data.get("tier", 1) or 1))
+                pressure = float(data.get("pressure", 0) or 0)
+                defense = float(data.get("defense", 100) or 0)
+                rival = dict(data.get("rival") or rival_profile(district))
+                city_rival = city_rivals_by_key.get(str(rival.get("city_key") or rival.get("key") or ""))
+                if city_rival:
+                    power = float(city_rival.get("power", rival.get("strength", 50)) or 50)
+                    hostility = float(city_rival.get("hostility", 40) or 40)
+                    rival.update({
+                        "city_key": city_rival.get("key"),
+                        "key": city_rival.get("key"),
+                        "name": city_rival.get("name", rival.get("name")),
+                        "style": city_rival.get("style", rival.get("style")),
+                        "strength": max(20, min(100, round(power * 0.72 + hostility * 0.28))),
+                        "relation": city_rival.get("relation", "neutral"),
+                    })
+                data["rival"] = {
+                    "key": rival.get("key"), "city_key": rival.get("city_key"),
+                    "name": rival.get("name"), "style": rival.get("style"),
+                    "strength": max(20, min(100, int(rival.get("strength", 50) or 50))),
+                    "relation": rival.get("relation", "neutral"),
+                    "pressure_mult": float(rival.get("pressure_mult", 1.0) or 1.0),
+                    "defense_mult": float(rival.get("defense_mult", 1.0) or 1.0),
+                }
+                rival_strength = float(data["rival"]["strength"])
+                rival_pressure_mult = float(rival.get("pressure_mult", 1.0) or 1.0)
+                rival_defense_mult = float(rival.get("defense_mult", 1.0) or 1.0)
+                relation = rival.get("relation", "neutral")
+                if relation == "allied":
+                    rival_pressure_mult *= 0.25
+                    rival_defense_mult *= 0.65
+                elif relation == "truce":
+                    rival_pressure_mult *= 0.50
+                    rival_defense_mult *= 0.80
+                pressure_gain = minutes * 0.025 * (1.0 + tier * 0.05) * max(0.55, 1.0 - investigation_level * 0.07)
+                pressure_gain *= (0.72 + rival_strength / 180.0) * rival_pressure_mult
+                pressure_gain *= float(organization_specialization_effects(player).get("territory_pressure_mult", 1.0) or 1.0)
+                pressure_gain *= 1.0 + max(0.0, 55.0 - defense) / 140.0
+                defense_loss = minutes * 0.018 * (1.0 + pressure / 140.0) * rival_defense_mult
+                pressure = min(100.0, pressure + pressure_gain)
+                defense = max(0.0, defense - defense_loss)
+                if pressure >= 96 and defense <= 8:
+                    if tier > 1:
+                        data["tier"] = tier - 1
+                        data["pressure"] = 62.0
+                        data["defense"] = 38.0
+                        data["last_rival_breach_at"] = now.isoformat()
+                        downgraded.append((district, tier - 1))
+                    else:
+                        lost.append(district)
+                        continue
                 else:
-                    lost.append(district)
-                    continue
-            else:
-                data["pressure"] = pressure
-                data["defense"] = defense
-            territories[district] = data
-        for district in lost:
-            territories.pop(district, None)
-            await add_event(db, pid, "police", f"Perdeste o controlo de {district}: pressão rival esmagou a defesa local.")
-        for district, tier in downgraded:
-            await add_event(db, pid, "team", f"{district} recuou para nível {tier} após uma ofensiva rival.")
-        player["territories"] = territories
+                    data["pressure"] = pressure
+                    data["defense"] = defense
+                territories[district] = data
+            for district in lost:
+                territories.pop(district, None)
+                await add_event(db, pid, "police", f"Perdeste o controlo de {district}: pressão rival esmagou a defesa local.")
+            for district, tier in downgraded:
+                await add_event(db, pid, "team", f"{district} recuou para nível {tier} após uma ofensiva rival.")
+            player["territories"] = territories
 
-    # Notoriedade da frota arrefece fora de operações.
-    if minutes > 0:
-        await db.vehicles.update_many(
-            {"player_id": pid, "notoriety": {"$gt": 0}},
-            {"$inc": {"notoriety": -minutes / 60.0 * VEHICLE_LIFECYCLE["notoriety_decay_per_hour"]}},
+        # Notoriedade da frota arrefece fora de operações.
+        if minutes > 0:
+            await db.vehicles.update_many(
+                {"player_id": pid, "notoriety": {"$gt": 0}},
+                {"$inc": {"notoriety": -minutes / 60.0 * VEHICLE_LIFECYCLE["notoriety_decay_per_hour"]}},
+            )
+            await db.vehicles.update_many({"player_id": pid, "notoriety": {"$lt": 0}}, {"$set": {"notoriety": 0.0}})
+
+        # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
+        # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
+        decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
+        decay_rate *= 1.0 + float(prestige_effects(player).get("heat_decay_bonus", 0.0)) + float(organization_specialization_effects(player).get("heat_decay_bonus", 0.0))
+        player["heat"] = round(max(0.0, player["heat"] - minutes * decay_rate), 3)
+        # A atenção policial por distrito arrefece com o tempo — zonas quentes
+        # voltam gradualmente a ser operáveis.
+        if minutes > 0 and player.get("district_attention"):
+            cooled = {}
+            for k, v in player["district_attention"].items():
+                nv = round(min(DISTRICT_ATTENTION_MAX, float(v)) - minutes * DISTRICT_ATTENTION_DECAY_PER_MIN, 2)
+                if nv > 0.5:
+                    cooled[k] = nv
+            player["district_attention"] = cooled
+        apply_dirty_money_heat(player, minutes / 60)
+
+        # Governance é uma relação viva: confiança degrada lentamente sem contacto;
+        # exposição arrefece mais depressa quando a rede não é usada.
+        if minutes > 0:
+            governance = dict(player.get("governance") or {})
+            governance["trust"] = round(max(0.0, float(governance.get("trust", 0) or 0) - (minutes / 60.0) * 0.03), 3)
+            governance["exposure"] = round(max(0.0, float(governance.get("exposure", 0) or 0) - (minutes / 60.0) * 0.10), 3)
+            player["governance"] = governance
+
+        player["level"] = level_for(player["respect"])
+        player["last_tick"] = now.isoformat()
+
+        committed = await db.players.update_one(
+            {"_id": player["_id"], "state_lease_owner": lease_token},
+            {"$set": {
+            "heat": player["heat"], "level": player["level"], "last_tick": player["last_tick"],
+            "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
+            "respect": player["respect"], "stats": player["stats"],
+            "raid_cooldown_until": player.get("raid_cooldown_until"),
+            "next_payroll_at": player.get("next_payroll_at"),
+            "pool_refresh_at": player.get("pool_refresh_at"),
+            "quests_daily_at": player.get("quests_daily_at"),
+            "quests_weekly_at": player.get("quests_weekly_at"),
+            "next_event_at": player.get("next_event_at"),
+            "temp_bonus": player.get("temp_bonus"),
+            "frac_dirty": player.get("frac_dirty", 0.0), "frac_clean": player.get("frac_clean", 0.0),
+            "frac_launder": player.get("frac_launder", 0.0),
+            "type_cooldowns": player.get("type_cooldowns", {}),
+            "achievement_bonus_pct": player.get("achievement_bonus_pct", 0.0),
+            "district_attention": player.get("district_attention", {}),
+            "streak_op_pending": player.get("streak_op_pending", False),
+            "quest_streak": player.get("quest_streak", {}),
+            "quest_perf": player.get("quest_perf", {}),
+            "quest_offer_history": player.get("quest_offer_history", {}),
+            "pending_chains": player.get("pending_chains", []),
+            "phrase_memory": player.get("phrase_memory", []),
+            "territories": player.get("territories", {}),
+            "frac_territory": player.get("frac_territory", 0.0),
+            "organization_event": player.get("organization_event"),
+            "next_organization_event_at": player.get("next_organization_event_at"),
+            "governance": player.get("governance", {}),
+            }},
         )
-        await db.vehicles.update_many({"player_id": pid, "notoriety": {"$lt": 0}}, {"$set": {"notoriety": 0.0}})
-
-    # Decaimento de calor não-linear (SSS v3, constantes v2 finalmente ligadas):
-    # calor baixo dissipa mais depressa, calor alto "cola-se" — picos pesam.
-    decay_rate = max(0.3, HEAT_DECAY_BASE_PER_MIN - HEAT_DECAY_SLOPE * (player["heat"] / 100))
-    decay_rate *= 1.0 + float(prestige_effects(player).get("heat_decay_bonus", 0.0)) + float(organization_specialization_effects(player).get("heat_decay_bonus", 0.0))
-    player["heat"] = round(max(0.0, player["heat"] - minutes * decay_rate), 3)
-    # A atenção policial por distrito arrefece com o tempo — zonas quentes
-    # voltam gradualmente a ser operáveis.
-    if minutes > 0 and player.get("district_attention"):
-        cooled = {}
-        for k, v in player["district_attention"].items():
-            nv = round(min(DISTRICT_ATTENTION_MAX, float(v)) - minutes * DISTRICT_ATTENTION_DECAY_PER_MIN, 2)
-            if nv > 0.5:
-                cooled[k] = nv
-        player["district_attention"] = cooled
-    apply_dirty_money_heat(player, minutes / 60)
-
-    # Governance é uma relação viva: confiança degrada lentamente sem contacto;
-    # exposição arrefece mais depressa quando a rede não é usada.
-    if minutes > 0:
-        governance = dict(player.get("governance") or {})
-        governance["trust"] = round(max(0.0, float(governance.get("trust", 0) or 0) - (minutes / 60.0) * 0.03), 3)
-        governance["exposure"] = round(max(0.0, float(governance.get("exposure", 0) or 0) - (minutes / 60.0) * 0.10), 3)
-        player["governance"] = governance
-
-    player["level"] = level_for(player["respect"])
-    player["last_tick"] = now.isoformat()
-
-    await db.players.update_one(
-        {"_id": player["_id"], "state_lease_owner": lease_token},
-        {"$set": {
-        "heat": player["heat"], "level": player["level"], "last_tick": player["last_tick"],
-        "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
-        "respect": player["respect"], "stats": player["stats"],
-        "raid_cooldown_until": player.get("raid_cooldown_until"),
-        "next_payroll_at": player.get("next_payroll_at"),
-        "pool_refresh_at": player.get("pool_refresh_at"),
-        "quests_daily_at": player.get("quests_daily_at"),
-        "quests_weekly_at": player.get("quests_weekly_at"),
-        "next_event_at": player.get("next_event_at"),
-        "temp_bonus": player.get("temp_bonus"),
-        "frac_dirty": player.get("frac_dirty", 0.0), "frac_clean": player.get("frac_clean", 0.0),
-        "frac_launder": player.get("frac_launder", 0.0),
-        "type_cooldowns": player.get("type_cooldowns", {}),
-        "achievement_bonus_pct": player.get("achievement_bonus_pct", 0.0),
-        "district_attention": player.get("district_attention", {}),
-        "streak_op_pending": player.get("streak_op_pending", False),
-        "quest_streak": player.get("quest_streak", {}),
-        "quest_perf": player.get("quest_perf", {}),
-        "quest_offer_history": player.get("quest_offer_history", {}),
-        "pending_chains": player.get("pending_chains", []),
-        "phrase_memory": player.get("phrase_memory", []),
-        "territories": player.get("territories", {}),
-        "frac_territory": player.get("frac_territory", 0.0),
-        "organization_event": player.get("organization_event"),
-        "next_organization_event_at": player.get("next_organization_event_at"),
-        "governance": player.get("governance", {}),
-        }, "$unset": {
-            "state_lease_owner": "",
-            "state_lease_until": "",
-        }},
-    )
-    await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
-    return player
+        if committed.matched_count != 1:
+            raise RuntimeError("O lease de simulação expirou; persistência final rejeitada")
+        await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
+        return player
+    finally:
+        await release_player_state_lease(db, player["_id"], lease_token)

@@ -152,6 +152,14 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=403, detail=f"Conta banida: {user.get('ban_reason', 'sem motivo indicado')}")
         if int(payload.get("ver", 0) or 0) != int(user.get("token_version", 0) or 0):
             raise HTTPException(status_code=401, detail="Sessão revogada")
+        # Throttle activity writes to at most once per hour per user. Admin
+        # active-users metrics must use activity, not registration date.
+        now = datetime.now(timezone.utc)
+        if str(user.get("last_seen_at") or "") < (now - timedelta(hours=1)).isoformat():
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"last_seen_at": now.isoformat()}},
+            )
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
@@ -476,10 +484,17 @@ async def login(body: LoginInput, request: Request, response: Response):
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(response: Response, user: dict = Depends(get_current_user)):
+    # Revoke both token types server-side, not merely their browser cookies.
+    # This intentionally signs out other devices until per-session jti
+    # revocation is implemented.
+    await db.users.update_one(
+        {"_id": ObjectId(user["_id"])},
+        {"$inc": {"token_version": 1}},
+    )
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
-    return {"ok": True}
+    return {"ok": True, "all_sessions_revoked": True}
 
 
 @router.get("/me")

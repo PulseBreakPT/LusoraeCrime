@@ -69,8 +69,27 @@ class RealtimeHub:
         async with self._lock:
             connections = list(self._connections.values())
 
+        # Alliance membership can be revoked without a WebSocket reconnect.
+        # Resolve it once per event, from the authoritative DB, before sending
+        # potentially private alliance content.
+        alliance_members = None
+        if event.get("scope") == "alliance":
+            target = str(event.get("target") or "")
+            alliance = (
+                await db.city_alliances.find_one(
+                    {"_id": ObjectId(target)}, {"member_ids": 1},
+                )
+                if ObjectId.is_valid(target) else None
+            )
+            alliance_members = set((alliance or {}).get("member_ids") or [])
+
         dead: list[WebSocket] = []
         for connection in connections:
+            if alliance_members is not None:
+                if connection.player_id not in alliance_members:
+                    connection.alliance_id = None
+                    continue
+                connection.alliance_id = str(event.get("target"))
             if not _event_visible(event, connection):
                 continue
             try:

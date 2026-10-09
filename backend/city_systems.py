@@ -214,9 +214,15 @@ async def ensure_rivals(db, player):
         return existing
     level = int(player.get("level", 1) or 1)
     docs = [_rival_doc(pid, i, RIVAL_ARCHETYPES[i], level) for i in range(min(5, len(RIVAL_ARCHETYPES)))]
-    if docs:
-        await db.city_rivals.insert_many(docs)
-    return docs
+    # The (player_id, key) unique index and $setOnInsert prevent two devices
+    # from creating the same rival fleet concurrently.
+    for doc in docs:
+        await db.city_rivals.update_one(
+            {"player_id": pid, "key": doc["key"]},
+            {"$setOnInsert": doc},
+            upsert=True,
+        )
+    return await db.city_rivals.find({"player_id": pid}).to_list(20)
 
 
 async def advance_rival_world(db, player, rivals, businesses, now=None):
@@ -481,23 +487,39 @@ async def _season_checkpoint(db, player, season):
         )
         return record
 
-    delta_respect = max(0, respect - int(record.get("respect_checkpoint", respect)))
-    delta_success = max(0, successes - int(record.get("success_checkpoint", successes)))
-    gained = delta_respect + delta_success * 12
-    if gained:
-        record["points"] = int(record.get("points", 0)) + gained
-        record["respect_checkpoint"] = respect
-        record["success_checkpoint"] = successes
-        record["updated_at"] = _utc_now().isoformat()
-        await db.city_season_scores.update_one(
-            {"player_id": pid, "season_id": season["id"]},
-            {"$set": {
-                "points": record["points"],
-                "respect_checkpoint": respect,
-                "success_checkpoint": successes,
-                "updated_at": record["updated_at"],
-            }},
+    # Optimistic compare-and-set: two simultaneous city/state requests must
+    # never turn the same respect increase into two sets of season points.
+    for _attempt in range(4):
+        old_respect = int(record.get("respect_checkpoint", respect))
+        old_success = int(record.get("success_checkpoint", successes))
+        delta_respect = max(0, respect - old_respect)
+        delta_success = max(0, successes - old_success)
+        gained = delta_respect + delta_success * 12
+        if not gained:
+            return record
+        updated = await db.city_season_scores.find_one_and_update(
+            {
+                "_id": record["_id"],
+                "respect_checkpoint": old_respect,
+                "success_checkpoint": old_success,
+            },
+            {
+                "$inc": {"points": gained},
+                "$set": {
+                    "respect_checkpoint": respect,
+                    "success_checkpoint": successes,
+                    "updated_at": _utc_now().isoformat(),
+                },
+            },
+            return_document=True,
         )
+        if updated:
+            return updated
+        record = await db.city_season_scores.find_one({
+            "player_id": pid, "season_id": season["id"],
+        })
+        if not record:
+            break
     return record
 
 
@@ -611,9 +633,13 @@ async def city_snapshot(db, player):
         "hq": {"$type": "object"},
     }).sort("respect", -1).to_list(20)
     pvp_challenges = await db.city_pvp_challenges.find({
-        "$or": [{"attacker_id": pid}, {"defender_id": pid}],
-        "status": "pending",
-        "expires_at": {"$gt": now.isoformat()},
+        "$and": [
+            {"$or": [{"attacker_id": pid}, {"defender_id": pid}]},
+            {"$or": [
+                {"status": "pending", "expires_at": {"$gt": now.isoformat()}},
+                {"status": "settling"},
+            ]},
+        ],
     }).sort("created_at", -1).to_list(20)
 
     news = _news_from_world(ctx)
