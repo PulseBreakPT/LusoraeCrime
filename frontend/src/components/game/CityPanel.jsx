@@ -441,10 +441,10 @@ export const CityPanel = ({
                     <Switch checked={!!city.social?.pvp_opt_in} disabled={!!busy || playerLevel < 15} onCheckedChange={(enabled) => act("pvp", "social/pvp", { enabled })} />
                   </div>
 
-                  {(city.social?.pvp_challenges || []).filter((c) => c.defender_id && c.status === "pending").length > 0 && (
+                  {(city.social?.pvp_challenges || []).filter((c) => c.defender_id && ["pending", "settling"].includes(c.status)).length > 0 && (
                     <div className="mt-3 space-y-1 border-t border-white/[0.06] pt-2">
                       <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Desafios pendentes</p>
-                      {(city.social?.pvp_challenges || []).filter((c) => c.status === "pending").map((challenge) => (
+                      {(city.social?.pvp_challenges || []).filter((c) => ["pending", "settling"].includes(c.status)).map((challenge) => (
                         <div key={challenge.id} className="flex items-center gap-2 rounded-md bg-black/25 px-2 py-2">
                           <span className="min-w-0 flex-1 truncate text-[10px] text-zinc-300">
                             {challenge.attacker_name} → {challenge.defender_name}
@@ -456,9 +456,9 @@ export const CityPanel = ({
                                 disabled={!!busy}
                                 onClick={() => act(`accept-${challenge.id}`, "social/pvp/accept", { challenge_id:challenge.id }, (d) => `Conflito resolvido: ${d.winner_name} venceu`)}
                               >
-                                Aceitar
+                                {challenge.status === "settling" ? "Retomar resultado" : "Aceitar"}
                               </ActionButton>
-                              <ActionButton
+                              {challenge.status === "pending" && <ActionButton
                                 disabled={!!busy}
                                 onClick={() => act(`decline-${challenge.id}`, "social/pvp/decline", { challenge_id:challenge.id }, "Desafio recusado")}
                               >
