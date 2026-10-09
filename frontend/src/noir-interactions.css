@@ -521,7 +521,7 @@
 }
 @media (max-width:390px) {
   .noir-access-card {padding-left:16px;padding-right:16px;}
-  .noir-access-status {font-size:9px;gap:5px;}
+  .noir-access-status {font-size:10px;gap:5px;}
   .noir-access-logo {font-size:20px;}
   .noir-access-links {gap:9px;}
   .noir-access-card-line span:last-child {display:none;}
