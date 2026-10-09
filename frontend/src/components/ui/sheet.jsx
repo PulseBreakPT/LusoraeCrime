@@ -98,8 +98,8 @@ const SheetContent = React.forwardRef(({
 
   React.useEffect(() => {
     if (!isOpen || isSearch) return undefined;
-    const raf = requestAnimationFrame(() => closeRef.current?.focus({ preventScroll: true }));
-    return () => cancelAnimationFrame(raf);
+    const timer = window.setTimeout(() => closeRef.current?.focus({ preventScroll: true }), 0);
+    return () => window.clearTimeout(timer);
   }, [isOpen, isSearch]);
 
   if (!isOpen || typeof document === "undefined") return null;
