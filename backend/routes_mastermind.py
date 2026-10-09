@@ -411,7 +411,7 @@ async def _snapshot(player, now):
             {"key": key, **cfg, "unlocked": rank["level"] >= cfg["unlock_rank"]}
             for key, cfg in FENCES.items()
         ],
-        "active_heist": _public_heist(state.get("active_heist"), now),
+        "active_heist": _public_heist(state.get("active_heist") or (state.get("claim_recovery") or {}).get("heist"), now),
         "market": {
             "goods": quotes,
             "capacity": capacity,
@@ -540,8 +540,8 @@ async def create_heist(body: HeistCreateInput, user: dict = Depends(get_current_
     player = await _player(user)
     now = now_utc()
     state = await _process_mastermind(player, now)
-    if state.get("active_heist"):
-        raise HTTPException(status_code=409, detail="Já tens um grande golpe em preparação")
+    if state.get("active_heist") or state.get("claim_recovery"):
+        raise HTTPException(status_code=409, detail="Conclui primeiro a liquidação do grande golpe anterior")
     target = HEIST_TARGETS.get(body.target_key)
     approach = HEIST_APPROACHES.get(body.approach_key)
     fence = FENCES.get(body.fence_key)
@@ -1019,7 +1019,9 @@ async def claim_heist(body: HeistIdInput, user: dict = Depends(get_current_user)
     player = await _player(user)
     now = now_utc()
     state = await _process_mastermind(player, now)
-    heist = state.get("active_heist")
+    recovery = state.get("claim_recovery") or {}
+    is_resuming = bool(recovery and (recovery.get("heist") or {}).get("id") == body.heist_id)
+    heist = recovery.get("heist") if is_resuming else state.get("active_heist")
     if not heist or heist.get("id") != body.heist_id:
         raise HTTPException(status_code=404, detail="Grande golpe não encontrado")
     finale = heist.get("finale")
@@ -1028,108 +1030,124 @@ async def claim_heist(body: HeistIdInput, user: dict = Depends(get_current_user)
             status_code=400,
             detail=f"Final ainda em curso durante {_remaining((finale or {}).get('finish_at'), now)}s",
         )
-    claimed = await db.players.find_one_and_update(
-        {
-            "_id": player["_id"],
-            "mastermind.active_heist.id": heist["id"],
-            "mastermind.active_heist.finale.id": finale["id"],
-            "mastermind.active_heist.finale.status": "ready",
-        },
-        {"$set": {"mastermind.active_heist": None}},
-        return_document=ReturnDocument.AFTER,
-    )
-    if not claimed:
-        raise HTTPException(status_code=409, detail="Este resultado já foi recolhido")
 
+    pid = str(player["_id"])
     success = finale["outcome"] == "success"
-    member_ids = await _release_heist_team(player, heist, now, success=success)
     target = HEIST_TARGETS[heist["target_key"]]
-    xp_gain = 80 + target["unlock_rank"] * 35 if success else 18
-    heat_gain = finale["heat_gain"] if success else max(4, int(finale["heat_gain"] * 1.35))
-    new_heat = min(100.0, float(claimed.get("heat", 0)) + heat_gain)
-    bounty_before = int((claimed.get("mastermind") or {}).get("bounty", 0) or 0)
-    bounty_gain = target["bounty"] if success else target["bounty"] + (12 if finale.get("caught") else 5)
-    new_bounty = min(100, bounty_before + bounty_gain)
-    reward = 0
-    if success:
-        room = max(0, dirty_money_cap(claimed.get("level", 1)) - int(claimed.get("dirty_money", 0)))
-        reward = min(int(finale["net_reward"]), room)
-
-    cooldown_until = (now + timedelta(seconds=target["cooldown_s"])).isoformat()
-    history = {
-        "id": heist["id"],
-        "ts": now.isoformat(),
-        "target_key": heist["target_key"],
-        "target_name": heist["target_name"],
-        "team_name": heist["team_name"],
-        "vehicle_name": heist["vehicle_name"],
-        "approach_name": heist["approach_name"],
-        "complication_name": finale["complication_name"],
-        "success": success,
-        "caught": bool(finale.get("caught")),
-        "reward": reward,
-        "xp": xp_gain,
-    }
-    update = {
-        "$set": {
-            "heat": new_heat,
-            "mastermind.bounty": new_bounty,
-            f"mastermind.target_cooldowns.{heist['target_key']}": cooldown_until,
-        },
-        "$inc": {"mastermind.xp": xp_gain},
-        "$push": {
-            "mastermind.history": {
-                "$each": [history],
-                "$position": 0,
-                "$slice": 20,
+    if is_resuming:
+        # The primary settlement was committed, but the asset release or
+        # secondary logs may have been interrupted. Never pay it again.
+        reward = int(recovery["reward"])
+        xp_gain = int(recovery["xp"])
+        credited_balance = int(recovery["balance_after"])
+    else:
+        xp_gain = 80 + target["unlock_rank"] * 35 if success else 18
+        heat_gain = finale["heat_gain"] if success else max(4, int(finale["heat_gain"] * 1.35))
+        new_heat = min(100.0, float(player.get("heat", 0)) + heat_gain)
+        bounty_before = int((player.get("mastermind") or {}).get("bounty", 0) or 0)
+        bounty_gain = target["bounty"] if success else target["bounty"] + (12 if finale.get("caught") else 5)
+        new_bounty = min(100, bounty_before + bounty_gain)
+        reward = 0
+        if success:
+            room = max(0, dirty_money_cap(player.get("level", 1)) - int(player.get("dirty_money", 0)))
+            reward = min(int(finale["net_reward"]), room)
+        credited_balance = int(player.get("dirty_money", 0)) + reward
+        cooldown_until = (now + timedelta(seconds=target["cooldown_s"])).isoformat()
+        history = {
+            "id": heist["id"], "ts": now.isoformat(),
+            "target_key": heist["target_key"],
+            "target_name": heist["target_name"],
+            "team_name": heist["team_name"],
+            "vehicle_name": heist["vehicle_name"],
+            "approach_name": heist["approach_name"],
+            "complication_name": finale["complication_name"],
+            "success": success, "caught": bool(finale.get("caught")),
+            "reward": reward, "xp": xp_gain,
+        }
+        # A single MongoDB document update both grants the full financial
+        # reward and clears the active heist. No partial payout is possible.
+        update = {
+            "$set": {
+                "mastermind.active_heist": None,
+                "mastermind.claim_recovery": {
+                    "heist": heist,
+                    "success": success,
+                    "reward": reward,
+                    "xp": xp_gain,
+                    "balance_after": credited_balance,
+                },
+                "heat": new_heat,
+                "mastermind.bounty": new_bounty,
+                f"mastermind.target_cooldowns.{heist['target_key']}": cooldown_until,
             },
-        },
-    }
-    if reward:
-        update["$inc"]["dirty_money"] = reward
-    await db.players.update_one({"_id": player["_id"]}, update)
+            "$inc": {"mastermind.xp": xp_gain},
+            "$push": {"mastermind.history": {
+                "$each": [history], "$position": 0, "$slice": 20,
+            }},
+        }
+        if reward:
+            update["$inc"]["dirty_money"] = reward
+        settled = await db.players.find_one_and_update(
+            {
+                "_id": player["_id"],
+                "mastermind.active_heist.id": heist["id"],
+                "mastermind.active_heist.finale.id": finale["id"],
+                "mastermind.active_heist.finale.status": "ready",
+            },
+            update,
+            return_document=ReturnDocument.AFTER,
+        )
+        if not settled:
+            raise HTTPException(status_code=409, detail="Este resultado já foi recolhido")
 
+    # Release is replay-safe: only entities still in the mastermind/on_mission
+    # state are changed, so a retry cannot increase their fatigue/XP twice.
+    member_ids = await _release_heist_team(player, heist, now, success=success)
     if reward:
-        await record_tx(
-            db,
-            str(player["_id"]),
-            "mastermind_heist",
-            reward,
-            "dirty",
-            int(claimed.get("dirty_money", 0)) + reward,
-            heist["target_name"],
+        await db.transactions.update_one(
+            {"_id": f"mastermind-heist:{pid}:{heist['id']}"},
+            {"$setOnInsert": {
+                "player_id": pid,
+                "kind": "mastermind_heist",
+                "amount": reward,
+                "currency": "dirty",
+                "balance_after": credited_balance,
+                "note": heist["target_name"],
+                "ts": now.isoformat(),
+            }},
+            upsert=True,
         )
     if not success and member_ids:
         victim_index = int(deterministic_roll(
-            f"{player['_id']}:{heist['id']}:victim"
+            f"{player['_id']}:{heist['id']}:victim",
         ) * len(member_ids))
         victim_id = member_ids[min(len(member_ids) - 1, victim_index)]
         if finale.get("caught"):
             await db.employees.update_one(
                 {"_id": victim_id},
-                {
-                    "$set": {
-                        "status": "arrested",
-                        "status_until": (now + timedelta(minutes=10)).isoformat(),
-                    },
-                },
+                {"$set": {
+                    "status": "arrested",
+                    "status_until": (now + timedelta(minutes=10)).isoformat(),
+                }},
             )
             await db.vehicles.update_one(
-                {"_id": _oid(heist["vehicle_id"])},
+                {
+                    "_id": _oid(heist["vehicle_id"]),
+                    "mastermind_penalties_applied": {"$ne": heist["id"]},
+                },
                 {
                     "$set": {"impounded_until": (now + timedelta(minutes=12)).isoformat()},
                     "$inc": {"street_notoriety": 20},
+                    "$addToSet": {"mastermind_penalties_applied": heist["id"]},
                 },
             )
         else:
             await db.employees.update_one(
                 {"_id": victim_id},
-                {
-                    "$set": {
-                        "status": "injured",
-                        "status_until": (now + timedelta(minutes=6)).isoformat(),
-                    },
-                },
+                {"$set": {
+                    "status": "injured",
+                    "status_until": (now + timedelta(minutes=6)).isoformat(),
+                }},
             )
 
     if success:
@@ -1141,14 +1159,17 @@ async def claim_heist(body: HeistIdInput, user: dict = Depends(get_current_user)
     else:
         message = f"{heist['target_name']} falhou; a equipa regressou ferida e sem carga."
         kind = "failure"
-    await add_event(db, str(player["_id"]), kind, message)
+
+    # Only clear the recovery marker after all financial and asset effects.
+    await db.players.update_one(
+        {"_id": player["_id"], "mastermind.claim_recovery.heist.id": heist["id"]},
+        {"$unset": {"mastermind.claim_recovery": ""}},
+    )
+    await add_event(db, pid, kind, message)
     return {
-        "ok": True,
-        "success": success,
+        "ok": True, "success": success,
         "caught": bool(finale.get("caught")),
-        "reward": reward,
-        "xp": xp_gain,
-        "message": message,
+        "reward": reward, "xp": xp_gain, "message": message,
     }
 
 
