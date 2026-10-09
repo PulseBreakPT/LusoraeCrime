@@ -1540,8 +1540,6 @@ const refreshCandidates=(save)=>{
   save.player.pool_refresh_at=new Date(Date.now()+30*60000).toISOString();
 };
 
-const genericOk=(message="Concluído")=>({ok:true,message});
-
 const mutateGame=(save,path,payload)=>{
   const p=parseBody(payload);
   const caps=calcCaps(save);
