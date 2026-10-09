@@ -633,9 +633,13 @@ async def city_snapshot(db, player):
         "hq": {"$type": "object"},
     }).sort("respect", -1).to_list(20)
     pvp_challenges = await db.city_pvp_challenges.find({
-        "$or": [{"attacker_id": pid}, {"defender_id": pid}],
-        "status": "pending",
-        "expires_at": {"$gt": now.isoformat()},
+        "$and": [
+            {"$or": [{"attacker_id": pid}, {"defender_id": pid}]},
+            {"$or": [
+                {"status": "pending", "expires_at": {"$gt": now.isoformat()}},
+                {"status": "settling"},
+            ]},
+        ],
     }).sort("created_at", -1).to_list(20)
 
     news = _news_from_world(ctx)
