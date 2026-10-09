@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContextV2";
 import { api } from "../../lib/api";
 import { Button } from "../ui/button";
-import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "../ui/alert-dialog";
+
 import { ShieldAlert, Scale, LogOut, RotateCcw, Check, Loader2, Hourglass } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -112,16 +112,16 @@ export function DisclaimerModal() {
   };
 
   return (
-    <AlertDialog open={visible}>
-      <AlertDialogContent
+    <main className="noir-legal-screen" aria-labelledby="disclaimer-title">
+      <div className="noir-legal-brand" aria-hidden="true">
+        <span>SUBMUNDO / BLACKLIST OS</span>
+        <span>ACESSO · INFORMAÇÃO LEGAL</span>
+      </div>
+      <section
         data-testid="disclaimer-overlay"
-        onEscapeKeyDown={(event) => event.preventDefault()}
-        className={`max-h-[calc(100dvh-1rem)] overflow-y-auto p-0 ${leaving ? "opacity-0" : "opacity-100"}`}
+        className={`noir-legal-content ${leaving ? "opacity-0" : "opacity-100"}`}
+        aria-label="Condições de utilização do jogo"
       >
-        <AlertDialogTitle className="sr-only">Aviso de ficção do SUBMUNDO</AlertDialogTitle>
-        <AlertDialogDescription className="sr-only">
-          Lê o aviso e confirma que entendes que o SUBMUNDO é uma obra de ficção antes de continuar.
-        </AlertDialogDescription>
 
         {stage === "notice" ? (
           <div className="p-6 md:p-7">
@@ -269,7 +269,7 @@ export function DisclaimerModal() {
             </div>
           </div>
         )}
-      </AlertDialogContent>
-    </AlertDialog>
+      </section>
+    </main>
   );
 }
