@@ -2265,7 +2265,7 @@ const mutateGame=(save,path,payload)=>{
   if(path==="mastermind/bounty"){if(p.action==="pay"){const cost=Math.max(2000,(save.mastermind.bounty||0)*180);chargeClean(save,cost,"Pagamento a caçadores");save.mastermind.bounty=0;}else{save.mastermind.bounty=Math.max(0,save.mastermind.bounty-25);save.player.heat=clamp(save.player.heat+6,0,100);}return {ok:true};}
   if(path==="mastermind/cache/scan"){if(save.mastermind.caches_collected.includes(p.district_key))fail(400,"Sinal já recolhido");save.mastermind.caches_collected.push(p.district_key);save.player.clean_money+=1800;save.mastermind.xp+=35;return {ok:true,reward:1800};}
 
-  return genericOk();
+  fail(404, `Ação indisponível no modo convidado: ${path}`);
 };
 
 export const isLocalGuestMode = () => localStorage.getItem(MODE_KEY) === "1";
