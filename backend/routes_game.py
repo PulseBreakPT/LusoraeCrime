@@ -23,7 +23,7 @@ from engine import (advance, haversine_m, add_event, now_utc, next_threshold, pa
                     local_presence_reduction_s, max_teams_for,
                     gen_candidate, employee_from_candidate, betrayal_risk_of, push_history,
                     record_tx, property_stack_ranks, property_stack_mult,
-                    dirty_money_cap, grant_quest_rewards,
+                    dirty_money_cap, settle_quest_reward,
                     weapon_combat_score, weapon_effective_score, weapon_jam_risk,
                     weapon_condition_factor,
                     _unlink_employee_weapon,
@@ -3999,98 +3999,64 @@ async def update_settings(body: SettingsUpdateInput, user: dict = Depends(get_cu
 async def claim_quest(body: QuestClaimInput, user: dict = Depends(get_current_user)):
     player = await get_player(user)
     pid = str(player["_id"])
-    q = await db.quests.find_one({"_id": _oid(body.quest_id, "Missão inválida"), "player_id": pid})
-    if not q:
+    quest = await db.quests.find_one({
+        "_id": _oid(body.quest_id, "Missão inválida"), "player_id": pid,
+    })
+    if not quest:
         raise HTTPException(status_code=404, detail="Missão não encontrada")
-    if q["status"] != "completed":
+    if quest.get("status") not in ("completed", "claiming"):
         raise HTTPException(status_code=400, detail="A missão ainda não está concluída")
-    d = QUEST_DEFS.get(q["quest_key"])
-    if not d:
+    definition = QUEST_DEFS.get(quest["quest_key"])
+    if not definition:
         raise HTTPException(status_code=400, detail="Missão desconhecida")
-    # Reserva por compare-and-set antes de creditar qualquer recompensa.
-    reserved = await db.quests.find_one_and_update(
-        {"_id": q["_id"], "player_id": pid, "status": "completed"},
-        {"$set": {"status": "claiming"}},
-        return_document=ReturnDocument.AFTER,
+
+    # A claim in 'claiming' is recoverable: both the reward snapshot and the
+    # balance receipt survive a crash. Do not return it to 'completed' after
+    # an exception, since the player may already have received the money.
+    parts, mult_note = await settle_quest_reward(
+        db, player, quest, definition, now_utc(),
     )
-    if not reserved:
-        raise HTTPException(status_code=409, detail="A recompensa acabou de ser reclamada noutra sessão")
-    try:
-        rewards, mult_note = effective_quest_rewards(player, q, d, now_utc())
-        parts = await grant_quest_rewards(db, player, rewards)
-        if mult_note:
-            parts.append(mult_note)
-        # effective_quest_rewards mutou série/desempenho — persistir já.
-        await db.players.update_one({"_id": player["_id"]}, {"$set": {
-            "quest_streak": player.get("quest_streak", {}),
-            "quest_perf": player.get("quest_perf", {}),
-        }})
-        await db.quests.update_one(
-            {"_id": q["_id"], "status": "claiming"},
-            {"$set": {"status": "claimed", "claimed_at": now_utc().isoformat()}},
-        )
-    except Exception:
-        await db.quests.update_one({"_id": q["_id"], "status": "claiming"}, {"$set": {"status": "completed"}})
-        raise
-    if q["quest_key"] == "c2_front":
-        await db.quests.insert_one(make_instance(pid, "dec_informador", now_utc(), player.get("stats", {}), expires_s=3600))
-        await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
-    msg = f"Recompensa reclamada — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada."
+    msg = (
+        f"Recompensa reclamada — {definition['name']}: " + ", ".join(parts) + "."
+        if parts else f"Missão {definition['name']} reclamada."
+    )
     await add_event(db, pid, "success", msg)
-    return {"ok": True, "rewards": parts, "unlocks": d.get("unlocks_text"), "mult_note": mult_note}
+    return {
+        "ok": True,
+        "rewards": parts,
+        "unlocks": definition.get("unlocks_text"),
+        "mult_note": mult_note,
+    }
 
 
 @router.post("/quests/claim_all")
 @idempotent("quests.claim_all")
 async def claim_all_quests(body: Optional[MutationInput] = None, user: dict = Depends(get_current_user)):
-    """Reclama TODAS as missões concluídas de uma vez — a mesma fórmula
-    dinâmica do claim individual (nível × dificuldade × tier × série ×
-    execução rápida), com a série/momentum persistidos uma única vez no fim."""
+    """Claim all completed or interrupted quests, preserving each reward once."""
     player = await get_player(user)
     pid = str(player["_id"])
     now = now_utc()
-    qs = await db.quests.find({"player_id": pid, "status": "completed"}).to_list(100)
-    claimable = [q for q in qs if QUEST_DEFS.get(q.get("quest_key"))]
+    quests = await db.quests.find({
+        "player_id": pid,
+        "status": {"$in": ["completed", "claiming"]},
+    }).to_list(100)
+    claimable = [quest for quest in quests if QUEST_DEFS.get(quest.get("quest_key"))]
     if not claimable:
         raise HTTPException(status_code=400, detail="Nenhuma missão concluída por reclamar")
+
     all_parts = []
-    claimed_count = 0
-    for q in claimable:
-        reserved = await db.quests.find_one_and_update(
-            {"_id": q["_id"], "player_id": pid, "status": "completed"},
-            {"$set": {"status": "claiming"}},
-            return_document=ReturnDocument.AFTER,
+    for quest in claimable:
+        definition = QUEST_DEFS[quest["quest_key"]]
+        parts, _ = await settle_quest_reward(db, player, quest, definition, now)
+        all_parts.append(
+            f"{definition['name']}: " + ", ".join(parts)
+            if parts else definition["name"]
         )
-        if not reserved:
-            continue
-        d = QUEST_DEFS[q["quest_key"]]
-        try:
-            rewards, mult_note = effective_quest_rewards(player, q, d, now)
-            parts = await grant_quest_rewards(db, player, rewards)
-            if mult_note:
-                parts.append(mult_note)
-            await db.quests.update_one(
-                {"_id": q["_id"], "status": "claiming"},
-                {"$set": {"status": "claimed", "claimed_at": now.isoformat()}},
-            )
-        except Exception:
-            await db.quests.update_one({"_id": q["_id"], "status": "claiming"}, {"$set": {"status": "completed"}})
-            raise
-        claimed_count += 1
-        if q["quest_key"] == "c2_front":
-            await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
-            await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
-        all_parts.append(f"{d['name']}: " + ", ".join(parts) if parts else d["name"])
-    # effective_quest_rewards mutou série/desempenho a cada claim — persistir uma vez.
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "quest_streak": player.get("quest_streak", {}),
-        "quest_perf": player.get("quest_perf", {}),
-    }})
-    if claimed_count == 0:
-        raise HTTPException(status_code=409, detail="As recompensas foram reclamadas noutra sessão")
-    await add_event(db, pid, "success",
-                    f"Recompensas reclamadas — {claimed_count} contrato(s) fechado(s) de uma vez.")
-    return {"ok": True, "claimed": claimed_count, "rewards": all_parts}
+    await add_event(
+        db, pid, "success",
+        f"Recompensas reclamadas — {len(all_parts)} contrato(s) fechado(s) de uma vez.",
+    )
+    return {"ok": True, "claimed": len(all_parts), "rewards": all_parts}
 
 
 @router.post("/quests/choose")
