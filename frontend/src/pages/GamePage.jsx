@@ -227,6 +227,38 @@ export default function GamePage() {
     setNavGroup((current) => (current === group ? null : group));
   };
 
+  // The full-screen menus never own navigation. They send a semantic intent
+  // to the game shell, which remains the single navigation controller.
+  useEffect(() => {
+    const onWorkspaceNavigate = (event) => {
+      const destination = event.detail?.panel;
+      if (!destination) return;
+      setNavGroup(null);
+      setMapLegendOpen(false);
+      setFocusTarget(null);
+      setSelectedOpp(null);
+      if (destination === "search") {
+        setCommandOpen(true);
+        setDeckOpen(false);
+        setOpenPanel(null);
+      } else if (destination === "map") {
+        setCommandOpen(false);
+        setDeckOpen(false);
+        setOpenPanel(null);
+      } else if (destination === "dashboard") {
+        setCommandOpen(false);
+        setOpenPanel(null);
+        setDeckOpen(true);
+      } else {
+        setCommandOpen(false);
+        setDeckOpen(false);
+        setOpenPanel(canonicalGamePanel(destination));
+      }
+    };
+    window.addEventListener("sub:workspace:navigate", onWorkspaceNavigate);
+    return () => window.removeEventListener("sub:workspace:navigate", onWorkspaceNavigate);
+  }, []);
+
   useEffect(() => {
     if (!selectedOpp || !state) return;
     const still = state.opportunities.find((o) => o.id === selectedOpp.id);

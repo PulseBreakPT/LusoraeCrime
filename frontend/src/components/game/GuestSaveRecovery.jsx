@@ -41,7 +41,7 @@ export function GuestSaveRecovery() {
   };
 
   return (
-    <div data-testid="guest-save-recovery" className="pointer-events-auto fixed left-1/2 top-3 z-[150] w-[min(94vw,34rem)] -translate-x-1/2 rounded-xl border border-amber-500/30 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-md">
+    <div data-testid="guest-save-recovery" className="noir-recovery-screen pointer-events-auto fixed left-1/2 top-3 z-[150] w-[min(94vw,34rem)] -translate-x-1/2 rounded-xl border border-amber-500/30 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-md">
       <div className="flex items-start gap-2.5">
         <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-400" />
         <div className="min-w-0">
