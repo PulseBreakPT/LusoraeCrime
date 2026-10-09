@@ -2197,38 +2197,55 @@ async def _resolve_chase(db, player, m):
 
 
 async def _pay_pending_reward(db, player, m):
+    """Pay a returning mission at most once, even after a failed tick/retry.
+
+    The credit and its receipt live in the *same player document* to guarantee
+    atomicity on a standalone MongoDB deployment (no replica-set required).
+    """
     reward = int(m.get("pending_reward", 0) or 0)
     if reward <= 0:
         return
     pays = m.get("pending_pays") or m.get("opportunity", {}).get("pays", "dirty")
-    stats = player.setdefault("stats", default_stats())
+    mission_id = str(m["_id"])
     wasted = 0
-    if pays == "clean":
-        player["clean_money"] += reward
-        stats["earned_clean"] = stats.get("earned_clean", 0) + reward
-    else:
-        cap = dirty_money_cap(player.get("level", 1)) + prestige.get("dirty_cap_increase", 0) + prestige_effects(player)["dirty_cap_increase"]
-        room = max(0, cap - player["dirty_money"])
+    credited = reward
+    if pays != "clean":
+        cap = dirty_money_cap(player.get("level", 1)) + int(
+            prestige_effects(player).get("dirty_cap_increase", 0) or 0
+        )
+        room = max(0, cap - int(player.get("dirty_money", 0) or 0))
         credited = min(reward, room)
         wasted = reward - credited
-        player["dirty_money"] += credited
-        stats["earned_dirty"] = stats.get("earned_dirty", 0) + credited
-    # Persist money & stats immediately.
-    await db.players.update_one({"_id": player["_id"]}, {"$set": {
-        "clean_money": player["clean_money"], "dirty_money": player["dirty_money"],
-        "stats": stats,
-    }})
-    kind = "success"
+    currency = "clean_money" if pays == "clean" else "dirty_money"
+    earned = "earned_clean" if pays == "clean" else "earned_dirty"
+    result = await db.players.update_one(
+        {"_id": player["_id"], "mission_rewards_paid": {"$ne": mission_id}},
+        {
+            "$inc": {currency: credited, f"stats.{earned}": credited},
+            "$addToSet": {"mission_rewards_paid": mission_id},
+        },
+    )
+    if result.modified_count != 1:
+        # A previous tick committed the reward but failed before finishing the
+        # mission. Never award it again, even with a new request_id.
+        return
+    player[currency] = int(player.get(currency, 0) or 0) + credited
+    stats = player.setdefault("stats", default_stats())
+    stats[earned] = int(stats.get(earned, 0) or 0) + credited
     label = "limpos" if pays == "clean" else "sujos"
-    await add_event(db, m["player_id"], kind,
-                    f"{m['team_name']} entregou {reward:,} € {label} no QG.")
-    await record_tx(db, m["player_id"], "mission_reward", reward - wasted, pays,
-                     player["clean_money"] if pays == "clean" else player["dirty_money"],
-                     f"Recompensa de {m['team_name']}: {m['opportunity']['name']}")
+    await add_event(
+        db, m["player_id"], "success",
+        f"{m['team_name']} entregou {credited:,} € {label} no QG.",
+    )
+    await record_tx(
+        db, m["player_id"], "mission_reward", credited, pays,
+        player[currency], f"Recompensa de {m['team_name']}: {m['opportunity']['name']}",
+    )
     if wasted > 0:
-        await add_event(db, m["player_id"], "police",
-                        f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.")
-
+        await add_event(
+            db, m["player_id"], "police",
+            f"Armazenamento de dinheiro sujo no limite — {wasted:,} € foram desperdiçados. Lava dinheiro para abrir espaço.",
+        )
 
 def _failure_cause_suffix(m):
     """Forense pós-operação (SSS v3): aponta o fator negativo mais pesado do
