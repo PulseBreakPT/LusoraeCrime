@@ -33,6 +33,9 @@ jobs:
       - name: Validate Python syntax
         run: python -m py_compile backend/engine.py backend/game_data.py backend/economy_constants.py backend/quests_data.py backend/mastermind_data.py backend/routes_game.py backend/routes_mastermind.py backend/routes_organization.py backend/routes_city.py backend/routes_admin.py backend/city_systems.py backend/city_data.py backend/organization_systems.py backend/organization_intelligence.py backend/organization_automation.py backend/organization_events.py backend/economy_director.py backend/mutation_guard.py backend/state_lease.py backend/player_access.py backend/models.py backend/retention_engine.py backend/operational_director.py backend/road_routing.py backend/travel_metrics.py backend/time_rules.py backend/auth.py backend/reward_engine.py backend/server.py
 
+      - name: Test critical settlement safety
+        run: python backend/tests/test_critical_settlement_safety.py
+
       - name: Test Portugal economy
         run: python backend/tests/test_economy_portugal_2026.py
 
