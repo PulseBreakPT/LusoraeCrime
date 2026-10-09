@@ -517,4 +517,26 @@ describe("offline guest engine", () => {
     expect(preview.data.operation_profile_label).toBeTruthy();
   });
 
+  test("rejects unsupported offline actions instead of faking success", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223, lng: -9.1393,
+    });
+    await expect(localGuestRequest("post", "/game/action-that-does-not-exist", {}))
+      .rejects.toMatchObject({ response: { status: 404 } });
+  });
+
+  test("invalid roulette choices never debit offline funds", async () => {
+    enableLocalGuestMode();
+    await localGuestRequest("post", "/game/hq/place", {
+      lat: 38.7223, lng: -9.1393,
+    });
+    const before = (await localGuestRequest("get", "/game/state")).data.player.clean_money;
+    await expect(localGuestRequest("post", "/game/city/casino/play", {
+      game: "roulette", bet: 500, choice: "invalid-colour",
+    })).rejects.toMatchObject({ response: { status: 400 } });
+    const after = (await localGuestRequest("get", "/game/state")).data.player.clean_money;
+    expect(after).toBe(before);
+  });
+
 });
