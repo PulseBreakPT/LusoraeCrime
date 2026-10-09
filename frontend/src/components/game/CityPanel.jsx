@@ -463,7 +463,7 @@ export const CityPanel = ({
                                 onClick={() => act(`decline-${challenge.id}`, "social/pvp/decline", { challenge_id:challenge.id }, "Desafio recusado")}
                               >
                                 Recusar
-                              </ActionButton>
+                              </ActionButton>}
                             </>
                           )}
                         </div>
