@@ -81,25 +81,28 @@ const SheetContent = React.forwardRef(({
   const context = React.useContext(WorkspaceContext);
   const closeRef = React.useRef(null);
   const isSearch = variant === "search";
+  const isOpen = Boolean(context?.open);
+  const changeOpen = context?.changeOpen;
+
   React.useEffect(() => {
-    if (!context?.open) return undefined;
+    if (!isOpen) return undefined;
     const onEscape = (event) => {
       if (event.key === "Escape" && !event.defaultPrevented) {
         event.preventDefault();
-        context.changeOpen(false);
+        changeOpen?.(false);
       }
     };
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
-  }, [context?.open, context?.changeOpen]);
+  }, [isOpen, changeOpen]);
 
   React.useEffect(() => {
-    if (!context?.open || isSearch) return;
+    if (!isOpen || isSearch) return undefined;
     const raf = requestAnimationFrame(() => closeRef.current?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(raf);
-  }, [context?.open, isSearch]);
+  }, [isOpen, isSearch]);
 
-  if (!context?.open || typeof document === "undefined") return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   const workspace = (
     <section
@@ -116,7 +119,7 @@ const SheetContent = React.forwardRef(({
       <div className="noir-workspace-chrome">
         <button ref={closeRef} type="button" className="noir-workspace-back"
           onClick={() => context.changeOpen(false)}
-          aria-label="Fechar menu e voltar ao centro de comando">
+          aria-label="Fechar menu e voltar ao ecrã anterior">
           <ArrowLeft size={19} strokeWidth={1.8}/><span>VOLTAR</span>
         </button>
         <span className="noir-workspace-brand">SUB<span>MUNDO</span><small>/ BLACKLIST OS</small></span>
