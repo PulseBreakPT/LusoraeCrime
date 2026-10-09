@@ -3,6 +3,7 @@ import { useGame } from "../context/GameContextV2";
 import { useSettings } from "../context/SettingsContext";
 import LiveMap, { MapLegend, PlacementControls } from "../components/game/LiveMap";
 import { ResourceBar } from "../components/game/ResourceBar";
+import { NoirCommandDeck, NoirCommandRail, NoirMobileBrand } from "../components/game/NoirCommandDeck";
 import { OpportunityCard } from "../components/game/OpportunityCard";
 import { TeamsPanel } from "../components/game/TeamsPanel";
 import { EmpirePanel } from "../components/game/EmpirePanel";
@@ -49,6 +50,7 @@ export default function GamePage() {
   const { hideImpossibleMissions, showFps, focusMode } = settings;
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [openPanel, setOpenPanel] = useState(initialGamePanel);
+  const [deckOpen, setDeckOpen] = useState(true);
   const [commandOpen, setCommandOpen] = useState(false);
   const [navGroup, setNavGroup] = useState(null);
   const [mapLegendOpen, setMapLegendOpen] = useState(false);
@@ -175,10 +177,12 @@ export default function GamePage() {
     );
     setNavGroup(null);
     setMapLegendOpen(false);
+    setDeckOpen(false);
     setOpenPanel(targetPanel);
   };
 
   const openFromNav = (panel) => {
+    setDeckOpen(false);
     setFocusTarget(null);
     setNavGroup(null);
     setMapLegendOpen(false);
@@ -188,6 +192,7 @@ export default function GamePage() {
   };
 
   const returnToMap = () => {
+    setDeckOpen(false);
     setFocusTarget(null);
     setNavGroup(null);
     setMapLegendOpen(false);
@@ -196,7 +201,24 @@ export default function GamePage() {
     setOpenPanel(null);
   };
 
+  const openDashboard = () => {
+    setFocusTarget(null);
+    setNavGroup(null);
+    setMapLegendOpen(false);
+    setCommandOpen(false);
+    setSelectedOpp(null);
+    setOpenPanel(null);
+    setDeckOpen(true);
+  };
+
+  const openCommandSearch = () => {
+    setDeckOpen(false);
+    setNavGroup(null);
+    setCommandOpen(true);
+  };
+
   const toggleNavGroup = (group) => {
+    setDeckOpen(false);
     setFocusTarget(null);
     setMapLegendOpen(false);
     setCommandOpen(false);
@@ -273,7 +295,8 @@ export default function GamePage() {
       }
     : levelSafeState;
 
-  const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || navGroup || mapLegendOpen);
+  const showDeck = deckOpen && !focusMode && !placement && !openPanel && !selectedOpp;
+  const hudPinned = Boolean(openPanel || selectedOpp || placement || commandOpen || navGroup || mapLegendOpen || showDeck);
 
   return (
     <div
@@ -281,7 +304,7 @@ export default function GamePage() {
       data-testid="game-page"
       data-heat-tier={heatTier}
       data-live-ops={takenOpportunities.length}
-      className={`sub-game-shell fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"} ${selectedOpp ? "sub-has-selection" : ""} ${hudPinned ? "sub-ui-open" : ""} ${takenOpportunities.length ? "sub-operations-live" : ""}`}
+      className={`sub-game-shell noir-game-shell ${showDeck ? "noir-deck-open" : ""} fixed inset-0 overflow-hidden bg-background ${hudAwake || hudPinned ? "sub-hud-awake" : "sub-hud-idle"} ${selectedOpp ? "sub-has-selection" : ""} ${hudPinned ? "sub-ui-open" : ""} ${takenOpportunities.length ? "sub-operations-live" : ""}`}
     >
       <LiveMap
         state={mapState}
@@ -289,6 +312,7 @@ export default function GamePage() {
         selectedOppId={selectedOpp?.id}
         onSelectOpp={(opp) => {
           setSelectedOpp(opp);
+          if (opp) setDeckOpen(false);
           if (!opp) setNavGroup(null);
           else {
             setNavGroup(null);
@@ -302,6 +326,42 @@ export default function GamePage() {
         baseFilter={baseFilter}
       />
       <div className="sub-vignette" aria-hidden="true" />
+      {!placement && !focusMode && (
+        <>
+          <NoirCommandRail
+            currentPanel={openPanel}
+            deckOpen={showDeck}
+            level={p.level}
+            orgName={p.org_name}
+            alerts={alerts.claimable || 0}
+            onDashboard={openDashboard}
+            onMap={returnToMap}
+            onNavigate={openFromNav}
+            onSearch={openCommandSearch}
+          />
+          <NoirMobileBrand
+            deckOpen={showDeck}
+            orgName={p.org_name}
+            onDashboard={openDashboard}
+            onSearch={openCommandSearch}
+          />
+        </>
+      )}
+      {showDeck && (
+        <NoirCommandDeck
+          state={state}
+          serverNow={serverNow}
+          realtimeConnected={realtimeConnected}
+          alerts={alerts.total || 0}
+          onNavigate={openFromNav}
+          onMap={returnToMap}
+          onSelectOpp={(opp) => {
+            setSelectedOpp(opp);
+            setDeckOpen(false);
+          }}
+          onSearch={openCommandSearch}
+        />
+      )}
       {stamp && (
         <div key={stamp.key} className="sub-stamp" aria-hidden="true" data-testid="dispatch-stamp">
           <div className="sub-stamp-box">
@@ -311,8 +371,8 @@ export default function GamePage() {
         </div>
       )}
 
-      {!focusMode && <ResourceBar />}
-      {!focusMode && !placement && !selectedOpp && !openPanel && !navGroup && (
+      {!focusMode && !showDeck && <ResourceBar />}
+      {!focusMode && !showDeck && !placement && !selectedOpp && !openPanel && !navGroup && (
         <WorldPulseHud
           world={state.operational?.world}
           realtimeConnected={realtimeConnected}
@@ -332,7 +392,7 @@ export default function GamePage() {
         </Button>
       )}
       {!focusMode && showFps && <FpsMeter />}
-      {!focusMode && availableMissions.length > 0 && (
+      {!focusMode && !showDeck && availableMissions.length > 0 && (
         <Button variant="bare" size="bare"
           type="button"
           data-testid="available-missions-hud"
@@ -345,7 +405,7 @@ export default function GamePage() {
           <span className="sub-available-missions-count">{availableMissions.length}</span>
         </Button>
       )}
-      {!focusMode && wantedStars > 0 && (
+      {!focusMode && !showDeck && wantedStars > 0 && (
         <div
           key={`wanted-${wantedStars}`}
           role="status"
@@ -382,7 +442,7 @@ export default function GamePage() {
       {/* Modo de colocação = modo focado: só o mapa e os controlos de colocação
           ficam visíveis; central, cartões, legenda, filtro e dock saem do
           caminho para nada tapar o Confirmar/Cancelar. */}
-      {!placement && !focusMode && <ActivityFeedMobile onNavigate={navigateTo} suppressed={!!selectedOpp} />}
+      {!placement && !focusMode && <ActivityFeedMobile onNavigate={navigateTo} suppressed={!!selectedOpp || showDeck} />}
       {selectedOpp && !placement && <OpportunityCard opp={selectedOpp} onClose={() => setSelectedOpp(null)} onNavigate={navigateTo} />}
 
       {!placement && !focusMode && (
