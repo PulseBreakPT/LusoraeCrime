@@ -1,116 +1,185 @@
-import * as React from "react"
-import * as SheetPrimitive from "@radix-ui/react-dialog"
-import { cva } from "class-variance-authority"
-import { X } from "lucide-react"
+import * as React from "react";
+import { createPortal } from "react-dom";
+import { ArrowLeft, ArrowUpRight, Banknote, Crosshair, Map as MapIcon, Search, Skull, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
+/**
+ * BLACKLIST Workspace Navigation
+ *
+ * Former game Sheets are now actual menu regions — not dialogs, overlays or
+ * focus traps. Existing panel APIs (Sheet/SheetContent/etc.) are preserved so
+ * game mechanics and nested tabs continue to work without being rewritten.
+ */
+const WorkspaceContext = React.createContext(null);
 
-const Sheet = SheetPrimitive.Root
-const SheetTrigger = SheetPrimitive.Trigger
-const SheetClose = SheetPrimitive.Close
-const SheetPortal = SheetPrimitive.Portal
+const Sheet = ({ open, defaultOpen = false, onOpenChange, children }) => {
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
+  const isOpen = open === undefined ? internalOpen : open;
+  const titleId = React.useId();
+  const changeOpen = React.useCallback((next) => {
+    if (open === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  }, [open, onOpenChange]);
 
-const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
-  <SheetPrimitive.Overlay
-    className={cn(
-      "sub-modal-overlay fixed inset-0 z-50 bg-black/65 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-150",
-      className
-    )}
-    {...props}
-    ref={ref}
-  />
-))
-SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
+  return (
+    <WorkspaceContext.Provider value={{ open: isOpen, changeOpen, titleId }}>
+      {children}
+    </WorkspaceContext.Provider>
+  );
+};
 
-// Os módulos principais do SUBMUNDO usam side="right", mas "right" significa
-// a shell modal central definida em DESIGN.md. As restantes variantes ficam
-// disponíveis para superfícies auxiliares que precisem de um sheet real.
-const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-4 pt-0 shadow-lg transition ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-200 data-[state=closed]:duration-150 sm:p-6 sm:pt-0",
-  {
-    variants: {
-      side: {
-        top: "inset-x-0 top-0 border-b data-[state=open]:slide-in-from-top data-[state=closed]:slide-out-to-top",
-        bottom: "inset-x-0 bottom-0 border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
-        left: "inset-y-0 left-0 h-full w-full border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left sm:w-[27rem] sm:max-w-[92vw] lg:w-[30rem]",
-        right: "left-1/2 top-1/2 rounded-2xl border",
+const cloneActivator = (children, callback, props = {}) => {
+  if (React.isValidElement(children)) {
+    return React.cloneElement(children, {
+      ...props,
+      onClick: (event) => {
+        children.props.onClick?.(event);
+        if (!event.defaultPrevented) callback();
       },
-    },
-    defaultVariants: {
-      side: "right",
-    },
+    });
   }
-)
+  return null;
+};
 
-const SheetContent = React.forwardRef(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content
+const SheetTrigger = React.forwardRef(({ asChild, children, ...props }, ref) => {
+  const context = React.useContext(WorkspaceContext);
+  if (asChild) return cloneActivator(children, () => context?.changeOpen(true), props);
+  return <button type="button" ref={ref} {...props} onClick={() => context?.changeOpen(true)}>{children}</button>;
+});
+SheetTrigger.displayName = "SheetTrigger";
+
+const SheetClose = React.forwardRef(({ asChild, children, onClick, ...props }, ref) => {
+  const context = React.useContext(WorkspaceContext);
+  if (asChild) return cloneActivator(children, () => context?.changeOpen(false), props);
+  return <button type="button" ref={ref} {...props} onClick={(event) => {
+    onClick?.(event);
+    if (!event.defaultPrevented) context?.changeOpen(false);
+  }}>{children}</button>;
+});
+SheetClose.displayName = "SheetClose";
+
+const SheetPortal = ({ children }) => <>{children}</>;
+const SheetOverlay = () => null;
+
+const sections = [
+  { id: "operations", label: "OPERAÇÕES", icon: Crosshair },
+  { id: "teams", label: "EQUIPAS", icon: Users },
+  { id: "empire", label: "FINANÇAS", icon: Banknote },
+  { id: "world", label: "CIDADE", icon: MapIcon },
+  { id: "intel", label: "INTEL", icon: Skull },
+];
+
+const navigate = (panel) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("sub:workspace:navigate", { detail: { panel } }));
+  }
+};
+
+const SheetContent = React.forwardRef(({
+  side = "right", className, children, onKeyDown, variant = "menu", ...props
+}, ref) => {
+  const context = React.useContext(WorkspaceContext);
+  const closeRef = React.useRef(null);
+  const isSearch = variant === "search";
+  React.useEffect(() => {
+    if (!context?.open) return undefined;
+    const onEscape = (event) => {
+      if (event.key === "Escape" && !event.defaultPrevented) {
+        event.preventDefault();
+        context.changeOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [context?.open, context?.changeOpen]);
+
+  React.useEffect(() => {
+    if (!context?.open || isSearch) return;
+    const raf = requestAnimationFrame(() => closeRef.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(raf);
+  }, [context?.open, isSearch]);
+
+  if (!context?.open || typeof document === "undefined") return null;
+
+  const workspace = (
+    <section
       ref={ref}
-      className={cn(sheetVariants({ side }), side === "right" && "sub-sheet-panel", className)}
+      role="region"
+      aria-labelledby={context.titleId}
+      data-noir-workspace={variant}
+      data-side={side}
+      tabIndex={-1}
+      className={cn("noir-workspace-menu sub-sheet-panel sub-panel", isSearch && "noir-workspace-search", className)}
+      onKeyDown={onKeyDown}
       {...props}
     >
-      <SheetPrimitive.Close
-        aria-label="Fechar"
-        className="sub-sheet-close absolute right-2 top-2 z-30 flex h-11 w-11 items-center justify-center rounded-xl border border-transparent bg-transparent p-0 text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:pointer-events-none sm:right-3 sm:top-2.5"
-      >
-        <X className="h-4 w-4" />
-        <span className="sr-only">Fechar</span>
-      </SheetPrimitive.Close>
-      <div className="sub-sheet-scroll">
+      <div className="noir-workspace-chrome">
+        <button ref={closeRef} type="button" className="noir-workspace-back"
+          onClick={() => context.changeOpen(false)}
+          aria-label="Fechar menu e voltar ao centro de comando">
+          <ArrowLeft size={19} strokeWidth={1.8}/><span>VOLTAR</span>
+        </button>
+        <span className="noir-workspace-brand">SUB<span>MUNDO</span><small>/ BLACKLIST OS</small></span>
+        <button type="button" className="noir-workspace-map" onClick={() => navigate("map")}>
+          <MapIcon size={15}/> <span>MAPA TÁTICO</span><ArrowUpRight size={14}/>
+        </button>
+      </div>
+      {!isSearch && (
+        <nav className="noir-workspace-tabs" aria-label="Aceder a outro menu">
+          {sections.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" onClick={() => navigate(id)}>
+              <Icon size={14}/><span>{label}</span>
+            </button>
+          ))}
+          <button type="button" onClick={() => navigate("search")}>
+            <Search size={14}/><span>PESQUISAR</span>
+          </button>
+        </nav>
+      )}
+      <div className="noir-workspace-scroll sub-sheet-scroll">
         {children}
       </div>
-    </SheetPrimitive.Content>
-  </SheetPortal>
-))
-SheetContent.displayName = SheetPrimitive.Content.displayName
+      <div className="noir-workspace-footnote" aria-hidden="true">
+        <span>SUBMUNDO / SISTEMAS DA ORGANIZAÇÃO</span>
+        <span>COMANDO PRIVADO • PORTUGAL</span>
+      </div>
+    </section>
+  );
+  return createPortal(workspace, document.body);
+});
+SheetContent.displayName = "SheetContent";
 
 const SheetHeader = ({ className, ...props }) => (
-  <div
-    className={cn(
-      "sub-modal-header sticky top-0 z-20 -mx-4 mb-3 flex flex-col space-y-1 border-b border-white/[0.065] bg-[#0b0b0e] px-4 pb-3.5 pr-14 pt-4 text-left sm:-mx-6 sm:px-6 sm:pr-16",
-      className
-    )}
-    {...props}
-  />
-)
-SheetHeader.displayName = "SheetHeader"
+  <div className={cn(
+    "sub-modal-header noir-workspace-section-head flex flex-col space-y-1 text-left",
+    className,
+  )} {...props}/>
+);
+SheetHeader.displayName = "SheetHeader";
 
 const SheetFooter = ({ className, ...props }) => (
-  <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
-    {...props}
-  />
-)
-SheetFooter.displayName = "SheetFooter"
+  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props}/>
+);
+SheetFooter.displayName = "SheetFooter";
 
-const SheetTitle = React.forwardRef(({ className, ...props }, ref) => (
-  <SheetPrimitive.Title
-    ref={ref}
-    className={cn("sub-modal-title sub-sheet-title font-display text-[17px] font-bold uppercase tracking-[0.04em] text-foreground", className)}
-    {...props}
-  />
-))
-SheetTitle.displayName = SheetPrimitive.Title.displayName
+const SheetTitle = React.forwardRef(({ className, ...props }, ref) => {
+  const context = React.useContext(WorkspaceContext);
+  return <h2 ref={ref} id={context?.titleId} className={cn(
+    "sub-modal-title sub-sheet-title font-display text-3xl font-bold uppercase tracking-[0.04em] text-foreground",
+    className,
+  )} {...props}/>;
+});
+SheetTitle.displayName = "SheetTitle";
 
 const SheetDescription = React.forwardRef(({ className, ...props }, ref) => (
-  <SheetPrimitive.Description
-    ref={ref}
-    className={cn("sub-sheet-description max-w-[36rem] text-[11px] leading-relaxed text-muted-foreground", className)}
-    {...props}
-  />
-))
-SheetDescription.displayName = SheetPrimitive.Description.displayName
+  <p ref={ref} className={cn(
+    "sub-sheet-description max-w-[50rem] text-sm leading-relaxed text-muted-foreground",
+    className,
+  )} {...props}/>
+));
+SheetDescription.displayName = "SheetDescription";
 
 export {
-  Sheet,
-  SheetPortal,
-  SheetOverlay,
-  SheetTrigger,
-  SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetFooter,
-  SheetTitle,
-  SheetDescription,
-}
+  Sheet, SheetPortal, SheetOverlay, SheetTrigger, SheetClose, SheetContent,
+  SheetHeader, SheetFooter, SheetTitle, SheetDescription,
+};
