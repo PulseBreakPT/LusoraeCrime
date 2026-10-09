@@ -157,8 +157,10 @@ export function NoirCommandDeck({
   const player = state?.player || {};
   const level = Number(player.level || 1);
   const heat = Number(player.heat || 0);
-  const rawMissions = state?.missions || [];
-  const missions = useMemo(() => rawMissions.filter((m) => m.phase !== "done"), [rawMissions]);
+  const missions = useMemo(
+    () => (state?.missions || []).filter((m) => m.phase !== "done"),
+    [state?.missions],
+  );
   const available = useMemo(
     () => (state?.opportunities || []).filter((o) =>
       o.status === "active" && Number(o.min_level || 1) <= level
