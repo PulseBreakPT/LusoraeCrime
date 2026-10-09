@@ -111,10 +111,16 @@ def idempotent(action_name: str, *, audit_collection: str | None = None):
                 return result
             except Exception:
                 if receipt_key:
-                    await db.action_receipts.delete_one({
-                        "key": receipt_key,
-                        "status": "processing",
-                    })
+                    # The handler may have already committed money or assets.
+                    # Never erase the receipt and permit a duplicate financial
+                    # command; mark it for reconciliation instead.
+                    try:
+                        await db.action_receipts.update_one(
+                            {"key": receipt_key, "status": "processing"},
+                            {"$set": {"status": "needs_reconciliation"}},
+                        )
+                    except Exception:
+                        pass
                 raise
             finally:
                 if player_doc and lease_owner:
