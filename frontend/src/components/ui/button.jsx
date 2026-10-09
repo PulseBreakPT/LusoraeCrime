@@ -5,7 +5,7 @@ import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "sub-btn relative isolate inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:pointer-events-none disabled:opacity-45 disabled:saturate-[0.7] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "sub-btn noir-control relative isolate inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:pointer-events-none disabled:opacity-45 disabled:saturate-[0.7] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -18,9 +18,9 @@ const buttonVariants = cva(
         secondary:
           "sub-btn-soft border border-white/10 bg-zinc-900/90 text-zinc-300 hover:border-white/20 hover:bg-zinc-800/90 hover:text-white active:scale-[0.96]",
         success:
-          "sub-btn-success border border-emerald-500/40 bg-emerald-700 text-white shadow-[0_3px_10px_rgba(0,0,0,0.25)] hover:border-emerald-400/55 hover:bg-emerald-600 active:scale-[0.96]",
+          "sub-btn-success border border-red-500/40 bg-red-800 text-white hover:border-red-400/55 hover:bg-red-700 active:scale-[0.96]",
         warning:
-          "sub-btn-warning border border-amber-500/35 bg-amber-950/80 text-amber-100 hover:border-amber-400/50 hover:bg-amber-900/85 active:scale-[0.96]",
+          "sub-btn-warning border border-amber-600/35 bg-[#2c1c19] text-amber-200 hover:border-amber-400/50 hover:bg-[#39211f] active:scale-[0.96]",
         filter:
           "sub-btn-filter border border-white/10 bg-[#0d0d10] text-zinc-400 hover:border-white/20 hover:bg-[#111115] hover:text-white active:scale-[0.96] aria-[pressed=true]:border-red-500/30 aria-[pressed=true]:bg-red-500/[0.12] aria-[pressed=true]:text-red-200",
         ghost: "sub-btn-ghost border border-transparent text-zinc-300 hover:bg-white/[0.06] hover:text-white",
