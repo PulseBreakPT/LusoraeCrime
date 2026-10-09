@@ -3094,10 +3094,17 @@ async def _refresh_recruitment_pool(db, player, now):
     player["pool_refresh_at"] = (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()
 
 
-async def grant_quest_rewards(db, player, rw):
+async def grant_quest_rewards(db, player, rw, claim_id=None):
+    """Apply a quest reward once, including after interrupted claims.
+
+    The player balance and the quest payment marker are updated atomically in
+    one document. Asset rewards carry the source quest id, allowing an
+    interrupted claim to resume without spawning a second asset.
+    """
     pid = str(player["_id"])
     now_iso = now_utc().isoformat()
     parts, inc, sets = [], {}, {}
+
     if rw.get("dirty"):
         inc["dirty_money"] = rw["dirty"]
         parts.append(f"+{rw['dirty']:,} € sujos")
@@ -3110,60 +3117,94 @@ async def grant_quest_rewards(db, player, rw):
     if rw.get("heat"):
         sets["heat"] = max(0.0, min(100.0, player["heat"] + rw["heat"]))
         parts.append(f"{rw['heat']} calor")
+
     if rw.get("vehicle"):
-        m = VEHICLE_MODELS[rw["vehicle"]]
-        caps, _ = await get_caps(db, pid, player["hq"]["level"])
-        used = await db.vehicles.count_documents({"player_id": pid})
-        if used < caps["vehicles"]:
-            await db.vehicles.insert_one(vehicle_doc(pid, rw["vehicle"], now_iso))
-            parts.append(f"{m['name']} novo na garagem")
+        model_key = rw["vehicle"]
+        model = VEHICLE_MODELS[model_key]
+        existing = (
+            await db.vehicles.find_one({"player_id": pid, "reward_quest_id": claim_id})
+            if claim_id else None
+        )
+        if existing:
+            parts.append(f"{model['name']} novo na garagem")
         else:
-            inc["clean_money"] = inc.get("clean_money", 0) + m["price"]
-            parts.append(f"+{m['price']:,} € limpos (garagem cheia)")
+            caps, _ = await get_caps(db, pid, player["hq"]["level"])
+            used = await db.vehicles.count_documents({"player_id": pid})
+            if used < caps["vehicles"]:
+                asset = vehicle_doc(pid, model_key, now_iso)
+                if claim_id:
+                    asset["reward_quest_id"] = claim_id
+                await db.vehicles.insert_one(asset)
+                parts.append(f"{model['name']} novo na garagem")
+            else:
+                inc["clean_money"] = inc.get("clean_money", 0) + model["price"]
+                parts.append(f"+{model['price']:,} € limpos (garagem cheia)")
+
     if rw.get("employee"):
         er = rw["employee"]
         role, rarity = er["role"], er["rarity"]
-        caps, _ = await get_caps(db, pid, player["hq"]["level"])
-        used = await db.employees.count_documents({"player_id": pid})
-        if used < caps["employees"]:
-            sp = SPECIALIZATIONS[role]
-            await db.employees.insert_one({
-                "player_id": pid, "name": random_employee_name(), "age": random.randint(20, 50),
-                "role_key": role, "spec": sp["spec"], "rarity": rarity,
-                "rank": "recruta", "level": 1, "xp": 0,
-                "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
-                "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
-                "attrs": gen_attrs(role, rarity), "talents": gen_talents(role, rarity),
-                "status": "idle", "status_until": None, "team_id": None, "training": None,
-                "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
-                "hired_at": now_iso,
-            })
+        sp = SPECIALIZATIONS[role]
+        existing = (
+            await db.employees.find_one({"player_id": pid, "reward_quest_id": claim_id})
+            if claim_id else None
+        )
+        if existing:
             parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
         else:
-            fb = er.get("fallback_clean", 10000)
-            inc["clean_money"] = inc.get("clean_money", 0) + fb
-            parts.append(f"+{fb:,} € limpos (sem espaço no esconderijo)")
+            caps, _ = await get_caps(db, pid, player["hq"]["level"])
+            used = await db.employees.count_documents({"player_id": pid})
+            if used < caps["employees"]:
+                asset = {
+                    "player_id": pid, "name": random_employee_name(),
+                    "age": random.randint(20, 50),
+                    "role_key": role, "spec": sp["spec"], "rarity": rarity,
+                    "rank": "recruta", "level": 1, "xp": 0,
+                    "salary": int(sp["salary"] * RARITIES[rarity]["mult"]),
+                    "loyalty": 80.0, "morale": 80.0, "fatigue": 0.0,
+                    "attrs": gen_attrs(role, rarity),
+                    "talents": gen_talents(role, rarity),
+                    "status": "idle", "status_until": None,
+                    "team_id": None, "training": None,
+                    "history": [{"ts": now_iso, "text": "Juntou-se como recompensa de missão."}],
+                    "hired_at": now_iso,
+                }
+                if claim_id:
+                    asset["reward_quest_id"] = claim_id
+                await db.employees.insert_one(asset)
+                parts.append(f"{sp['name']} {RARITIES[rarity]['name']} juntou-se à organização")
+            else:
+                fallback = er.get("fallback_clean", 10000)
+                inc["clean_money"] = inc.get("clean_money", 0) + fallback
+                parts.append(f"+{fallback:,} € limpos (sem espaço no esconderijo)")
+
     if rw.get("temp_bonus"):
         tb = rw["temp_bonus"]
-        sets["temp_bonus"] = {"kind": tb["kind"], "pct": tb["pct"],
-                              "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat()}
+        sets["temp_bonus"] = {
+            "kind": tb["kind"], "pct": tb["pct"],
+            "until": (now_utc() + timedelta(seconds=tb["duration_s"])).isoformat(),
+        }
         parts.append(f"+{int(tb['pct'] * 100)}% recompensas durante {tb['duration_s'] // 60} min")
+
     update = {}
     if inc:
         update["$inc"] = inc
     if sets:
         update["$set"] = sets
+    query = {"_id": player["_id"]}
+    if claim_id:
+        query["quest_rewards_paid"] = {"$ne": str(claim_id)}
+        update["$addToSet"] = {"quest_rewards_paid": str(claim_id)}
+
     if update:
-        await db.players.update_one({"_id": player["_id"]}, update)
-    # Reflete as alterações também no objeto em memória — necessário quando esta
-    # função é chamada a partir do advance() (auto-reclamar missões), que faz um
-    # persist final do estado inteiro do jogador a partir deste dicionário, o que
-    # apagaria silenciosamente o $inc/$set feito diretamente na base de dados.
-    for k, v in inc.items():
-        player[k] = player.get(k, 0) + v
+        result = await db.players.update_one(query, update)
+        if result.modified_count != 1:
+            # Already paid. This is the recoverable replay of an interrupted
+            # claim, not a second opportunity to earn the reward.
+            return parts
+    for key, value in inc.items():
+        player[key] = player.get(key, 0) + value
     player.update(sets)
     return parts
-
 
 # ---------------- Automatizações ----------------
 
