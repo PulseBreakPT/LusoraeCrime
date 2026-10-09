@@ -71,7 +71,6 @@ export function AuthProvider({ children }) {
       setPhase("LOADING_PROFILE");
       advanceProgress("LOADING_PROFILE", 20);
       // Perfil já está em /auth/me, só avançamos progresso
-      await new Promise((r) => setTimeout(r, 200));
       advanceProgress("LOADING_PROFILE", 30);
       log("AUTH", "success", "Perfil carregado");
 
@@ -114,7 +113,6 @@ export function AuthProvider({ children }) {
       setPhase("LOADING_TEAMS");
       advanceProgress("LOADING_TEAMS", 65);
       // Dados já estão em gameState
-      await new Promise((r) => setTimeout(r, 100));
       advanceProgress("LOADING_TEAMS", 75);
       log("AUTH", "success", "Equipas e frota carregadas");
 
@@ -122,14 +120,12 @@ export function AuthProvider({ children }) {
       setPhase("LOADING_MISSIONS");
       advanceProgress("LOADING_MISSIONS", 80);
       // Dados já estão em gameState
-      await new Promise((r) => setTimeout(r, 100));
       advanceProgress("LOADING_MISSIONS", 90);
       log("AUTH", "success", "Operações carregadas");
 
       // PREPARAR INTERFACE (90-100%)
       setPhase("PREPARING_UI");
       advanceProgress("PREPARING_UI", 95);
-      await new Promise((r) => setTimeout(r, 100));
       advanceProgress("PREPARING_UI", 100);
       log("AUTH", "success", "Interface pronta");
 
