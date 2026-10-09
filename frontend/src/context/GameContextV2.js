@@ -521,7 +521,10 @@ export function GameProvider({ children }) {
     const errors = [];
     for (const request of requests) {
       try {
-        await api.post(`/game/${request.path}`, request.payload || {});
+        const requestId = typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        await api.post(`/game/${request.path}`, { ...(request.payload || {}), request_id: requestId });
         completed += 1;
       } catch (error) {
         errors.push(formatApiErrorDetail(error.response?.data?.detail) || error.message);
