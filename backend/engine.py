@@ -3849,7 +3849,7 @@ async def advance(db, player):
         player["level"] = level_for(player["respect"])
         player["last_tick"] = now.isoformat()
 
-        await db.players.update_one(
+        committed = await db.players.update_one(
             {"_id": player["_id"], "state_lease_owner": lease_token},
             {"$set": {
             "heat": player["heat"], "level": player["level"], "last_tick": player["last_tick"],
@@ -3880,6 +3880,8 @@ async def advance(db, player):
             "governance": player.get("governance", {}),
             }},
         )
+        if committed.matched_count != 1:
+            raise RuntimeError("O lease de simulação expirou; persistência final rejeitada")
         await spawn_opportunities(db, player, props, rare_chance=bonuses.get("rare_opp", 0.0))
         return player
     finally:
