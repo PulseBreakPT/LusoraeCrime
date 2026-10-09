@@ -138,7 +138,7 @@ const Metric = ({ icon: Icon, label, value, detail, tone = "neutral", progress }
 const ModuleHeading = ({ eyebrow, title, action, onAction }) => (
   <div className="noir-module-heading">
     <div><span className="noir-overline">{eyebrow}</span><h2>{title}</h2></div>
-    {onAction && <button type="button" onClick={onAction}>{action || "ABRIR"} <ArrowUpRight size={15} /></button>}
+    {onAction && <button type="button" onClick={onAction} aria-label={action || "Abrir módulo"}>{action || "ABRIR"} <ArrowUpRight size={15} /></button>}
   </div>
 );
 
