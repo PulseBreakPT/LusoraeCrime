@@ -3094,7 +3094,7 @@ async def _refresh_recruitment_pool(db, player, now):
     player["pool_refresh_at"] = (now + timedelta(minutes=POOL_REFRESH_MIN)).isoformat()
 
 
-async def grant_quest_rewards(db, player, rw, claim_id=None):
+async def grant_quest_rewards(db, player, rw, claim_id=None, claim_progress=None):
     """Apply a quest reward once, including after interrupted claims.
 
     The player balance and the quest payment marker are updated atomically in
@@ -3185,6 +3185,9 @@ async def grant_quest_rewards(db, player, rw, claim_id=None):
         }
         parts.append(f"+{int(tb['pct'] * 100)}% recompensas durante {tb['duration_s'] // 60} min")
 
+    if claim_progress is not None:
+        sets["quest_streak"] = claim_progress["quest_streak"]
+        sets["quest_perf"] = claim_progress["quest_perf"]
     update = {}
     if inc:
         update["$inc"] = inc
@@ -3290,26 +3293,101 @@ async def _auto_rest_employees(db, player, employees, settings, now):
         await add_event(db, pid, "team", f"{e['name']} foi descansar automaticamente.")
 
 
+async def settle_quest_reward(db, player, quest, definition, now):
+    """Resume a quest claim safely after a server failure.
+
+    Persist the calculated rewards and streak snapshot in the quest BEFORE
+    applying any reward. Replays use this snapshot, never reroll rewards or
+    increment the streak a second time.
+    """
+    qid = str(quest["_id"])
+    pid = str(player["_id"])
+    status = quest.get("status")
+    if status == "completed":
+        rewards, mult_note = effective_quest_rewards(player, quest, definition, now)
+        progress = {
+            "quest_streak": player.get("quest_streak", {}),
+            "quest_perf": player.get("quest_perf", {}),
+        }
+        reserved = await db.quests.update_one(
+            {"_id": quest["_id"], "player_id": pid, "status": "completed"},
+            {"$set": {
+                "status": "claiming",
+                "claim_rewards": rewards,
+                "claim_mult_note": mult_note,
+                "claim_progress": progress,
+            }},
+        )
+        if reserved.modified_count != 1:
+            raise ValueError("Quest claim was concurrently reserved")
+    elif status == "claiming":
+        rewards = quest.get("claim_rewards")
+        mult_note = quest.get("claim_mult_note")
+        progress = quest.get("claim_progress")
+        if rewards is None or progress is None:
+            # Compatibility with older claims that were left half-finished.
+            rewards, mult_note = effective_quest_rewards(player, quest, definition, now)
+            progress = {
+                "quest_streak": player.get("quest_streak", {}),
+                "quest_perf": player.get("quest_perf", {}),
+            }
+            await db.quests.update_one(
+                {"_id": quest["_id"], "status": "claiming"},
+                {"$set": {
+                    "claim_rewards": rewards,
+                    "claim_mult_note": mult_note,
+                    "claim_progress": progress,
+                }},
+            )
+    else:
+        raise ValueError("Quest is not ready for claim")
+
+    parts = await grant_quest_rewards(
+        db, player, rewards, claim_id=qid, claim_progress=progress,
+    )
+    if mult_note:
+        parts.append(mult_note)
+
+    # Unlock side effects must precede the terminal status, so retries can
+    # repair an interruption. The provenance key prevents a duplicate unlock.
+    if quest["quest_key"] == "c2_front":
+        existing = await db.quests.find_one(
+            {"player_id": pid, "source_claim_id": qid},
+        )
+        if not existing:
+            follow = make_instance(
+                pid, "dec_informador", now, player.get("stats", {}), expires_s=3600,
+            )
+            follow["source_claim_id"] = qid
+            await db.quests.insert_one(follow)
+            await add_event(
+                db, pid, "intel",
+                "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.",
+            )
+
+    await db.quests.update_one(
+        {"_id": quest["_id"], "player_id": pid, "status": "claiming"},
+        {"$set": {"status": "claimed", "claimed_at": now.isoformat()}},
+    )
+    return parts, mult_note
+
+
 async def _auto_claim_quests(db, player, now):
     pid = str(player["_id"])
-    completed = await db.quests.find({"player_id": pid, "status": "completed"}).to_list(50)
+    completed = await db.quests.find({
+        "player_id": pid, "status": {"$in": ["completed", "claiming"]},
+    }).to_list(50)
     for q in completed:
-        d = QUEST_DEFS.get(q["quest_key"])
-        if not d:
+        definition = QUEST_DEFS.get(q["quest_key"])
+        if not definition:
             continue
-        # Recompensas dinâmicas (SSS v3): nível × dificuldade × tier adaptativo
-        # × streak — o mesmo cálculo do claim manual, para consistência total.
-        rewards, streak_note = effective_quest_rewards(player, q, d, now)
-        parts = await grant_quest_rewards(db, player, rewards)
-        if streak_note:
-            parts.append(streak_note)
-        await db.quests.update_one({"_id": q["_id"]}, {"$set": {"status": "claimed", "claimed_at": now.isoformat()}})
-        if q["quest_key"] == "c2_front":
-            await db.quests.insert_one(make_instance(pid, "dec_informador", now, player.get("stats", {}), expires_s=3600))
-            await add_event(db, pid, "intel", "DECISÃO: O Informador quer falar contigo — abre o painel de Missões.")
-        msg = f"Recompensa reclamada automaticamente — {d['name']}: " + ", ".join(parts) + "." if parts else f"Missão {d['name']} reclamada automaticamente."
+        parts, _ = await settle_quest_reward(db, player, q, definition, now)
+        msg = (
+            f"Recompensa reclamada automaticamente — {definition['name']}: "
+            + ", ".join(parts) + "."
+            if parts else f"Missão {definition['name']} reclamada automaticamente."
+        )
         await add_event(db, pid, "success", msg)
-
 
 async def process_automations(db, player, employees, vehicles, props, bonuses, now):
     settings = {**DEFAULT_SETTINGS, **(player.get("settings") or {})}
