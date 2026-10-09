@@ -74,17 +74,17 @@ export default function AuthPage() {
           <section className="sub-auth-hero hidden lg:block">
             <p className="sub-auth-eyebrow">
               <span aria-hidden="true" className="sub-auth-live-dot" />
-              UNIVERSO CRIMINAL · PORTUGAL
+              SUBMUNDO / BLACKLIST — ACESSO PRIVADO
             </p>
             <h1 className="max-w-2xl font-display text-6xl font-black uppercase leading-[0.9] tracking-tight xl:text-7xl">
-              Constrói o teu
-              <span className="block text-red-500">império.</span>
+              O PODER NÃO SE PEDE.
+              <span className="block text-red-500">CONQUISTA-SE.</span>
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-relaxed text-zinc-400">
-              Gere equipas, veículos, propriedades, operações e território num
-              mapa vivo de Portugal. Entra com Google ou começa imediatamente
-              como convidado.
+              Assume o controlo do teu império. Comanda equipas, domina a
+              cidade, prepara operações e constrói uma reputação impossível
+              de ignorar. Portugal é o teu território.
             </p>
 
             <div className="mt-8 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
@@ -113,13 +113,13 @@ export default function AuthPage() {
                   SUBMUNDO
                 </h2>
                 <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-red-400">
-                  O TEU IMPÉRIO COMEÇA AQUI
+                  ACESSO AO SISTEMA / BLACKLIST
                 </p>
               </div>
 
               <div className="mt-5 rounded-lg border border-white/8 bg-white/[0.025] p-3 text-left lg:hidden">
-                <p className="text-xs font-semibold text-zinc-200">Escolhe operações, prepara equipas e faz crescer a organização.</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">O mapa é o centro do jogo: mostra oportunidades, deslocações e o que está a acontecer agora.</p>
+                <p className="text-xs font-semibold text-zinc-200">Um império inteiro. Uma única central de comando.</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Operações, equipas, cidade viva e mapa tático à distância de um toque.</p>
               </div>
 
               <div className="mt-5 space-y-3">
