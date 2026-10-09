@@ -8,6 +8,8 @@ from db import db
 from auth import get_current_user, VALID_ROLES, STAFF_ROLES, root_admin_email
 from engine import now_utc, default_stats
 from game_data import HQ_LOCATION, HQ_DEFAULT_PRIORITY
+from state_lease import acquire_player_state_lease, release_player_state_lease
+from uuid import uuid4
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -194,35 +196,44 @@ async def grant_resources(user_id: str, body: GrantResourcesInput, admin: dict =
     if not player:
         raise HTTPException(status_code=404, detail="Jogador não encontrado")
 
-    # Never write balances computed from a stale snapshot: a simultaneous
-    # mission payout or purchase could otherwise be overwritten.
-    increments = {
-        key: amount for key, amount in (
-            ("clean_money", body.clean_money),
-            ("dirty_money", body.dirty_money),
-            ("respect", body.respect),
-        ) if amount
-    }
-    if increments:
-        query = {"_id": player["_id"]}
-        for key, amount in increments.items():
-            if amount < 0:
-                query[key] = {"$gte": -amount}
-        applied = await db.players.update_one(query, {"$inc": increments})
-        if applied.modified_count != 1:
-            raise HTTPException(status_code=409, detail="Saldo alterado ou insuficiente; repete a operação")
+    lease_owner = f"admin-grant:{admin['_id']}:{uuid4().hex}"
+    locked = await acquire_player_state_lease(
+        db, player["_id"], lease_owner, ttl_s=120, wait_s=5,
+    )
+    if not locked:
+        raise HTTPException(status_code=409, detail="O jogador está a atualizar o estado; tenta novamente")
+    try:
+        # Never write balances computed from a stale snapshot: a simultaneous
+        # mission payout or purchase could otherwise be overwritten.
+        increments = {
+            key: amount for key, amount in (
+                ("clean_money", body.clean_money),
+                ("dirty_money", body.dirty_money),
+                ("respect", body.respect),
+            ) if amount
+        }
+        if increments:
+            query = {"_id": player["_id"]}
+            for key, amount in increments.items():
+                if amount < 0:
+                    query[key] = {"$gte": -amount}
+            applied = await db.players.update_one(query, {"$inc": increments})
+            if applied.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Saldo alterado ou insuficiente; repete a operação")
 
-    # Log da ação
-    await db.admin_logs.insert_one({
-        "admin_id": admin["_id"],
-        "admin_email": admin["email"],
-        "action": "grant_resources",
-        "target_player_id": str(player["_id"]),
-        "details": body.model_dump(),
-        "ts": now_utc().isoformat(),
-    })
+        # Log da ação
+        await db.admin_logs.insert_one({
+            "admin_id": admin["_id"],
+            "admin_email": admin["email"],
+            "action": "grant_resources",
+            "target_player_id": str(player["_id"]),
+            "details": body.model_dump(),
+            "ts": now_utc().isoformat(),
+        })
 
-    return {"ok": True, "message": "Recursos concedidos com sucesso"}
+        return {"ok": True, "message": "Recursos concedidos com sucesso"}
+    finally:
+        await release_player_state_lease(db, player["_id"], lease_owner)
 
 
 @router.post("/user/{user_id}/reset-progress")
