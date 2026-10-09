@@ -370,6 +370,8 @@ async def casino_play(body: CasinoPlayInput, user: dict = Depends(get_current_us
         raise HTTPException(status_code=400, detail="Jogo de casino inválido")
     if int(player.get("clean_money", 0)) < bet:
         raise HTTPException(status_code=400, detail="Saldo insuficiente")
+    if body.game == "roulette" and (body.choice or "red").lower() not in {"red", "black", "green"}:
+        raise HTTPException(status_code=400, detail="Escolha inválida para a roleta")
     rng = random.SystemRandom()
     await _change_clean(player, -bet, f"Aposta: {body.game}", "city_casino_bet")
     payout = 0
@@ -537,7 +539,18 @@ async def join_alliance(body: AllianceJoinInput, user: dict = Depends(get_curren
         raise HTTPException(status_code=404, detail="Código de aliança inválido")
     if len(alliance.get("member_ids", [])) >= 20:
         raise HTTPException(status_code=400, detail="Aliança cheia")
-    await db.city_alliances.update_one({"_id": alliance["_id"]}, {"$addToSet": {"member_ids": pid}})
+    # Capacity is checked in the same atomic update as the membership change.
+    # A separate check is not safe when multiple players join simultaneously.
+    joined = await db.city_alliances.update_one(
+        {
+            "_id": alliance["_id"],
+            "member_ids": {"$ne": pid},
+            "$expr": {"$lt": [{"$size": "$member_ids"}, 20]},
+        },
+        {"$addToSet": {"member_ids": pid}},
+    )
+    if joined.modified_count != 1:
+        raise HTTPException(status_code=409, detail="Aliança cheia ou alterada; tenta novamente")
     return {"ok": True, "name": alliance["name"]}
 
 
@@ -673,9 +686,10 @@ async def accept_pvp(body: PvpAcceptInput, user: dict = Depends(get_current_user
         "_id": _oid(body.challenge_id, "Desafio"),
         "defender_id": str(defender["_id"]),
         "status": "pending",
+        "expires_at": {"$gt": now_utc().isoformat()},
     })
     if not challenge:
-        raise HTTPException(status_code=404, detail="Desafio PvP não encontrado")
+        raise HTTPException(status_code=404, detail="Desafio PvP expirado ou não encontrado")
     attacker = await db.players.find_one({"_id": _oid(challenge["attacker_id"], "Atacante")})
     if not attacker or not attacker.get("pvp_opt_in") or not defender.get("pvp_opt_in"):
         raise HTTPException(status_code=400, detail="PvP já não está ativo para ambos")
