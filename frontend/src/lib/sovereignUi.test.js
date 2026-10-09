@@ -40,7 +40,9 @@ describe("Sovereign UI contract", () => {
 
   test("entry and in-game panels use the same surface system", () => {
     expect(auth).toContain('className="sub-auth-shell');
-    expect(auth).toContain('className="sub-auth-gate');
+    expect(auth).toContain('className="noir-access-card"');
+    expect(auth).toContain('data-testid="google-sign-in-button"');
+    expect(auth).toContain('data-testid="guest-play-button"');
     for (const selector of [".sub-sheet-panel", ".sub-menu-modal", ".sub-nav-tray", ".sub-auth-gate"]) {
       expect(css).toContain(selector);
     }

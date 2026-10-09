@@ -7,6 +7,7 @@ import "@/performance.css";
 import "@/sovereign-ui.css";
 import "@/noir-empire.css";
 import "@/noir-workspaces.css";
+import "@/noir-interactions.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -15,7 +16,6 @@ import { GameProvider } from "./context/GameContextV2";
 import { BootProvider, useBoot } from "./context/BootContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { LoadingProvider } from "./context/LoadingContext";
-import { BootScreen } from "./components/BootScreen";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
 import GamePage from "./pages/GamePage";
@@ -106,7 +106,6 @@ function App() {
         <LoadingProvider>
           <TooltipProvider delayDuration={220}>
           <BrowserRouter basename={process.env.PUBLIC_URL}>
-            <BootScreen />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/termos" element={<LegalPage />} />
@@ -142,17 +141,17 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <Toaster
-              position="top-center"
+              position="top-right"
               theme="dark"
               closeButton
               gap={6}
-              visibleToasts={2}
+              visibleToasts={3}
               duration={3200}
-              mobileOffset={{ top: 8, left: 8, right: 8 }}
+              mobileOffset={{ top: 68, left: 12, right: 12 }}
               swipeDirections={["left", "right"]}
               icons={TOAST_ICONS}
-              style={{ "--width": "300px" }}
-              toastOptions={{ className: "sub-toast", duration: 3200 }}
+              style={{ "--width": "360px" }}
+              toastOptions={{ className: "sub-toast noir-toast", duration: 3200 }}
             />
           </BrowserRouter>
           </TooltipProvider>

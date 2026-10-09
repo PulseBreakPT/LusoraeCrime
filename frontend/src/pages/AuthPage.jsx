@@ -2,31 +2,16 @@ import { useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContextV2";
 import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { Separator } from "../components/ui/separator";
-import {
-  Loader2,
-  ShieldCheck,
-  Gamepad2,
-  LogIn,
-  MapPinned,
-  Users,
-  Car,
-  Building2,
-} from "lucide-react";
+import { ArrowUpRight, Crown, Gamepad2, LockKeyhole, LogIn, Loader2, ShieldCheck } from "lucide-react";
 
-const BG =
-  "https://images.unsplash.com/photo-1731234361187-4702894e725a?crop=entropy&cs=srgb&fm=jpg&q=85&w=1920";
-
+/**
+ * Immediate access gateway: no cinematic splash, dramatic cover, animation,
+ * staged entrance, or forced loading sequence. Login and guest mode preserve
+ * their existing authentication and storage semantics.
+ */
 export default function AuthPage() {
-  const {
-    user,
-    loginWithGoogle,
-    playAsGuest,
-    googleSignInEnabled,
-  } = useAuth();
-
+  const { user, loginWithGoogle, playAsGuest, googleSignInEnabled } = useAuth();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
 
@@ -36,14 +21,17 @@ export default function AuthPage() {
     if (!googleSignInEnabled || busy) return;
     setError("");
     setBusy("google");
-    const result = await loginWithGoogle();
-    setBusy(null);
-    if (!result.ok) {
-      if (result.status === 404 || result.isNetwork) {
-        setError("O servidor do jogo não está disponível neste momento. O acesso Google volta a funcionar assim que o backend estiver online.");
-      } else {
-        setError(result.error || "Não foi possível entrar com Google.");
+    try {
+      const result = await loginWithGoogle();
+      if (!result.ok) {
+        setError(result.status === 404 || result.isNetwork
+          ? "O servidor não está disponível neste momento. Podes entrar em modo convidado."
+          : (result.error || "Não foi possível entrar com Google."));
       }
+    } catch {
+      setError("Falha na ligação ao serviço de autenticação.");
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -51,142 +39,84 @@ export default function AuthPage() {
     if (busy) return;
     setError("");
     setBusy("guest");
-    const result = await playAsGuest();
-    setBusy(null);
-    if (!result.ok) {
-      setError(result.error || "Não foi possível iniciar o modo convidado local.");
+    try {
+      const result = await playAsGuest();
+      if (!result.ok) setError(result.error || "Não foi possível iniciar o modo convidado local.");
+    } catch {
+      setError("Não foi possível carregar os dados locais. Verifica o armazenamento do dispositivo.");
+    } finally {
+      setBusy(null);
     }
   };
 
   return (
-    <main className="sub-auth-shell relative min-h-screen overflow-hidden bg-[#050506] text-white">
-      <img
-        src={BG}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-cover opacity-30"
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-[#050506]/85 to-[#050506]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(239,68,68,0.12),transparent_34%)]" />
+    <main className="sub-auth-shell noir-access-shell" aria-labelledby="access-title">
+      <div className="noir-access-layout">
+        <header className="noir-access-topbar">
+          <div className="noir-access-identity">
+            <span className="noir-access-crest"><Crown size={20} aria-hidden="true" /></span>
+            <span className="noir-access-logo">SUB<span>MUNDO</span></span>
+            <span className="noir-access-edition">BLACKLIST OS / 01</span>
+          </div>
+          <span className="noir-access-status"><span className="noir-signal-dot" /> ACESSO RESTRITO</span>
+        </header>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-10 sm:px-6">
-        <div className="grid w-full gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <section className="sub-auth-hero hidden lg:block">
-            <p className="sub-auth-eyebrow">
-              <span aria-hidden="true" className="sub-auth-live-dot" />
-              SUBMUNDO / BLACKLIST — ACESSO PRIVADO
-            </p>
-            <h1 className="max-w-2xl font-display text-6xl font-black uppercase leading-[0.9] tracking-tight xl:text-7xl">
-              O PODER NÃO SE PEDE.
-              <span className="block text-red-500">CONQUISTA-SE.</span>
-            </h1>
+        <section className="noir-access-card" aria-labelledby="access-title">
+          <div className="noir-access-card-line">
+            <span><LockKeyhole size={14} /> CENTRO DE COMANDO</span>
+            <span>PORTUGAL · PT</span>
+          </div>
 
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-zinc-400">
-              Assume o controlo do teu império. Comanda equipas, domina a
-              cidade, prepara operações e constrói uma reputação impossível
-              de ignorar. Portugal é o teu território.
-            </p>
+          <div className="noir-access-emblem" aria-hidden="true"><Crown size={32} strokeWidth={1.5} /></div>
+          <p className="noir-access-eyebrow">ENTRADA DIRETA / SUBMUNDO</p>
+          <h1 id="access-title">ENTRA NO <span>TEU IMPÉRIO.</span></h1>
+          <p className="noir-access-description">
+            Escolhe como queres jogar e entra diretamente na tua organização.
+            Sem apresentações, sem esperas artificiais.
+          </p>
 
-            <div className="mt-8 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
-              {[
-                [MapPinned, "Mapa vivo"],
-                [Users, "Equipas e operacionais"],
-                [Car, "Frota e logística"],
-                [Building2, "Propriedades e QG"],
-              ].map(([Icon, label]) => (
-                <Card
-                  key={label}
-                  className="sub-card flex items-center gap-3 rounded-lg border-white/8 bg-white/[0.03] p-3 text-sm text-zinc-300"
-                >
-                  <Icon size={17} className="text-red-500" />
-                  {label}
-                </Card>
-              ))}
-            </div>
-          </section>
+          <div className="noir-access-actions">
+            <Button type="button" data-testid="google-sign-in-button"
+              onClick={handleGoogle} disabled={Boolean(busy) || !googleSignInEnabled}
+              className="noir-access-google w-full">
+              {busy === "google" ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+              CONTINUAR COM GOOGLE
+              <ArrowUpRight size={15} className="ml-auto" />
+            </Button>
 
-          <section className="sub-auth-entry mx-auto w-full max-w-md">
-            <Card className="sub-auth-gate sub-card rounded-2xl border-white/10 bg-black/70 p-6 shadow-2xl sm:p-8">
-              <div className="sub-auth-brand text-center">
-                <ShieldCheck className="mx-auto h-9 w-9 text-red-500" />
-                <h2 className="mt-4 font-display text-4xl font-black uppercase tracking-tight">
-                  SUBMUNDO
-                </h2>
-                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-red-400">
-                  ACESSO AO SISTEMA / BLACKLIST
-                </p>
-              </div>
+            <Button type="button" data-testid="guest-play-button"
+              onClick={handleGuest} disabled={Boolean(busy)}
+              className="noir-access-guest w-full">
+              {busy === "guest" ? <Loader2 size={18} className="animate-spin" /> : <Gamepad2 size={18} />}
+              JOGAR COMO CONVIDADO
+              <ArrowUpRight size={15} className="ml-auto" />
+            </Button>
+          </div>
 
-              <div className="mt-5 rounded-lg border border-white/8 bg-white/[0.025] p-3 text-left lg:hidden">
-                <p className="text-xs font-semibold text-zinc-200">Um império inteiro. Uma única central de comando.</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Operações, equipas, cidade viva e mapa tático à distância de um toque.</p>
-              </div>
+          {!googleSignInEnabled && (
+            <p className="noir-access-note">O acesso Google está temporariamente indisponível. O modo convidado continua disponível.</p>
+          )}
 
-              <div className="mt-5 space-y-3">
-                <Button
-                  type="button"
-                  data-testid="google-sign-in-button"
-                  onClick={handleGoogle}
-                  disabled={Boolean(busy) || !googleSignInEnabled}
-                  className="sub-auth-google h-12 w-full bg-white font-semibold text-zinc-950 hover:bg-zinc-100"
-                >
-                  {busy === "google" ? (
-                    <Loader2 size={18} className="mr-2 animate-spin" />
-                  ) : (
-                    <LogIn size={18} className="mr-2" />
-                  )}
-                  Continuar com Google
-                </Button>
+          {error && (
+            <Alert variant="destructive" className="noir-access-error">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-                <Button
-                  type="button"
-                  data-testid="guest-play-button"
-                  onClick={handleGuest}
-                  disabled={Boolean(busy)}
-                  className="sub-auth-guest h-12 w-full border border-red-500/30 bg-red-600 font-semibold text-white hover:bg-red-500"
-                >
-                  {busy === "guest" ? (
-                    <Loader2 size={18} className="mr-2 animate-spin" />
-                  ) : (
-                    <Gamepad2 size={18} className="mr-2" />
-                  )}
-                  Jogar como convidado
-                </Button>
-              </div>
+          <div className="noir-access-privacy">
+            <ShieldCheck size={16} />
+            <p>Em modo convidado, o progresso fica guardado apenas neste dispositivo. Para jogar entre dispositivos, entra com a tua conta.</p>
+          </div>
+          <nav className="noir-access-links" aria-label="Informação legal">
+            <Link to="/termos">TERMOS DE UTILIZAÇÃO <ArrowUpRight size={13} /></Link>
+            <Link to="/privacidade">PRIVACIDADE <ArrowUpRight size={13} /></Link>
+          </nav>
+        </section>
 
-              {!googleSignInEnabled && (
-                <p className="mt-3 text-center text-[11px] text-zinc-500">
-                  O início de sessão com Google está temporariamente indisponível. Podes jogar como convidado.
-                </p>
-              )}
-
-              {error && (
-                <Alert variant="destructive" className="mt-4 border-red-500/20 bg-red-500/10 text-center">
-                  <AlertDescription className="text-xs leading-relaxed text-red-300">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="mt-6 text-center text-[11px] leading-relaxed text-zinc-500">
-                <Separator className="mb-5 bg-white/8" />
-                <p>
-                  No modo convidado, o progresso fica guardado apenas neste dispositivo.
-                  Para o manter entre dispositivos, usa a Conta Google.
-                </p>
-                <p className="mt-3">
-                  Ao continuar, aceitas os{" "}
-                  <Link to="/termos" className="text-zinc-300 underline underline-offset-2">
-                    Termos de Serviço
-                  </Link>{" "}
-                  e a{" "}
-                  <Link to="/privacidade" className="text-zinc-300 underline underline-offset-2">
-                    Política de Privacidade
-                  </Link>.
-                </p>
-              </div>
-            </Card>
-
-          </section>
-        </div>
+        <footer className="noir-access-footer">
+          <span>SUBMUNDO / BLACKLIST</span>
+          <span>UM IMPÉRIO. UM COMANDO.</span>
+        </footer>
       </div>
     </main>
   );
