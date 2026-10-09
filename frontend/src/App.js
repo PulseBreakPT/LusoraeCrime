@@ -5,6 +5,7 @@ import "@/shadcn-system.css";
 import "@/gameplay-fx.css";
 import "@/performance.css";
 import "@/sovereign-ui.css";
+import "@/noir-empire.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
