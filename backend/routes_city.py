@@ -7,6 +7,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from auth import get_current_user
 from db import db
@@ -541,14 +542,17 @@ async def join_alliance(body: AllianceJoinInput, user: dict = Depends(get_curren
         raise HTTPException(status_code=400, detail="Aliança cheia")
     # Capacity is checked in the same atomic update as the membership change.
     # A separate check is not safe when multiple players join simultaneously.
-    joined = await db.city_alliances.update_one(
-        {
-            "_id": alliance["_id"],
-            "member_ids": {"$ne": pid},
-            "$expr": {"$lt": [{"$size": "$member_ids"}, 20]},
-        },
-        {"$addToSet": {"member_ids": pid}},
-    )
+    try:
+        joined = await db.city_alliances.update_one(
+            {
+                "_id": alliance["_id"],
+                "member_ids": {"$ne": pid},
+                "$expr": {"$lt": [{"$size": "$member_ids"}, 20]},
+            },
+            {"$addToSet": {"member_ids": pid}},
+        )
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Já pertences a outra aliança")
     if joined.modified_count != 1:
         raise HTTPException(status_code=409, detail="Aliança cheia ou alterada; tenta novamente")
     return {"ok": True, "name": alliance["name"]}
